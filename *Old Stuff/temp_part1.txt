@@ -1,0 +1,230 @@
+import React, { useState } from 'react';
+
+// Device specifications
+const DEVICES = {
+  'iphone-15-pro': {
+    name: 'iPhone 15 Pro',
+    width: 393,
+    height: 852,
+    screenRadius: 44,
+    frameRadius: 55,
+    framePadding: 12,
+    notchType: 'island', // dynamic island
+    islandWidth: 126,
+    islandHeight: 37,
+  },
+  'iphone-15-pro-max': {
+    name: 'iPhone 15 Pro Max',
+    width: 430,
+    height: 932,
+    screenRadius: 48,
+    frameRadius: 60,
+    framePadding: 14,
+    notchType: 'island',
+    islandWidth: 126,
+    islandHeight: 37,
+  },
+  'iphone-14': {
+    name: 'iPhone 14',
+    width: 390,
+    height: 844,
+    screenRadius: 44,
+    frameRadius: 55,
+    framePadding: 12,
+    notchType: 'notch',
+    notchWidth: 160,
+    notchHeight: 34,
+  },
+  'iphone-se': {
+    name: 'iPhone SE',
+    width: 375,
+    height: 667,
+    screenRadius: 0,
+    frameRadius: 40,
+    framePadding: 14,
+    notchType: 'none',
+    hasHomeButton: true,
+  },
+  'pixel-8': {
+    name: 'Pixel 8',
+    width: 412,
+    height: 915,
+    screenRadius: 40,
+    frameRadius: 48,
+    framePadding: 10,
+    notchType: 'punch', // punch hole camera
+    punchSize: 24,
+  },
+  'galaxy-s24': {
+    name: 'Galaxy S24',
+    width: 412,
+    height: 915,
+    screenRadius: 36,
+    frameRadius: 44,
+    framePadding: 8,
+    notchType: 'punch',
+    punchSize: 20,
+  },
+};
+
+// Phone frame wrapper with device selector - Fixed SE bezel
+const PhoneFrame = ({ children, device = 'iphone-15-pro', onDeviceChange, onHome, onDoubleClickHome, onSettings, darkMode = true }) => {
+  const d = DEVICES[device];
+  const isSE = d.hasHomeButton === true;
+  
+  // Calculate padding for SE vs other devices
+  const padTop = isSE ? 65 : d.framePadding;
+  const padBottom = isSE ? 80 : d.framePadding;
+  const padSide = d.framePadding;
+  
+  // Total device height for display
+  const totalHeight = isSE ? (d.height + 65 + 80) : d.height;
+  
+  return (
+    <div className="h-screen bg-gradient-to-br from-gray-100 to-gray-200 flex flex-col items-center justify-center overflow-hidden">
+      {/* Device selector */}
+      <div className="mb-4 flex items-center gap-3">
+        <span className="text-sm text-gray-600 font-medium">Device:</span>
+        <select 
+          value={device}
+          onChange={(e) => onDeviceChange?.(e.target.value)}
+          className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+        >
+          <optgroup label="iPhone">
+            <option value="iphone-15-pro">iPhone 15 Pro</option>
+            <option value="iphone-15-pro-max">iPhone 15 Pro Max</option>
+            <option value="iphone-14">iPhone 14</option>
+            <option value="iphone-se">iPhone SE</option>
+          </optgroup>
+          <optgroup label="Android">
+            <option value="pixel-8">Pixel 8</option>
+            <option value="galaxy-s24">Galaxy S24</option>
+          </optgroup>
+        </select>
+        <span className="text-xs text-gray-400">{d.width}×{totalHeight}</span>
+      </div>
+      
+      {/* Device frame */}
+      <div className="relative" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.25))' }}>
+        <div 
+          className="relative bg-[#1a1a1c]"
+          style={{ 
+            borderRadius: d.frameRadius,
+            paddingTop: padTop,
+            paddingBottom: padBottom,
+            paddingLeft: padSide,
+            paddingRight: padSide,
+          }}
+        >
+          {/* Side buttons - non-SE iPhones */}
+          {device.startsWith('iphone') && !isSE && (
+            <>
+              <div className="absolute -left-[3px] top-[120px] w-[3px] h-[32px] bg-[#2a2a2c] rounded-l-sm" />
+              <div className="absolute -left-[3px] top-[170px] w-[3px] h-[56px] bg-[#2a2a2c] rounded-l-sm" />
+              <div className="absolute -left-[3px] top-[235px] w-[3px] h-[56px] bg-[#2a2a2c] rounded-l-sm" />
+              <div className="absolute -right-[3px] top-[180px] w-[3px] h-[72px] bg-[#2a2a2c] rounded-r-sm" />
+            </>
+          )}
+          
+          {/* SE side buttons */}
+          {isSE && (
+            <>
+              <div className="absolute -left-[3px] top-[80px] w-[3px] h-[24px] bg-[#2a2a2c] rounded-l-sm" />
+              <div className="absolute -left-[3px] top-[115px] w-[3px] h-[44px] bg-[#2a2a2c] rounded-l-sm" />
+              <div className="absolute -left-[3px] top-[168px] w-[3px] h-[44px] bg-[#2a2a2c] rounded-l-sm" />
+              <div className="absolute -right-[3px] top-[100px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-r-sm" />
+            </>
+          )}
+          
+          {/* SE top bezel: earpiece + camera */}
+          {isSE && (
+            <>
+              <div className="absolute top-[26px] left-1/2 -translate-x-1/2 w-[50px] h-[5px] bg-[#0a0a0a] rounded-full" style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)' }} />
+              <div className="absolute top-[22px] rounded-full" style={{ left: 'calc(50% + 45px)', width: 10, height: 10, background: 'radial-gradient(circle at 30% 30%, #1a1a2e 0%, #000 60%)' }} />
+            </>
+          )}
+          
+          {/* SE home button in bottom bezel */}
+          {isSE && (
+            <div className="absolute bottom-[12px] left-1/2 -translate-x-1/2 w-[54px] h-[54px] rounded-full bg-[#0d0d0d]" style={{ boxShadow: 'inset 0 0 0 3px #2a2a2c' }}>
+              <div className="absolute inset-[8px] rounded-full border border-[#3a3a3a]" />
+            </div>
+          )}
+          
+          {/* Screen */}
+          <div 
+            className={`overflow-hidden relative ${darkMode ? 'bg-gray-950' : 'bg-gray-100'}`}
+            style={{ width: d.width, height: d.height, borderRadius: d.screenRadius }}
+          >
+            {/* Dynamic Island */}
+            {d.notchType === 'island' && (
+              <div className="absolute top-[12px] left-1/2 -translate-x-1/2 bg-black rounded-full z-20"
+                style={{ width: d.islandWidth, height: d.islandHeight }} />
+            )}
+            {/* Notch */}
+            {d.notchType === 'notch' && (
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-black z-20"
+                style={{ width: d.notchWidth, height: d.notchHeight, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }} />
+            )}
+            {/* Punch hole */}
+            {d.notchType === 'punch' && (
+              <div className="absolute top-[12px] left-1/2 -translate-x-1/2 bg-black rounded-full z-20"
+                style={{ width: d.punchSize, height: d.punchSize }} />
+            )}
+            
+            {/* Status bar */}
+            <div className={`flex items-end justify-between px-6 pb-2 ${darkMode ? 'text-white' : 'text-gray-900'} text-sm font-semibold relative z-10 ${isSE ? 'h-[24px]' : 'h-[54px]'}`}>
+              <span>9:41</span>
+              <div className="flex gap-1 items-center">
+                <svg className="w-[17px] h-[10px]" viewBox="0 0 17 10" fill="currentColor">
+                  <path d="M1 3C1 2.4 1.4 2 2 2h1c.6 0 1 .4 1 1v4c0 .6-.4 1-1 1H2c-.6 0-1-.4-1-1V3zM6 2c0-.6.4-1 1-1h1c.6 0 1 .4 1 1v5c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V2zM11 1c0-.6.4-1 1-1h1c.6 0 1 .4 1 1v6c0 .6-.4 1-1 1h-1c-.6 0-1-.4-1-1V1z"/>
+                </svg>
+                <div className="flex items-center">
+                  <div className={`w-[22px] h-[11px] border-[1.5px] ${darkMode ? 'border-white' : 'border-gray-900'} rounded-[3px] flex items-center p-[2px]`}>
+                    <div className={`w-[14px] h-[7px] ${darkMode ? 'bg-white' : 'bg-gray-900'} rounded-[1px]`} />
+                  </div>
+                  <div className={`w-[1px] h-[4px] ${darkMode ? 'bg-white' : 'bg-gray-900'} ml-[1px] rounded-r-sm`} />
+                </div>
+              </div>
+            </div>
+            
+            {/* Global nav bar */}
+            {onHome && onSettings && (
+              <div className={`flex items-center justify-between px-3 py-1.5 ${darkMode ? 'bg-gray-950/80' : 'bg-white/80'} backdrop-blur-sm z-10`}>
+                <button onClick={onHome} onDoubleClick={onDoubleClickHome} className="text-xl leading-none active:scale-90 transition-transform">🌀</button>
+                <button onClick={onSettings} className={`text-xl leading-none active:scale-90 transition-transform ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>☰</button>
+              </div>
+            )}
+            
+            {/* App content */}
+            <div className={`overflow-hidden flex flex-col ${isSE ? (onHome ? 'h-[calc(100%-24px-36px)]' : 'h-[calc(100%-24px)]') : (onHome ? 'h-[calc(100%-54px-34px-36px)]' : 'h-[calc(100%-54px-34px)]')}`}>
+              {children}
+            </div>
+            
+            {/* Home indicator (non-SE) */}
+            {!isSE && (
+              <div className={`absolute bottom-[8px] left-1/2 -translate-x-1/2 w-[134px] h-[5px] ${darkMode ? 'bg-white' : 'bg-gray-900'} rounded-full opacity-80`} />
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Device info */}
+      <div className="mt-4 text-xs text-gray-500">
+        {d.name} • Preview Mode
+      </div>
+    </div>
+  );
+};
+
+// Categories with icons - 6 categories from vB
+const CATEGORIES = [
+  { id: 'prediction', name: 'Predictions', icon: '🔮', description: 'Future events & outcomes', color: 'violet' },
+  { id: 'philosophy', name: 'Philosophy', icon: '🤔', description: 'Big questions & thought experiments', color: 'cyan' },
+  { id: 'debate', name: 'Debates', icon: '⚔️', description: 'Contested topics', color: 'rose' },
+  { id: 'opinion', name: 'Opinions', icon: '💭', description: 'Subjective preferences', color: 'pink' },
+  { id: 'evaluation', name: 'Evaluation', icon: '📋', description: 'Judge quality & accuracy', color: 'emerald' },
+  { id: 'logic', name: 'Logic', icon: '🧩', description: 'Reasoning puzzles', color: 'blue' },
+];
+
+// Question types: 'binary' or 'multiple'

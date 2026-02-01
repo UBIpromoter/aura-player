@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Aura">
+  <meta name="theme-color" content="#030712">
+  <title>Aura Player vI</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --sat: env(safe-area-inset-top);
+      --sar: env(safe-area-inset-right);
+      --sab: env(safe-area-inset-bottom);
+      --sal: env(safe-area-inset-left);
+    }
+    html, body, #root {
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-overflow-scrolling: touch;
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      background: #030712;
+    }
+    * {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { color-scheme: dark; }
+    }
+    .question-text {
+      font-size: clamp(16px, 4.5vw, 20px);
+      line-height: 1.35;
+      text-wrap: balance;
+    }
+    .safe-top { padding-top: env(safe-area-inset-top); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    @keyframes fill { from { width: 100%; } to { width: 0%; } }
+    @keyframes shrink { from { width: 100%; } to { width: 0%; } }
+    @keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ==================== DATA ====================
+const CATEGORIES = [
+  { id: 'prediction', name: 'Predictions', icon: '🔮', color: 'amber' },
+  { id: 'reasoning', name: 'Reasoning', icon: '🧠', color: 'violet' },
+  { id: 'judgment', name: 'Judgment', icon: '⚖️', color: 'teal' },
+];
+
+const MC_COLORS = [
+  { hex: '#3b82f6', name: 'blue', shades: ['#93c5fd', '#60a5fa', '#3b82f6', '#1e40af'], rgb: '59, 130, 246' },
+  { hex: '#14b8a6', name: 'teal', shades: ['#5eead4', '#2dd4bf', '#14b8a6', '#0f766e'], rgb: '20, 184, 166' },
+  { hex: '#22c55e', name: 'green', shades: ['#86efac', '#4ade80', '#22c55e', '#15803d'], rgb: '34, 197, 94' },
+  { hex: '#ec4899', name: 'pink', shades: ['#f9a8d4', '#f472b6', '#ec4899', '#be185d'], rgb: '236, 72, 153' },
+  { hex: '#8b5cf6', name: 'violet', shades: ['#c4b5fd', '#a78bfa', '#8b5cf6', '#6d28d9'], rgb: '139, 92, 246' },
+];
+
+const CONFIDENCE_LABELS = { 1: "Hunch", 2: "Leaning", 3: "Firm", 4: "Certain" };
+
+const QUESTIONS = [
+  // PREDICTIONS (30 questions)
+  { id: 1, type: 'binary', text: "Will Bitcoin exceed $150,000 before July 2026?", category: "prediction", preEvidence: [{ type: 'stat', label: 'Current Price', value: '$97,234' }, { type: 'stat', label: 'ATH', value: '$108,786' }] },
+  { id: 3, type: 'binary', text: "Will GPT-5 be released before September 2026?", category: "prediction", preEvidence: [{ type: 'stat', label: 'GPT-4 Release', value: 'March 2023' }] },
+  { id: 6, type: 'multiple', text: "What will be the dominant AI interface by 2030?", category: "prediction", options: ["Text chat", "Voice assistants", "AR/VR agents", "Brain-computer interfaces", "Autonomous agents"] },
+  { id: 9, type: 'binary', text: "Will humans land on Mars before 2035?", category: "prediction", preEvidence: [{ type: 'stat', label: 'SpaceX target', value: '2029' }, { type: 'stat', label: 'NASA target', value: '2040' }] },
+  { id: 12, type: 'multiple', text: "Most likely cause of human extinction?", category: "prediction", options: ["AI/technology", "Climate change", "Pandemic/bioweapon", "Nuclear war", "Asteroid impact"] },
+  { id: 101, type: 'binary', text: "Will Tesla stock be higher than today in 1 year?", category: "prediction" },
+  { id: 102, type: 'binary', text: "Will there be a major cyber attack on US infrastructure in 2026?", category: "prediction" },
+  { id: 103, type: 'multiple', text: "Which company will have the largest market cap in 2030?", category: "prediction", options: ["Apple", "Microsoft", "NVIDIA", "Google", "A company that doesn't exist yet"] },
+  { id: 104, type: 'binary', text: "Will self-driving cars be legal nationwide by 2028?", category: "prediction" },
+  { id: 105, type: 'binary', text: "Will fusion power be commercially viable by 2035?", category: "prediction" },
+  { id: 106, type: 'multiple', text: "What will cause the next major recession?", category: "prediction", options: ["AI job displacement", "Housing bubble", "Geopolitical conflict", "Climate disasters", "Debt crisis"] },
+  { id: 107, type: 'binary', text: "Will China's economy surpass the US by 2040?", category: "prediction" },
+  { id: 108, type: 'binary', text: "Will quantum computers break current encryption by 2030?", category: "prediction" },
+  { id: 109, type: 'multiple', text: "First country to achieve AGI?", category: "prediction", options: ["USA", "China", "UK", "International collaboration", "None by 2035"] },
+  { id: 110, type: 'binary', text: "Will remote work remain dominant after 2030?", category: "prediction" },
+  { id: 111, type: 'binary', text: "Will Twitter/X still exist in 5 years?", category: "prediction" },
+  { id: 112, type: 'binary', text: "Will lab-grown meat be mainstream by 2030?", category: "prediction" },
+  { id: 113, type: 'multiple', text: "Next major tech platform after smartphones?", category: "prediction", options: ["AR glasses", "Neural interfaces", "Ambient computing", "Humanoid robots", "Something else"] },
+  { id: 114, type: 'binary', text: "Will AI write a bestselling novel by 2028?", category: "prediction" },
+  { id: 115, type: 'binary', text: "Will cryptocurrency replace traditional banking by 2040?", category: "prediction" },
+  { id: 117, type: 'binary', text: "Will there be a US constitutional amendment by 2035?", category: "prediction" },
+  { id: 118, type: 'multiple', text: "Most transformative technology of the 2030s?", category: "prediction", options: ["AGI", "Longevity tech", "Brain interfaces", "Climate tech", "Space colonization"] },
+  { id: 119, type: 'binary', text: "Will virtual reality replace business travel by 2030?", category: "prediction" },
+  { id: 120, type: 'binary', text: "Will AI tutors outperform human teachers by 2028?", category: "prediction" },
+  { id: 121, type: 'binary', text: "Will deepfakes cause a major political crisis by 2027?", category: "prediction" },
+  { id: 122, type: 'multiple', text: "First Mars colonists will be from?", category: "prediction", options: ["SpaceX private mission", "NASA government mission", "International collaboration", "China", "Won't happen by 2040"] },
+  { id: 123, type: 'binary', text: "Will college degrees become obsolete by 2035?", category: "prediction" },
+  { id: 124, type: 'binary', text: "Will AI-generated music top the charts by 2027?", category: "prediction" },
+  { id: 126, type: 'binary', text: "Will there be a major social media platform collapse by 2027?", category: "prediction" },
+  { id: 127, type: 'multiple', text: "How will most people make money in 2040?", category: "prediction", options: ["Traditional jobs", "Gig/freelance work", "UBI/government support", "AI-assisted entrepreneurship", "Passive AI income"] },
+
+  // REASONING (30 questions)
+  { id: 2, type: 'multiple', text: "Is a hot dog a sandwich?", category: "reasoning", options: ["Yes, it's bread with filling", "No, it's its own category", "It's a taco (single folded bread)", "Depends on regional definition"], preEvidence: [{ type: 'note', text: 'Merriam-Webster: sandwich = "two or more slices of bread with filling"' }] },
+  { id: 7, type: 'binary', text: "Is water wet?", category: "reasoning", preEvidence: [{ type: 'note', text: 'Wet = covered in water. Can water cover itself?' }] },
+  { id: 10, type: 'multiple', text: "Is a Pop-Tart a ravioli?", category: "reasoning", options: ["Yes - filling enclosed in carb wrapper", "No - ravioli must be savory", "No - ravioli must be pasta", "It's actually a dumpling"] },
+  { id: 17, type: 'multiple', text: "Ship of Theseus: replace every part, same ship?", category: "reasoning", options: ["Yes - continuity of identity", "No - it's a new ship", "The original uses old parts", "Identity is an illusion"] },
+  { id: 19, type: 'binary', text: "Is the simulation hypothesis likely?", category: "reasoning", preEvidence: [{ type: 'note', text: "Bostrom's trilemma argument" }] },
+  { id: 21, type: 'binary', text: "Is 847 + 256 greater than 1100?", category: "reasoning" },
+  { id: 28, type: 'binary', text: "Is free will an illusion?", category: "reasoning" },
+  { id: 34, type: 'binary', text: "Is cereal a soup?", category: "reasoning" },
+  { id: 201, type: 'binary', text: "If you replace your brain cells one by one with chips, are you still you?", category: "reasoning" },
+  { id: 202, type: 'multiple', text: "Trolley problem: pull the lever?", category: "reasoning", options: ["Yes, save 5 lives", "No, don't actively cause death", "It depends on who's on the tracks", "The question is flawed"] },
+  { id: 203, type: 'binary', text: "Can AI ever be truly conscious?", category: "reasoning" },
+  { id: 204, type: 'binary', text: "Is math discovered or invented?", category: "reasoning" },
+  { id: 205, type: 'multiple', text: "What makes something 'alive'?", category: "reasoning", options: ["Ability to reproduce", "Consciousness", "Metabolism", "DNA/genetic material", "All of the above"] },
+  { id: 206, type: 'binary', text: "If a tree falls with no one around, does it make a sound?", category: "reasoning" },
+  { id: 207, type: 'binary', text: "Is infinity a number?", category: "reasoning" },
+  { id: 208, type: 'multiple', text: "Chicken or egg: which came first?", category: "reasoning", options: ["Chicken", "Egg", "Neither - evolution is gradual", "Depends on definition"] },
+  { id: 209, type: 'binary', text: "Can you step in the same river twice?", category: "reasoning" },
+  { id: 210, type: 'binary', text: "Is a PDF file a document?", category: "reasoning" },
+  { id: 211, type: 'binary', text: "Does the present moment exist?", category: "reasoning" },
+  { id: 212, type: 'multiple', text: "Is time travel logically possible?", category: "reasoning", options: ["Yes, to the future", "Yes, both directions", "No, paradoxes make it impossible", "Yes, but only observation"] },
+  { id: 213, type: 'binary', text: "Can something come from nothing?", category: "reasoning" },
+  { id: 214, type: 'binary', text: "Is a copy of you still you?", category: "reasoning" },
+  { id: 215, type: 'multiple', text: "What is the color of a mirror?", category: "reasoning", options: ["Silver", "Green", "Whatever it reflects", "No color"] },
+  { id: 216, type: 'binary', text: "Is silence a sound?", category: "reasoning" },
+  { id: 217, type: 'binary', text: "Can you prove you're not dreaming right now?", category: "reasoning" },
+  { id: 218, type: 'multiple', text: "Is zero even or odd?", category: "reasoning", options: ["Even", "Odd", "Neither", "Both"] },
+  { id: 219, type: 'binary', text: "Is a hole a thing or an absence of a thing?", category: "reasoning" },
+  { id: 220, type: 'binary', text: "Do we see colors the same way?", category: "reasoning" },
+  { id: 221, type: 'binary', text: "Is forgetting the same as the memory never existing?", category: "reasoning" },
+  { id: 222, type: 'multiple', text: "If you teleport, do you die and a copy lives?", category: "reasoning", options: ["Yes, you die", "No, continuous consciousness", "Depends on the method", "Identity is an illusion anyway"] },
+
+  // JUDGMENT (30 questions)
+  { id: 4, type: 'multiple', text: "Which animal would win in a fight?", category: "judgment", options: ["100 duck-sized horses", "1 horse-sized duck", "It depends on the terrain", "They'd become friends"] },
+  { id: 8, type: 'multiple', text: "Best programming language for beginners in 2026?", category: "judgment", options: ["Python", "JavaScript", "Scratch/visual coding", "Natural language (AI-assisted)", "Rust"] },
+  { id: 11, type: 'binary', text: "Could an average person beat a goose in a fight?", category: "judgment", preEvidence: [{ type: 'stat', label: 'Avg goose weight', value: '8-14 lbs' }] },
+  { id: 16, type: 'binary', text: "Could Batman beat Superman (no prep, no kryptonite)?", category: "judgment" },
+  { id: 20, type: 'multiple', text: "Most important skill for the next decade?", category: "judgment", options: ["AI/ML literacy", "Critical thinking", "Emotional intelligence", "Adaptability", "Domain expertise"] },
+  { id: 31, type: 'binary', text: "Should social media require age verification?", category: "judgment" },
+  { id: 116, type: 'binary', text: "Should billionaires exist?", category: "judgment" },
+  { id: 125, type: 'binary', text: "Is universal basic income a good idea?", category: "judgment" },
+  { id: 321, type: 'binary', text: "Should AI-generated art be allowed in art competitions?", category: "judgment" },
+  { id: 301, type: 'binary', text: "Is it ethical to eat meat?", category: "judgment" },
+  { id: 302, type: 'binary', text: "Should voting be mandatory?", category: "judgment" },
+  { id: 303, type: 'multiple', text: "Best way to address climate change?", category: "judgment", options: ["Carbon tax", "Nuclear power", "Renewable subsidies", "Individual action", "Geoengineering"] },
+  { id: 304, type: 'binary', text: "Should there be limits on AI development?", category: "judgment" },
+  { id: 305, type: 'binary', text: "Is cancel culture a net positive?", category: "judgment" },
+  { id: 306, type: 'multiple', text: "Most overrated tech product?", category: "judgment", options: ["Smart watches", "VR headsets", "Crypto/NFTs", "Electric cars", "Smart home devices"] },
+  { id: 307, type: 'binary', text: "Should genetic editing of humans be allowed?", category: "judgment" },
+  { id: 308, type: 'binary', text: "Is college worth the cost anymore?", category: "judgment" },
+  { id: 309, type: 'multiple', text: "Best Star Wars movie?", category: "judgment", options: ["Empire Strikes Back", "A New Hope", "Return of the Jedi", "Rogue One", "The Force Awakens"] },
+  { id: 310, type: 'binary', text: "Should tipping culture be abolished?", category: "judgment" },
+  { id: 311, type: 'binary', text: "Is remote work better than office work?", category: "judgment" },
+  { id: 312, type: 'multiple', text: "Most important invention in history?", category: "judgment", options: ["Printing press", "Electricity", "Internet", "Antibiotics", "Writing"] },
+  { id: 313, type: 'binary', text: "Should AI have legal rights?", category: "judgment" },
+  { id: 314, type: 'binary', text: "Is privacy more important than security?", category: "judgment" },
+  { id: 315, type: 'multiple', text: "Best pizza topping?", category: "judgment", options: ["Pepperoni", "Mushrooms", "Pineapple", "Sausage", "Plain cheese"] },
+  { id: 316, type: 'binary', text: "Should schools teach coding to all students?", category: "judgment" },
+  { id: 317, type: 'binary', text: "Is social media doing more harm than good?", category: "judgment" },
+  { id: 318, type: 'multiple', text: "Best way to learn a new skill?", category: "judgment", options: ["Online courses", "Books", "Practice/doing", "Mentorship", "Formal education"] },
+  { id: 319, type: 'binary', text: "Should AI be used in hiring decisions?", category: "judgment" },
+  { id: 320, type: 'binary', text: "Is a 4-day work week better?", category: "judgment" },
+  { id: 322, type: 'multiple', text: "Most underrated decade for music?", category: "judgment", options: ["1970s", "1980s", "1990s", "2000s", "2010s"] },
+];
+
+const shuffleArray = (array) => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
+const generateFakeResults = (question) => {
+  const seed = question.id;
+  const random = (n) => ((seed * 9301 + 49297) % 233280) / 233280 * n;
+  const count = 550 + Math.floor(random(200));
+
+  if (question.type === 'binary') {
+    const evaluators = [];
+    const yesBase = 30 + random(40);
+    for (let i = 0; i < count; i++) {
+      const isYes = Math.random() * 100 < yesBase;
+      evaluators.push({
+        id: `e${i}`,
+        answer: isYes ? 0 : 1,
+        confidence: 1 + Math.floor(Math.random() * 4),
+        score: 40 + Math.floor(Math.random() * 40)
+      });
+    }
+    return { evaluators };
+  } else {
+    const options = question.options || [];
+    const evaluators = [];
+    for (let i = 0; i < count; i++) {
+      evaluators.push({
+        id: `e${i}`,
+        answer: Math.floor(Math.random() * options.length),
+        confidence: 1 + Math.floor(Math.random() * 4),
+        score: 40 + Math.floor(Math.random() * 40)
+      });
+    }
+    return { evaluators };
+  }
+};
+
+// ==================== STORAGE ====================
+const STORAGE_KEY = 'aura-demo-vI';
+const getInitialState = () => ({
+  answers: {}, skipped: [], saved: [], viewed: [],
+  settings: { darkMode: null, undoDelay: 1.5, showStreak: true, requireConfirmation: true, showTips: true },
+  stats: { answered: 0, streak: 0, lastAnswerDate: null }
+});
+
+const demoStorage = {
+  get: () => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (data) return { ...getInitialState(), ...JSON.parse(data) };
+    } catch (e) {}
+    return getInitialState();
+  },
+  set: (data) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {} },
+  clear: () => { try { localStorage.removeItem(STORAGE_KEY); } catch (e) {} }
+};
+
+const getInitialDarkMode = () => {
+  const settings = demoStorage.get().settings;
+  if (settings.darkMode !== null) return settings.darkMode;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+};
+
+// ==================== HOOKS ====================
+const useDisplayMode = () => {
+  const getMode = () => {
+    try {
+      if (window.matchMedia('(display-mode: standalone)').matches) return 'mobile';
+      if (window.navigator.standalone === true) return 'mobile';
+      if (window.innerWidth <= 768) return 'mobile';
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) return 'mobile';
+    } catch (e) {}
+    return 'desktop';
+  };
+  const [mode, setMode] = useState('desktop');
+  useEffect(() => {
+    setMode(getMode());
+    const handleResize = () => setMode(getMode());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  return mode;
+};
+
+const useSwipe = ({ onSwipeLeft, onSwipeRight, enabled = true }) => {
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+
+  const handleTouchStart = useCallback((e) => {
+    if (!enabled) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, [enabled]);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (!enabled) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+      if (deltaX > 0 && onSwipeRight) onSwipeRight();
+      else if (deltaX < 0 && onSwipeLeft) onSwipeLeft();
+    }
+  }, [enabled, onSwipeLeft, onSwipeRight]);
+
+  return { handlers: { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } };
+};
+
+// ==================== COMPONENTS ====================
+
+// PhoneFrame - Desktop wrapper
+const PhoneFrame = ({ children, darkMode = true }) => (
+  <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+    <div className="relative bg-[#1a1a1c] rounded-[55px] p-3 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))' }}>
+      <div className="absolute -left-[3px] top-[100px] w-[3px] h-[28px] bg-[#2a2a2c] rounded-l-sm" />
+      <div className="absolute -left-[3px] top-[145px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
+      <div className="absolute -left-[3px] top-[205px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
+      <div className="absolute -right-[3px] top-[160px] w-[3px] h-[65px] bg-[#2a2a2c] rounded-r-sm" />
+      <div className={`relative overflow-hidden flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-100'}`} style={{ width: 393, height: 852, borderRadius: 44 }}>
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[126px] h-[37px] bg-black rounded-full z-30" />
+        <div className={`flex-shrink-0 flex items-end justify-between px-8 pb-2 h-[54px] ${darkMode ? 'text-white' : 'text-gray-900'} text-sm font-semibold relative z-20`}>
+          <span>9:41</span>
+          <div className="flex gap-1.5 items-center">
+            <svg className="w-[18px] h-[12px]" viewBox="0 0 18 12" fill="currentColor"><path d="M1 4a1 1 0 011-1h1a1 1 0 011 1v4a1 1 0 01-1 1H2a1 1 0 01-1-1V4zM6 3a1 1 0 011-1h1a1 1 0 011 1v5a1 1 0 01-1 1H7a1 1 0 01-1-1V3zM11 2a1 1 0 011-1h1a1 1 0 011 1v6a1 1 0 01-1 1h-1a1 1 0 01-1-1V2z"/></svg>
+            <svg className="w-[17px] h-[11px]" viewBox="0 0 17 11" fill="currentColor"><path d="M8.5 2.5a6 6 0 014.24 1.76.75.75 0 001.06-1.06A7.5 7.5 0 008.5 1a7.5 7.5 0 00-5.3 2.2.75.75 0 001.06 1.06A6 6 0 018.5 2.5z"/><path d="M8.5 5.5a3 3 0 012.12.88.75.75 0 001.06-1.06 4.5 4.5 0 00-6.36 0 .75.75 0 001.06 1.06A3 3 0 018.5 5.5z"/><circle cx="8.5" cy="9" r="1.5"/></svg>
+            <div className="flex items-center">
+              <div className={`w-[25px] h-[12px] border-[1.5px] ${darkMode ? 'border-white' : 'border-gray-900'} rounded-[3px] flex items-center p-[2px]`}>
+                <div className={`w-[17px] h-[7px] ${darkMode ? 'bg-white' : 'bg-gray-900'} rounded-[1px]`} />
+              </div>
+              <div className={`w-[1.5px] h-[5px] ${darkMode ? 'bg-white' : 'bg-gray-900'} ml-[1px] rounded-r-sm`} />
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
+        <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-[134px] h-[5px] ${darkMode ? 'bg-white' : 'bg-gray-900'} rounded-full opacity-60 z-20`} />
+      </div>
+    </div>
+  </div>
+);
+
+// NavBar
+const NavBar = ({ darkMode, stats, showStreak, onHome, onSettings, onProfile }) => (
+  <div className={`flex items-center justify-between px-4 py-2 ${darkMode ? 'bg-gray-950/70 border-b border-white/5' : 'bg-white/70 border-b border-gray-200/50'} backdrop-blur-md`}>
+    <button onClick={onHome} className="text-xl active:scale-90 transition-transform">🌀</button>
+    <button onClick={onProfile} className={`flex items-center gap-2 px-2 py-1 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-800/50' : 'hover:bg-gray-200'}`}>
+      <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{stats.answered} answered</span>
+      {showStreak && stats.streak > 0 && <span className="text-xs text-orange-400">🔥{stats.streak}</span>}
+    </button>
+    <button onClick={onSettings} className={`text-xl active:scale-90 transition-transform ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>☰</button>
+  </div>
+);
+
+// LaunchScreen
+const LaunchScreen = ({ onDemo, onLogin, darkMode }) => (
+  <div className="flex-1 flex flex-col items-center justify-center p-8" style={{backgroundColor: darkMode ? '#030712' : '#f9fafb'}}>
+    <div className="text-6xl mb-4">🌀</div>
+    <h1 className="text-3xl font-bold mb-2" style={{color: darkMode ? '#fff' : '#111'}}>Aura</h1>
+    <p className="text-sm mb-12" style={{color: darkMode ? '#9ca3af' : '#6b7280'}}>Answer questions with confidence</p>
+    <div className="w-full max-w-xs space-y-3">
+      <button onClick={onLogin} className="w-full py-3 px-6 rounded-xl font-medium transition-all" style={{backgroundColor: darkMode ? '#fff' : '#111', color: darkMode ? '#111' : '#fff'}}>Login / Sign Up</button>
+      <button onClick={onDemo} className="w-full py-3 px-6 rounded-xl font-medium transition-all" style={{backgroundColor: darkMode ? '#1f2937' : '#f3f4f6', color: darkMode ? '#d1d5db' : '#374151'}}>Try Demo</button>
+    </div>
+    <p className="text-xs mt-6 text-center max-w-xs" style={{color: darkMode ? '#4b5563' : '#9ca3af'}}>Demo answers aren't saved to community.<br/>Login to contribute real data.</p>
+  </div>
+);
+
+// ConfidenceSegments - fills up inside button
+const ConfidenceSegments = ({ level, color = 'violet', active = false, darkMode = true }) => {
+  const colors = {
+    emerald: ['rgba(6,78,59,0.6)', 'rgba(4,120,87,0.7)', 'rgba(5,150,105,0.8)', 'rgba(16,185,129,0.9)'],
+    rose: ['rgba(136,19,55,0.6)', 'rgba(190,18,60,0.7)', 'rgba(225,29,72,0.8)', 'rgba(244,63,94,0.9)'],
+  };
+  const shades = colors[color] || colors.emerald;
+  if (!active || level === 0) return null;
+  return (
+    <div className="absolute bottom-0 left-0 right-0 h-2 flex">
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className={`flex-1 transition-all duration-150 ${i === 1 ? 'rounded-bl-xl' : ''} ${i === 4 ? 'rounded-br-xl' : ''}`}
+          style={{
+            backgroundColor: level >= i ? shades[i - 1] : 'rgba(0,0,0,0.2)',
+            borderRight: i < 4 ? '1px solid rgba(0,0,0,0.3)' : 'none'
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+// BinaryChart - confidence breakdown
+const BinaryChart = ({ evaluators, userResponse, darkMode = true }) => {
+  if (!evaluators || evaluators.length === 0) return null;
+  const allVotes = userResponse ? [...evaluators, { ...userResponse, id: 'user', score: 50 }] : evaluators;
+  const data = [
+    { label: 'Yes', answer: 0, confCounts: [0,0,0,0] },
+    { label: 'No', answer: 1, confCounts: [0,0,0,0] },
+  ];
+  allVotes.forEach(v => {
+    if (v.answer === 0) data[0].confCounts[v.confidence - 1]++;
+    else if (v.answer === 1) data[1].confCounts[v.confidence - 1]++;
+  });
+  data.forEach(d => d.count = d.confCounts.reduce((a, b) => a + b, 0));
+  const total = data[0].count + data[1].count;
+  const sorted = [...data].sort((a, b) => b.count - a.count);
+  const maxCount = Math.max(data[0].count, data[1].count, 1);
+  const yesColors = ['#6ee7b7', '#34d399', '#10b981', '#059669'];
+  const noColors = ['#fda4af', '#fb7185', '#f43f5e', '#e11d48'];
+
+  return (
+    <div className="space-y-1.5">
+      {sorted.map((opt) => {
+        const isUser = userResponse?.answer === opt.answer;
+        const pct = total > 0 ? Math.round((opt.count / total) * 100) : 0;
+        const barWidth = maxCount > 0 ? (opt.count / maxCount) * 100 : 0;
+        const colors = opt.answer === 0 ? yesColors : noColors;
+        return (
+          <div key={opt.answer}>
+            <div className="flex items-center justify-between mb-0.5">
+              <span className={`text-xs ${opt.answer === 0 ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-rose-400' : 'text-rose-600')} ${isUser ? 'font-bold underline' : ''}`}>
+                {opt.label}{isUser && ' •'}
+              </span>
+              <span className={`text-[10px] ${opt.answer === 0 ? (darkMode ? 'text-emerald-400/70' : 'text-emerald-600') : (darkMode ? 'text-rose-400/70' : 'text-rose-600')}`}>{pct}%</span>
+            </div>
+            <div className={`h-3 rounded-sm overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+              <div className="h-full flex" style={{ width: `${barWidth}%` }}>
+                {[3, 2, 1, 0].map(i => {
+                  const count = opt.confCounts[i];
+                  const segPct = opt.count > 0 ? (count / opt.count) * 100 : 0;
+                  return segPct > 0 && <div key={i} className="h-full" style={{ width: `${segPct}%`, background: colors[i] }} />;
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// MultipleChoiceChart
+const MultipleChoiceChart = ({ evaluators, userResponse, options, darkMode = true }) => {
+  if (!evaluators || evaluators.length === 0) return null;
+  const allVotes = userResponse ? [...evaluators, { ...userResponse, id: 'user', score: 50 }] : evaluators;
+  const data = options.map((label, i) => {
+    const votes = allVotes.filter(v => v.answer === i);
+    const confCounts = [0, 0, 0, 0];
+    votes.forEach(v => confCounts[v.confidence - 1]++);
+    return { label, index: i, count: votes.length, confCounts };
+  });
+  const total = allVotes.length;
+  const sorted = [...data].sort((a, b) => b.count - a.count);
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+
+  return (
+    <div className="space-y-1">
+      {sorted.filter(opt => opt.count > 0).slice(0, 5).map((opt, rank) => {
+        const isUser = userResponse?.answer === opt.index;
+        const pct = total > 0 ? Math.round((opt.count / total) * 100) : 0;
+        const barWidth = maxCount > 0 ? (opt.count / maxCount) * 100 : 0;
+        const optColor = MC_COLORS[opt.index % MC_COLORS.length];
+        return (
+          <div key={opt.index}>
+            <div className="flex items-center justify-between mb-0.5">
+              <span className={`text-xs truncate flex-1 mr-2 ${isUser ? 'font-bold underline' : ''}`} style={{ color: optColor.hex }}>{opt.label}{isUser && ' •'}</span>
+              <span className="text-[10px]" style={{ color: optColor.hex }}>{pct}%</span>
+            </div>
+            <div className={`h-3 rounded-sm overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+              <div className="h-full flex origin-left" style={{ width: `${barWidth}%` }}>
+                {[3, 2, 1, 0].map(i => {
+                  const count = opt.confCounts[i];
+                  const segPct = opt.count > 0 ? (count / opt.count) * 100 : 0;
+                  return segPct > 0 && <div key={i} className="h-full" style={{ width: `${segPct}%`, background: optColor.shades[i] }} />;
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Mini Community Results - shows comparison with user's answer
+const MiniCommunityResults = ({ question, results, userResponse, darkMode, onClick }) => {
+  if (!results || !results.evaluators || !userResponse) return null;
+  const total = results.evaluators.length;
+  const isBinary = question.type === 'binary';
+
+  if (isBinary) {
+    const yes = results.evaluators.filter(e => e.answer === 0).length;
+    const no = total - yes;
+    const yesPct = Math.round((yes / total) * 100);
+    const noPct = 100 - yesPct;
+    const userPct = userResponse.answer === 0 ? yesPct : noPct;
+    const userLabel = userResponse.answer === 0 ? 'Yes' : 'No';
+
+    return (
+      <button onClick={onClick} className={`w-full px-3 py-2.5 rounded-lg text-left transition-all active:scale-[0.99] ${darkMode ? 'bg-gray-900/80 hover:bg-gray-800' : 'bg-gray-100 hover:bg-gray-200'}`}>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className={`text-xs font-medium ${userResponse.answer === 0 ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-rose-400' : 'text-rose-600')}`}>
+            You said <span className="font-bold">{userLabel}</span> · {userPct}% agree
+          </span>
+          <span className={`text-[10px] ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>{total} →</span>
+        </div>
+        <div className={`h-2.5 rounded-full overflow-hidden flex ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+          <div className="h-full bg-emerald-500" style={{ width: `${yesPct}%` }} />
+          <div className="h-full bg-rose-500" style={{ width: `${noPct}%` }} />
+        </div>
+        <div className={`text-[9px] mt-1 truncate ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+          ↑ {question.text}
+        </div>
+      </button>
+    );
+  }
+
+  // MC - show user's ranking
+  const counts = {};
+  results.evaluators.forEach(e => { counts[e.answer] = (counts[e.answer] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const userRank = sorted.findIndex(([idx]) => parseInt(idx) === userResponse.answer) + 1;
+  const userCount = counts[userResponse.answer] || 0;
+  const userPct = Math.round((userCount / total) * 100);
+  const userLabel = question.options?.[userResponse.answer] || 'Option';
+  const optColor = MC_COLORS[userResponse.answer % MC_COLORS.length];
+
+  return (
+    <button onClick={onClick} className={`w-full px-3 py-2.5 rounded-lg text-left transition-all active:scale-[0.99] ${darkMode ? 'bg-gray-900/80 hover:bg-gray-800' : 'bg-gray-100 hover:bg-gray-200'}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className={`text-xs font-medium`} style={{ color: optColor.hex }}>
+          You picked <span className="font-bold">{userLabel.slice(0, 20)}</span> · #{userRank} ({userPct}%)
+        </span>
+        <span className={`text-[10px] ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>{total} →</span>
+      </div>
+      <div className={`h-2.5 rounded-full overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+        <div className="h-full" style={{ width: `${userPct}%`, backgroundColor: optColor.hex }} />
+      </div>
+      <div className={`text-[9px] mt-1 truncate ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+        ↑ {question.text}
+      </div>
+    </button>
+  );
+};
+
+// Full Results Panel (modal)
+const FullResultsPanel = ({ question, results, userResponse, darkMode, onClose }) => {
+  const isBinary = question.type === 'binary';
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={onClose}>
+      <div className={`w-full max-w-md rounded-t-2xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`} style={{ animation: 'slideUp 0.2s ease-out' }}>
+        {/* Header - clicking anywhere here closes */}
+        <div className="flex justify-between items-center p-4 pb-2 cursor-pointer" onClick={onClose}>
+          <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Community Results</span>
+          <span className={`text-lg ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>×</span>
+        </div>
+        {/* Content - doesn't close on click */}
+        <div className="px-4 pb-4" onClick={e => e.stopPropagation()}>
+          <p className={`text-xs mb-3 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{question.text}</p>
+          {isBinary ? (
+            <BinaryChart evaluators={results?.evaluators} userResponse={userResponse} darkMode={darkMode} />
+          ) : (
+            <MultipleChoiceChart evaluators={results?.evaluators} userResponse={userResponse} options={question.options || []} darkMode={darkMode} />
+          )}
+          <div className={`text-[10px] text-center mt-3 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+            {results?.evaluators?.length || 0} total responses · Demo data
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Question Flag Modal
+const QUESTION_FLAG_REASONS = ['Unclear', 'Biased', 'Duplicate', 'Wrong'];
+const QuestionFlagModal = ({ questionId, onClose, onFlag, onClear, existingFlag, darkMode = true }) => {
+  const [selected, setSelected] = React.useState(
+    existingFlag ? existingFlag.split(', ').filter(r => QUESTION_FLAG_REASONS.includes(r)) : []
+  );
+  const [other, setOther] = React.useState(
+    existingFlag ? existingFlag.split(', ').filter(r => !QUESTION_FLAG_REASONS.includes(r)).join(', ') : ''
+  );
+  const toggle = (r) => setSelected(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+  const canSubmit = selected.length > 0 || other.trim();
+  const handleSubmit = () => { onFlag(questionId, [...selected, other.trim()].filter(Boolean).join(', ')); onClose(); };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 pb-8" onClick={onClose}>
+      <div className={`rounded-xl p-3 w-[calc(100%-2rem)] max-w-xs ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200'}`} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-rose-400 text-sm">⚑</span>
+          <span className={`text-xs font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Flag question issue</span>
+        </div>
+        <div className="flex gap-1.5 mb-2 flex-wrap">
+          {QUESTION_FLAG_REASONS.map(r => (
+            <button key={r} onClick={() => toggle(r)}
+              className={`px-2 py-1 rounded text-[10px] ${selected.includes(r) ? 'bg-rose-500 text-white' : darkMode ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-600 border border-gray-200'}`}
+            >{r}</button>
+          ))}
+        </div>
+        <input type="text" value={other} onChange={(e) => setOther(e.target.value)} placeholder="Other..."
+          className={`w-full px-2 py-1 rounded text-[10px] mb-2 ${darkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-100 text-gray-900 border-gray-300'} border focus:outline-none focus:border-rose-500`}
+        />
+        <div className="flex gap-2">
+          <button onClick={onClose} className={`py-1.5 px-3 text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>Cancel</button>
+          {existingFlag && <button onClick={() => { onClear(questionId); onClose(); }} className="py-1.5 px-3 rounded text-[10px] bg-violet-500/80 text-white">Clear</button>}
+          <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-1.5 rounded text-[10px] font-medium ${canSubmit ? 'bg-rose-500 text-white' : darkMode ? 'bg-gray-800 text-gray-600' : 'bg-white text-gray-400 border border-gray-200'}`}>
+            {existingFlag ? 'Update' : 'Flag'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Explanation Modal
+const EXPLANATION_REASONS = ['Gut feel', 'Research', 'Experience', 'Logic'];
+const ExplanationModal = ({ questionId, onClose, onSave, onClear, existingExplanation, darkMode = true }) => {
+  const [selected, setSelected] = React.useState(
+    existingExplanation ? existingExplanation.split(', ').filter(r => EXPLANATION_REASONS.includes(r)) : []
+  );
+  const [other, setOther] = React.useState(
+    existingExplanation ? existingExplanation.split(', ').filter(r => !EXPLANATION_REASONS.includes(r)).join(', ') : ''
+  );
+  const toggle = (r) => setSelected(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+  const canSubmit = selected.length > 0 || other.trim();
+  const handleSubmit = () => { onSave(questionId, [...selected, other.trim()].filter(Boolean).join(', ')); onClose(); };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 pb-8" onClick={onClose}>
+      <div className={`rounded-xl p-3 w-[calc(100%-2rem)] max-w-xs ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200'}`} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-amber-400 text-sm">✎</span>
+          <span className={`text-xs font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Add note to answer</span>
+        </div>
+        <div className="flex gap-1.5 mb-2 flex-wrap">
+          {EXPLANATION_REASONS.map(r => (
+            <button key={r} onClick={() => toggle(r)}
+              className={`px-2 py-1 rounded text-[10px] ${selected.includes(r) ? 'bg-amber-500 text-white' : darkMode ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-600 border border-gray-200'}`}
+            >{r}</button>
+          ))}
+        </div>
+        <input type="text" value={other} onChange={(e) => setOther(e.target.value)} placeholder="Other note..."
+          className={`w-full px-2 py-1 rounded text-[10px] mb-2 ${darkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-100 text-gray-900 border-gray-300'} border focus:outline-none focus:border-amber-500`}
+        />
+        <div className="flex gap-2">
+          <button onClick={onClose} className={`py-1.5 px-3 text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>Cancel</button>
+          {existingExplanation && <button onClick={() => { onClear(questionId); onClose(); }} className="py-1.5 px-3 rounded text-[10px] bg-violet-500/80 text-white">Clear</button>}
+          <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-1.5 rounded text-[10px] font-medium ${canSubmit ? 'bg-amber-500 text-white' : darkMode ? 'bg-gray-800 text-gray-600' : 'bg-white text-gray-400 border border-gray-200'}`}>
+            {existingExplanation ? 'Update' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Answered Question View - shows expanded results (no change answer - locked after undo)
+const AnsweredQuestionView = ({ question, response, results, darkMode, questionFlag, explanation, onFlagClick, onExplainClick }) => {
+  const isBinary = question.type === 'binary';
+  const category = CATEGORIES.find(c => c.id === question.category);
+  const categoryColors = {
+    prediction: darkMode ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-700',
+    reasoning: darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700',
+    judgment: darkMode ? 'bg-teal-900/30 text-teal-400' : 'bg-teal-100 text-teal-700',
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-y-auto px-4 py-3">
+      {/* Category badge */}
+      {category && (
+        <div className="flex justify-center mb-2">
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${categoryColors[question.category]}`}>
+            {category.icon} {category.name}
+          </span>
+        </div>
+      )}
+
+      {/* Question with flag button */}
+      <div className="flex items-start gap-2 mb-4">
+        <h2 className={`question-text text-center font-medium flex-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+          {question.text}
+        </h2>
+        <button
+          onClick={onFlagClick}
+          className={`text-sm flex-shrink-0 ${questionFlag ? 'text-rose-400' : (darkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}
+        >
+          ⚑
+        </button>
+      </div>
+
+      {/* Your answer summary with explain button */}
+      <div className={`p-3 rounded-lg mb-4 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-100'}`}>
+        <div className="flex items-center justify-center gap-2">
+          <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Your answer: <span className={`font-bold ${
+              isBinary
+                ? (response.answer === 0 ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-rose-400' : 'text-rose-600'))
+                : ''
+            }`} style={!isBinary ? { color: MC_COLORS[response.answer % MC_COLORS.length].hex } : undefined}>
+              {isBinary ? (response.answer === 0 ? 'Yes' : 'No') : question.options?.[response.answer]}
+            </span> · {CONFIDENCE_LABELS[response.confidence]}
+          </div>
+          <button
+            onClick={onExplainClick}
+            className={`text-sm ${explanation ? 'text-amber-400' : (darkMode ? 'text-gray-600 hover:text-amber-400' : 'text-gray-400 hover:text-amber-500')}`}
+            title={explanation ? 'Edit note' : 'Add note'}
+          >
+            ✎
+          </button>
+        </div>
+        {explanation && (
+          <div className={`text-[10px] text-center mt-1 ${darkMode ? 'text-amber-400/70' : 'text-amber-600'}`}>
+            {explanation}
+          </div>
+        )}
+      </div>
+
+      {/* Community Results - expanded */}
+      <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200'}`}>
+        <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Community Results</div>
+        {isBinary ? (
+          <BinaryChart evaluators={results?.evaluators} userResponse={response} darkMode={darkMode} />
+        ) : (
+          <MultipleChoiceChart evaluators={results?.evaluators} userResponse={response} options={question.options || []} darkMode={darkMode} />
+        )}
+        <div className={`text-[10px] text-center mt-2 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+          {results?.evaluators?.length || 0} responses · Demo data
+        </div>
+      </div>
+
+      {/* Swipe hint */}
+      <div className={`text-center mt-4 text-[10px] ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+        Swipe → for next question
+      </div>
+    </div>
+  );
+};
+
+// Category Selection Screen
+const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCategory, onSettings, stats }) => {
+  const getProgress = (categoryId) => {
+    const catQuestions = questions.filter(q => q.category === categoryId);
+    const answered = catQuestions.filter(q => responses[q.id]).length;
+    const unanswered = catQuestions.length - answered;
+    return { total: catQuestions.length, answered, unanswered };
+  };
+
+  const totalUnanswered = questions.filter(q => !responses[q.id]).length;
+
+  return (
+    <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      {/* Header */}
+      <div className={`flex items-center justify-between px-4 py-3 ${darkMode ? 'border-b border-gray-800' : 'border-b border-gray-200'}`}>
+        <div className="text-xl">🌀</div>
+        <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          {stats.answered} answered {stats.streak > 0 && <span className="text-orange-400">🔥{stats.streak}</span>}
+        </div>
+        <button onClick={onSettings} className={`text-xl ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>☰</button>
+      </div>
+
+      <div className="flex-1 p-3 overflow-y-auto space-y-2">
+        {/* Random - all unanswered */}
+        <button
+          onClick={() => onSelectCategory('random')}
+          className={`w-full flex items-center gap-3 p-3 rounded-lg ${darkMode ? 'bg-violet-900/20 hover:bg-violet-900/30' : 'bg-violet-100 hover:bg-violet-200'}`}
+        >
+          <span className="text-2xl">🎲</span>
+          <div className="flex-1 text-left">
+            <div className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Random</div>
+            <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>All categories mixed</div>
+          </div>
+          <div className={`text-sm font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>
+            {totalUnanswered}
+          </div>
+        </button>
+
+        {/* Category cards */}
+        {categories.map(cat => {
+          const progress = getProgress(cat.id);
+          if (progress.total === 0) return null;
+          const pct = progress.total > 0 ? Math.round((progress.answered / progress.total) * 100) : 0;
+
+          return (
+            <button
+              key={cat.id}
+              onClick={() => onSelectCategory(cat.id)}
+              disabled={progress.unanswered === 0}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                progress.unanswered === 0
+                  ? darkMode ? 'bg-gray-900/50 opacity-50' : 'bg-gray-100 opacity-50'
+                  : darkMode ? 'bg-gray-900 hover:bg-gray-800' : 'bg-white hover:bg-gray-50 border border-gray-200'
+              }`}
+            >
+              <span className="text-2xl">{cat.icon}</span>
+              <div className="flex-1 text-left">
+                <div className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{cat.name}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className={`flex-1 h-1.5 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                    <div
+                      className={`h-full rounded-full ${
+                        cat.color === 'amber' ? 'bg-amber-500' :
+                        cat.color === 'violet' ? 'bg-violet-500' : 'bg-teal-500'
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>{pct}%</span>
+                </div>
+              </div>
+              <div className={`text-sm font-bold ${
+                progress.unanswered > 0
+                  ? (cat.color === 'amber' ? 'text-amber-400' : cat.color === 'violet' ? 'text-violet-400' : 'text-teal-400')
+                  : (darkMode ? 'text-gray-600' : 'text-gray-400')
+              }`}>
+                {progress.unanswered}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// UndoBar - slides up from bottom
+const UndoBar = ({ darkMode, undoDelay, onUndo, answer, confidence, isBinary, options }) => {
+  const [countdown, setCountdown] = useState(undoDelay);
+  useEffect(() => {
+    setCountdown(undoDelay);
+    const interval = setInterval(() => setCountdown(prev => Math.max(0, prev - 0.1)), 100);
+    return () => clearInterval(interval);
+  }, [undoDelay, answer, confidence]);
+  const progress = countdown / undoDelay;
+  const answerText = isBinary ? (answer === 0 ? 'Yes' : 'No') : (options?.[answer] || `Option ${answer + 1}`);
+  return (
+    <div className={`${darkMode ? 'bg-amber-900/90' : 'bg-amber-100/90'} backdrop-blur-sm rounded-lg`}>
+      <div className="flex items-center justify-between px-3 py-2">
+        <button onClick={onUndo} className={`font-medium text-sm ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>↩ UNDO</button>
+        <div className={`text-xs truncate mx-2 flex-1 text-center ${darkMode ? 'text-amber-400/70' : 'text-amber-600/70'}`}>{answerText} · {CONFIDENCE_LABELS[confidence]}</div>
+        <div className="flex items-center gap-1.5">
+          <div className={`w-12 h-1.5 rounded-full overflow-hidden ${darkMode ? 'bg-black/20' : 'bg-amber-200'}`}>
+            <div className="h-full bg-amber-500 transition-all duration-100" style={{ width: `${progress * 100}%` }} />
+          </div>
+          <span className={`text-[10px] tabular-nums w-5 ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>{countdown.toFixed(1)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Tip Banner
+const TipBanner = ({ darkMode, onDismiss }) => (
+  <div
+    onClick={onDismiss}
+    className={`rounded-lg px-3 py-2 flex items-center justify-between cursor-pointer mb-2 ${
+      darkMode ? 'bg-violet-900/30 border border-violet-500/30' : 'bg-violet-100 border border-violet-300'
+    }`}
+  >
+    <div className={`text-xs ${darkMode ? 'text-violet-300' : 'text-violet-700'}`}>
+      <span className="font-medium">Tip:</span> Tap to select · Tap again to increase confidence
+    </div>
+    <span className={`text-xs ${darkMode ? 'text-violet-500' : 'text-violet-400'}`}>✕</span>
+  </div>
+);
+
+// QuestionCard (compact)
+const QuestionCard = ({ question, darkMode, evidenceExpanded, onToggleEvidence }) => {
+  const category = CATEGORIES.find(c => c.id === question.category);
+  const hasEvidence = question.preEvidence && question.preEvidence.length > 0;
+  const categoryColors = {
+    prediction: darkMode ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-700',
+    reasoning: darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700',
+    judgment: darkMode ? 'bg-teal-900/30 text-teal-400' : 'bg-teal-100 text-teal-700',
+  };
+  return (
+    <div className="space-y-2">
+      {category && (
+        <div className="flex justify-center">
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${categoryColors[question.category]}`}>{category.icon} {category.name}</span>
+        </div>
+      )}
+      <h2 className={`question-text text-center font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{question.text}</h2>
+      {hasEvidence && (
+        <div className={`rounded-lg overflow-hidden ${darkMode ? 'bg-gray-900/50' : 'bg-white border border-gray-200'}`}>
+          <button onClick={onToggleEvidence} className={`w-full px-3 py-1.5 flex items-center justify-between text-[10px] ${darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-600 hover:text-gray-800'}`}>
+            <span>📊 Evidence ({question.preEvidence.length})</span>
+            <span>{evidenceExpanded ? '−' : '+'}</span>
+          </button>
+          {evidenceExpanded && (
+            <div className="px-3 pb-2 space-y-1">
+              {question.preEvidence.map((item, i) => (
+                <div key={i} className={`text-[10px] ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  {item.type === 'stat' ? (
+                    <div className="flex justify-between"><span>{item.label}</span><span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{item.value}</span></div>
+                  ) : (
+                    <div className={`italic ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>"{item.text}"</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Binary Answer Buttons - vG style with gradient/glow/scale
+const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentResponse, onTap, onRightClick, pendingSubmit }) => {
+  // Color shades for gradient (light to dark by confidence)
+  const yesShades = {
+    1: darkMode ? ['#065f46', '#059669'] : ['#a7f3d0', '#6ee7b7'],
+    2: darkMode ? ['#047857', '#10b981'] : ['#6ee7b7', '#34d399'],
+    3: darkMode ? ['#059669', '#34d399'] : ['#34d399', '#10b981'],
+    4: darkMode ? ['#10b981', '#6ee7b7'] : ['#10b981', '#059669'],
+  };
+  const noShades = {
+    1: darkMode ? ['#9f1239', '#e11d48'] : ['#fecdd3', '#fda4af'],
+    2: darkMode ? ['#be123c', '#f43f5e'] : ['#fda4af', '#fb7185'],
+    3: darkMode ? ['#e11d48', '#fb7185'] : ['#fb7185', '#f43f5e'],
+    4: darkMode ? ['#f43f5e', '#fda4af'] : ['#f43f5e', '#e11d48'],
+  };
+
+  const getButtonStyle = (answer) => {
+    const isSelected = tappedAnswer === answer;
+    const isPending = pendingSubmit?.answer === answer;
+    const wasAnswered = currentResponse?.answer === answer;
+    const shades = answer === 0 ? yesShades : noShades;
+    const conf = isSelected ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2);
+
+    if (wasAnswered || isPending) {
+      const s = shades[Math.min(conf, 4)];
+      return {
+        background: `linear-gradient(135deg, ${s[0]} 0%, ${s[1]} 100%)`,
+        transform: 'scale(1)',
+        boxShadow: 'none',
+        color: 'white',
+      };
+    }
+    if (isSelected) {
+      const s = shades[Math.min(tapCount, 4)];
+      return {
+        background: `linear-gradient(135deg, ${s[0]} 0%, ${s[1]} 100%)`,
+        transform: `scale(${1 + tapCount * 0.012})`,
+        boxShadow: `0 0 ${tapCount * 8}px rgba(${answer === 0 ? '16,185,129' : '244,63,94'}, ${0.2 + tapCount * 0.15})`,
+        color: 'white',
+      };
+    }
+    if (isAnswered) {
+      return {
+        background: darkMode ? 'rgb(31,41,55)' : 'rgb(243,244,246)',
+        transform: 'scale(1)',
+        boxShadow: 'none',
+        color: darkMode ? 'rgb(107,114,128)' : 'rgb(156,163,175)',
+      };
+    }
+    return {
+      background: darkMode ? 'rgb(31,41,55)' : 'rgb(255,255,255)',
+      transform: 'scale(1)',
+      boxShadow: 'none',
+      color: darkMode ? 'rgb(209,213,219)' : (answer === 0 ? 'rgb(5,150,105)' : 'rgb(225,29,72)'),
+      border: darkMode ? 'none' : `2px solid ${answer === 0 ? 'rgb(167,243,208)' : 'rgb(254,205,211)'}`,
+    };
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {[0, 1].map(answer => {
+        const isSelected = tappedAnswer === answer;
+        const style = getButtonStyle(answer);
+        return (
+          <button
+            key={answer}
+            onClick={() => !isAnswered && !pendingSubmit && onTap(answer)}
+            onContextMenu={(e) => onRightClick && onRightClick(e, answer)}
+            disabled={isAnswered || pendingSubmit}
+            className={`relative h-[72px] rounded-xl font-bold text-xl transition-all duration-150 overflow-hidden select-none ${isSelected ? (answer === 0 ? 'ring-2 ring-emerald-400' : 'ring-2 ring-rose-400') : ''}`}
+            style={style}
+          >
+            <ConfidenceSegments level={tapCount} color={answer === 0 ? 'emerald' : 'rose'} active={isSelected} darkMode={darkMode} />
+            <span className="relative z-10">{answer === 0 ? 'YES' : 'NO'}</span>
+            {isSelected && (
+              <span className="absolute top-2 right-2 text-sm font-bold bg-white/30 w-7 h-7 rounded-full flex items-center justify-center z-10">
+                {tapCount}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// Multiple Choice Buttons - vG style
+const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, currentResponse, onTap, onRightClick, pendingSubmit }) => {
+  const getOptionStyle = (option, index) => {
+    const color = MC_COLORS[index % MC_COLORS.length];
+    const isSelected = tappedAnswer === index;
+    const isPending = pendingSubmit?.answer === index;
+    const wasAnswered = currentResponse?.answer === index;
+    const conf = isSelected ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2);
+
+    if (wasAnswered || isPending) {
+      return {
+        background: `linear-gradient(135deg, ${color.shades[conf - 1]} 0%, ${color.shades[Math.min(conf, 3)]} 100%)`,
+        transform: 'scale(1)',
+        boxShadow: 'none',
+        color: 'white',
+        border: '2px solid transparent',
+      };
+    }
+    if (isSelected) {
+      return {
+        background: `linear-gradient(135deg, ${color.shades[tapCount - 1]} 0%, ${color.shades[Math.min(tapCount, 3)]} 100%)`,
+        transform: `scale(${1 + tapCount * 0.008})`,
+        boxShadow: `0 0 ${tapCount * 6}px rgba(${color.rgb}, ${0.2 + tapCount * 0.12})`,
+        color: 'white',
+        border: `2px solid ${color.hex}`,
+      };
+    }
+    if (isAnswered) {
+      return {
+        background: darkMode ? 'rgb(31,41,55)' : 'rgb(243,244,246)',
+        transform: 'scale(1)',
+        boxShadow: 'none',
+        color: darkMode ? 'rgb(107,114,128)' : 'rgb(156,163,175)',
+        border: '2px solid transparent',
+      };
+    }
+    return {
+      background: darkMode ? 'rgb(31,41,55)' : 'rgb(255,255,255)',
+      transform: 'scale(1)',
+      boxShadow: 'none',
+      color: darkMode ? 'rgb(209,213,219)' : 'rgb(55,65,81)',
+      border: darkMode ? '2px solid transparent' : '2px solid rgb(229,231,235)',
+    };
+  };
+
+  return (
+    <div className="space-y-1.5">
+      {options.map((option, index) => {
+        const isSelected = tappedAnswer === index;
+        const style = getOptionStyle(option, index);
+        return (
+          <button
+            key={option}
+            onClick={() => !isAnswered && !pendingSubmit && onTap(index)}
+            onContextMenu={(e) => onRightClick && onRightClick(e, index)}
+            disabled={isAnswered || pendingSubmit}
+            className="w-full h-[44px] px-3 rounded-lg text-left text-sm transition-all duration-150 active:scale-[0.99] overflow-hidden relative"
+            style={style}
+          >
+            <span className="font-medium mr-1.5 opacity-60">{String.fromCharCode(65 + index)}.</span>
+            <span className="truncate">{option}</span>
+            {isSelected && (
+              <span className="absolute top-1/2 right-2 -translate-y-1/2 text-xs font-bold bg-white/30 w-5 h-5 rounded-full flex items-center justify-center">
+                {tapCount}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// SettingsScreen
+const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, onBack, onReset }) => (
+  <div className={`flex-1 flex flex-col overflow-hidden ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+    <div className={`flex items-center justify-between px-4 py-3 border-b ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+      <button onClick={onBack} className={`text-sm ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>← Back</button>
+      <h1 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Settings</h1>
+      <div className="w-12" />
+    </div>
+    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200'}`}>
+        <div className="flex items-center justify-between">
+          <div><div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Theme</div></div>
+          <button onClick={() => setDarkMode(!darkMode)} className={`relative w-12 h-6 rounded-full transition-colors ${darkMode ? 'bg-violet-600' : 'bg-gray-200'}`}>
+            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform flex items-center justify-center text-[10px] ${darkMode ? 'translate-x-6' : 'translate-x-0.5'}`}>{darkMode ? '🌙' : '☀️'}</div>
+          </button>
+        </div>
+      </div>
+      <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200'}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Undo Delay</div>
+          <span className={`text-sm font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{undoDelay === 0 ? 'Off' : `${undoDelay}s`}</span>
+        </div>
+        <input type="range" min="0" max="3" step="0.5" value={undoDelay} onChange={(e) => setUndoDelay(parseFloat(e.target.value))} className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-violet-500 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+      </div>
+      <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200'}`}>
+        <div className="flex items-center justify-between">
+          <div><div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Require Submit Button</div><div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Off = auto-submit on tap</div></div>
+          <button onClick={() => setRequireConfirmation(!requireConfirmation)} className={`relative w-12 h-6 rounded-full transition-colors ${requireConfirmation ? 'bg-violet-600' : darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${requireConfirmation ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+      </div>
+      <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200'}`}>
+        <div className="flex items-center justify-between">
+          <div><div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Show Tips</div><div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Gesture hints for new users</div></div>
+          <button onClick={() => setShowTips(!showTips)} className={`relative w-12 h-6 rounded-full transition-colors ${showTips ? 'bg-violet-600' : darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showTips ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+      </div>
+      <button onClick={onReset} className={`w-full py-2.5 rounded-lg text-sm font-medium ${darkMode ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-100 text-rose-600'}`}>Reset Demo Data</button>
+      <div className={`text-[10px] text-center ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Aura Player vI</div>
+    </div>
+  </div>
+);
+
+// ==================== MAIN APP ====================
+function App() {
+  const displayMode = useDisplayMode();
+  const [questions] = useState(() => shuffleArray(QUESTIONS));
+  const [screen, setScreen] = useState('launch');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [darkMode, setDarkMode] = useState(getInitialDarkMode);
+  const [responses, setResponses] = useState(() => demoStorage.get().answers);
+  const [communityResults, setCommunityResults] = useState({});
+  const [undoDelay, setUndoDelay] = useState(() => demoStorage.get().settings.undoDelay);
+  const [requireConfirmation, setRequireConfirmation] = useState(() => demoStorage.get().settings.requireConfirmation);
+  const [showTips, setShowTips] = useState(() => demoStorage.get().settings.showTips !== false);
+  const [showGestureHint, setShowGestureHint] = useState(true);
+  const [stats, setStats] = useState(() => demoStorage.get().stats);
+  const [pendingSubmit, setPendingSubmit] = useState(null);
+  const [tappedAnswer, setTappedAnswer] = useState(null);
+  const [tapCount, setTapCount] = useState(0);
+  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
+  const [showFullResults, setShowFullResults] = useState(null);
+  const [lastAnsweredQuestion, setLastAnsweredQuestion] = useState(null); // Track the question we just answered
+  const [selectedCategory, setSelectedCategory] = useState(null); // For category filtering
+  const [questionFlags, setQuestionFlags] = useState({}); // { [questionId]: "flag text" }
+  const [answerExplanations, setAnswerExplanations] = useState({}); // { [questionId]: "explanation" }
+  const [showQuestionFlagModal, setShowQuestionFlagModal] = useState(null); // questionId or null
+  const [showExplanationModal, setShowExplanationModal] = useState(null); // questionId or null
+
+  const submitTimeoutRef = useRef(null);
+  const tapTimeoutRef = useRef(null);
+
+  const currentQuestion = questions[currentIndex];
+  const currentResponse = currentQuestion ? responses[currentQuestion.id] : null;
+  const isAnswered = !!currentResponse;
+  const currentResults = currentQuestion ? communityResults[currentQuestion.id] : null;
+  const isBinary = currentQuestion?.type === 'binary';
+
+  // Last answered question for bottom community results (not just prev index)
+  const lastAnsweredResponse = lastAnsweredQuestion ? responses[lastAnsweredQuestion.id] : null;
+  const lastAnsweredResults = lastAnsweredQuestion ? communityResults[lastAnsweredQuestion.id] : null;
+
+  // Calculate progress
+  const totalQuestions = questions.length;
+  const answeredCount = Object.keys(responses).length;
+
+  useEffect(() => {
+    const data = demoStorage.get();
+    data.settings = { ...data.settings, darkMode, undoDelay, requireConfirmation, showTips };
+    demoStorage.set(data);
+  }, [darkMode, undoDelay, requireConfirmation, showTips]);
+
+  // Find next unanswered question
+  const findNextUnanswered = useCallback((fromIndex) => {
+    for (let i = fromIndex + 1; i < questions.length; i++) {
+      if (!responses[questions[i].id]) return i;
+    }
+    for (let i = 0; i < fromIndex; i++) {
+      if (!responses[questions[i].id]) return i;
+    }
+    return null;
+  }, [questions, responses]);
+
+  const goToNext = useCallback(() => {
+    // First try to find next unanswered (within selected category if set)
+    let nextIdx = null;
+
+    if (selectedCategory && selectedCategory !== 'random') {
+      // Find next unanswered in same category
+      for (let i = currentIndex + 1; i < questions.length; i++) {
+        if (questions[i].category === selectedCategory && !responses[questions[i].id]) {
+          nextIdx = i;
+          break;
+        }
+      }
+      if (nextIdx === null) {
+        // Wrap around
+        for (let i = 0; i < currentIndex; i++) {
+          if (questions[i].category === selectedCategory && !responses[questions[i].id]) {
+            nextIdx = i;
+            break;
+          }
+        }
+      }
+    } else {
+      // Random/all - find any next unanswered
+      nextIdx = findNextUnanswered(currentIndex);
+    }
+
+    if (nextIdx !== null) {
+      setCurrentIndex(nextIdx);
+      setTappedAnswer(null);
+      setTapCount(0);
+      setEvidenceExpanded(false);
+    } else {
+      // No more unanswered - go back to categories
+      setScreen('categories');
+    }
+  }, [currentIndex, findNextUnanswered, questions, responses, selectedCategory]);
+
+  const goToPrev = useCallback(() => {
+    // Go to previous question (within category if set)
+    if (selectedCategory && selectedCategory !== 'random') {
+      for (let i = currentIndex - 1; i >= 0; i--) {
+        if (questions[i].category === selectedCategory) {
+          setCurrentIndex(i);
+          setTappedAnswer(null);
+          setTapCount(0);
+          setEvidenceExpanded(false);
+          return;
+        }
+      }
+    } else if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+      setTappedAnswer(null);
+      setTapCount(0);
+      setEvidenceExpanded(false);
+    }
+  }, [currentIndex, questions, selectedCategory]);
+
+  const { handlers: swipeHandlers } = useSwipe({
+    onSwipeLeft: goToNext,
+    onSwipeRight: goToPrev,
+    enabled: screen === 'question' && !pendingSubmit
+  });
+
+  const handleAnswerTap = (answer) => {
+    if (isAnswered || pendingSubmit) return;
+
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+
+    let newTapCount;
+    if (tappedAnswer === answer) {
+      newTapCount = Math.min(tapCount + 1, 4);
+      setTapCount(newTapCount);
+    } else {
+      newTapCount = 1;
+      setTappedAnswer(answer);
+      setTapCount(1);
+    }
+
+    // Auto-submit if not requiring confirmation
+    if (!requireConfirmation) {
+      tapTimeoutRef.current = setTimeout(() => {
+        submitAnswer(answer, newTapCount);
+      }, 400);
+    }
+  };
+
+  // Right-click to decrease confidence
+  const handleAnswerRightClick = (e, answer) => {
+    e.preventDefault();
+    if (isAnswered || pendingSubmit) return;
+    if (tappedAnswer !== answer) return; // Can only decrease if this answer is selected
+
+    if (tapCount > 1) {
+      setTapCount(tapCount - 1);
+    }
+  };
+
+  const submitAnswer = (answer, confidence) => {
+    if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+
+    const community = generateFakeResults(currentQuestion);
+
+    setPendingSubmit({ answer, confidence, community });
+    setTappedAnswer(null);
+    setTapCount(0);
+
+    // Hide gesture hint after first answer
+    if (showGestureHint) setShowGestureHint(false);
+
+    if (undoDelay === 0) {
+      finalizeSubmit(answer, confidence, community);
+    } else {
+      submitTimeoutRef.current = setTimeout(() => {
+        finalizeSubmit(answer, confidence, community);
+      }, undoDelay * 1000);
+    }
+  };
+
+  const finalizeSubmit = (answer, confidence, community) => {
+    const data = demoStorage.get();
+    data.answers[currentQuestion.id] = { answer, confidence, timestamp: Date.now() };
+    data.stats.answered = Object.keys(data.answers).length;
+    const today = new Date().toDateString();
+    if (data.stats.lastAnswerDate !== today) {
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      data.stats.streak = data.stats.lastAnswerDate === yesterday ? data.stats.streak + 1 : 1;
+      data.stats.lastAnswerDate = today;
+    }
+    demoStorage.set(data);
+
+    // Track this as last answered question BEFORE advancing
+    setLastAnsweredQuestion(currentQuestion);
+
+    setResponses(data.answers);
+    setCommunityResults(prev => ({ ...prev, [currentQuestion.id]: community }));
+    setStats(data.stats);
+    setPendingSubmit(null);
+
+    // Go straight to next question (no flash of results screen)
+    goToNext();
+  };
+
+  const handleUndo = () => {
+    if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
+    setPendingSubmit(null);
+    setTappedAnswer(null);
+    setTapCount(0);
+  };
+
+  // Question flag handlers
+  const handleQuestionFlag = (questionId, flagText) => {
+    setQuestionFlags(prev => ({ ...prev, [questionId]: flagText }));
+  };
+
+  const handleClearQuestionFlag = (questionId) => {
+    setQuestionFlags(prev => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+  };
+
+  // Explanation handlers
+  const handleSaveExplanation = (questionId, text) => {
+    setAnswerExplanations(prev => ({ ...prev, [questionId]: text }));
+  };
+
+  const handleClearExplanation = (questionId) => {
+    setAnswerExplanations(prev => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+  };
+
+  // Category selection
+  const handleSelectCategory = (categoryId) => {
+    setSelectedCategory(categoryId);
+    // Find first unanswered in this category (or all if 'random')
+    const filtered = categoryId === 'random'
+      ? questions
+      : questions.filter(q => q.category === categoryId);
+    const firstUnanswered = filtered.findIndex(q => !responses[q.id]);
+    if (firstUnanswered !== -1) {
+      // Find the actual index in the full questions array
+      const actualIndex = questions.findIndex(q => q.id === filtered[firstUnanswered].id);
+      setCurrentIndex(actualIndex);
+    }
+    setScreen('question');
+  };
+
+  const startDemo = () => {
+    // Go to category selection screen
+    setSelectedCategory(null);
+    setTappedAnswer(null);
+    setTapCount(0);
+    setScreen('categories');
+  };
+
+  const resetDemo = () => {
+    demoStorage.clear();
+    setResponses({});
+    setCommunityResults({});
+    setStats({ answered: 0, streak: 0, lastAnswerDate: null });
+    setCurrentIndex(0);
+    setShowGestureHint(true);
+    setScreen('launch');
+  };
+
+  const renderContent = () => {
+    if (screen === 'launch') return <LaunchScreen onDemo={startDemo} onLogin={() => {}} darkMode={darkMode} />;
+    if (screen === 'settings') return (
+      <SettingsScreen
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+        undoDelay={undoDelay}
+        setUndoDelay={setUndoDelay}
+        requireConfirmation={requireConfirmation}
+        setRequireConfirmation={setRequireConfirmation}
+        showTips={showTips}
+        setShowTips={setShowTips}
+        onBack={() => setScreen('categories')}
+        onReset={resetDemo}
+      />
+    );
+    if (screen === 'categories') return (
+      <CategoryScreen
+        darkMode={darkMode}
+        categories={CATEGORIES}
+        questions={questions}
+        responses={responses}
+        onSelectCategory={handleSelectCategory}
+        onSettings={() => setScreen('settings')}
+        stats={stats}
+      />
+    );
+
+    if (!currentQuestion) return (
+      <div className={`flex-1 flex items-center justify-center ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+        <div className="text-center p-8"><div className="text-4xl mb-4">🎉</div><div className="text-xl font-medium mb-2">All done!</div></div>
+      </div>
+    );
+
+    const progress = totalQuestions > 0 ? answeredCount / totalQuestions : 0;
+    const hasNext = findNextUnanswered(currentIndex) !== null || currentIndex < questions.length - 1;
+
+    // Generate results for current question if answered but no results yet
+    const currentQuestionResults = currentResults || (isAnswered ? generateFakeResults(currentQuestion) : null);
+    if (isAnswered && !currentResults) {
+      setCommunityResults(prev => ({ ...prev, [currentQuestion.id]: currentQuestionResults }));
+    }
+
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden relative" {...swipeHandlers}>
+        {/* vG-style Navigation Bar with Progress */}
+        <div className={`h-[36px] flex-shrink-0 flex items-center gap-2 px-3 ${darkMode ? 'bg-gray-900/50' : 'bg-white border-b border-gray-200'}`}>
+          <button
+            onClick={goToPrev}
+            disabled={currentIndex === 0}
+            className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${
+              currentIndex === 0
+                ? (darkMode ? 'text-gray-700' : 'text-gray-300')
+                : (darkMode ? 'text-gray-300 active:text-white' : 'text-gray-600 active:text-gray-900')
+            }`}
+          >
+            ◀
+          </button>
+          <div className={`flex-1 h-2 rounded-full overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-300'}`}>
+            <div
+              className="h-full bg-violet-500 transition-all duration-300"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+          <button
+            onClick={goToNext}
+            disabled={!hasNext}
+            className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${
+              !hasNext
+                ? (darkMode ? 'text-gray-700' : 'text-gray-300')
+                : (darkMode ? 'text-gray-300 active:text-white' : 'text-gray-600 active:text-gray-900')
+            }`}
+          >
+            ▶
+          </button>
+        </div>
+
+        {/* ANSWERED QUESTION VIEW - shows full results */}
+        {isAnswered && !pendingSubmit ? (
+          <AnsweredQuestionView
+            question={currentQuestion}
+            response={currentResponse}
+            results={currentQuestionResults}
+            darkMode={darkMode}
+            questionFlag={questionFlags[currentQuestion.id]}
+            explanation={answerExplanations[currentQuestion.id]}
+            onFlagClick={() => setShowQuestionFlagModal(currentQuestion.id)}
+            onExplainClick={() => setShowExplanationModal(currentQuestion.id)}
+          />
+        ) : (
+          <>
+            {/* TIP BANNER - above question area when visible */}
+            {showTips && showGestureHint && !isAnswered && !pendingSubmit && (
+              <div className="px-4 pt-2">
+                <TipBanner darkMode={darkMode} onDismiss={() => setShowGestureHint(false)} />
+              </div>
+            )}
+
+            {/* QUESTION AREA - anchored near top, expands down for long questions */}
+            <div className="flex-1 flex flex-col px-4 pt-[15vh] pb-3 overflow-y-auto">
+              <QuestionCard
+                question={currentQuestion}
+                darkMode={darkMode}
+                evidenceExpanded={evidenceExpanded}
+                onToggleEvidence={() => setEvidenceExpanded(!evidenceExpanded)}
+              />
+            </div>
+
+            {/* FIXED BOTTOM AREA - answer zones */}
+            <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white'}`}>
+
+              {/* ZONE 1: Answer Buttons - FIXED HEIGHT */}
+              <div className={`px-4 pt-3 ${isBinary ? 'h-[90px]' : ''}`}>
+                {isBinary ? (
+                  <BinaryButtons
+                    darkMode={darkMode}
+                    tappedAnswer={tappedAnswer}
+                    tapCount={tapCount}
+                    isAnswered={isAnswered}
+                    currentResponse={currentResponse}
+                    onTap={handleAnswerTap}
+                    onRightClick={handleAnswerRightClick}
+                    pendingSubmit={pendingSubmit}
+                  />
+                ) : (
+                  <MCButtons
+                    options={currentQuestion.options}
+                    darkMode={darkMode}
+                    tappedAnswer={tappedAnswer}
+                    tapCount={tapCount}
+                    isAnswered={isAnswered}
+                    currentResponse={currentResponse}
+                    onTap={handleAnswerTap}
+                    onRightClick={handleAnswerRightClick}
+                    pendingSubmit={pendingSubmit}
+                  />
+                )}
+              </div>
+
+              {/* ZONE 2: Confidence/Submit - FIXED HEIGHT 44px */}
+              <div className="h-[44px] px-4 flex items-center justify-center">
+                {tappedAnswer !== null && !isAnswered && !pendingSubmit && (
+                  <div className="flex items-center gap-3">
+                    <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      {CONFIDENCE_LABELS[tapCount]} · {tapCount < 4 ? 'tap +' : 'max'}
+                    </div>
+                    {requireConfirmation && (
+                      <button
+                        onClick={() => submitAnswer(tappedAnswer, tapCount)}
+                        className={`px-5 py-1.5 rounded-lg text-sm font-medium text-white ${
+                          isBinary
+                            ? (tappedAnswer === 0 ? 'bg-emerald-600' : 'bg-rose-600')
+                            : ''
+                        }`}
+                        style={!isBinary ? { backgroundColor: MC_COLORS[tappedAnswer % MC_COLORS.length].hex } : undefined}
+                      >
+                        Submit
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ZONE 3: Bottom Bar (Undo OR Community) - FIXED HEIGHT 72px */}
+              <div className="h-[72px] px-4 pb-2">
+                {pendingSubmit ? (
+                  <UndoBar
+                    darkMode={darkMode}
+                    undoDelay={undoDelay}
+                    onUndo={handleUndo}
+                    answer={pendingSubmit.answer}
+                    confidence={pendingSubmit.confidence}
+                    isBinary={isBinary}
+                    options={currentQuestion.options}
+                  />
+                ) : lastAnsweredQuestion && lastAnsweredResponse && lastAnsweredResults ? (
+                  <MiniCommunityResults
+                    question={lastAnsweredQuestion}
+                    results={lastAnsweredResults}
+                    userResponse={lastAnsweredResponse}
+                    darkMode={darkMode}
+                    onClick={() => setShowFullResults({ question: lastAnsweredQuestion, results: lastAnsweredResults, response: lastAnsweredResponse })}
+                  />
+                ) : (
+                  <div className={`h-full flex items-center justify-center text-[10px] ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+                    Swipe → for next question
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Full Results Modal */}
+        {showFullResults && (
+          <FullResultsPanel
+            question={showFullResults.question}
+            results={showFullResults.results}
+            userResponse={showFullResults.response}
+            darkMode={darkMode}
+            onClose={() => setShowFullResults(null)}
+          />
+        )}
+
+        {/* Question Flag Modal */}
+        {showQuestionFlagModal && (
+          <QuestionFlagModal
+            darkMode={darkMode}
+            questionId={showQuestionFlagModal}
+            onClose={() => setShowQuestionFlagModal(null)}
+            onFlag={handleQuestionFlag}
+            onClear={handleClearQuestionFlag}
+            existingFlag={questionFlags[showQuestionFlagModal]}
+          />
+        )}
+
+        {/* Explanation Modal */}
+        {showExplanationModal && (
+          <ExplanationModal
+            darkMode={darkMode}
+            questionId={showExplanationModal}
+            onClose={() => setShowExplanationModal(null)}
+            onSave={handleSaveExplanation}
+            onClear={handleClearExplanation}
+            existingExplanation={answerExplanations[showExplanationModal]}
+          />
+        )}
+      </div>
+    );
+  };
+
+  if (displayMode === 'desktop') {
+    return (
+      <PhoneFrame darkMode={darkMode}>
+        {screen !== 'launch' && screen !== 'settings' && screen !== 'categories' && (
+          <NavBar darkMode={darkMode} stats={stats} showStreak={true} onHome={() => setScreen('categories')} onSettings={() => setScreen('settings')} onProfile={() => {}} />
+        )}
+        {renderContent()}
+      </PhoneFrame>
+    );
+  }
+
+  return (
+    <div className={`h-full flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      {screen !== 'launch' && screen !== 'settings' && screen !== 'categories' && (
+        <div className="safe-top">
+          <NavBar darkMode={darkMode} stats={stats} showStreak={true} onHome={() => setScreen('categories')} onSettings={() => setScreen('settings')} onProfile={() => {}} />
+        </div>
+      )}
+      <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
+      <div className="safe-bottom" />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

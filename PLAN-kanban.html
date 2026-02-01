@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Player - Kanban Board</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #e2e8f0;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 8px;
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #64748b;
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .column {
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 500px;
+      border: 1px solid rgba(100, 116, 139, 0.2);
+    }
+
+    .column-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid;
+    }
+
+    .column.backlog .column-header { border-color: #f59e0b; }
+    .column.progress .column-header { border-color: #3b82f6; }
+    .column.done .column-header { border-color: #10b981; }
+
+    .column-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .column-header .icon {
+      font-size: 1.2rem;
+    }
+
+    .column-header .count {
+      margin-left: auto;
+      background: rgba(100, 116, 139, 0.3);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
+    .cards {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 8px;
+      padding: 12px;
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(100, 116, 139, 0.4);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .card-id {
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .card.backlog .card-id { color: #fbbf24; }
+    .card.done .card-id { color: #34d399; }
+
+    .card-title {
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: #f1f5f9;
+    }
+
+    .card-desc {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    .card-tags {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .tag.quick { background: #065f46; color: #6ee7b7; }
+    .tag.medium { background: #1e40af; color: #93c5fd; }
+    .tag.large { background: #7c2d12; color: #fdba74; }
+    .tag.version { background: #374151; color: #9ca3af; }
+    .tag.new { background: #7c3aed; color: #c4b5fd; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #64748b;
+      font-style: italic;
+    }
+
+    .legend {
+      max-width: 1200px;
+      margin: 24px auto 0;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
+    @media (max-width: 768px) {
+      .board {
+        grid-template-columns: 1fr;
+      }
+      .column {
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Aura Player Improvements</h1>
+  <p class="subtitle">Quick Wins Kanban Board</p>
+
+  <div class="board">
+    <!-- BACKLOG -->
+    <div class="column backlog">
+      <div class="column-header">
+        <span class="icon">📋</span>
+        <h2>Backlog</h2>
+        <span class="count">5</span>
+      </div>
+      <div class="cards">
+        <div class="card backlog">
+          <div class="card-header">
+            <span class="card-id">#8</span>
+            <span class="card-title">Rounded Squares</span>
+          </div>
+          <div class="card-desc">Distinguish completed results from in-progress assessments with rounded squares vs glowing circles.</div>
+          <div class="card-tags">
+            <span class="tag quick">⚡ Quick</span>
+          </div>
+        </div>
+
+        <div class="card backlog">
+          <div class="card-header">
+            <span class="card-id">#4</span>
+            <span class="card-title">Submit Confirmation UI</span>
+          </div>
+          <div class="card-desc">Checkmark and X buttons are small and awkward. Needs prototyping.</div>
+          <div class="card-tags">
+            <span class="tag medium">⚡ Medium</span>
+          </div>
+        </div>
+
+        <div class="card backlog">
+          <div class="card-header">
+            <span class="card-id">#10</span>
+            <span class="card-title">Expansion Behavior</span>
+          </div>
+          <div class="card-desc">Click point stability - content jumps around unpredictably when expanding.</div>
+          <div class="card-tags">
+            <span class="tag medium">⚡ Medium</span>
+          </div>
+        </div>
+
+        <div class="card backlog">
+          <div class="card-header">
+            <span class="card-id">#11</span>
+            <span class="card-title">Comparison to Others</span>
+          </div>
+          <div class="card-desc">Show how user's answers compare to others on the platform.</div>
+          <div class="card-tags">
+            <span class="tag large">⚡ Large</span>
+          </div>
+        </div>
+
+        <div class="card backlog">
+          <div class="card-header">
+            <span class="card-id">#14</span>
+            <span class="card-title">Meta-Analysis at Top</span>
+          </div>
+          <div class="card-desc">Move meta-analysis summary to top of Analysis screen, collapsed initially.</div>
+          <div class="card-tags">
+            <span class="tag large">⚡ Large</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IN PROGRESS -->
+    <div class="column progress">
+      <div class="column-header">
+        <span class="icon">🔨</span>
+        <h2>In Progress</h2>
+        <span class="count">0</span>
+      </div>
+      <div class="cards">
+        <div class="empty-state">
+          Drag a card here to start working on it
+        </div>
+      </div>
+    </div>
+
+    <!-- DONE -->
+    <div class="column done">
+      <div class="column-header">
+        <span class="icon">✅</span>
+        <h2>Done</h2>
+        <span class="count">9</span>
+      </div>
+      <div class="cards">
+        <div class="card done">
+          <div class="card-header">
+            <span class="card-id">#9</span>
+            <span class="card-title">Nested Assessment Levels</span>
+          </div>
+          <div class="card-desc">Stacked overlapping rings for multi-level assessments (Reasoning I, II, III).</div>
+          <div class="card-tags">
+            <span class="tag new">🆕 New</span>
+            <span class="tag version">vR, CP-3</span>
+          </div>
+        </div>
+
+        <div class="card done">
+          <div class="card-header">
+            <span class="card-id">#13</span>
+            <span class="card-title">Visual Spectrum Scores</span>
+          </div>
+          <div class="card-desc">Two-color gradient bars with position markers for assessment results.</div>
+          <div class="card-tags">
+            <span class="tag version">vR, CP-1</span>
+          </div>
+        </div>
+
+        <div class="card done">
+          <div class="card-header">
+            <span class="card-id">#12</span>
+            <span class="card-title">Hover/Hold Highlighting</span>
+          </div>
+          <div class="card-desc">Consistent hover-glow classes with inset box-shadow throughout app.</div>
+          <div class="card-tags">
+            <span class="tag version">vR, CP-2</span>
+          </div>
+        </div>
+
+        <div class="card done">
+          <div class="card-header">
+            <span class="card-id">#7</span>
+            <span class="card-title">Explain Button Options</span>
+          </div>
+          <div class="card-desc">Before answering: 4 options. After answering: adds correction options.</div>
+          <div class="card-tags">
+            <span class="tag version">vR, pre-CP-1</span>
+          </div>
+        </div>
+
+        <div class="card done">
+          <div class="card-header">
+            <span class="card-id">#6</span>
+            <span class="card-title">Question Circles (Mix)</span>
+          </div>
+          <div class="card-desc">Shows "Mix" instead of count number in question circles.</div>
+          <div class="card-tags">
+            <span class="tag version">vR, CP-2</span>
+          </div>
+        </div>
+
+        <div class="card done">
+          <div class="card-header">
+            <span class="card-id">#5</span>
+            <span class="card-title">Assessment Glow Effect</span>
+          </div>
+          <div class="card-desc">3-layer graduated shadows for natural fade on assessments.</div>
+          <div class="card-tags">
+            <span class="tag version">vR, pre-CP-1</span>
+          </div>
+        </div>
+
+        <div class="card done">
+          <div class="card-header">
+            <span class="card-id">#3</span>
+            <span class="card-title">Confidence Stars</span>
+          </div>
+          <div class="card-desc">Replaced diamond (◆) with stars (★★★★) for confidence display.</div>
+          <div class="card-tags">
+            <span class="tag version">vR, pre-CP-1</span>
+          </div>
+        </div>
+
+        <div class="card done">
+          <div class="card-header">
+            <span class="card-id">#2</span>
+            <span class="card-title">QOTD Condensing</span>
+          </div>
+          <div class="card-desc">Collapsed state: single line with 🌀 + text + ✓. Reduced padding.</div>
+          <div class="card-tags">
+            <span class="tag version">vR, pre-CP-1</span>
+          </div>
+        </div>
+
+        <div class="card done">
+          <div class="card-header">
+            <span class="card-id">#1</span>
+            <span class="card-title">Light Mode Cleanup</span>
+          </div>
+          <div class="card-desc">Fixed muddy colors on category cards, added bright gradients.</div>
+          <div class="card-tags">
+            <span class="tag version">vR, pre-CP-1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="tag quick">⚡ Quick</span> Easy win</div>
+    <div class="legend-item"><span class="tag medium">⚡ Medium</span> Some effort</div>
+    <div class="legend-item"><span class="tag large">⚡ Large</span> Big project</div>
+    <div class="legend-item"><span class="tag new">🆕 New</span> Just completed</div>
+  </div>
+</body>
+</html>

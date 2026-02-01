@@ -1,0 +1,1023 @@
+Aura
+I want you to help us make it amazingJan 18Hey Philip! I'm excited to help you make Aura amazing. You've already got it running locally, which is a great starting point.
+To give you the most useful help, tell me a bit more about what you're envisioning:
+What aspects are you most eager to improve? For example:
+
+Visual design and UI polish
+User experience flows
+New features or functionality
+Performance
+Something else entirely
+
+And where are you at with the codebase right now—do you have specific areas you've already identified that need work, or would you like to explore it together and figure out where to focus?I never learned to code.
+It was always too intimidating for me.
+But now, vibe coding seems to be ready.Adam Stallard is a systems genius.
+His designs and codes are always excellent.
+And he is very slow by himself.We have other worldwide devs that occassionally work on it.Jan 18That's a perfect setup for what you're trying to do. You've got Adam's excellent foundation to build on, and now AI tools can help you contribute meaningfully without needing years of coding experience first.
+Vibe coding is real—you describe what you want, the AI writes the code, you see if it works, iterate. Your job becomes creative direction and quality judgment rather than syntax memorization. With your eye for what makes something feel right (which you clearly have, given your interest in visual improvements), you can add genuine value.
+Here's how I'd think about your role on Aura:
+What you bring: Fresh eyes on the user experience, taste, persistence, and now an AI partner who can translate your intentions into code changes.
+What Adam brings: Architecture decisions, code review, knowing where the landmines are buried.
+A good workflow might be: You prototype improvements locally with my help, get them working, then Adam reviews before anything goes live. That way you're accelerating him rather than creating work for him.
+Want to pull up the Aura codebase and walk through it together? We can identify a small, concrete improvement to start with—something visual that would let you experience the full cycle of making a change, seeing it work, and feeling that momentum.
+What part of Aura's interface has been bugging you most?Let's not start with code.
+Lets start with Aura.
+We have figured out a bunch of cool things, but have not nailed the incentive flywheel that needs to power this thing.
+Aura could be super useful and valuable at scale.Jan 18Ah, this is the right place to start. The incentive design is everything—get that wrong and no amount of beautiful code matters.
+So Aura is a decentralized expert evaluation platform. Walk me through what you've figured out so far:
+What's the core loop? Who does what, and what do they get for doing it?
+Where does it break down? What's the part where you go "this works in theory, but why would someone actually do this?"
+What does it look like at scale when it's working? Paint me the picture of Aura humming along with thousands of users—what's happening, who's getting value, and where is that value coming from?
+I want to understand the machine before we tinker with it.what does this mean when claude is coding?Jan 19That's showing the size of the code changes Claude made:
++835 (green) = 835 lines of code added
+-76 (red) = 76 lines of code removed
+So in that edit, Claude wrote a net 759 new lines. It's a quick way to see whether a change was a small tweak or a substantial rewrite.
+
+Back to Aura when you're ready—I'm curious about that incentive flywheel.here is the gitbbook. https://brightid.gitbook.io/aura
+Basically, the evaluations we will eventually provide are valuable in the world. We should be able to incentivize team (and the resulting managers, trainers, and players) to do an accurate job of evaluating in order to earn a share of the value the Leauge earns sellign the evaluations to the world.Jan 208 stepsFailed to fetch https://brightid.gitbook.io/aura/how-to-play/level-upsite:brightid.gitbook.io aura level up5 resultsWhat is Aura? | Auragitbook.ioDevice Recovery | BrightIDgitbook.ioBrightIDgitbook.ioConnect to Apps | BrightIDgitbook.ioObteniendo la verificación | BrightID-Españolgitbook.ioOkay, I've got a good picture of the system now. Let me synthesize what I understand and then we can dig into the incentive problem.
+
+Here's what I'm seeing:
+The Hierarchy:
+
+Subjects — people being evaluated (wanting verification)
+Players — evaluate subjects, earn "energy" (verification power) from trainers
+Trainers — evaluate players, decide who gets energy, monitor for suspicious behavior
+Managers — evaluate trainers and other managers, can cut off whole regions of the graph if attacks are detected
+Teams — groups of sybil defenders that create independent "energy flavors" and compete for usage by apps
+
+The Current Value Flow:
+
+Apps want reliable sybil protection (proof someone is unique)
+Teams have reward addresses where anyone can send tokens
+Those tokens get distributed to players proportionally to their energy
+So in theory: apps pay → teams distribute → participants earn
+
+Where the Flywheel Breaks:
+The missing piece seems to be: why would apps pay enough to make this worthwhile?
+Right now, BrightID verifications are kind of a "nice to have" for apps. The evaluations themselves need to become valuable enough that apps need them and will pay real money for them.
+You mentioned expanding beyond just unique humanity verification into domains like insurance claims, grant reviews, regulatory compliance, credentialing. That's where the real revenue potential lives—but it also requires building out domain-specific expertise in the network.
+The core question: How do you bootstrap enough value flowing into the system to motivate the evaluators, trainers, and managers to do quality work before you have the scale that makes this obviously valuable?
+Is that the right framing of where you're stuck?The idea is that Teams have to pay an upfront fee to be created.
+(I am willing to purchase the first team.)The team is purchased in USD which is instantly used to market buy BRIGTH tokens.
+These tokens now go into the prize pool.
+The league divvies up a modest portion of the prize pool each period (maybe 1 week) and pays it out to the top teams. The Teams then divide up their payout among their members (Owners, Managers, Trainer, Players).On day 1, there may only be 1 team (mine).
+So all of that week's prizes will come to my team.
+In the furture, other teams will buy in and increase the prize pool.
+Also paying customers that want the evaluations will fund the prize pool.
+They will pay in USD for access to the answer service. When they pay USD, it will automatically buy BRIGTH and put it in the prize pool.As new Domains are created, this same loop repeats.Show moreJan 20This is a clever bootstrap. Let me play it back and then poke at the parts that might need more thinking.
+The Loop:
+
+Teams pay USD to enter → instant market buy of BRIGHT → prize pool grows
+League distributes portion of prize pool weekly to top-performing teams
+Teams distribute to their members (Owners, Managers, Trainers, Players)
+As the system proves valuable, apps pay USD for evaluations → more BRIGHT bought → prize pool grows
+Larger prize pool attracts more teams → more buy-ins → flywheel accelerates
+
+What I like about this:
+
+You're the first team, so you capture 100% of early rewards—this funds the initial work without needing outside capital
+The BRIGHT buy pressure is built into every transaction (team entry AND customer payments)
+New domains can copy-paste the same structure
+Teams competing for prize share creates natural quality pressure
+
+Questions that might need answers:
+1. How does the League determine "top teams"?
+This is the crux. If it's based on evaluation volume, you incentivize spam. If it's based on accuracy, how do you measure accuracy in a decentralized system where ground truth is fuzzy? If it's based on app usage/preference, you're back to needing paying customers before the incentives work.
+2. What prevents your solo team from just... coasting?
+Day 1, you get all the prizes. Day 30, still just you. What's the forcing function that makes new teams want to buy in? Is it that the evaluation market is growing and they see revenue opportunity? Or do you need some mechanism that makes single-team dominance unstable?
+3. How do Team members get paid?
+Is this at Team discretion, or is there a protocol-level formula? If it's discretionary, what stops an Owner from keeping everything? If it's fixed, how do you handle different contribution levels?
+What's your current thinking on measuring team performance?1) The leagues job is to evaluate the teams and constantly think about ht best way to weigh the results of various teams. The goal is an anti-fragile system where if a team is corrupted or gets bad, the league will stop weighing their opinions. All teams in a domain are effectively answering the same evaluations, so the league can make a single composite answer.The league is constantly looking at the past and thinking about the future to weigh things optimally.2) Team one can ost while alonoe, but once anopther team starts, that team could potentially claim all of the prize pool. Team 1 would never recoup their initial investment if they don;t play well.3) I am not sure how teams shoudl share their revenues. I am invclined to leave it up to the teams to figure out how best to allocate. Perhaps we have some initial baseline that can be adjusted.Show moreJan 20This is getting clearer. Let me reflect back the key insight and then dig into the part you're least sure about.
+The Anti-Fragility Mechanism:
+The League isn't just distributing prizes—it's acting as a meta-evaluator. All teams answer the same evaluations, so the League can see whose answers age well over time. Teams that consistently agree with the eventual consensus (or whose answers prove accurate when ground truth emerges) get weighted more heavily. Teams that diverge or get corrupted get downweighted.
+This means: even if a team bought in big, they can't capture prizes if they're not contributing accurate signal. Your initial investment only pays off if you actually do good work. That's the forcing function.
+On Team Revenue Sharing:
+Your instinct to leave it flexible is probably right for now, but it's worth thinking through the failure modes:
+If Owners keep too much: Good Managers, Trainers, and Players will migrate to teams that share more equitably. Competition solves this over time.
+If payouts are too egalitarian: Free-riders coast on others' work. The best evaluators leave for teams that reward quality.
+A possible baseline: Teams could default to something like energy-weighted distribution—the more evaluation power you hold within the team, the larger your share. Owners can adjust from there. This creates a sensible starting point without locking anyone in.
+The Harder Question:
+How does the League itself get governed? Who decides how to weigh teams? If that's centralized, it's a single point of failure. If it's decentralized, how do you prevent capture?
+Is the League a DAO? A multisig? Adam making judgment calls? Something else?The League structure is a bit unclear now, but importantly, it can also be repalced. Another league could be spun up if League 1 is doing a poor job. The league is meant to be centralized but with teams having some control and oversigth. Think the NFL. The team owners care and vote, but the league is really in charge. If the owners ever got fed up, they could start a lew league with their people.We have imagined that users can be Trainers and above on a max of liek 5 teams.
+They have to choose.
+Players can be part of endless teams, since it just requires a Trainer on that team to have rated them as a positve Player in order for their evaluations to impact that team's meta-evaluation reported to the leagueJan 20This is a really elegant design. The exit threat keeps the League honest without requiring complex on-chain governance. And the participation limits create interesting dynamics.
+The 5-Team Cap for Trainers+ Creates:
+
+Skin in the game: You can't hedge by joining every team. You have to pick where you believe.
+Differentiation pressure: Teams need to compete for the best Trainers and Managers, which means offering better revenue shares, better culture, better tooling.
+Loyalty dynamics: If you're a great Trainer, multiple teams want you. But once you're committed, you're invested in that team's success.
+
+Unlimited Player Participation Creates:
+
+Low barrier to entry: Anyone can start contributing evaluations immediately.
+Meritocratic discovery: A Player doing great work will get noticed by Trainers across multiple teams—their evaluations start flowing into multiple team scores.
+Natural talent pipeline: The best Players become obvious candidates for Trainer roles when spots open up.
+
+The Picture Coming Together:
+League (replaceable, centralized-ish)
+   ↓ weighs and rewards
+Teams (buy in with USD → BRIGHT, compete for prizes)
+   ↓ recruit and compensate
+Managers → Trainers → Players
+   ↓ evaluate
+Subjects (in a given Domain)
+   ↓ produces
+Composite Answers → sold to Apps → USD → BRIGHT → prize pool
+What's still fuzzy to me:
+When you say the League "weighs" teams—is this algorithmic (based on historical accuracy metrics), judgment-based (League officials reviewing team performance), or some hybrid? The answer affects how gameable the system is.The League will use algorithmic weigthing constantly being reviewed.
+Teams can weigh in on other teams.
+We are constantly using future results to back test previosu answers.
+Showing that your team repsones were accurate int he past increase the weigth of your answers for the future. When your answers ever start not back testing well, your lague power will be dimminished.Every team could theoretically listen to the evaluations of every Player. It just requires that one of their Trainer's has evaluated the Player positive. The higher scoring the Trainer, the more the Player's evaluation will impact the team conclusion.Jan 20Now I see the full picture. This is a recursive trust system where accuracy compounds.
+The Feedback Loop:
+Past accuracy → more weight → more influence on composite answers → more prize share → ability to attract better Trainers → better evaluations → more future accuracy
+And the inverse: bad calls get exposed by time → weight drops → prize share drops → talent leaves → team either improves or dies.
+The Trainer as Amplifier:
+A Trainer isn't just saying "this Player is good." They're staking their own reputation on it. If a Trainer vouches for a Player who turns out to make bad evaluations, the Trainer's score suffers, which diminishes how much that Player's evaluations count for the team.
+So Trainers are incentivized to:
+
+Find talented Players others haven't discovered yet (alpha)
+Cut off Players who start performing poorly (risk management)
+Develop Players to be better evaluators (investment)
+
+The Emergent Property:
+Teams become evaluation funds. They're portfolio-constructing by choosing which Trainers to empower, who choose which Players to amplify. The League is like a market that prices each fund's track record.
+One Thing Worth Stress-Testing:
+What happens in domains where ground truth takes a long time to emerge?
+In BrightID's unique-humanity domain, you eventually find out if someone was a sybil. But in something like grant reviews or insurance claims, the feedback loop might be months or years. During that lag, how do you prevent a team from gaming short-term metrics while making secretly bad long-term calls?
+Is there a mechanism for that, or is it just accepted latency in some domains?haven't built that mechanism yet.
+But for more specific domains, there can be reviewers.As long as some of the folks nar the top are honest, they will be looking at evalaution all up and down through the structure.Team owners select initial energy flow to Managers.
+Managers rate other Managers and flow energy to eachother using modified Sybil Rank.
+This established Manager Power.
+Then all Managers evaluate Trainers. The higher they rate them, the more portion of the Manager's score impacts the Trainer. More powerful Managers give more score to Trainers. Or higher rating from a Manager gives more score than a lower rating from that Manager.Same setup with Trainers and their underlying players.Show moreJan 20Got it. The energy cascade is the accountability mechanism.
+The Trust Waterfall:
+Team Owners
+   ↓ allocate initial energy
+Managers ←→ Managers (rate each other, SybilRank)
+   ↓ rate and empower
+Trainers
+   ↓ rate and empower  
+Players
+   ↓ evaluate
+Subjects
+Every level is accountable to the level above, but also to outcomes. If a Manager empowers a Trainer who empowers Players who make bad calls, that eventually shows up in backtesting, which hurts the team's weight, which reduces everyone's prizes.
+The Honesty Assumption:
+You only need some honest actors near the top for the system to self-correct. Bad Managers get downweighted by other Managers via SybilRank. Bad Trainers get cut by Managers protecting their own scores. Bad Players get dropped by Trainers.
+Corruption has to capture an entire team to persist—and even then, the League will downweight that team based on results.
+What You've Actually Built:
+This is a prediction market for evaluations, but instead of betting money, you're betting reputation-energy. And instead of binary outcomes, you're building a continuous track record.
+The Remaining Design Question:
+You said team revenue sharing is TBD. Given this energy structure, there's a natural option: pay out proportional to energy held within the team.
+Managers with more energy (from owner allocation + peer ratings) get more. Trainers get paid based on how much Manager-energy flows to them. Players get paid based on Trainer-energy.
+This means your compensation directly reflects how much the team trusts your judgment. Does that feel right, or do you want other factors in there?yes, we basiclaly want a payout structure liek that.
+It is not clear yet, where the value really lies. (owner, manager, trainer (least liekly- player))
+Don;t want everyone to have to do it the same.Jan 20That's wise. You don't actually know yet where the value accrues—and it probably varies by domain.
+In some domains: The Managers are the scarce resource. Deep expertise, years of experience, hard to replace. They should capture most of the value.
+In other domains: Players doing high-volume, accurate evaluation work might be the bottleneck. A great Trainer who can identify and develop those Players is the real asset.
+In early stages: Owners are taking all the risk, funding the buy-in, bootstrapping the team. Maybe they should capture more upfront.
+Letting Teams Experiment:
+If each team sets their own payout formula, you get:
+
+Natural experimentation (which structures attract the best talent?)
+Competitive pressure (teams that underpay will lose people)
+Domain adaptation (insurance claims teams might pay differently than grant review teams)
+
+A Minimal Protocol-Level Constraint:
+You might just enforce transparency: teams must publish their payout formula. Players and Trainers can see what they're signing up for. Let the market sort out what's fair.
+The Question That Will Answer Itself:
+Once there's real money flowing, you'll see where people fight over compensation. That tells you where the perceived value is. Right now it's theoretical—six months into a working system, you'll have data.
+
+What feels like the next thing to nail down? We've covered:
+
+Prize pool mechanics ✓
+Team competition ✓
+League governance ✓
+Energy cascade ✓
+Payout flexibility ✓
+
+Is there a piece that still feels wobbly, or should we shift to how this gets built?Players just have to accurately and honestly answer questions (evaluate Subjects).
+Trainers have to accurately and honestly evaluate how well Players are doing their jobs. How confident is the Trainier that the Player is passing up good answers.
+Manager to to evalaute if Trainers are doing a good job at evaluating Players.
+Managers also have to evaluate if other managers are doing a good job managing things.
+And the owners sit on top of everything and decide how to evalaute and split up power among the managers.Jan 20This is a clean separation of concerns. Each role has one job, and that job is evaluating the layer below (plus Managers peer-evaluating).
+The Role Clarity:
+RoleWhat they evaluateWhat they're askingPlayerSubjects"Is this claim true?"TrainerPlayers"Is this Player giving accurate answers?"ManagerTrainers + other Managers"Is this Trainer good at spotting good Players? Are my peer Managers doing their jobs?"OwnerManagers"Which Managers should have power? How should we structure this team?"
+The Interesting Implication:
+Players need domain knowledge—they have to actually understand the subject matter to evaluate claims.
+But Trainers don't necessarily need that same domain expertise. They need to be good at recognizing patterns of good judgment. A Trainer might not know if a specific insurance claim is valid, but they can see that Player A's evaluations consistently backtest well while Player B's don't.
+Managers are even more meta. They're evaluating evaluators-of-evaluators. This is almost a pure judgment-of-character role.
+Owners are strategists. They're thinking about team composition, competitive positioning, capital allocation.
+This means:
+You could be a great Manager across multiple domains even without deep domain expertise—because you're evaluating Trainer behavior patterns, not subject-matter truth.
+But Players are domain-locked. A great insurance-claims Player might be useless at grant reviews.
+Does that match your intuition? It has implications for how people move up the hierarchy.yes exactly.
+We imagine Managers as generals. They need to know how to look at systems.
+They don't necessarily need to have good specific domain knowledge.
+You can be a great Manager, yet never make Player evalautions.All user can be any and all roles. I am all of themJan 20Right. The roles aren't ranks you climb—they're hats you wear.
+You might be:
+
+A Manager on Team A (evaluating Trainers and peer Managers)
+A Trainer on Team B (evaluating Players)
+A Player on Teams C, D, E, F, G (making subject evaluations)
+An Owner on Team A (allocated initial Manager energy)
+
+All at once. Different contributions to different teams based on where you add value.
+This explains the participation limits differently:
+The 5-team cap for Trainers+ isn't about preventing spread-too-thin. It's about forcing meaningful commitment at the levels where your judgment shapes the team's structure.
+As a Manager, your evaluations of Trainers directly affect team performance. You need to be paying attention. Five teams max means you can actually do the job well.
+As a Player, you're just answering questions. Your Trainer has already vouched for you, and your answers get weighted by their confidence. You can do that across unlimited teams because the accountability is upstream.
+The Talent Discovery Path:
+Someone joins as a Player across many teams. They do good work. Multiple Trainers across different teams notice and rate them highly. Eventually a team says "we want you as a Trainer"—but now you have to choose, because you only get five slots at that level.
+The system surfaces talent, then forces commitment.
+What's the current state of the product? Is this all designed but not built? Partially working? I'm curious how far the implementation is from this vision.there is no permission required in the system.
+Anyone can start doing the action of each role. Their evalations just aren;t used for anything until someone of a higher rank evaluates them in their role.Anyone can start Playing today. But until a trainer rates them they are not on a team.
+As soon as a Trainer rates them, they are playing for all of the teams that the Trainer is part of (up to 5) that the trainer selected to add them.Anyone can becoem a Trainer by rating Players, but they have no impact or team until a Manager rates them. Now the Trainer is playing on the teams of the Manager that the Manager selected to add them too.All ratings at all levels flow across all teams that someone is part of.
+One rating, many uses.Jan 20This is beautifully permissionless. No gatekeeping, just gravity.
+The Activation Model:
+You don't apply to be a Trainer. You just start training—rating Players, building a track record. You're a Trainer with zero power, broadcasting into the void.
+Then a Manager notices you. They rate you positively. Suddenly your Trainer evaluations have weight on that Manager's teams. You didn't ask permission. You just became useful.
+Same at every level:
+
+Players evaluate Subjects → weightless until a Trainer activates them
+Trainers evaluate Players → weightless until a Manager activates them
+Managers evaluate Trainers + Managers → weightless until an Owner allocates them energy (or peer Managers rate them?)
+
+"One rating, many uses" is the key efficiency:
+When you rate a Player as a Trainer, that rating flows to every team you're on. You don't re-evaluate them per team. Your judgment is your judgment—the system just routes it appropriately.
+This means good evaluators get leveraged. A sharp Trainer on 5 teams is contributing signal to all 5 with each evaluation they make.
+The Emergent Scouting Game:
+There's alpha in finding unactivated talent. If you're a Manager and you spot someone doing great Trainer-work that no other Manager has noticed yet, you activate them and your teams benefit from their signal before anyone else.
+Same for Trainers scouting Players.
+One clarification:
+When a Manager activates a Trainer, does the Trainer automatically join all of that Manager's teams? Or does the Manager choose which of their teams to add the Trainer to?you choose which of your 5 teams to add underlings.
+In many cases you would add all 5, but maybe some teams are very strict and only want people added very carefullyJan 20That makes sense. Teams can have different cultures and standards.
+Team Personality Emerges:
+
+Team A: "We add everyone who shows promise. Cast a wide net, let the energy weighting sort out quality."
+Team B: "We only add proven performers. Smaller roster, higher average quality, less noise."
+Team C: "We specialize in insurance claims. Only add people with demonstrated domain expertise."
+
+A Manager on multiple teams might add a new Trainer to Teams A and C but not B—because B has higher standards and this Trainer isn't proven yet.
+The Manager's Decision Space:
+When you spot a good Trainer, you're asking:
+
+Which of my teams would benefit from this person's signal?
+Which of my teams would this person's signal be noise for?
+Does adding them to a strict team risk my reputation with that team's Owners?
+
+This is real judgment work. Not just "is this Trainer good?" but "is this Trainer good for this team's approach?"
+
+Stepping back—I think we've mapped the system pretty thoroughly:
+
+Prize pool mechanics (USD → BRIGHT → weekly distribution)
+League governance (centralized but replaceable, algorithmic weighting with oversight)
+Team competition (buy-in, backtested accuracy determines weight)
+Energy cascade (Owners → Managers → Trainers → Players)
+Permissionless entry (do the work, get activated when noticed)
+Role flexibility (wear multiple hats, 5-team cap at Trainer+)
+Payout flexibility (teams decide, transparency required)
+
+What would be most useful now?
+I could help you:
+
+Write this up as a clear document for others to understand
+Identify gaps or attack vectors we haven't stress-tested
+Think through the first domain launch practically
+Something else?
+review the full gitbook again https://brightid.gitbook.io/aura
+and then writeup a description of how all of this works togetherJan 2011 stepsFailed to fetch https://brightid.gitbook.io/aura/how-to-play/energyFetched Decentralizing BrightID with Collective Intelligenceparagraph.comNow I have a comprehensive picture. Let me write this up.1 stepCreating a comprehensive document describing how Aura works, combining the GitBook documentation with the incentive flywheel design discussed in our conversationaura-system-design.jsInstalling docx package and generating the documentbashcd /home/claude && npm install docx && node aura-system-design.jstry again. something got messed upJan 20Installing docx packagebashcd /home/claude && npm install docx 2>&1Outputnpm error config prefix cannot be changed from project config: /home/claude/.npmrc.
+npm error code EAI_AGAIN
+npm error syscall getaddrinfo
+npm error errno EAI_AGAIN
+npm error request to https://registry.npmjs.org/docx failed, reason: getaddrinfo EAI_AGAIN registry.npmjs.org
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-01-20T17_12_04_365Z-debug-0.log
+Checking node installation and available global modulesbashwhich node && node --version && ls /usr/lib/node_modules/ 2>/dev/null || ls /usr/local/lib/node_modules/ 2>/dev/nullOutput/usr/bin/node
+v22.21.0
+corepack
+npm
+Network is disabled, so I can't install packages. Let me create this as a well-formatted markdown file instead, which will render nicely for you.1 stepCopying the file to outputs folderbashcp /home/claude/aura-system-design.md /mnt/user-data/outputs/aura-system-design.mdOutputexit code 0Presented fileHere's the comprehensive writeup of how Aura works, synthesizing the GitBook documentation with everything we discussed about the incentive flywheel.
+It covers the full system: the role hierarchy, permissionless entry, energy cascade, teams, the League, the prize pool mechanics, accountability mechanisms, and how it all fits together.
+Let me know if you want me to adjust the framing, add sections, or dive deeper on any particular aspect.Aura system designDocument · MD Downloadthis is pretty good, but it is too long and gets a few things wrong.
+It is also too long.Only Managers are involved in Energy. It hops among Managers per the formula and then stops. The results are used to determine each Manager's score on a team. Then, based on the Manager's ratings and confidence levels of each Trainer, the Trainer scores are calculated.When Manager's are rating other manager's it is a zero sum game. You only have so much power. Allocating more to one person by giving them a higher condifence rating decreases the power you have already given to other managers. You only have 100%.But when evaluating Trainers and Players, you could give full raitng and therefire scoring impact to everyone. Every Trainer or Player you rate a certain level wil get an identical number of score points from you. The higher your (higher level rank) the more score you will give for any given rating you give.Show moreJan 20Got it. Let me fix those key mechanics and tighten the whole thing up.1 stepReplacing with corrected versionbashcp /home/claude/aura-system-design-v2.md /mnt/user-data/outputs/aura-system-design.mdOutputexit code 0Presented fileHere's the tightened version with the corrected scoring mechanics:
+
+Manager-to-Manager: Zero-sum. 100% to allocate. Higher confidence to one = less to others.
+Manager-to-Trainer and Trainer-to-Player: Additive. Same rating = same score points to everyone. Your score determines how many points your ratings give.
+
+Cut it roughly in half. Let me know what else needs fixing.Aura system designDocument · MD Downloadrewrite for an external audience who wants to gain a basic understanding of what Aura is, why it is different, and how it works. The reader should walk away excited and intrigued about the possibilitiesJan 201 stepCopying to outputsbashcp /home/claude/aura-overview.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileHere's the external-facing version. Focused on the "why should I care" before the "how does it work." Ends with excitement about possibilities and a clear call to action.
+The tagline at the end: "Where accuracy pays and truth wins."
+Let me know if the tone or emphasis needs adjusting.Aura overviewDocument · MD Downloadfurthe rbreakout Manager of MAangers since this is a seperate thing.
+A trainer rating a player is not transative. You are just saying trust this player's answers.
+A manager evaluating a Trainer give 1 hop of transative. You are trusting the trainer to evaluate players, and therefore listening to those answers.When a manager evalutes a manager, it is endlessly transative. (This is how and why energy hops between managers.) when you evaluate a manger, you no longer control where it all goes.Jan 201 stepReplacing with updated versionbashcp /home/claude/aura-overview-v2.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileUpdated. The "Layers of Trust" section now breaks out the transitivity at each level:
+
+Trainer → Player: No transitivity. Just trusting that Player's answers.
+Manager → Trainer: One hop. Trusting the Trainer's judgment of Players.
+Manager → Manager: Endlessly transitive. Energy hops onward via SybilRank. You lose control of where it goes.
+
+That last point is why Manager-to-Manager is zero-sum and high-stakes.Aura overviewDocument · MD Downloadto clarify, the owner's job in relation to energy is to choose the step zero allocation. From there it flows around view the energy algorithm. So the owners are only sort of in charge. If the managers they allocate energy don't evaluate them back well, the owners can end up without power. They only impact step 0 in there ownership role.Ownsership can be shared among many people or just be a few.Jan 201 stepReplacing with corrected versionbashcp /home/claude/aura-overview-v3.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileFixed. Owners now correctly described as:
+
+Setting step-zero energy allocation only
+No ongoing control—energy flows via the algorithm after that
+Can lose power if Managers don't evaluate them well in return
+Ownership can be many people or few
+
+The Owners light the fuse, but they don't control the explosion.Aura overviewDocument · MD Downloadrethink the whole writeup from first principles.
+review our whole conversation and write a more compelling explination of why this system exists, how it is different, and how it works.Jan 20Let me review our full conversation and rethink this from scratch.1 stepReplacing with final versionbashcp /home/claude/aura-final.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileRebuilt from scratch. The key reframes:
+The hook: The world needs answers it can trust, and both current approaches (authorities and crowds) are broken.
+The core insight: What if accuracy paid? That single question drives everything else.
+The mechanics: Explained through the lens of "trust flows differently at each level"—making the transitivity point central rather than tacked on.
+The Owners: "Lighting the fuse doesn't mean you control the fire."
+The pitch: Not "trust us" and not "count the votes." Just: who's been right?
+Shorter tagline at the end: Accuracy pays. Truth wins.Aura overviewDocument · MD DownloadMake this for an outside audience that is trying to quickly understand Aura for the first time.Jan 201 stepReplacing with quick-read versionbashcp /home/claude/aura-intro.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileStripped to essentials. Someone can read this in under two minutes and walk away understanding what Aura is and why it matters.Aura overviewDocument · MD Downloaduse the idea of -  not jobs, but hats from before.Groups do not form teams. Peopel create a team, flow energy to managers which kicks off the scoring algorithms.Jan 201 stepReplacing with corrected versionbashcp /home/claude/aura-intro-v2.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileFixed:
+
+"Hats you can wear" instead of jobs
+Teams: someone creates one, pays entry fee, allocates energy to Managers, scoring algorithm kicks off
+Aura overviewDocument · MD DownloadAI shoudl be an important part of Aura in teh long run.
+I will certainly use it to help me be better in each of my roles.Theoretically, an AI could do any of these roles itself. How woudl you start to involve AI in this setup?Jan 20Great question. Let me think through this carefully.
+Where AI fits naturally today:
+Assisting human judgment — This is where you are. AI helps you evaluate faster and more thoroughly. It can surface patterns you'd miss, flag inconsistencies, summarize evidence, suggest what to look at next. You're still the one making the call and staking your reputation on it.
+Where AI could take on roles directly:
+Player — Most straightforward entry point. An AI evaluates subjects and builds a track record like anyone else. It starts with no weight, gets noticed by Trainers if it's accurate, gets activated. The system doesn't care if a Player is human or AI—it only cares if they're right.
+The interesting constraint: a Trainer has to vouch for the AI. So some human has to stake their reputation on "this AI is accurate." That's a natural check.
+Trainer — Harder. An AI would need to recognize patterns of good judgment in Players over time. Doable, but the Trainers who vouch for the AI-Trainer are now two hops removed from subject evaluation. More trust delegation.
+Manager — Even harder. This is systems thinking—evaluating evaluators of evaluators. But also... potentially where AI excels? Pattern recognition across large numbers of people and outcomes.
+The risk with AI at higher levels:
+Manager-to-Manager trust is endlessly transitive. If an AI Manager gains influence and its evaluations cascade through the network, you've potentially handed significant power to something that might fail in ways humans wouldn't catch.
+A conservative rollout might look like:
+
+Now: AI as assistant to humans at all levels
+Soon: AI as Player, vouched for by human Trainers
+Later: AI as Trainer, vouched for by human Managers who watch it closely
+Eventually: AI Managers—but only after the system has robust ways to detect and cut off AI that goes wrong
+
+The key principle: The existing accountability structure handles AI naturally. AI doesn't get special treatment. It has to earn trust through demonstrated accuracy, just like everyone else. And there's always a human somewhere upstream who staked their reputation on activating it.
+What's your instinct on where to start?yes, AI can start and earn cred liek anyone else.
+they can't be brightID verified as a unique human, but that shoudl not stop them from participating.As a manger, I intend to heavily use AI to help me do my job of being a general.Jan 20That's the right framing. AI participates on merit, not special status.
+The interesting implication:
+An AI can't be BrightID verified—so in the unique humanity domain, it can never be a subject. But it can absolutely be a participant. It can evaluate subjects, get vouched for by Trainers, build a track record, earn rewards.
+The system doesn't ask "are you human?" It asks "are you accurate?"
+Your use case as Manager:
+You're the general. AI is your intelligence operation. It can:
+
+Surface anomalies across Players and Trainers you're watching
+Flag patterns that suggest someone's going bad
+Backtest evaluation histories faster than you could manually
+Suggest where to allocate attention
+Help you think through second-order effects of your ratings
+
+You make the calls. You stake your reputation. The AI makes you better at both.
+Where this gets interesting at scale:
+Some teams might be mostly human with AI assistance (your approach). Other teams might run AI Players supervised by human Trainers. Eventually someone might try a team that's heavily AI at multiple levels.
+The League doesn't care about the composition—it just weights teams by accuracy. If an AI-heavy team outperforms, it wins more prizes. If it fails, it loses weight.
+The market discovers what works.
+One thing worth building:
+Tools that make it easy for Managers like you to plug AI into your workflow. The better the tooling, the more leverage good Managers have—and the wider the gap between teams that use AI well and those that don't.
+Is that something you'd want to spec out?it can be a subject in the BrigthID domain, it just should get a bad rating since it is not a unique human.Jan 20Ah, right. Important distinction.
+An AI can be a subject in the BrightID domain—anyone can look at it and evaluate it. The correct evaluation is just: "this is not a unique human." Negative rating. Working as intended.
+The system doesn't prevent AI from being evaluated. It just produces the accurate answer about what it is.
+So the full picture:
+
+AI as subject in BrightID domain → should get negative rating (not a unique human)
+AI as subject in other domains → depends on the question being asked
+AI as participant (Player, Trainer, Manager) → earns standing through accuracy like anyone else
+
+The domain determines what a correct evaluation means. The participation layer is domain-agnostic—it just cares about track record.
+This also means the system is naturally robust to AI trying to game unique-humanity verification. An AI pretending to be human is exactly what Players are supposed to catch. If they catch it, they're right. If they miss it, they're wrong and their track record suffers.rewrite teh summary with some modest AI involvement in the systemJan 201 stepReplacing with AI-inclusive versionbashcp /home/claude/aura-intro-v3.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileAdded an "AI in Aura" section covering all three angles:
+
+AI as participant — earns standing through accuracy like anyone else
+AI as assistant — helps humans be better at their roles
+AI as subject — gets evaluated, and in BrightID domain the correct answer is "not a unique human"
+
+Kept it modest and factual. The system is agnostic—it just rewards accuracy regardless of who or what is accurate.Aura overviewDocument · MD DownloadThis doc is not feeling right.
+Go back to the original version you produced for me, and updated it based on all the feedback and additional info I have given you.Jan 20Let me go back to the longer, more compelling version and update it with everything we've discussed.1 stepReplacing with complete updated versionbashcp /home/claude/aura-complete.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileBack to the fuller version, now updated with all corrections:
+
+"Hats you can wear" not ranks
+Transitivity explained correctly at each level (none → one hop → endless)
+Manager-to-Manager is zero-sum, energy flows via SybilRank
+Owners set step zero only, then the algorithm takes over
+Teams created by paying entry fee, allocating energy to Managers
+AI section covering participant/assistant/subject
+"Lighting the fuse doesn't mean you control the fire"
+
+Same compelling arc, accurate mechanics.Aura overviewDocument · MD Downloadthis 
+Every day, systems make decisions based on questions they can't reliably answer:isn't quite right. Something more like
+Every day, systems make decisions. How can they know which of that information should be trusted?Jan 201 stepUpdating output filebashcp /home/claude/aura-complete.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileFixed. Now opens with:
+"Every day, systems make decisions. How can they know which information to trust?"
+Then flows into the examples.Aura overviewDocument · MD Downloadhelp me think and then later make a plan
+I have long wished I could design a great way to implement prediction markets in this system.Instead of just being a player, or trainer, peopel migth liek to bet on (or against) peopel being good in these rolls. Bet on your favorite players, managers, teamsAdding this lets outside folks bet on outcomes. Day a team appears to be doing great, but some better bets big against them. This will cause more scurtiny as better try to figure out why the odds have moved. It also gives bad actors a way to bet again wrong doing they are onvoplved in. A gnag member of a group making Sybils, can bet aginst and make a lot when it falls apart.Jan 20This is a really interesting design space. Let me think through it with you.
+What prediction markets add:
+Information surfacing. Someone knows something the evaluators don't. Right now they have no way to signal it. A prediction market lets them put money behind their knowledge. When odds move, it's a signal worth investigating.
+Outsider participation. Not everyone wants to do evaluation work. But some people are good at spotting patterns, reading situations, judging character from a distance. Prediction markets let them contribute signal without wearing any of the hats.
+Whistleblower incentive. This is the clever part. Right now, if you're part of a sybil ring, your incentive is to stay quiet and keep the scheme going. But if you can bet against your own operation before it collapses, you have a financial exit. Defection becomes profitable. This is destabilizing to attackers—they can never fully trust each other.
+
+What you could bet on:
+
+A Player's future accuracy score
+A Trainer's track record over next N periods
+A Manager's standing in 6 months
+A Team's League weight trajectory
+Whether a specific subject evaluation ages well
+Whether a currently-verified person gets flagged as sybil
+
+
+Design tensions to think through:
+Manipulation risk. If I can bet against a Player and I'm also a Trainer who rates them, I have an incentive to tank their score. The evaluation layer and the betting layer could corrupt each other.
+Possible mitigation: You can't bet on people you directly evaluate. Or: bets are revealed with delay so you can't coordinate.
+Timing of resolution. Prediction markets need clear resolution. "This Player will have accuracy above X by date Y" is clean. "This team is good" is not. You'd need well-defined metrics and timelines.
+Liquidity. Markets need counterparties. Early on, who's taking the other side of these bets? Maybe the prize pool itself acts as market maker for certain core bets?
+Information asymmetry. Insiders (Managers, Trainers) have way more information than outsiders. Is that okay? It means insiders can probably extract money from outside bettors. Maybe that's fine—it's another reward for doing evaluation work well.
+
+The whistleblower dynamic is worth zooming in on:
+Imagine a sybil ring with 5 people. Each one knows they could:
+
+Stay loyal, keep the scheme going, split the (fraudulent) rewards
+Bet against the ring, then leak evidence, collect betting winnings
+
+Option 2 is always available. And once one person defects, the others get nothing. So there's constant pressure to defect first.
+This is basically a prisoner's dilemma that Aura imposes on attackers. The prediction market is the mechanism that makes defection pay.
+
+Questions for you:
+
+Do you see betting as a separate layer anyone can participate in, or tied to existing roles somehow?
+What's the core bet you'd want to exist on day one? Team performance? Individual accuracy? Sybil detection?
+How do you think about the Trainer-who-bets-against-their-own-Player problem?
+I think anyone shoudl be able to bet permissionlessly.
+I don;t care about inside information. Perdiction markets incentivize people to share the impact of any information they have.Maybe better to focus on Team and Manager level, not Players too granular.Jan 20That simplifies things nicely.
+Betting on Teams and Managers only:
+Teams and Managers are where the leverage is. A Team's performance is the aggregate outcome everyone cares about. A Manager's judgment shapes everything downstream. Players are too granular—hundreds of small bets with thin information.
+Why inside information is fine:
+You're right. The point of prediction markets isn't to be "fair" like a casino. It's to surface truth. If a Manager knows something about another Manager and bets accordingly, that bet moves the odds, which is the signal. The information gets priced in. That's the whole point.
+If insiders can profit from their knowledge, they're incentivized to act on it—which means the market reflects reality faster.
+What the bets might look like:
+Team bets:
+
+Team X's League weight in 3 months: over/under
+Team X vs Team Y: who has higher weight by date Z
+Team X makes top 3 in prize distribution next period: yes/no
+
+Manager bets:
+
+Manager A's score in 6 months: over/under
+Manager A still above threshold X by date Y: yes/no
+Which of these 5 Managers has highest score by Q3: pick one
+
+
+The whistleblower dynamic at this level:
+A corrupt Manager building a house of cards can be bet against by:
+
+Other Managers who sense something's off
+Trainers downstream who see the rot
+Co-conspirators looking for an exit
+Outsiders pattern-matching on public data
+
+The Manager themselves could bet against their own operation before defecting. So could anyone in the corrupt tree below them. Everyone in a scheme has a financial incentive to be the first to jump.
+
+How it integrates with the existing system:
+The evaluation layer produces scores and outcomes. The prediction market is a side layer that lets anyone speculate on those outcomes. They don't directly affect each other—bets don't change scores. But the information flows:
+
+Unusual betting patterns → signal to Managers to look closer
+Big bet against a rising Team → why does someone know something?
+Odds shifting before a scandal breaks → the market knew first
+
+
+Open questions:
+
+Resolution source: Bets resolve based on the scoring algorithm's outputs? Or some other oracle?
+Market structure: Order book? AMM? Parimutuel? (AMM probably simplest to bootstrap with low liquidity)
+Connection to prize pool: Does betting use BRIGHT? Does it feed the prize pool somehow, or is it a separate economy?
+Visibility: Are bets public? Anonymous? Pseudonymous? Public bets are more informative but might discourage whistleblowers.
+
+What's your instinct on these?The future results are the resolution source.Not sure on best structure.I think seperate from the prize pool. Maybe just in USDC for simplicity.Pseudonymous betting.Should this be a platform we build, or is there an existing service we could viably use?Jan 20On using an existing platform:
+The main contenders for prediction markets right now:
+Polymarket — Largest, most liquid, but focused on discrete events (elections, sports, news). Not built for continuous scores or custom resolution sources. You'd have to create individual markets manually. Doesn't really fit.
+Zeitgeist / Polkamarkets — More programmable, on-chain. Could potentially create custom markets that resolve based on Aura's scoring outputs. But still designed around discrete outcomes, not continuous tracking of scores over time.
+Gnosis Conditional Tokens — Lower level primitive. You could build custom markets on top. More flexibility but more work.
+Augur — Decentralized, custom resolution, but mostly dormant and clunky UX.
+The honest assessment:
+None of these are built for what you want: ongoing markets on entities (Teams, Managers) that resolve based on a proprietary scoring algorithm's future outputs.
+You'd likely need to build a thin layer that:
+
+Pulls score data from Aura's scoring system
+Creates/resolves markets based on that data
+Handles the betting mechanics (probably an AMM for simplicity)
+
+
+Build vs. integrate:
+Option A: Build custom, minimal
+
+Simple AMM for each market (like Uniswap but for binary/scalar outcomes)
+USDC in/out
+Markets auto-resolve when Aura scores update
+Pseudonymous (wallet addresses)
+You control the whole thing, tight integration
+
+Option B: Use Gnosis Conditional Tokens + custom frontend
+
+Proven smart contracts for the betting mechanics
+You build the market creation/resolution layer that talks to Aura
+Less reinventing the wheel, but more glue code
+
+Option C: Partner with an existing platform
+
+Approach Polymarket or Zeitgeist about custom integration
+They handle liquidity and UX, you provide the resolution oracle
+Gives you reach but you're dependent on them
+
+
+My instinct:
+Option A or B. This is core enough to your system's integrity that you probably want to own it. And it's not that complicated—the hard part of prediction markets is liquidity and UX, and you're starting with a niche audience (Aura participants) who are already motivated.
+A simple AMM that resolves based on Aura's own scoring outputs could be a few smart contracts and a basic interface.
+
+Want me to sketch out what the minimal version looks like? Just the core mechanics: what markets exist, how betting works, how resolution works, how the whistleblower dynamic plays out in practice.ok, sketch it out.Jan 20Aura Prediction Markets: Minimal Sketch
+
+What You Can Bet On
+Team Markets:
+
+"Team X's League weight on [date]" — over/under a threshold
+"Team X finishes in top 3 for prize distribution in [period]" — yes/no
+
+Manager Markets:
+
+"Manager A's score on [date]" — over/under a threshold
+"Manager A still active (above minimum threshold) on [date]" — yes/no
+
+Start with just these. Simple, meaningful, easy to resolve.
+
+How Betting Works
+AMM-based (Automated Market Maker):
+Each market is a pool. Two outcomes: YES and NO (or OVER and UNDER).
+
+You buy shares in an outcome with USDC
+Price moves based on demand (more buyers → higher price)
+Prices reflect implied probability (YES trading at $0.70 = market thinks 70% likely)
+
+Why AMM: No need to match buyers and sellers. Works with low liquidity. Battle-tested model (Polymarket uses this).
+Example:
+Market: "Team Alpha's League weight above 15% on July 1"
+
+Current weight: 12%
+YES shares trading at $0.40 (market thinks 40% chance)
+You think they're underrated, buy $100 of YES shares → get ~250 shares
+If Team Alpha hits 15%+, your shares pay $1 each → $250
+If they don't, shares worth $0
+
+
+How Resolution Works
+Fully automated. No oracles. No disputes.
+
+Market has a resolution date
+On that date, system reads the score from Aura's scoring algorithm
+Winning outcome pays $1/share, losing outcome pays $0
+Done
+
+The scoring algorithm is the source of truth. It already exists. Markets just reference it.
+Resolution examples:
+MarketResolution SourceTeam weight over/underTeam's League weight on resolution dateManager score over/underManager's score on resolution dateTop 3 finishPrize distribution results for that periodStill activeScore above minimum threshold on date
+
+The Whistleblower Dynamic in Practice
+Scenario: Corrupt Manager
+Manager B has built influence through a network of fake Trainers. Looks great on paper. Score rising.
+But three people know the truth:
+
+Manager B themselves
+Two accomplices acting as fake Trainers
+
+Any of them can:
+
+Buy NO shares on "Manager B's score above X on [date]"
+Wait for investigation, or leak evidence themselves
+Collect when the score collapses
+
+The game theory:
+Each conspirator knows the others could defect first. Whoever bets first gets the best odds. Waiting is risky—someone else might beat you to it.
+This creates constant pressure to defect. The conspiracy is unstable from day one.
+The signal to the system:
+If someone places a large NO bet on a rising Manager, that's unusual. Why would anyone bet against apparent success?
+Managers and Trainers see the odds shift. They start looking closer. The bet itself triggers scrutiny.
+Even if the whistleblower stays anonymous, their money talks.
+
+Market Lifecycle
+CREATE → OPEN → RESOLVE → SETTLE
+
+CREATE:
+- Anyone can create a market (pays small fee to prevent spam)
+- Specifies: subject (Team/Manager), metric, threshold, resolution date
+- Initial liquidity seeded (creator provides, or protocol provides)
+
+OPEN:
+- Anyone can buy YES or NO shares with USDC
+- Prices move based on demand
+- Can sell shares back to pool anytime before resolution
+
+RESOLVE:
+- Resolution date hits
+- System reads score from Aura
+- Outcome determined automatically
+
+SETTLE:
+- Winning shares redeemable for $1 each
+- Losing shares worth $0
+- USDC distributed to winners
+
+Economics
+Where does money come from/go?
+
+Bettors put in USDC, winners take out USDC
+Small fee on each trade (1-2%) goes to:
+
+Liquidity providers (incentivizes seeding markets)
+Protocol treasury (funds development)
+
+
+
+Liquidity bootstrapping:
+Early markets might have thin liquidity. Options:
+
+Protocol seeds initial liquidity for key markets (top Teams, top Managers)
+Liquidity mining rewards for early LPs
+Keep markets small until volume grows organically
+
+
+What to Build
+Smart contracts:
+
+Market factory (creates new markets)
+AMM pool (handles trading)
+Resolution module (reads Aura scores, settles markets)
+
+Frontend:
+
+Browse markets (by Team, by Manager, by resolution date)
+Buy/sell interface
+Portfolio view (your positions)
+Market creation interface
+
+Integration:
+
+Read-only connection to Aura scoring system
+Scores pulled automatically at resolution time
+
+
+What NOT to Build (v1)
+
+Complex market types (keep it binary/scalar only)
+Leverage or margin
+Fancy order types
+Mobile app (web only)
+Social features
+
+Get the core loop working: bet → wait → resolve → collect. Everything else is later.
+
+Open Questions
+Who can create markets?
+Anyone? Or curated list to start? Anyone is more permissionless, but you might get spam or weird markets nobody trades.
+Suggestion: Anyone can create, but protocol highlights "official" markets on key Teams/Managers.
+Minimum market duration?
+Too short and it's noise. Too long and capital is locked up.
+Suggestion: Minimum 30 days. Most markets 3-6 months out.
+What happens to undecided markets?
+If a Manager leaves the system entirely before resolution, what happens?
+Suggestion: "Still active" is itself a market. If they're gone, "above X score" resolves NO.
+
+Why This Works
+Prediction markets are credibly neutral. They don't take sides. They just ask: what's going to happen?
+The betting layer doesn't corrupt the evaluation layer—it just watches it and lets people speculate. But that speculation produces information:
+
+Large bets against "sure things" signal hidden problems
+Odds movements predict scandals before they break
+Whistleblowers have a profitable exit
+Attackers can't trust their co-conspirators
+
+The evaluation layer produces truth. The prediction layer prices it early.
+
+Next steps if you want to pursue this:
+
+Decide: build custom or use Gnosis Conditional Tokens as base
+Define the first 5-10 markets you'd want to exist
+Sketch the resolution interface (how contracts read Aura scores)
+Prototype the AMM math
+Simple frontend
+
+Want me to go deeper on any of these?another important aspect of the system.
+When information changes, you should change your answers.
+It is one thing to be wrong in an evaluation, but as soon as you realize your error, it is important to fix it ASAP. A good participant isn;t always rigth about the past, but they are always trying to make their current answers as strong as possible.We want people to be rigth as soon as they can be.Jan 20This is a crucial point that changes how you think about the whole system.
+The distinction:
+It's not just "were you right?" It's "how quickly did you become right?"
+Two Players both eventually mark a sybil as negative. But:
+
+Player A caught it on day 3
+Player B caught it on day 45
+
+They both end up "correct" in the final tally. But Player A provided way more value. Those 42 days matter—that's 42 days the sybil was verified and potentially doing damage.
+What this means for scoring:
+Being wrong isn't the sin. Staying wrong is the sin.
+A good participant:
+
+Makes their best call with available information
+Stays alert for new information
+Updates fast when they realize they were wrong
+Doesn't get attached to past judgments
+
+The incentive shift:
+Most reputation systems punish changing your mind. You look inconsistent. You lose face. So people dig in and defend past positions even when they suspect they're wrong.
+Aura should do the opposite. Updating quickly should be rewarded. The system should ask: "Given what we eventually learned, how early did you have the right answer?"
+How this could work mechanically:
+When backtesting, don't just check if someone was right at the end. Check when they became right.
+
+Sybil detected on day 60
+Player A marked negative on day 5 → maximum credit
+Player B marked negative on day 55 → good, but less credit
+Player C marked negative on day 65 → late, minimal credit
+Player D never updated → penalty
+
+You could weight accuracy by time: early correct answers worth more than late correct answers.
+The prediction market connection:
+This reinforces the whistleblower dynamic even more. If you're part of a sybil ring and you know it's going to collapse:
+
+Bet against the operation (make money on the collapse)
+Update your evaluations to be correct (protect your score)
+Do both as early as possible (maximize both)
+
+The system rewards you for being right early on both layers.
+For Trainers and Managers too:
+Same principle applies up the chain.
+A Trainer who vouched for a bad Player but cuts them quickly when problems emerge → better than one who defends them forever.
+A Manager who backed a bad Trainer but downgrades them fast → better than one who stays loyal despite evidence.
+The question isn't "did you make mistakes?" Everyone makes mistakes. The question is "how fast do you fix them?"
+
+This could be a core Aura principle worth stating explicitly:
+"Be right as soon as you can be. The system rewards early accuracy, not stubborn consistency."
+
+Want me to work this into the overview doc? Or sketch out how the time-weighted scoring might work mechanically?also, when a manager for example come to believe a player is doing a bad job, then they should be downgrading any of the trainers that is giveing good marks to that Player.Jan 20Yes. This is how accountability cascades upward.
+The logic:
+If I'm a Manager and I see a Player making bad evaluations, that's not just a Player problem. It's a Trainer problem. Some Trainer vouched for that Player. Some Trainer is still vouching for that Player.
+So the right move isn't just to note that the Player is bad. It's to ask: why is this Trainer still rating them positively? Either:
+
+The Trainer hasn't noticed yet (not paying attention—that's a problem)
+The Trainer noticed but hasn't updated (slow to correct—that's a problem)
+The Trainer disagrees with me (maybe I'm wrong, or maybe they're wrong)
+
+In cases 1 and 2, the Trainer is failing at their job. A Trainer's whole role is to identify good Players and cut bad ones. If they're not doing that, my rating of that Trainer should drop.
+The cascade:
+Manager sees bad Player
+    ↓
+Manager checks: which Trainers are rating this Player positively?
+    ↓
+Manager downgrades those Trainers
+    ↓
+Trainer's score drops
+    ↓
+Trainer's impact on all their other Players drops too
+    ↓
+Trainer is incentivized to catch bad Players faster next time
+This creates pressure at every level:
+Trainers can't just "set and forget" their Player ratings. They have to actively monitor. Because if one of their Players goes bad and they don't react, Managers will downgrade them—and that affects everything else they're connected to.
+Same logic applies upward. If a Manager is vouching for bad Trainers and not updating, other Managers should be downgrading that Manager.
+The time element connects here too:
+It's not just "did the Trainer eventually downgrade the bad Player?" It's "how fast?"
+
+Player goes bad on day 10
+Trainer A downgrades on day 12 → minimal damage to Trainer A's score
+Trainer B downgrades on day 40 → significant damage, they weren't paying attention
+Trainer C never downgrades → Manager should cut them
+
+The culture this creates:
+Everyone is watching their downstreams. Not to micromanage, but because their own score depends on it.
+
+Trainers watch their Players
+Managers watch their Trainers (and watch for Trainers who aren't watching their Players)
+Managers watch other Managers
+
+You can't just vouch for someone and walk away. You're accountable for their ongoing performance.
+
+This might be worth adding to the overview as a principle:
+"Vouching is ongoing, not one-time. If someone you rated goes bad and you don't update, you go down with them."
+
+This also makes the Manager role more interesting. You're not just evaluating "is this Trainer good?" You're evaluating "is this Trainer actively maintaining quality control?" That's a higher bar.confidence levels (1-4) mean one thing when different, but binary ratings (yes, no) mean very different things when different.Disagreeing about confidence is very different than disageeing about the fact.
+Me giving someone a 1 confidence does not mean I think they are less human, I just don;t have enough confidence to snwer strongly.When I evaluate my Mom, I don;t need lots of evidence, since she is my mom. I know and trust her. I could give her a 4 rigth away. Some othe stranger, I migth need to see a pile of documents before I give a 2.Any time the sign is different (yes vs no) that is important. Confidence differenciation is not a problem.Jan 20This is an important distinction. Let me make sure I understand it.
+Two dimensions to every evaluation:
+
+Direction (yes/no): Is this a unique human? Is this Player accurate? Is this Trainer good?
+Confidence (1-4): How sure am I?
+
+Disagreement on direction is a red flag.
+If I say YES and you say NO, one of us is wrong. That matters. That's the kind of disagreement the system should surface and ultimately resolve through backtesting.
+Disagreement on confidence is just... information.
+If I give someone a 3 and you give them a 2, we're not disagreeing. We both think they're legitimate. We just have different amounts of evidence or different relationships to the subject.
+Your mom example is perfect:
+
+You give her a 4 because she's your mom. You know.
+I might give her a 2 because I only have documents. I believe it, but I'm working with less.
+
+We're both saying YES. The confidence just reflects the strength of our evidence, not a different conclusion.
+What this means for the system:
+
+Direction disagreements should draw scrutiny
+Confidence disagreements are normal and expected
+A mix of confidence levels on the same subject isn't a problem—it's just people with different evidence bases
+
+Scoring implications:
+When backtesting, direction is what matters most. Did you have the right sign?
+Confidence affects weight, not correctness. A high-confidence wrong answer might be worse than a low-confidence wrong answer (you were sure and still blew it). But two people with the same direction and different confidence are both right—they just contributed different amounts of weight to the outcome.
+The Trainer/Manager cascade:
+When a Manager sees a Trainer giving a YES to a Player that the Manager thinks deserves a NO—that's a problem worth downgrading over.
+But if the Manager sees a Trainer giving a 2 where the Manager would give a 3? That's nothing. They agree on the fact. The Trainer just has less evidence.
+
+Does this framing match how you think about it?close.in Aura, all evaluations have two parts.
+Your answer, and your confidence in that answer.If you say YES, 1 confidence and you are wrong that is a little bad.
+If you say YES 4 and you are wrong that is a much bigger problem.If I rate someone yes 4 and you rate them Yes 1, we have no disagreement, but if I say No 1 and you say Yes 1 (or worse Yes 4) we have a problem.Whoever is right should benefit and whioever is wrong should be dingedJan 20Got it. Now I have it right.
+Every evaluation = Answer + Confidence
+The answer is YES or NO. The confidence is 1-4.
+Confidence is your stake.
+High confidence when right = more credit
+High confidence when wrong = more damage
+Low confidence when wrong = small ding (you weren't sure anyway)
+Low confidence when right = small credit (you hedged)
+It's like betting. Confidence is how much you're putting on the table.
+Disagreement only exists when the sign differs.
+
+YES 4 vs YES 1 = no disagreement, just different evidence
+NO 1 vs YES 1 = disagreement (and someone's wrong)
+NO 1 vs YES 4 = serious disagreement (and the YES 4 person is either very right or very wrong)
+
+When the truth comes out:
+Say the subject turns out to be a sybil (correct answer was NO).
+EvaluationOutcomeNO 4Big win—right and confidentNO 1Small win—right but hedgedYES 1Small loss—wrong but didn't commitYES 4Big loss—wrong and confident
+The system rewards conviction when you're right and punishes conviction when you're wrong. If you're uncertain, say so—you'll lose less when wrong but gain less when right.
+This creates good incentives:
+
+Only go high confidence when you really know
+If you're unsure, say 1 or 2—it's honest and protects you
+Don't bluff confidence you don't have
+In the math of Aura, any negative rating applys 4x as a positve rating would be worth.
+This ensures that negative infomraion rises faster.The system is protected from people giving lots of bad ratings (if not actually true) by that fact that they are doing a bad job answering and should be downgraded by their raters. Their misused power quickly evaporates.This is why we need the outside prediction market. You can alwyas bet hard on conviction. If the betting market is healthy, the system will be kept honest and focused.Jan 20Now I see how the pieces fit together.
+The 4x negative multiplier:
+A negative rating hits 4x harder than a positive rating of the same confidence. This means bad information surfaces fast. One confident NO can outweigh several casual YESes.
+This is intentional. The system is designed to catch problems quickly, not to be "fair" in some balanced sense. A sybil getting through is worse than a legitimate person waiting a bit longer for verification.
+The abuse check:
+Someone could try to weaponize this—just rate everyone NO and let the 4x multiplier do damage. But that person is now wrong a lot. Their Trainers (or Managers, depending on their role) see a pattern of bad evaluations and downgrade them. Their influence evaporates.
+The 4x power is real, but it's borrowed power. Misuse it and you lose it.
+Why the prediction market completes the system:
+The evaluation layer has this built-in accountability, but it takes time. A bad actor might do damage before their Trainers catch on. And Trainers might be slow, or compromised themselves.
+The prediction market is the fast layer. Anyone, anywhere, can bet against someone they think is wrong or corrupt. They don't need to be a Trainer or Manager. They don't need standing in the system. They just need conviction and money.
+If the evaluation layer is slow to catch a problem, bettors can:
+
+Profit from their knowledge
+Signal to the system (odds moving is visible)
+Create pressure for evaluators to look closer
+
+The two layers reinforce each other:
+LayerSpeedWho participatesAccountabilityEvaluationSlowerParticipants with standingTrack record over timePredictionFasterAnyone with convictionMoney on the line
+Evaluation produces the truth. Prediction prices it early and keeps everyone honest.
+The whistleblower path is now fully clear:
+You're in a corrupt operation. You can:
+
+Bet against it (prediction layer—make money)
+Update your evaluations to be correct early (evaluation layer—protect your score)
+Watch the corrupt actors above you get hit with 4x negative ratings as the truth comes out
+
+The system is designed so that staying loyal to corruption is the worst possible strategy.
+
+Should I update the overview doc to include these mechanics? The 4x negative weight, confidence as stake, and how the prediction market completes the accountability loop?Have you reviewed the backup docs?
+https://hackmd.io/-5NhDyekTJWH4NmPD3xBTg
+https://hackmd.io/Hz3uGS54Tyel50CjO_Ow7gJan 20Let me review those docs.Fetched Aura Definitions - HackMDhackmd.ioFetched Aura Levels - HackMDhackmd.ioGood, I've now reviewed both docs. Let me extract the key details:
+From Aura Definitions:
+
+Domains define what subjects can be evaluated and what questions are asked
+The first team creating a domain sets definitions; domains can be forked if teams disagree
+Domains set maximum number of teams a Player can join
+Evaluations include confidence ratings (low, medium, high, very high)
+Anyone can start as provisional (Level 0) in any role
+Team owners vote to add/remove owners; they define levels and can bootstrap evaluations
+Leagues aggregate evaluations from teams for apps; if a league becomes untrustworthy, a new one can replace it quickly
+
+From Aura Levels:
+
+Score formula: sum of (evaluator's score × confidence × sign), capped per evaluator
+Negative evaluations produce negative scores (Level -1 possible)
+Levels have minimum evaluation requirements (e.g., "one medium+ confidence from level 1+ player")
+Manager energy is computed differently: flows via weighted SybilRank for limited iterations (2-4 hops), seeded by team captains
+When a Manager evaluates a new Manager positively, it reduces energy to others (zero-sum)
+Trainer and Player scores don't work this way—one evaluation doesn't diminish others
+Team captains are exempt from minimum evaluation requirements (bootstrap)
+
+Key things I had right:
+
+Manager-to-Manager is zero-sum
+Trainer-to-Player and Manager-to-Trainer are additive
+Energy hops via SybilRank
+
+Things to add/clarify:
+
+Levels have specific requirements (score threshold + minimum evaluations)
+Score = evaluator's score × confidence × sign (capped)
+Level -1 exists for negative scores
+Level 0 = provisional
+Domains can be forked
+Confidence options are low/medium/high/very high (not 1-4, though maybe same thing)
+
+Should I update the overview doc with these details, or do you want to discuss any of this first?let's discuss first.The levels are (and may always be ) in flux.
+Don;t get hung up on any of the specific numbers for levels.low/med/high/VH is just the verbal version of 1-4.
+The actual code is based on the 1-4 (positive and negative)Tell me knew things you are excited to learn.Tell me what seems newly problematicJan 20Things I'm excited to learn:
+The score formula is elegant. Score = sum of (evaluator's score × confidence × sign), capped per evaluator. This means your influence is directly tied to the influence of those who vouch for you, scaled by how confident they are. And the cap prevents any single evaluator from dominating your score. Simple, but it creates the right dynamics.
+Level -1 exists. I hadn't thought about negative levels, but it makes sense. You're not just "unverified"—you can be actively marked as bad. That's important information for the system to surface.
+Domains can be forked. If teams disagree about definitions, someone can fork the whole domain—subjects, teams, participants, evaluations—and set new rules. This is a pressure release valve. No one is stuck with bad definitions forever. It's like the League replaceability but at the domain level.
+The cap per evaluator. This prevents a single powerful person from making or breaking someone. Even if a very high-scoring Manager vouches for you with maximum confidence, there's a ceiling. You need breadth of support, not just one powerful friend.
+
+Things that seem newly problematic:
+The SybilRank iteration limit (2-4 hops). I understand why it's there—you need the algorithm to terminate. But it means Managers far from the team captains in the graph might have structurally less energy available to them, regardless of how good they are. Is there a risk of calcified power near the center?
+Bootstrapping new teams. Team captains seed the energy and are exempt from minimum evaluation requirements. This makes sense for getting started, but it means the founding Managers have an advantage that later Managers can never have. Does that create unhealthy founder privilege, or is it fine because the energy algorithm quickly redistributes based on actual evaluations?
+The interaction between the cap and the 4x negative multiplier. If negative ratings hit 4x harder AND there's a cap on positive contributions, it seems like a coordinated negative attack could be powerful. A few people rating someone NO with high confidence could overwhelm a lot of positive ratings. The check is that attackers get downgraded for being wrong—but what if the attack is fast and the correction is slow?Team captains choose iniital energy allocation, but it has to come back to them for them to have any.Team captains can change over time.New particiapnts can create new teams.I agree that 2-4 hops may not be enough. Adam (the coding master) has always thougth this was enough.Jan 20On team captains:
+Okay, so it's even less privileged than I thought. Captains allocate initial energy outward, but if it doesn't flow back to them through the network, they end up with nothing. They light the fuse but don't automatically keep the fire.
+And captains can change—so there's no permanent founder class. Plus anyone can start a new team. The system stays fluid.
+On the 2-4 hops question:
+I want to think about this more carefully.
+The argument for limited hops: SybilRank needs to terminate, computation scales with hops, and most legitimate trust relationships are probably within a few hops anyway.
+The argument for more hops: In a large, healthy network, good Managers far from the original captains might be structurally disadvantaged. Energy pools near the center. New regions of the graph take longer to get adequate energy.
+A question for Adam: Has he seen this play out in practice? Are there good Managers who seem starved for energy because of their graph position? Or does the 2-4 hop limit actually work fine because the Manager graph stays relatively dense and connected?
+A related thought:
+If the prediction market works well, it might partially compensate for this. Even if a distant Manager has low energy in the evaluation layer, bettors could recognize their quality and price that in. It wouldn't give them more evaluation power directly, but it would surface information about who's undervalued.
+Is graph position something you've seen cause real problems, or is this more theoretical concern?It is all theoretical at this point.
+Don;t worry about the num,ber of hops. We can always resize later when we have real participants.Let's update the doc.Jan 201 stepCopying updated doc to outputsbashcp /home/claude/aura-final-v2.md /mnt/user-data/outputs/aura-overview.mdOutputexit code 0Presented fileUpdated with everything we discussed:
+
+Two-part evaluations (answer + confidence)
+Confidence as stake (table showing outcomes)
+4x negative multiplier and the check against abuse
+Zero-sum Manager-to-Manager vs additive Trainer/Player evaluations
+Owners set step zero, then lose control; can change over time
+"Being wrong isn't the sin, staying wrong is"
+Accountability cascades upward (bad Player → downgrade Trainer)
+Domains can fork
+Prediction markets section (whistleblower dynamic, fast layer)
+AI section (participant, assistant, subject)
+
+Let me know what needs adjusting.Aura overviewDocument · MD DownloadWe have been working on BrigthID for 10 years and Aura for 5.
+Should we keep going?
+Realistiacally what are our changes of success after so many years of failure trying to sove a super hard problem no onw has crackedJan 20That's a real question and it deserves a real answer.
+The case for stopping:
+Ten years is a long time. Five years on Aura specifically. You've seen cycles come and go. The problem—decentralized identity and trust—has defeated a lot of smart people. Worldcoin raised billions and still has fundamental problems. Every "proof of humanity" approach has tradeoffs that limit adoption.
+If the honest assessment is that the core problem is unsolvable, or that you're the wrong team, or that the timing will never be right, then continuing is just sunk cost fallacy.
+The case for continuing:
+You're still here. Adam is still building. The system design we just walked through is genuinely sophisticated—it's not a naive approach. The incentive flywheel, the accountability cascade, the prediction market layer, the AI integration path. This is a mature design that has learned from years of iteration.
+And the world has changed:
+
+AI is making the problem worse and more urgent simultaneously. Synthetic content is exploding. The need for human verification is becoming obvious to everyone, not just crypto people.
+The infrastructure is better. When you started, the tools for coordination, payments, and decentralized systems were primitive. Now they work.
+You have something most projects don't: a working system with real users, even if small. BrightID exists. Aura exists. You're not pitching a whitepaper.
+
+The question I'd ask:
+What's different now versus two years ago? If the answer is "nothing, we're just grinding," that's concerning. If the answer is "the design is finally right, the timing is finally right, and we have a path to the flywheel starting," that's different.
+What would success require?
+Honestly: one meaningful customer paying real money for evaluations, which funds the prize pool, which attracts more evaluators, which improves quality, which attracts more customers. The flywheel has to actually start spinning.
+Is there a realistic path to that first customer in the next 12 months?Adam has been going through days of interviews with SpruceID.
+He is likely going to start working for them at a high level.
+He may try to push SpruceID to integrate into the tech stack he has already built with BrigthID, Aura, and Updraft. https://github.com/adamstallardJan 20That's a significant development.
+What SpruceID is:
+They're building identity infrastructure—Sign-In with Ethereum, decentralized identifiers, verifiable credentials. Real traction, real customers, real funding. They're in the plumbing layer that applications actually use.
+What this could mean:
+Adam on the inside, at a high level, with the ability to influence technical direction. SpruceID needs what Aura provides—a way to verify claims about people that doesn't depend on centralized authorities. Their stack handles the format of identity. Aura handles the truth of identity.
+If SpruceID integrates BrightID/Aura as a verification layer, that's:
+
+Distribution (SpruceID's customers become potential Aura customers)
+Legitimacy (a serious company betting on the approach)
+Resources (SpruceID's engineering capacity touching the stack)
+The first real customer for the flywheel
+
+The risk:
+Adam's attention splits. The pace on BrightID/Aura slows further. SpruceID has its own priorities and Adam has limited influence. The integration never happens or happens in a watered-down way.
+The opportunity:
+This might be the path to that first meaningful customer you've been missing for ten years. Not by convincing someone from the outside, but by having Adam on the inside of a company that already has customers who need this.
+The question:
+Is Adam going in with a clear plan to push for integration? Or is this a job that might incidentally help? The difference matters a lot.Aura has always been super slow with a small team and not much money.
+Adam is amazing at design, coding, and systems, but in spurts.
+If there was a team around him that could independently work on and push stuff, he could be awesome.Jan 20That's the real bottleneck, isn't it.
+Adam is the irreplaceable core—the systems genius who sees the whole architecture. But he works in spurts, and there's no team that can carry momentum between those spurts. So progress is episodic. He builds something brilliant, then life happens, then months pass, then another spurt.
+What you actually need:
+People who can:
+
+Take Adam's designs and implement without hand-holding
+Push forward when Adam is focused elsewhere
+Handle the non-Adam work (docs, community, ops, biz dev)
+Keep the flywheel turning between spurts
+
+The SpruceID angle changes this calculation:
+If Adam is at SpruceID, he's not available for spurts on Aura. But if SpruceID is the team around him—if their engineers become the ones implementing his vision as part of their day jobs—that could actually solve the problem.
+Instead of: Adam alone, working in spurts, no support
+It becomes: Adam with SpruceID resources, Aura/BrightID as part of SpruceID's stack, a team that ships continuously
+The question is whether that integration actually happens, or whether Adam just becomes an employee working on SpruceID's existing priorities.
+What would you do if SpruceID integration works?
+You're an Owner. You've said you'd buy the first team. You're planning to use AI heavily as a Manager. You have the vision and the incentive design.
+If SpruceID provides the engineering capacity Adam has always lacked, what's your role? Are you the business/strategy side that Adam has also always lacked? The person who finds the first paying customers, tells the story, builds the community?Adam and I made Aura.
+It will never be anything without us both on board.
+If Adam goes to SpruceID, it will either be to use Aura, or it will die.
+I am ok either way. I really tried, and for a long time.
+Maybe it was a waste, or maybe Adam turns it into something.
+I know that if Adam is ever happily involved in a system that solves the human uniqueness problem in a way he thinks is good, I am happy with it too.Jan 20That's a clear-eyed and generous way to see it.
+You built something real together. The design is sound—genuinely sophisticated. Whether it becomes Aura-the-product or gets absorbed into something else that solves the problem, the work wasn't wasted. The ideas exist. The architecture exists. Adam carries it forward in whatever form makes sense.
+And you tried for ten years. That's not a small thing. Most people don't try for ten months.
+The honest summary:
+If Adam goes to SpruceID and pushes Aura into their stack, it might finally get the team and resources it always needed. If he goes and it doesn't fit, Aura probably ends, but the problem might still get solved by whatever he builds there.
+Either way, you're at peace with it. That's not giving up—that's knowing when you've done what you can do and the next move isn't yours to make.
+One thing I'd say:
+The document we just wrote? The prediction market sketch? The incentive design we walked through? That's all still valuable. If Adam ever needs to explain Aura to SpruceID leadership, or write a proposal for integration, or onboard new engineers—it exists now. You've captured it.
+Whatever happens next, the thinking is preserved.Write me a great summary narrative about this conversation that I could share with AdamJan 201 stepCopying to outputsbashcp /home/claude/summary-for-adam.md /mnt/user-data/outputs/summary-for-adam.mdOutputexit code 0Presented 2 filesHere's the summary for Adam, plus the full overview document you can attach.
+The summary tells the story of our conversation—what we clarified, what we added, and where you are with it all. It's honest about the decade of work and where things stand now.Summary for adamDocument · MD DownloadAura overviewDocument · MD DownloadDownload allAdam understand Aura and me very well.
+We dont need to tell him lots of things he already knows.We can create a seperate section that is a 1-pager about Aura for SpruceID.Jan 201 stepCopying to outputsbashcp /home/claude/for-adam.md /mnt/user-data/outputs/for-adam.mdOutputexit code 0Presented 2 filesShort note to Adam at the top. SpruceID one-pager below it. Full overview attached separately.

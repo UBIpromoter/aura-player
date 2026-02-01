@@ -1,0 +1,72 @@
+// Phone frame specifications for the emulator UI
+// This is purely for the demo interface, not needed for production mobile app
+
+export const DEVICES = {
+  'iphone-15-pro': {
+    name: 'iPhone 15 Pro',
+    width: 393,
+    height: 852,
+    screenRadius: 44,
+    frameRadius: 55,
+    framePadding: 12,
+    notchType: 'island',
+    islandWidth: 126,
+    islandHeight: 37,
+  },
+  'iphone-15-pro-max': {
+    name: 'iPhone 15 Pro Max',
+    width: 430,
+    height: 932,
+    screenRadius: 48,
+    frameRadius: 60,
+    framePadding: 14,
+    notchType: 'island',
+    islandWidth: 126,
+    islandHeight: 37,
+  },
+  'iphone-14': {
+    name: 'iPhone 14',
+    width: 390,
+    height: 844,
+    screenRadius: 44,
+    frameRadius: 55,
+    framePadding: 12,
+    notchType: 'notch',
+    notchWidth: 160,
+    notchHeight: 34,
+  },
+  'iphone-se': {
+    name: 'iPhone SE',
+    width: 375,
+    height: 548,
+    screenRadius: 0,
+    frameRadius: 50,
+    framePadding: 4,
+    topBezel: 65,
+    bottomBezel: 80,
+    notchType: 'none',
+    hasHomeButton: true,
+  },
+  'pixel-8': {
+    name: 'Pixel 8',
+    width: 412,
+    height: 915,
+    screenRadius: 40,
+    frameRadius: 48,
+    framePadding: 10,
+    notchType: 'punch',
+    punchSize: 24,
+  },
+  'galaxy-s24': {
+    name: 'Galaxy S24',
+    width: 412,
+    height: 915,
+    screenRadius: 36,
+    frameRadius: 44,
+    framePadding: 8,
+    notchType: 'punch',
+    punchSize: 20,
+  },
+};
+
+export default DEVICES;
