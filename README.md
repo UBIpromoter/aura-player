@@ -4,15 +4,14 @@ A React-based web application for crowdsourced evaluation and prediction. Users 
 
 ## Quick Start
 
-Open `aura-player-vT.html` in a browser. That's it - it's a self-contained app.
+Open `aura-player.html` in a browser. That's it - it's a self-contained app connected to Supabase.
 
 ## Project Structure
 
 ```
 Aura/
-├── aura-player-vT.html    # Current production app
-├── CLAUDE.md              # AI assistant guidelines
-├── data/                  # Question data and assessments
+├── aura-player.html       # Production app (Supabase-connected)
+├── CLAUDE.md              # AI assistant guidelines & data rules
 ├── docs/                  # Documentation
 │   ├── design/            # Design thesis and architecture
 │   └── planning/          # Kanban board and roadmaps
@@ -42,7 +41,7 @@ Aura/
 Since this is a CDN-based app, just edit the HTML file directly. No build step required.
 
 **Making changes:**
-1. Edit `aura-player-vT.html`
+1. Edit `aura-player.html`
 2. Refresh browser to see changes
 3. Commit with git when ready
 
