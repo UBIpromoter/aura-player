@@ -4475,6 +4475,9 @@ function App() {
   }, [responseCount, isGuestMode, nudgeShown]);
 
   const resetDemo = () => {
+    // Sign out any logged-in user first
+    signOut();
+    // Clear all app state
     demoStorage.clear();
     const freshState = getInitialState();
     setResponses(freshState.answers);
@@ -4485,8 +4488,10 @@ function App() {
     setQotdResponse(null);
     setQotdTappedAnswer(null);
     setQotdTapCount(0);
+    // Clear all guest/login tracking
     localStorage.removeItem('aura_guest_mode');
     localStorage.removeItem('aura_nudge_shown');
+    localStorage.removeItem('aura_guest_start_count');
     setIsGuestMode(false);
     setNudgeShown(false);
     setScreen('welcome');
