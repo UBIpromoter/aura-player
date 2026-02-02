@@ -1,34 +1,56 @@
-# Claude Preferences for Aura Project
+# AURA Project - Agent Instructions
 
-## Git Workflow (IMPORTANT)
+> **READ FIRST:** Check `tasks/status.md` for current state before starting any work.
+
+## Quick Reference
+| User says | You do |
+|-----------|--------|
+| "Try something" / "Let's work on X" | Create feature branch, start working |
+| "Save this" | Commit to feature branch |
+| "Make it live" | Merge feature → dev → main → push |
+| "Undo this" | Reset feature branch |
+| "Status" | Show git status + tasks/status.md summary |
+
+## Session Protocol
+
+### Starting a Session
+1. Read `tasks/status.md` - understand current state
+2. Read `tasks/lessons.md` - avoid past mistakes
+3. Check `git branch` - never work on main/dev directly
+4. If needed, create feature branch from dev
+
+### Ending a Session
+1. Commit all work (or stash if incomplete)
+2. Update `tasks/status.md` with current state + handoff notes
+3. Update `tasks/todo.md` - check off completed, add new tasks
+4. If user corrected you, add lesson to `tasks/lessons.md`
+
+### When User Corrects You
+1. Fix the issue immediately
+2. Add the pattern to `tasks/lessons.md` so it won't happen again
+
+## Core Principles
+- **Simplicity First** - Make every change as simple as possible
+- **No Lazy Fixes** - Find root causes, not workarounds
+- **Minimal Impact** - Only touch what's necessary
+- **Verify Before Done** - Test in browser, check console for errors
+- **Just Do It** - Don't ask for permission on obvious fixes
+
+## Git Workflow
 
 ### Branch Structure
 ```
-main                    ← production (live at ubipromoter.github.io/aura-player)
+main                    ← production (ubipromoter.github.io/aura-player)
   └── dev               ← integration branch
        └── feature/X    ← where work happens
 ```
 
 ### Rules
-1. **NEVER edit directly on main or dev** - always create a feature branch
-2. **Create feature branch**: `git checkout -b feature/feature-name` from dev
-3. **Commit early and often** on the feature branch
-4. **User says "make it live"** → merge feature to dev, then dev to main, push
-5. **Multiple bots**: Each bot works on its own feature branch to avoid conflicts
-
-### Commands for User
-| User says | Claude does |
-|-----------|-------------|
-| "I want to try something" | Create `feature/X` branch from dev |
-| "Save this" | Commit to current feature branch |
-| "Make it live" | Merge to dev → main → push |
-| "Undo this" | Reset feature branch |
-| "Show changes" | `git diff` or `git log` |
-
-### Before Starting Any Work
-1. Check current branch: `git branch`
-2. If on main or dev, create feature branch first
-3. Never assume previous work was committed
+1. **NEVER edit directly on main or dev** - always create feature branch
+2. **Create feature branch**: `git checkout dev && git checkout -b feature/name`
+3. **Commit early and often** on feature branch
+4. **"Make it live"** → merge feature to dev, dev to main, push
+5. **Multiple agents**: Each agent uses own feature branch to avoid conflicts
 
 ## Question & Assessment Rules
 
@@ -43,19 +65,17 @@ main                    ← production (live at ubipromoter.github.io/aura-playe
 - **NEVER delete questions** - index matters for stored responses
 - **NEVER reorder questions** - index is stored in responses
 - Can ADD questions to END of items array only
-- Test IDs are stored in `responses.test_id` column in Supabase
 
 ### Data Architecture
-- Questions live in HTML (for now) - will migrate to DB later
+- Questions live in HTML (will migrate to DB later)
 - Responses stored in Supabase `responses` table
 - Profiles stored in Supabase `profiles` table
 - Sync uses `email` + `test_id` columns
 
 ## UI Patterns
 
-### Hover Text / Tooltips
-Always use instant CSS tooltips, never native `title` attribute.
-
+### Tooltips
+Always use instant CSS tooltips, never native `title` attribute:
 ```jsx
 <div className="relative group">
   <Element />
@@ -67,3 +87,9 @@ Always use instant CSS tooltips, never native `title` attribute.
 
 ### Locked Items
 Show tooltip: "Unlock by completing {prerequisiteName}"
+
+## File Reference
+- `index.html` - entire React app (~7000 lines)
+- `tasks/status.md` - current state + handoff notes
+- `tasks/todo.md` - active tasks with checkboxes
+- `tasks/lessons.md` - mistakes to avoid
