@@ -2415,8 +2415,8 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
   const isAnswered = answers[question?.id] !== undefined;
   const totalQuestions = ONBOARDING_QUESTIONS.length;
 
-  // Show confidence stars starting at question 6
-  const showConfidenceStars = currentIndex >= 5;
+  // Show confidence UI starting at question 6
+  const showConfidenceUI = currentIndex >= 5;
 
   const handleTap = (answer) => {
     if (isAnswered) return;
@@ -2437,7 +2437,7 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
     const newAnswers = { ...answers, [question.id]: { answer: tappedAnswer, confidence: tapCount } };
     setAnswers(newAnswers);
 
-    // Quick advance - no celebration delay
+    // Advance to next
     setTappedAnswer(null);
     setTapCount(0);
 
@@ -2448,16 +2448,6 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
       onComplete(newAnswers);
     }
   };
-
-  // Auto-submit on tap (no confirmation needed for onboarding)
-  React.useEffect(() => {
-    if (tappedAnswer !== null && !isAnswered) {
-      const timer = setTimeout(() => {
-        handleSubmit();
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [tappedAnswer, tapCount]);
 
   if (!question) return null;
 
@@ -2490,25 +2480,14 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
     return `bg-gradient-to-r ${shades[conf - 1]} border-violet-500 text-white`;
   };
 
-  // Render confidence stars (4 stars, filled based on tapCount)
-  const renderStars = () => {
-    if (!showConfidenceStars || tappedAnswer === null) return null;
-    return (
-      <div className="flex justify-center gap-1 mb-6">
-        {[1, 2, 3, 4].map(i => (
-          <span
-            key={i}
-            className={`text-xl transition-all ${
-              i <= tapCount
-                ? (darkMode ? 'text-violet-400' : 'text-violet-500')
-                : (darkMode ? 'text-gray-700' : 'text-gray-300')
-            }`}
-          >
-            {i <= tapCount ? '★' : '☆'}
-          </span>
-        ))}
-      </div>
-    );
+  // Get confidence hint text based on current state
+  const getConfidenceHint = () => {
+    if (!showConfidenceUI) return null;
+    if (tappedAnswer === null) return "Tap your answer, then tap again to show how sure you are";
+    if (tapCount === 1) return "Tap again to increase confidence";
+    if (tapCount === 2) return "Tap again for even more confidence";
+    if (tapCount === 3) return "One more tap for maximum confidence";
+    return "Maximum confidence!";
   };
 
   return (
@@ -2545,12 +2524,34 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
       {/* Question area */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
         {/* Question text */}
-        <h1 className={`text-2xl font-bold text-center mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+        <h1 className={`text-2xl font-bold text-center mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
           {question.text}
         </h1>
 
-        {/* Confidence stars - appear at Q6+, under question, above buttons */}
-        {renderStars()}
+        {/* Confidence stars and hint - appear at Q6+, under question */}
+        {showConfidenceUI && (
+          <div className="mb-4 text-center">
+            {/* Stars row */}
+            <div className="flex justify-center gap-1.5 mb-1">
+              {[1, 2, 3, 4].map(i => (
+                <span
+                  key={i}
+                  className={`text-2xl transition-all ${
+                    tappedAnswer !== null && i <= tapCount
+                      ? (darkMode ? 'text-violet-400' : 'text-violet-500')
+                      : (darkMode ? 'text-gray-700' : 'text-gray-300')
+                  }`}
+                >
+                  {tappedAnswer !== null && i <= tapCount ? '★' : '☆'}
+                </span>
+              ))}
+            </div>
+            {/* Hint text */}
+            <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              {getConfidenceHint()}
+            </p>
+          </div>
+        )}
 
         {/* Answer buttons */}
         <div className="w-full max-w-sm space-y-3">
@@ -2565,6 +2566,18 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
             </button>
           ))}
         </div>
+
+        {/* Submit button - appears when answer is selected */}
+        {tappedAnswer !== null && (
+          <button
+            onClick={handleSubmit}
+            className={`mt-6 w-full max-w-sm py-3 rounded-xl font-medium text-lg btn-feedback ${
+              darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'
+            }`}
+          >
+            {currentIndex < totalQuestions - 1 ? 'Next' : 'Finish'}
+          </button>
+        )}
       </div>
     </div>
   );
