@@ -4432,9 +4432,6 @@ function App() {
   const handleTryFirst = () => {
     localStorage.setItem('aura_guest_mode', 'true');
     setIsGuestMode(true);
-    // Track starting response count for nudge logic
-    const currentCount = Object.keys(responses).length;
-    localStorage.setItem('aura_guest_start_count', currentCount.toString());
     setScreen('categories');
   };
 
@@ -4464,10 +4461,20 @@ function App() {
 
   // Check if we should show nudge (20 NEW responses for guests since entering guest mode)
   const responseCount = Object.keys(responses).length;
+  const guestStartCountRef = React.useRef(null);
+
+  // Set start count when entering guest mode
   React.useEffect(() => {
-    if (isGuestMode && !nudgeShown && !getCurrentEmail()) {
-      const startCount = parseInt(localStorage.getItem('aura_guest_start_count') || '0', 10);
-      const newResponses = responseCount - startCount;
+    if (isGuestMode && guestStartCountRef.current === null) {
+      guestStartCountRef.current = responseCount;
+    } else if (!isGuestMode) {
+      guestStartCountRef.current = null;
+    }
+  }, [isGuestMode, responseCount]);
+
+  React.useEffect(() => {
+    if (isGuestMode && !nudgeShown && !getCurrentEmail() && guestStartCountRef.current !== null) {
+      const newResponses = responseCount - guestStartCountRef.current;
       if (newResponses >= 20) {
         setShowSaveNudge(true);
       }
@@ -4491,7 +4498,6 @@ function App() {
     // Clear all guest/login tracking
     localStorage.removeItem('aura_guest_mode');
     localStorage.removeItem('aura_nudge_shown');
-    localStorage.removeItem('aura_guest_start_count');
     setIsGuestMode(false);
     setNudgeShown(false);
     setScreen('welcome');
