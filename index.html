@@ -799,12 +799,6 @@ const ONBOARDING_QUESTIONS = [
   { id: 'onboard-9', text: "Will AI replace most jobs?", options: ["Yes, big changes coming", "No, jobs will adapt"], type: 'binary' },
   { id: 'onboard-10', text: "Is water wet?", options: ["Yes", "No"], type: 'binary' },
 ];
-
-// Micro-celebration messages shown after each onboarding answer
-const ONBOARD_CELEBRATIONS = [
-  "Nice!", "Good one!", "Got it!", "Interesting!", "Cool!",
-  "Nice pick!", "Good call!", "Noted!", "Great!", "Love it!"
-];
   </script>
   <script>
     // Supabase Configuration
@@ -2416,15 +2410,13 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
   const [answers, setAnswers] = React.useState({});
   const [tappedAnswer, setTappedAnswer] = React.useState(null);
   const [tapCount, setTapCount] = React.useState(0);
-  const [showCelebration, setShowCelebration] = React.useState(null);
-  const [showConfidenceHint, setShowConfidenceHint] = React.useState(false);
 
   const question = ONBOARDING_QUESTIONS[currentIndex];
   const isAnswered = answers[question?.id] !== undefined;
   const totalQuestions = ONBOARDING_QUESTIONS.length;
 
-  // Show confidence hint starting at question 6
-  const shouldShowConfidenceHint = currentIndex >= 5 && currentIndex < 8 && !showConfidenceHint;
+  // Show confidence stars starting at question 6
+  const showConfidenceStars = currentIndex >= 5;
 
   const handleTap = (answer) => {
     if (isAnswered) return;
@@ -2432,9 +2424,6 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
     if (tappedAnswer === answer) {
       // Increase confidence on repeat tap
       setTapCount(Math.min(tapCount + 1, 4));
-      if (currentIndex >= 5 && !showConfidenceHint) {
-        setShowConfidenceHint(true);
-      }
     } else {
       setTappedAnswer(answer);
       setTapCount(1);
@@ -2448,23 +2437,16 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
     const newAnswers = { ...answers, [question.id]: { answer: tappedAnswer, confidence: tapCount } };
     setAnswers(newAnswers);
 
-    // Show celebration
-    const celebrationMsg = ONBOARD_CELEBRATIONS[currentIndex % ONBOARD_CELEBRATIONS.length];
-    setShowCelebration(celebrationMsg);
+    // Quick advance - no celebration delay
+    setTappedAnswer(null);
+    setTapCount(0);
 
-    // Auto-advance after celebration
-    setTimeout(() => {
-      setShowCelebration(null);
-      setTappedAnswer(null);
-      setTapCount(0);
-
-      if (currentIndex < totalQuestions - 1) {
-        setCurrentIndex(currentIndex + 1);
-      } else {
-        // Completed onboarding
-        onComplete(newAnswers);
-      }
-    }, 600);
+    if (currentIndex < totalQuestions - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      // Completed onboarding
+      onComplete(newAnswers);
+    }
   };
 
   // Auto-submit on tap (no confirmation needed for onboarding)
@@ -2508,6 +2490,27 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
     return `bg-gradient-to-r ${shades[conf - 1]} border-violet-500 text-white`;
   };
 
+  // Render confidence stars (4 stars, filled based on tapCount)
+  const renderStars = () => {
+    if (!showConfidenceStars || tappedAnswer === null) return null;
+    return (
+      <div className="flex justify-center gap-1 mb-6">
+        {[1, 2, 3, 4].map(i => (
+          <span
+            key={i}
+            className={`text-xl transition-all ${
+              i <= tapCount
+                ? (darkMode ? 'text-violet-400' : 'text-violet-500')
+                : (darkMode ? 'text-gray-700' : 'text-gray-300')
+            }`}
+          >
+            {i <= tapCount ? '★' : '☆'}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
       {/* Minimal header with Sign In option */}
@@ -2541,19 +2544,13 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
 
       {/* Question area */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
-        {/* Celebration overlay */}
-        {showCelebration && (
-          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-            <div className={`text-4xl font-bold ${darkMode ? 'text-violet-400' : 'text-violet-500'} animate-bounce`}>
-              {showCelebration}
-            </div>
-          </div>
-        )}
-
         {/* Question text */}
-        <h1 className={`text-2xl font-bold text-center mb-8 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+        <h1 className={`text-2xl font-bold text-center mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
           {question.text}
         </h1>
+
+        {/* Confidence stars - appear at Q6+, under question, above buttons */}
+        {renderStars()}
 
         {/* Answer buttons */}
         <div className="w-full max-w-sm space-y-3">
@@ -2565,19 +2562,9 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
               className={`w-full py-4 px-6 rounded-xl font-medium text-lg transition-all border-2 btn-feedback ${getButtonStyle(idx)}`}
             >
               {option}
-              {tappedAnswer === idx && tapCount > 1 && (
-                <span className="ml-2 opacity-70">{Array(tapCount).fill('★').join('')}</span>
-              )}
             </button>
           ))}
         </div>
-
-        {/* Confidence hint - appears at question 6 */}
-        {currentIndex >= 5 && currentIndex < 8 && tappedAnswer !== null && (
-          <p className={`mt-4 text-sm text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'} animate-pulse`}>
-            Feeling sure? Tap again to boost confidence
-          </p>
-        )}
       </div>
     </div>
   );
