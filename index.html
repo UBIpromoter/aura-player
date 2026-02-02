@@ -2152,6 +2152,14 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (mode === 'signup') handleSignUp();
+      else handleSignIn();
+    }
+  };
+
   if (mode === 'welcome') {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8" style={{backgroundColor: darkMode ? '#030712' : '#f9fafb'}}>
@@ -2187,6 +2195,7 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={handleKeyDown}
           className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
         />
         <input
@@ -2194,6 +2203,7 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
           placeholder="PIN (4+ digits)"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+          onKeyDown={handleKeyDown}
           inputMode="numeric"
           className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
         />
