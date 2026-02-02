@@ -2079,14 +2079,19 @@ const PhoneFrame = ({ children, darkMode = true }) => (
 );
 
 // NavBar
-const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSettings, onProfile }) => (
+const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSettings, onProfile, isLoggedIn, isGuest }) => (
   <div className={`flex items-center justify-between px-4 py-2 ${darkMode ? 'bg-gray-950/70 border-b border-white/5' : 'bg-white/70 border-b border-gray-200/50'} backdrop-blur-md`}>
     <button onClick={onHome} onDoubleClick={onDoubleClickHome} className="text-xl btn-feedback">🌀</button>
     <button onClick={onProfile} className={`flex items-center gap-2 px-2 py-1 rounded-lg btn-feedback ${darkMode ? 'hover:bg-gray-800/50' : 'hover:bg-gray-200'}`}>
       <span className={`text-sm ${TH('text-muted', darkMode)}`}>{stats.answered} answered</span>
       {showStreak && stats.streak > 0 && <span className="text-sm text-orange-400">🔥{stats.streak}</span>}
     </button>
-    <button onClick={onSettings} className={`text-xl btn-feedback ${TH('text-muted', darkMode)}`}>☰</button>
+    <div className="flex items-center gap-2">
+      <span className={`text-base ${isLoggedIn ? (darkMode ? 'text-emerald-400' : 'text-emerald-500') : (darkMode ? 'text-gray-500' : 'text-gray-400')}`}>
+        {isLoggedIn ? '👤' : '❓'}
+      </span>
+      <button onClick={onSettings} className={`text-xl btn-feedback ${TH('text-muted', darkMode)}`}>☰</button>
+    </div>
   </div>
 );
 
@@ -4427,6 +4432,9 @@ function App() {
   const handleTryFirst = () => {
     localStorage.setItem('aura_guest_mode', 'true');
     setIsGuestMode(true);
+    // Track starting response count for nudge logic
+    const currentCount = Object.keys(responses).length;
+    localStorage.setItem('aura_guest_start_count', currentCount.toString());
     setScreen('categories');
   };
 
@@ -4454,11 +4462,15 @@ function App() {
     setScreen('welcome');
   };
 
-  // Check if we should show nudge (20 responses for guests)
+  // Check if we should show nudge (20 NEW responses for guests since entering guest mode)
   const responseCount = Object.keys(responses).length;
   React.useEffect(() => {
-    if (isGuestMode && !nudgeShown && responseCount >= 20 && !getCurrentEmail()) {
-      setShowSaveNudge(true);
+    if (isGuestMode && !nudgeShown && !getCurrentEmail()) {
+      const startCount = parseInt(localStorage.getItem('aura_guest_start_count') || '0', 10);
+      const newResponses = responseCount - startCount;
+      if (newResponses >= 20) {
+        setShowSaveNudge(true);
+      }
     }
   }, [responseCount, isGuestMode, nudgeShown]);
 
@@ -7262,7 +7274,7 @@ function App() {
           {darkMode && <div className="global-stars" />}
           <div className="flex-1 flex flex-col overflow-hidden">
             {screen !== 'launch' && screen !== 'welcome' && screen !== 'settings' && screen !== 'categories' && (
-              <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} />
+              <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} />
             )}
             {renderContent()}
           </div>
@@ -7286,7 +7298,7 @@ function App() {
       {darkMode && <div className="global-stars" />}
       {screen !== 'launch' && screen !== 'welcome' && screen !== 'settings' && screen !== 'categories' && (
         <div className="safe-top">
-          <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} />
+          <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} />
         </div>
       )}
       <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
