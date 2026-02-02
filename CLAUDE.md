@@ -1,6 +1,8 @@
 # AURA Project - Agent Instructions
 
-> **READ FIRST:** Check `tasks/status.md` for current state before starting any work.
+> **Global protocol loaded from ~/.claude/CLAUDE.md** (plan-first, visibility reports, evidence standard)
+
+> **READ FIRST:** Check `LESSONS.md` then `tasks/status.md` before starting any work.
 
 ## Quick Reference
 | User says | You do |
@@ -89,7 +91,14 @@ Always use instant CSS tooltips, never native `title` attribute:
 Show tooltip: "Unlock by completing {prerequisiteName}"
 
 ## File Reference
+
+### Protocol Files (3-File Backbone)
+- `CLAUDE.md` - this file (project rules)
+- `PLAN.md` - current task plan (clear after completion)
+- `LESSONS.md` - mistakes to avoid (read before every task)
+- `scripts/preflight.sh` - run before marking "done"
+
+### Project Files
 - `index.html` - entire React app (~7000 lines)
 - `tasks/status.md` - current state + handoff notes
 - `tasks/todo.md` - active tasks with checkboxes
-- `tasks/lessons.md` - mistakes to avoid

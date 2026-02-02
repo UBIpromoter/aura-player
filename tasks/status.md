@@ -1,33 +1,92 @@
 # AURA Status
 
 ## Current State
-- **Branch:** feature/agent-workflow
+- **Branch:** feature/ux-flow-fun
 - **Last Updated:** 2026-02-02
-- **Last Session:** Fixed Starter Pack black screen bug
+- **Last Session:** UX Overhaul - Progressive Onboarding Flow
 
 ## What's Working
-- Welcome screen with Sign In / Create Account / Try It First
+- Welcome screen with Sign In / Let's Go
+- **New progressive onboarding flow** (10 fun questions)
+- **Path choice screen** after onboarding (Reveal vs Explore)
 - Guest mode with 20-response nudge
-- Session persistence (stays logged in)
-- User icon shows login state (glowing = logged in, ? = guest)
-- Logged-in users land on assessment profile
-- Demo mode defaults to Alex profile
+- Session persistence for signed-in users
 - Supabase backend storing profiles + responses
 - **Starter Pack v4.3** - 5-module assessment battery (41 items)
+- **Gamification foundation** - XP system, levels, titles
 
 ## Handoff Notes
-Fixed Starter Pack v4.3 black screen bug. Changes are on feature/agent-workflow branch, not yet committed.
 
-**Root cause:** The `indigo` color used by Starter Pack tests was added to `ASSESS_C` and `PROGRESS_GRADIENTS` but NOT to the question screen's style mappings at ~line 5692.
+### New Onboarding Flow (This Session)
 
-## Recent Changes
-- **Fixed Starter Pack black screen** - Added missing `indigo` color to:
-  - Question screen: gradientStyles, selectedStyles, pendingStyles, numColors (~line 5692)
-  - CSS: .hover-glow-indigo (~line 127)
-  - AnalysisCard colorStyles (~line 6408)
-  - Completion celebration glow chain (~line 5714)
-- Added guard clause to assess-results screen for undefined test
-- Improved user icon (larger, glowing effect)
-- Fixed landing behavior (logged-in → assessment, guest → categories)
-- Fixed reset to clear all data including assessments
-- Added Enter key submit to forms
+**Philosophy:** "New users should feel smart, not overwhelmed." Start with fun world questions, teach mechanics progressively.
+
+#### Components Added/Modified:
+
+1. **ONBOARDING_QUESTIONS** (~line 787)
+   - 10 fun binary questions about the world (not about the user)
+   - Examples: "Which came first - chicken or egg?", "Is a hot dog a sandwich?"
+
+2. **OnboardingFlow Component** (~line 2501)
+   - Progressive 10-question flow with MC-style buttons
+   - Confidence hint banner appears at question 6+
+   - Navigation: single-tap vortex → categories, double-tap → reset to welcome
+   - Hamburger menu (☰) for settings access
+
+3. **PathChoiceScreen Component** (~line 2725)
+   - Shows after completing 10 onboarding questions
+   - Two paths: "Learn About Yourself" (Reveal) or "Explore Topics" (Categories)
+   - Same vortex/menu navigation pattern
+
+4. **Gamification System** (~line 1995)
+   - `XP_RATES`: answer=5, highConfidence=2, assessment=50, dailyFirst=10, etc.
+   - `calculateLevel(xp)`: Level = floor(sqrt(xp / 100)) + 1
+   - `LEVEL_TITLES`: Newcomer → Curious Mind → Explorer → ... → Master Mind
+   - `LevelUpModal` component for celebrations
+
+5. **VortexButton Component** (~line 2338)
+   - Reusable component with single/double tap detection
+   - Not currently used (direct handlers preferred for simplicity)
+
+#### Navigation Changes:
+
+- **Vortex (🌀) behavior:**
+  - Single tap → Go to categories menu
+  - Double tap → Full reset to welcome/login screen
+
+- **Page reload behavior:**
+  - Signed-in users → Categories menu
+  - Not signed-in (including guests) → Welcome screen
+
+- **NavBar exclusions:** Added 'onboarding' and 'path-choice' to screens that hide the NavBar
+
+#### Key Files Changed:
+- `index.html` - All changes in single file (~8000 lines)
+
+#### Key Line References:
+- ONBOARDING_QUESTIONS: ~787
+- XP_RATES, calculateLevel, LEVEL_TITLES: ~1995
+- VortexButton: ~2338
+- OnboardingFlow: ~2501
+- PathChoiceScreen: ~2725
+- getInitialScreen: ~4593
+- renderContent (screen routing): ~5396
+
+## Recent Changes (This Session)
+- Added 10-question progressive onboarding flow
+- Added path choice screen (Reveal vs Explore)
+- Added gamification foundation (XP, levels, titles)
+- MC-style buttons for onboarding questions
+- Confidence tip banner at question 6+
+- Vortex: single-tap → categories, double-tap → reset
+- Hamburger menu on onboarding/path-choice screens
+- Page reload: non-signed-in users go to welcome
+- Page reload: signed-in users go to categories (not assess-picker)
+
+## Not Yet Implemented (From Plan)
+- Full gamification UI (XP bar display, level-up animations)
+- Streak system enhancements
+- Achievement badges
+- Category feed optimization
+- Profile enhancements
+- Power user features (auto-submit, undo delay options)

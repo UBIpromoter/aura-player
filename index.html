@@ -816,14 +816,22 @@ const ONBOARDING_QUESTIONS = [
     })();
     console.log('[Aura] Session ID:', AURA_SESSION_ID);
 
-    // Capture response to Supabase
+    // Capture response to Supabase with snapshot
     async function captureResponse(questionId, answer, confidence) {
+      const question = QUESTIONS.find(q => q.id === questionId);
       const response = {
         session_id: AURA_SESSION_ID,
         question_id: questionId,
         answer: answer,
         confidence: confidence,
-        email: AURA_USER_EMAIL
+        email: AURA_USER_EMAIL,
+        snapshot: question ? {
+          q: question.text,
+          a: question.type === 'binary' ? (answer ? 'Yes' : 'No') : (question.options?.[answer] || String(answer)),
+          t: question.type,
+          c: question.category,
+          v: question._v
+        } : null
       };
 
       const { error } = await auraDB.from('responses').insert(response);
@@ -835,15 +843,31 @@ const ONBOARDING_QUESTIONS = [
       }
     }
 
-    // Capture assessment response with test_id
+    // Capture assessment response with test_id and snapshot
     async function captureAssessResponse(testId, questionIndex, answer) {
+      const test = ASSESS_TESTS[testId];
+      const item = test?.items?.[questionIndex];
+      const scaleLabels = {
+        likeme: ['Not at all', 'A little', 'Somewhat', 'Very much', 'Extremely'],
+        agreement: ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'],
+        frequency: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'],
+        likelihood: ['Very unlikely', 'Unlikely', 'Neutral', 'Likely', 'Very likely']
+      };
+
       const response = {
         session_id: AURA_SESSION_ID,
         question_id: -(questionIndex + 1), // Negative to distinguish from regular questions
         answer: answer,
         confidence: 0,
         email: AURA_USER_EMAIL,
-        test_id: testId
+        test_id: testId,
+        snapshot: test && item ? {
+          test: testId,
+          name: test.name,
+          q: item.q,
+          a: scaleLabels[test.scale]?.[answer - 1] || String(answer),
+          idx: questionIndex
+        } : null
       };
 
       const { error } = await auraDB.from('responses').insert(response);
@@ -869,6 +893,52 @@ const ONBOARDING_QUESTIONS = [
       a.download = `aura-backup-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    // Export user data in AI-friendly format from Supabase
+    async function exportForAI(email) {
+      const { data: responses, error } = await auraDB.from('responses')
+        .select('*')
+        .eq('email', email)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('[Aura] Export failed:', error);
+        return null;
+      }
+
+      const questions = responses
+        .filter(r => r.question_id > 0)
+        .map(r => ({
+          question: r.snapshot?.q || `Question #${r.question_id}`,
+          answer: r.snapshot?.a || String(r.answer),
+          confidence: ['Hunch', 'Leaning', 'Firm', 'Certain'][r.confidence - 1] || r.confidence,
+          category: r.snapshot?.c || 'unknown',
+          type: r.snapshot?.t || 'unknown',
+          answered_at: r.created_at
+        }));
+
+      const assessments = {};
+      responses.filter(r => r.test_id).forEach(r => {
+        if (!assessments[r.test_id]) {
+          assessments[r.test_id] = { name: r.snapshot?.name || r.test_id, items: [] };
+        }
+        assessments[r.test_id].items.push({
+          question: r.snapshot?.q || `Item #${Math.abs(r.question_id)}`,
+          answer: r.snapshot?.a || String(r.answer)
+        });
+      });
+
+      return {
+        user: email,
+        exported_at: new Date().toISOString(),
+        summary: {
+          total_questions: questions.length,
+          total_assessments: Object.keys(assessments).length
+        },
+        questions,
+        assessments
+      };
     }
 
     // Import data from JSON file
@@ -2265,6 +2335,29 @@ const PhoneFrame = ({ children, darkMode = true }) => (
   </div>
 );
 
+// VortexButton with double-tap detection (works on touch devices)
+// Single tap fires immediately, double tap (within 400ms) fires reset
+const VortexButton = ({ onSingleTap, onDoubleTap, className = "text-xl btn-feedback" }) => {
+  const lastTap = React.useRef(0);
+
+  const handleTap = () => {
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTap.current;
+
+    if (timeSinceLastTap < 400 && timeSinceLastTap > 0) {
+      // Double tap detected - fire reset
+      lastTap.current = 0;
+      onDoubleTap && onDoubleTap();
+    } else {
+      // Single tap - fire immediately (if provided)
+      lastTap.current = now;
+      onSingleTap && onSingleTap();
+    }
+  };
+
+  return <button onClick={handleTap} className={className}>🌀</button>;
+};
+
 // NavBar
 const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSettings, onProfile, isLoggedIn, isGuest }) => (
   <div className={`flex items-center justify-between px-4 py-2 ${darkMode ? 'bg-gray-950/70 border-b border-white/5' : 'bg-white/70 border-b border-gray-200/50'} backdrop-blur-md`}>
@@ -2405,11 +2498,26 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
 
 // ==================== ONBOARDING FLOW ====================
 // Progressive onboarding for new users - fun questions first
-const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
+const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) => {
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [answers, setAnswers] = React.useState({});
   const [tappedAnswer, setTappedAnswer] = React.useState(null);
   const [tapCount, setTapCount] = React.useState(0);
+
+  // Single tap → skip to categories, Double tap → reset to welcome
+  const lastVortexTap = React.useRef(0);
+  const handleVortexTap = () => {
+    const now = Date.now();
+    if (now - lastVortexTap.current < 400) {
+      // Double tap detected - reset
+      lastVortexTap.current = 0;
+      onReset && onReset();
+    } else {
+      // Single tap - skip to categories
+      lastVortexTap.current = now;
+      onSkip && onSkip();
+    }
+  };
 
   const question = ONBOARDING_QUESTIONS[currentIndex];
   const isAnswered = answers[question?.id] !== undefined;
@@ -2488,14 +2596,14 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
 
   return (
     <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
-      {/* Minimal header with Sign In option */}
+      {/* Header with vortex and settings */}
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <span className="text-2xl">🌀</span>
+        <button className="text-2xl btn-feedback" onClick={handleVortexTap}>🌀</button>
         <button
-          onClick={onSignIn}
-          className={`text-sm ${darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-500'}`}
+          onClick={onSettings}
+          className={`text-xl btn-feedback ${darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-500'}`}
         >
-          Sign In
+          ☰
         </button>
       </div>
 
@@ -2516,63 +2624,97 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
       </div>
 
       {/* QUESTION AREA - flex grows to fill available space */}
-      <div className="flex-1 flex flex-col justify-center px-6">
-        <h1 className={`text-2xl font-bold text-center ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-          {question.text}
-        </h1>
+      <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-y-auto">
+        {/* Question card with glow effect like main MC screen */}
+        <div className={`space-y-2 p-4 rounded-2xl ${darkMode ? 'glow-violet' : ''}`}>
+          {/* Topic tag */}
+          <div className="flex justify-center">
+            <span className={`px-2 py-0.5 rounded-full text-sm font-medium ${
+              darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700'
+            }`}>
+              🎯 Quick Take
+            </span>
+          </div>
+          {/* Question text */}
+          <h2 className={`question-text text-center font-medium ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+            {question.text}
+          </h2>
+        </div>
       </div>
 
-      {/* FIXED BOTTOM AREA - buttons never move */}
+      {/* FIXED BOTTOM AREA - matches normal question screen layout */}
       <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white'}`}>
-        {/* Confidence hint row - ALWAYS same height (h-8), text shows at Q6+ when answer selected */}
-        <div className="h-8 flex items-center justify-center px-4">
-          {showConfidenceHint && tappedAnswer !== null && (
-            <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-              {getConfidenceHint()}
-            </span>
-          )}
-        </div>
+        {/* Tip banner - confidence hint at Q6+ */}
+        {showConfidenceHint && (
+          <div className="px-4 pt-2">
+            <div className={`rounded-xl px-4 py-2 flex items-center justify-between ${
+              darkMode ? 'bg-violet-500/15 border border-violet-500/50' : 'bg-violet-100 border border-violet-300'
+            }`}>
+              <span className={`text-sm ${darkMode ? 'text-violet-300' : 'text-violet-700'}`}>
+                <span className="font-medium">Tip:</span> {tappedAnswer !== null ? getConfidenceHint() : "Confident? Tap up to four times"}
+              </span>
+            </div>
+          </div>
+        )}
 
-        {/* Answer buttons - ALWAYS same position, stars inside like main UI */}
-        <div className="px-4 pb-3 space-y-3">
+        {/* Answer buttons - MC format */}
+        <div className={`px-4 ${showConfidenceHint ? 'pt-2' : 'pt-3'} space-y-1`}>
           {question.options.map((option, idx) => {
             const isSelected = tappedAnswer === idx;
             return (
-              <button
-                key={idx}
-                onClick={() => handleTap(idx)}
-                disabled={isAnswered}
-                className={`relative w-full h-14 rounded-xl font-medium text-lg overflow-hidden select-none btn-feedback ${
-                  isSelected ? 'ring-2 ring-violet-400 shine-card shine-violet' : ''
-                }`}
-                style={getButtonStyle(idx)}
-              >
-                {/* Confidence segments at bottom - like main UI */}
-                <ConfidenceSegments level={tapCount} color="violet" active={isSelected} darkMode={darkMode} />
-                {/* Button content with stars */}
-                <div className="relative z-10 flex items-center justify-center h-full gap-2">
-                  <span>{option}</span>
+              <div key={idx} className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleTap(idx)}
+                  disabled={isAnswered}
+                  className={`flex-1 h-[40px] px-3 rounded-lg text-left text-base overflow-hidden relative btn-feedback ${
+                    isSelected ? 'shine-card shine-violet' : ''
+                  }`}
+                  style={getButtonStyle(idx)}
+                >
+                  <span className="font-medium mr-1 opacity-60">{String.fromCharCode(65 + idx)}.</span>
+                  <span className="truncate">{option}</span>
                   {isSelected && tapCount > 0 && (
-                    <span className="text-sm font-medium opacity-70">{getStars(tapCount)}</span>
+                    <span className="absolute top-1/2 right-2 -translate-y-1/2 text-sm font-bold bg-white/30 w-5 h-5 rounded-full flex items-center justify-center">
+                      {tapCount}
+                    </span>
+                  )}
+                </button>
+                {/* ✕/✓ controls - fixed width, shows when this option is selected */}
+                <div className="w-9 h-[40px] flex-shrink-0 flex flex-col items-center justify-center">
+                  {isSelected && (
+                    <>
+                      <button
+                        onClick={() => { setTappedAnswer(null); setTapCount(0); }}
+                        className={`w-4 h-4 rounded-full btn-feedback flex items-center justify-center text-[10px] ${
+                          darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'
+                        }`}
+                      >
+                        ✕
+                      </button>
+                      <button
+                        onClick={handleSubmit}
+                        className="w-8 h-8 rounded-full text-white shadow-lg btn-feedback flex items-center justify-center text-base bg-violet-500"
+                      >
+                        ✓
+                      </button>
+                    </>
                   )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
 
-        {/* Submit row - ALWAYS same height (h-16), button shows/hides */}
-        <div className="h-16 px-4 pb-4 flex items-start">
-          {tappedAnswer !== null && (
-            <button
-              onClick={handleSubmit}
-              className={`w-full py-3 rounded-xl font-medium text-lg btn-feedback ${
-                darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'
-              }`}
-            >
-              {currentIndex < totalQuestions - 1 ? 'Next' : 'Finish'}
-            </button>
-          )}
+        {/* Action row - matches normal question screen height */}
+        <div className="h-[36px] px-4 mt-2 flex items-center justify-center">
+          {/* Empty for onboarding - just reserves space */}
+        </div>
+
+        {/* Bottom hint area - matches normal question screen */}
+        <div className="px-4 pb-3 pt-1">
+          <div className={`h-full flex items-center justify-center text-sm ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+            {currentIndex + 1} of {totalQuestions}
+          </div>
         </div>
       </div>
     </div>
@@ -2581,12 +2723,36 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
 
 // ==================== PATH CHOICE SCREEN ====================
 // Shown after 10 onboarding questions - user chooses their adventure
-const PathChoiceScreen = ({ darkMode, onReveal, onExplore }) => {
+const PathChoiceScreen = ({ darkMode, onReveal, onExplore, onSkip, onSettings, onReset }) => {
+  // Single tap → skip to categories, Double tap → reset to welcome
+  const lastVortexTap = React.useRef(0);
+  const handleVortexTap = () => {
+    const now = Date.now();
+    if (now - lastVortexTap.current < 400) {
+      lastVortexTap.current = 0;
+      onReset && onReset();
+    } else {
+      lastVortexTap.current = now;
+      onSkip && onSkip();
+    }
+  };
+
   return (
-    <div className={`flex-1 flex flex-col items-center justify-center px-6 ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
-      {/* Celebration header */}
-      <div className="text-center mb-8">
-        <div className="text-5xl mb-4">🎉</div>
+    <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      {/* Header with vortex and settings */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-2">
+        <button className="text-2xl btn-feedback" onClick={handleVortexTap}>🌀</button>
+        <button
+          onClick={onSettings}
+          className={`text-xl btn-feedback ${darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-500'}`}
+        >
+          ☰
+        </button>
+      </div>
+      {/* Celebration content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-4">🎉</div>
         <h1 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
           Nice! 10 down
         </h1>
@@ -2642,6 +2808,7 @@ const PathChoiceScreen = ({ darkMode, onReveal, onExplore }) => {
             <span className={`text-lg ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>→</span>
           </div>
         </button>
+      </div>
       </div>
     </div>
   );
@@ -3596,7 +3763,7 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
       {/* Header - with XP and level display */}
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
         <div className="flex items-center gap-3">
-          <span className="text-3xl cursor-pointer select-none" onDoubleClick={onResetQotd}>🌀</span>
+          <button className="text-3xl btn-feedback" onDoubleClick={onResetQotd}>🌀</button>
           {/* Level badge */}
           <div className="flex items-center gap-1.5">
             <span className={`text-sm font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>
@@ -4425,11 +4592,9 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
 // Helper to determine initial screen based on login state
 const getInitialScreen = () => {
   const hasEmail = localStorage.getItem('aura_user_email');
-  const isGuest = localStorage.getItem('aura_guest_mode') === 'true';
-  // Logged-in users land on their assessment profile
-  if (hasEmail) return 'assess-picker';
-  // Guest mode lands on categories
-  if (isGuest) return 'categories';
+  // Only signed-in users stay logged in on reload - land on categories menu
+  if (hasEmail) return 'categories';
+  // Everyone else (including guests) starts fresh at welcome
   return 'welcome';
 };
 
@@ -5251,7 +5416,9 @@ function App() {
       <OnboardingFlow
         darkMode={darkMode}
         onComplete={handleOnboardingComplete}
-        onSignIn={() => setScreen('welcome')}
+        onSkip={() => { assessLoadDemoProfile(1); setScreen('categories'); }}
+        onSettings={goToSettings}
+        onReset={resetDemo}
       />
     );
     if (screen === 'path-choice') return (
@@ -5259,6 +5426,9 @@ function App() {
         darkMode={darkMode}
         onReveal={handleChooseReveal}
         onExplore={handleChooseExplore}
+        onSkip={() => { assessLoadDemoProfile(1); setScreen('categories'); }}
+        onSettings={goToSettings}
+        onReset={resetDemo}
       />
     );
     if (screen === 'launch') return <LaunchScreen onDemo={startDemo} onLogin={() => {}} darkMode={darkMode} />;
@@ -7223,7 +7393,7 @@ function App() {
         qotdData={qotdData}
         qotdResponse={qotdResponse}
         onQotdClick={() => setScreen('qotd')}
-        onResetQotd={resetQotd}
+        onResetQotd={resetDemo}
         onAssessments={() => setScreen('assess-picker')}
         assessCompleted={assessCompleted}
       />
@@ -7964,7 +8134,7 @@ function App() {
           {/* Global stars background for dark mode */}
           {darkMode && <div className="global-stars" />}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {screen !== 'launch' && screen !== 'welcome' && screen !== 'settings' && screen !== 'categories' && (
+            {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && (
               <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} />
             )}
             {renderContent()}
@@ -7988,7 +8158,7 @@ function App() {
     >
       {/* Global stars background for dark mode */}
       {darkMode && <div className="global-stars" />}
-      {screen !== 'launch' && screen !== 'welcome' && screen !== 'settings' && screen !== 'categories' && (
+      {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && (
         <div className="safe-top">
           <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} />
         </div>
