@@ -83,6 +83,35 @@
 - Page reload: non-signed-in users go to welcome
 - Page reload: signed-in users go to categories (not assess-picker)
 
+## Vision Notes (2026-02-02 Session)
+
+### The Big Picture
+Aura Player is the **training ground for the real work**. The self-discovery flow isn't separate from BrightID verification - it's the on-ramp.
+
+**Funnel:**
+- Wide top: Fun self-discovery, anyone can do it, immediately valuable
+- Middle: Learn mechanics (tap/hold, confidence), build track record, get calibrated
+- Narrow bottom: Qualified evaluators who can do serious BrightID verification
+
+### How the Pieces Connect
+- **Philip builds:** The front-end - the thing humans touch, that makes them want to participate, that trains them without feeling like training
+- **Adam builds:** The backend - trust graphs, energy flow, SybilRank, accountability cascades
+- **The merge:** Players calibrated on fun questions can be trusted more on serious questions. Track record transfers.
+
+### BrightID Verification Questions (Same Interface)
+The same UI/mechanics work for evaluating unique humanity:
+- Have you met them in person?
+- Have you touched them?
+- When did you last see them?
+- Do you know their family?
+- Have you seen documents?
+- How long have you known them?
+
+### Core Insight
+The same interface that helps people understand themselves can train them to evaluate others.
+
+---
+
 ## Not Yet Implemented (From Plan)
 - Full gamification UI (XP bar display, level-up animations)
 - Streak system enhancements

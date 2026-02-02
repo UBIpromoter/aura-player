@@ -48,4 +48,9 @@
 
 ---
 
+## Assessment System
+
+- **New assessment breaks demo profiles** → assessLoadDemoProfile crashes on tests without demo data → **Always add guard check** for missing profile data
+  - Example: `if (profile[testId]) { ... } else { return; }` before iterating
+
 *Add new lessons whenever a mistake happens or user corrects you.*

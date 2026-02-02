@@ -138,6 +138,28 @@ export const ASSESS_TESTS = {
     ]
   },
 
+  // Quick Profile - Gateway assessment (10 questions, ~90 seconds)
+  'quick-profile': {
+    name: 'Quick Profile',
+    icon: '✨',
+    color: 'blue',
+    scale: 'likeme',
+    tier: 0,
+    description: 'Who are you in 2 minutes?',
+    items: [
+      { q: "At a party, I'm usually one of the last to leave", c: 'E', k: '+' },
+      { q: "Too much socializing drains me", c: 'E', k: '-' },
+      { q: "I keep my commitments even when I don't feel like it", c: 'C', k: '+' },
+      { q: "I start more projects than I finish", c: 'C', k: '-' },
+      { q: "When someone near me is anxious, I feel it too", c: 'A', k: '+' },
+      { q: "I say uncomfortable truths others avoid", c: 'A', k: '-' },
+      { q: "I overthink things that haven't happened yet", c: 'N', k: '+' },
+      { q: "The unconventional appeals to me more than the traditional", c: 'O', k: '+' },
+      { q: "I trust my gut more than analysis", c: 'intuition', k: '+' },
+      { q: "I'd rather have three close friends than thirty acquaintances", c: 'depth', k: '+' },
+    ]
+  },
+
   // Additional tests are in index.html:
   // - cognitive, attachment, risk, integrity
   // - shadow-M, shadow-N, shadow-P
@@ -147,14 +169,16 @@ export const ASSESS_TESTS = {
 };
 
 // Assessment categories
+// Tier system: 0 = always available, 1 = after Quick Profile, 2 = after Starter Pack
 export const ASSESS_CATEGORIES = {
-  starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'] },
-  personality: { name: 'Personality', icon: '🎭', color: 'violet', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'] },
-  character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'] },
-  shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'] },
-  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['adhd', 'cognitive', 'chronotype', 'reasoning', 'reasoning-2', 'reasoning-3'] },
-  relationships: { name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'] },
-  behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'] },
+  quickstart: { name: 'Quick Profile', icon: '✨', color: 'blue', tests: ['quick-profile'], tier: 0 },
+  starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], tier: 1 },
+  personality: { name: 'Personality', icon: '🎭', color: 'violet', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], tier: 2 },
+  character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'], tier: 2 },
+  shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'], tier: 2 },
+  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['adhd', 'cognitive', 'chronotype', 'reasoning', 'reasoning-2', 'reasoning-3'], tier: 2 },
+  relationships: { name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'], tier: 2 },
+  behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], tier: 2 },
 };
 
 export const ASSESS_TRAITS = {
@@ -163,4 +187,22 @@ export const ASSESS_TRAITS = {
   C: 'Conscientiousness',
   N: 'Neuroticism',
   O: 'Openness'
+};
+
+// Calculate user's unlock tier based on completed assessments
+// Tier 0: Default (only Quick Profile available)
+// Tier 1: Quick Profile completed (Starter Pack unlocked)
+// Tier 2: All 5 Starter Pack modules completed (all branches unlocked)
+export const calculateAssessTier = (completed) => {
+  if (!completed) return 0;
+
+  // Check for tier 2: all starter modules completed
+  const starterModules = ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'];
+  const starterComplete = starterModules.every(id => completed[id]);
+  if (starterComplete) return 2;
+
+  // Check for tier 1: quick-profile completed
+  if (completed['quick-profile']) return 1;
+
+  return 0;
 };

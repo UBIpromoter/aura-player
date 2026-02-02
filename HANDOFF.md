@@ -1,10 +1,94 @@
 # Aura Handoff Memo
 **Date:** 2026-02-02
-**Session:** Data Architecture + Vite Scaffold
+**Session:** Progressive Assessment Unlock System
 
 ---
 
-## What Was Done
+## What Was Done This Session
+
+### Progressive Assessment Unlock System (COMPLETE)
+
+**Goal:** Create a Quick Profile test as gateway to Reveal, with progressive unlocking of deeper assessments.
+
+**User Flow:**
+```
+First time clicking "Reveal" from path-choice
+              ↓
+      Quick Profile (10 questions)
+      "Who are you in 2 minutes?"
+              ↓
+      Fun result + "You've unlocked Starter Pack!"
+              ↓
+      assess-picker shows: Starter Pack only
+              ↓
+      Complete Starter Pack → All branches unlock
+      (Personality, Mind, Shadow, etc.)
+```
+
+**Changes Made:**
+
+1. **Added Quick Profile test** (`index.html:1855`)
+   - 10 questions (2 per Big Five trait + 2 bonus)
+   - Rose color, ✨ icon, tier: 0
+   - ~90 second completion time
+
+2. **Added tier system to ASSESS_CATEGORIES** (`index.html:1905`)
+   - quickstart: tier 0 (always available)
+   - starter: tier 1 (after Quick Profile)
+   - all others: tier 2 (after Starter Pack)
+
+3. **Added tier calculation function** (`index.html:1921`)
+   - `calculateAssessTier(completed)` → 0, 1, or 2
+
+4. **Filtered assess-picker by tier** (`index.html:6001`)
+   - Only shows categories where tier <= currentTier
+
+5. **Added unlock celebration** (`index.html:5376, 6363`)
+   - Shows "Starter Pack Unlocked!" or "All Branches Unlocked!"
+   - Rose/amber gradient, 🔓 icon
+
+6. **Gated Reveal entry** (`index.html:5194`)
+   - First click → goes directly to Quick Profile
+   - After completion → goes to assess-picker
+
+7. **Quick Profile results** (`index.html:6577`)
+   - Simple personality snapshot in 2-3 sentences
+   - "Ready for more?" CTA to Starter Pack
+
+**App Scaffold Updates:**
+- `app/src/data/assessments.js` - Added quick-profile + tier system
+- `app/src/hooks/useAssessmentTier.js` - New hook for tier calculation
+
+### Analysis Screen Tier Filtering (COMPLETE)
+
+**Goal:** Hide tier 2 content in Analysis until user completes Starter Pack.
+
+**Changes Made:**
+
+1. **Quick Profile results card** (`index.html:7307`)
+   - Shows personality snapshot at top of Analysis
+   - CTA button to continue to Starter Pack if tier < 2
+
+2. **Starter Pack section in Analysis** (`index.html:7327`)
+   - Shows 5 module cards with progress/completion status
+   - Only visible when tier >= 1
+
+3. **Tier 2 content filtering** (`index.html:7368`)
+   - Big Five, Shadow Self, individual assessments wrapped in `currentTier >= 2` check
+   - Shows locked teasers (grayed out cards) for tier < 2
+
+4. **Locked teaser cards** (`index.html:7697`)
+   - Personality, Mind, Shadow Self teasers with 🔒 lock icon
+   - "Complete Starter Pack to unlock" message
+   - Encouraging "More awaits" card at bottom
+
+5. **Analysis button gating** (`index.html:5965`)
+   - Already gated: only clickable after Quick Profile complete
+   - Grayed out with `cursor-not-allowed` when locked
+
+---
+
+## Previous Session Work
 
 ### Phase 1: Response Enrichment (COMPLETE)
 
