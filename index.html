@@ -2482,7 +2482,6 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
 
   // Get confidence hint text based on current state
   const getConfidenceHint = () => {
-    if (!showConfidenceUI) return null;
     if (tappedAnswer === null) return "Tap your answer, then tap again to show how sure you are";
     if (tapCount === 1) return "Tap again to increase confidence";
     if (tapCount === 2) return "Tap again for even more confidence";
@@ -2503,58 +2502,60 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
         </button>
       </div>
 
-      {/* Progress dots - only show after question 4 */}
-      {currentIndex >= 4 && (
-        <div className="flex justify-center gap-1.5 py-2">
-          {ONBOARDING_QUESTIONS.map((_, i) => (
-            <div
-              key={i}
-              className={`w-2 h-2 rounded-full transition-all ${
-                i < currentIndex
-                  ? (darkMode ? 'bg-violet-500' : 'bg-violet-400')
-                  : i === currentIndex
-                  ? (darkMode ? 'bg-violet-400 scale-125' : 'bg-violet-500 scale-125')
-                  : (darkMode ? 'bg-gray-700' : 'bg-gray-300')
-              }`}
-            />
-          ))}
-        </div>
-      )}
+      {/* Progress dots - always reserve space, only show content after Q4 */}
+      <div className="h-6 flex justify-center items-center gap-1.5">
+        {currentIndex >= 4 && ONBOARDING_QUESTIONS.map((_, i) => (
+          <div
+            key={i}
+            className={`w-2 h-2 rounded-full transition-all ${
+              i < currentIndex
+                ? (darkMode ? 'bg-violet-500' : 'bg-violet-400')
+                : i === currentIndex
+                ? (darkMode ? 'bg-violet-400 scale-125' : 'bg-violet-500 scale-125')
+                : (darkMode ? 'bg-gray-700' : 'bg-gray-300')
+            }`}
+          />
+        ))}
+      </div>
 
-      {/* Question area */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
-        {/* Question text */}
-        <h1 className={`text-2xl font-bold text-center mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+      {/* QUESTION AREA - flex grows to fill available space */}
+      <div className="flex-1 flex flex-col justify-center px-6">
+        <h1 className={`text-2xl font-bold text-center ${darkMode ? 'text-white' : 'text-gray-900'}`}>
           {question.text}
         </h1>
+      </div>
 
-        {/* Confidence stars and hint - appear at Q6+, under question */}
-        {showConfidenceUI && (
-          <div className="mb-4 text-center">
-            {/* Stars row */}
-            <div className="flex justify-center gap-1.5 mb-1">
-              {[1, 2, 3, 4].map(i => (
-                <span
-                  key={i}
-                  className={`text-2xl transition-all ${
-                    tappedAnswer !== null && i <= tapCount
-                      ? (darkMode ? 'text-violet-400' : 'text-violet-500')
-                      : (darkMode ? 'text-gray-700' : 'text-gray-300')
-                  }`}
-                >
-                  {tappedAnswer !== null && i <= tapCount ? '★' : '☆'}
-                </span>
-              ))}
+      {/* FIXED BOTTOM AREA - buttons never move */}
+      <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white'}`}>
+        {/* Confidence hint row - ALWAYS same height (h-10), content changes at Q6+ */}
+        <div className="h-10 flex items-center justify-center px-4">
+          {showConfidenceUI && (
+            <div className="flex items-center gap-3">
+              {/* Stars */}
+              <div className="flex gap-1">
+                {[1, 2, 3, 4].map(i => (
+                  <span
+                    key={i}
+                    className={`text-lg transition-all ${
+                      tappedAnswer !== null && i <= tapCount
+                        ? (darkMode ? 'text-violet-400' : 'text-violet-500')
+                        : (darkMode ? 'text-gray-700' : 'text-gray-300')
+                    }`}
+                  >
+                    {tappedAnswer !== null && i <= tapCount ? '★' : '☆'}
+                  </span>
+                ))}
+              </div>
+              {/* Hint text */}
+              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                {getConfidenceHint()}
+              </span>
             </div>
-            {/* Hint text */}
-            <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-              {getConfidenceHint()}
-            </p>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Answer buttons */}
-        <div className="w-full max-w-sm space-y-3">
+        {/* Answer buttons - ALWAYS same position */}
+        <div className="px-4 pb-3 space-y-3">
           {question.options.map((option, idx) => (
             <button
               key={idx}
@@ -2567,17 +2568,19 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
           ))}
         </div>
 
-        {/* Submit button - appears when answer is selected */}
-        {tappedAnswer !== null && (
-          <button
-            onClick={handleSubmit}
-            className={`mt-6 w-full max-w-sm py-3 rounded-xl font-medium text-lg btn-feedback ${
-              darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'
-            }`}
-          >
-            {currentIndex < totalQuestions - 1 ? 'Next' : 'Finish'}
-          </button>
-        )}
+        {/* Submit row - ALWAYS same height (h-16), button shows/hides */}
+        <div className="h-16 px-4 pb-4 flex items-start">
+          {tappedAnswer !== null && (
+            <button
+              onClick={handleSubmit}
+              className={`w-full py-3 rounded-xl font-medium text-lg btn-feedback ${
+                darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'
+              }`}
+            >
+              {currentIndex < totalQuestions - 1 ? 'Next' : 'Finish'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
