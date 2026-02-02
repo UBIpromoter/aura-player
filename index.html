@@ -2109,9 +2109,21 @@ const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSett
       {showStreak && stats.streak > 0 && <span className="text-sm text-orange-400">🔥{stats.streak}</span>}
     </button>
     <div className="flex items-center gap-2">
-      <span className={`text-base ${isLoggedIn ? (darkMode ? 'text-emerald-400' : 'text-emerald-500') : (darkMode ? 'text-gray-500' : 'text-gray-400')}`}>
-        {isLoggedIn ? '👤' : '❓'}
-      </span>
+      {isLoggedIn ? (
+        <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05))',
+            boxShadow: '0 0 12px 3px rgba(255,255,255,0.3), inset 0 0 8px rgba(255,255,255,0.1)',
+            border: '1.5px solid rgba(255,255,255,0.3)'
+          }}>
+          <span style={{color: 'rgba(255,255,255,0.9)'}}>👤</span>
+        </div>
+      ) : (
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium ${darkMode ? 'border-gray-600 text-gray-500' : 'border-gray-400 text-gray-400'}`}
+          style={{ border: '1.5px dashed', background: 'transparent' }}>
+          ?
+        </div>
+      )}
       <button onClick={onSettings} className={`text-xl btn-feedback ${TH('text-muted', darkMode)}`}>☰</button>
     </div>
   </div>
@@ -3969,7 +3981,10 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
 const getInitialScreen = () => {
   const hasEmail = localStorage.getItem('aura_user_email');
   const isGuest = localStorage.getItem('aura_guest_mode') === 'true';
-  if (hasEmail || isGuest) return 'categories';
+  // Logged-in users land on their assessment profile
+  if (hasEmail) return 'assess-picker';
+  // Guest mode lands on categories
+  if (isGuest) return 'categories';
   return 'welcome';
 };
 
@@ -4474,20 +4489,24 @@ function App() {
   const handleTryFirst = () => {
     localStorage.setItem('aura_guest_mode', 'true');
     setIsGuestMode(true);
+    // Load Alex as default demo profile
+    assessLoadDemoProfile(1);
     setScreen('categories');
   };
 
   const handleSignIn = (email) => {
     localStorage.removeItem('aura_guest_mode');
     setIsGuestMode(false);
-    setScreen('categories');
+    // Land on assessment profile for logged-in users
+    setScreen('assess-picker');
   };
 
   const handleCreateAccount = (email) => {
     localStorage.removeItem('aura_guest_mode');
     setIsGuestMode(false);
     claimMyResponses();
-    setScreen('categories');
+    // Land on assessment profile for logged-in users
+    setScreen('assess-picker');
   };
 
   const handleNudgeLater = () => {
