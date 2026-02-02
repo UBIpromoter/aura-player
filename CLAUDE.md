@@ -1,5 +1,35 @@
 # Claude Preferences for Aura Project
 
+## Git Workflow (IMPORTANT)
+
+### Branch Structure
+```
+main                    ← production (live at ubipromoter.github.io/aura-player)
+  └── dev               ← integration branch
+       └── feature/X    ← where work happens
+```
+
+### Rules
+1. **NEVER edit directly on main or dev** - always create a feature branch
+2. **Create feature branch**: `git checkout -b feature/feature-name` from dev
+3. **Commit early and often** on the feature branch
+4. **User says "make it live"** → merge feature to dev, then dev to main, push
+5. **Multiple bots**: Each bot works on its own feature branch to avoid conflicts
+
+### Commands for User
+| User says | Claude does |
+|-----------|-------------|
+| "I want to try something" | Create `feature/X` branch from dev |
+| "Save this" | Commit to current feature branch |
+| "Make it live" | Merge to dev → main → push |
+| "Undo this" | Reset feature branch |
+| "Show changes" | `git diff` or `git log` |
+
+### Before Starting Any Work
+1. Check current branch: `git branch`
+2. If on main or dev, create feature branch first
+3. Never assume previous work was committed
+
 ## Question & Assessment Rules
 
 ### Regular Questions (Q_RAW)
