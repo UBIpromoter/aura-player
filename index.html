@@ -4479,10 +4479,10 @@ function App() {
     signOut();
     // Clear all app state
     demoStorage.clear();
-    const freshState = getInitialState();
-    setResponses(freshState.answers);
+    // Use truly empty state (not pre-filled demo data)
+    setResponses({});
     setCommunityResults(generateDemoCommunityResults());
-    setStats(freshState.stats);
+    setStats({ answered: 0, streak: 0, lastAnswerDate: null });
     setCurrentIndex(0);
     setShowGestureHint(true);
     setQotdResponse(null);
