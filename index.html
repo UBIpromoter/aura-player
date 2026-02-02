@@ -3747,6 +3747,14 @@ const ProfileSection = ({ darkMode }) => {
     setCurrentEmail(null);
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (mode === 'signup') handleSignUp();
+      else handleSignIn();
+    }
+  };
+
   const [syncStatus, setSyncStatus] = React.useState(null); // null, 'success', 'error'
   const [syncMessage, setSyncMessage] = React.useState('');
 
@@ -3829,6 +3837,7 @@ const ProfileSection = ({ darkMode }) => {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={handleKeyDown}
           className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
         />
         <input
@@ -3836,6 +3845,7 @@ const ProfileSection = ({ darkMode }) => {
           placeholder="PIN (4+ digits)"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+          onKeyDown={handleKeyDown}
           inputMode="numeric"
           className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
         />
