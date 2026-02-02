@@ -2415,8 +2415,8 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
   const isAnswered = answers[question?.id] !== undefined;
   const totalQuestions = ONBOARDING_QUESTIONS.length;
 
-  // Show confidence UI starting at question 6
-  const showConfidenceUI = currentIndex >= 5;
+  // Show confidence hint starting at question 6
+  const showConfidenceHint = currentIndex >= 5;
 
   const handleTap = (answer) => {
     if (isAnswered) return;
@@ -2451,41 +2451,38 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
 
   if (!question) return null;
 
-  // Button gradient styles based on confidence
-  const getButtonStyle = (idx) => {
-    const isSelected = tappedAnswer === idx;
-    const conf = isSelected ? tapCount : 0;
-
-    if (!isSelected) {
-      return darkMode
-        ? 'bg-gray-800/50 border-gray-700 text-gray-300'
-        : 'bg-gray-100 border-gray-300 text-gray-700';
-    }
-
-    // Confidence-based gradients (matching main app style)
-    const shades = darkMode
-      ? [
-          'from-violet-700/80 to-violet-600/80',
-          'from-violet-600 to-violet-500',
-          'from-violet-500 to-violet-400',
-          'from-violet-400 to-violet-300',
-        ]
-      : [
-          'from-violet-300 to-violet-200',
-          'from-violet-400 to-violet-300',
-          'from-violet-500 to-violet-400',
-          'from-violet-600 to-violet-500',
-        ];
-
-    return `bg-gradient-to-r ${shades[conf - 1]} border-violet-500 text-white`;
+  // Violet shades for confidence gradients (matching main app style)
+  const violetShades = {
+    1: darkMode ? ['#5b21b6', '#7c3aed'] : ['#ddd6fe', '#c4b5fd'],
+    2: darkMode ? ['#6d28d9', '#8b5cf6'] : ['#c4b5fd', '#a78bfa'],
+    3: darkMode ? ['#7c3aed', '#a78bfa'] : ['#a78bfa', '#8b5cf6'],
+    4: darkMode ? ['#8b5cf6', '#c4b5fd'] : ['#8b5cf6', '#7c3aed'],
   };
 
-  // Get confidence hint text based on current state
+  const getButtonStyle = (idx) => {
+    const isSelected = tappedAnswer === idx;
+    if (!isSelected) {
+      return {
+        background: darkMode ? 'rgb(31,41,55)' : 'rgb(255,255,255)',
+        color: darkMode ? 'rgb(209,213,219)' : 'rgb(107,114,128)',
+        border: darkMode ? 'none' : '2px solid rgb(229,231,235)',
+      };
+    }
+    const conf = Math.min(tapCount, 4);
+    const s = violetShades[conf];
+    return {
+      background: `linear-gradient(135deg, ${s[0]} 0%, ${s[1]} 100%)`,
+      color: 'white',
+      boxShadow: `0 0 ${tapCount * 8}px rgba(139, 92, 246, ${0.2 + tapCount * 0.15})`,
+    };
+  };
+
+  // Get confidence hint text
   const getConfidenceHint = () => {
-    if (tappedAnswer === null) return "Tap your answer, then tap again to show how sure you are";
+    if (tappedAnswer === null) return "Tap again to show confidence";
     if (tapCount === 1) return "Tap again to increase confidence";
-    if (tapCount === 2) return "Tap again for even more confidence";
-    if (tapCount === 3) return "One more tap for maximum confidence";
+    if (tapCount === 2) return "More confident? Tap again";
+    if (tapCount === 3) return "One more for maximum";
     return "Maximum confidence!";
   };
 
@@ -2527,45 +2524,41 @@ const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
 
       {/* FIXED BOTTOM AREA - buttons never move */}
       <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white'}`}>
-        {/* Confidence hint row - ALWAYS same height (h-10), content changes at Q6+ */}
-        <div className="h-10 flex items-center justify-center px-4">
-          {showConfidenceUI && (
-            <div className="flex items-center gap-3">
-              {/* Stars */}
-              <div className="flex gap-1">
-                {[1, 2, 3, 4].map(i => (
-                  <span
-                    key={i}
-                    className={`text-lg transition-all ${
-                      tappedAnswer !== null && i <= tapCount
-                        ? (darkMode ? 'text-violet-400' : 'text-violet-500')
-                        : (darkMode ? 'text-gray-700' : 'text-gray-300')
-                    }`}
-                  >
-                    {tappedAnswer !== null && i <= tapCount ? '★' : '☆'}
-                  </span>
-                ))}
-              </div>
-              {/* Hint text */}
-              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                {getConfidenceHint()}
-              </span>
-            </div>
+        {/* Confidence hint row - ALWAYS same height (h-8), text shows at Q6+ when answer selected */}
+        <div className="h-8 flex items-center justify-center px-4">
+          {showConfidenceHint && tappedAnswer !== null && (
+            <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              {getConfidenceHint()}
+            </span>
           )}
         </div>
 
-        {/* Answer buttons - ALWAYS same position */}
+        {/* Answer buttons - ALWAYS same position, stars inside like main UI */}
         <div className="px-4 pb-3 space-y-3">
-          {question.options.map((option, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleTap(idx)}
-              disabled={isAnswered}
-              className={`w-full py-4 px-6 rounded-xl font-medium text-lg transition-all border-2 btn-feedback ${getButtonStyle(idx)}`}
-            >
-              {option}
-            </button>
-          ))}
+          {question.options.map((option, idx) => {
+            const isSelected = tappedAnswer === idx;
+            return (
+              <button
+                key={idx}
+                onClick={() => handleTap(idx)}
+                disabled={isAnswered}
+                className={`relative w-full h-14 rounded-xl font-medium text-lg overflow-hidden select-none btn-feedback ${
+                  isSelected ? 'ring-2 ring-violet-400 shine-card shine-violet' : ''
+                }`}
+                style={getButtonStyle(idx)}
+              >
+                {/* Confidence segments at bottom - like main UI */}
+                <ConfidenceSegments level={tapCount} color="violet" active={isSelected} darkMode={darkMode} />
+                {/* Button content with stars */}
+                <div className="relative z-10 flex items-center justify-center h-full gap-2">
+                  <span>{option}</span>
+                  {isSelected && tapCount > 0 && (
+                    <span className="text-sm font-medium opacity-70">{getStars(tapCount)}</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {/* Submit row - ALWAYS same height (h-16), button shows/hides */}
