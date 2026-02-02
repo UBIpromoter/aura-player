@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Design Playground</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+    /* Animations */
+    @keyframes shimmer-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Shine card effect */
+    .shine-card { position: relative; }
+    .shine-card::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      background: linear-gradient(180deg, var(--accent-bright, rgba(255,255,255,0.5)) 0%, var(--accent-color, rgba(255,255,255,0.2)) 5%, transparent 15%, transparent 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      padding: 2px;
+      pointer-events: none;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .shine-card:hover::before { opacity: 1; animation: shimmer-pulse 3s ease-in-out infinite; }
+
+    /* Color-specific shines */
+    .shine-emerald { --accent-color: rgba(16, 185, 129, 0.25); --accent-bright: rgba(110, 231, 183, 0.55); }
+    .shine-rose { --accent-color: rgba(244, 63, 94, 0.25); --accent-bright: rgba(251, 113, 133, 0.55); }
+    .shine-violet { --accent-color: rgba(139, 92, 246, 0.25); --accent-bright: rgba(196, 181, 253, 0.55); }
+    .shine-blue { --accent-color: rgba(59, 130, 246, 0.3); --accent-bright: rgba(147, 197, 253, 0.6); }
+    .shine-amber { --accent-color: rgba(251, 191, 36, 0.2); --accent-bright: rgba(253, 224, 71, 0.45); }
+    .shine-teal { --accent-color: rgba(45, 212, 191, 0.2); --accent-bright: rgba(153, 246, 228, 0.5); }
+
+    /* Glow effects */
+    .glow-amber { box-shadow: 0 0 15px rgba(251, 191, 36, 0.12), 0 0 35px rgba(251, 191, 36, 0.08); }
+    .glow-violet { box-shadow: 0 0 18px rgba(139, 92, 246, 0.2), 0 0 40px rgba(139, 92, 246, 0.12); }
+    .glow-teal { box-shadow: 0 0 18px rgba(45, 212, 191, 0.16), 0 0 40px rgba(45, 212, 191, 0.1); }
+
+    /* Button feedback */
+    .btn-feedback { transition: transform 0.1s ease, filter 0.1s ease; }
+    .btn-feedback:hover { filter: brightness(1.15); }
+    .btn-feedback:active { transform: scale(0.96); filter: brightness(0.92); }
+
+    /* Question text */
+    .question-text {
+      font-size: clamp(18px, 5vw, 24px);
+      line-height: 1.35;
+      text-wrap: balance;
+    }
+
+    /* Hide scrollbar */
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Color picker input */
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: none;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+// ============================================================
+// COLOR PALETTES - Curated themes, easy to switch
+// ============================================================
+const PALETTES = {
+  // Current production palette
+  aura: {
+    name: 'Aura (Current)',
+    colors: {
+      primary: '#8b5cf6',      // Violet
+      secondary: '#3b82f6',    // Blue
+      success: '#10b981',      // Emerald
+      danger: '#f43f5e',       // Rose
+      warning: '#f59e0b',      // Amber
+      neutral: '#6b7280',      // Gray
+    },
+    categories: {
+      prediction: '#fbbf24',   // Amber
+      reasoning: '#8b5cf6',    // Violet
+      judgment: '#14b8a6',     // Teal
+    },
+    confidence: {
+      yes: ['#a7f3d0', '#6ee7b7', '#34d399', '#10b981'],
+      no: ['#fecaca', '#fda4af', '#fb7185', '#f43f5e'],
+    },
+  },
+
+  // Cool ocean vibes
+  ocean: {
+    name: 'Ocean',
+    colors: {
+      primary: '#0ea5e9',      // Sky blue
+      secondary: '#06b6d4',    // Cyan
+      success: '#14b8a6',      // Teal
+      danger: '#f43f5e',       // Rose
+      warning: '#f59e0b',      // Amber
+      neutral: '#64748b',      // Slate
+    },
+    categories: {
+      prediction: '#06b6d4',   // Cyan
+      reasoning: '#0ea5e9',    // Sky
+      judgment: '#14b8a6',     // Teal
+    },
+    confidence: {
+      yes: ['#99f6e4', '#5eead4', '#2dd4bf', '#14b8a6'],
+      no: ['#fecdd3', '#fda4af', '#fb7185', '#f43f5e'],
+    },
+  },
+
+  // Warm sunset tones
+  sunset: {
+    name: 'Sunset',
+    colors: {
+      primary: '#f97316',      // Orange
+      secondary: '#ef4444',    // Red
+      success: '#84cc16',      // Lime
+      danger: '#dc2626',       // Red-600
+      warning: '#eab308',      // Yellow
+      neutral: '#78716c',      // Stone
+    },
+    categories: {
+      prediction: '#f97316',   // Orange
+      reasoning: '#ef4444',    // Red
+      judgment: '#eab308',     // Yellow
+    },
+    confidence: {
+      yes: ['#d9f99d', '#bef264', '#a3e635', '#84cc16'],
+      no: ['#fecaca', '#fca5a5', '#f87171', '#ef4444'],
+    },
+  },
+
+  // Clean and minimal
+  mono: {
+    name: 'Mono',
+    colors: {
+      primary: '#3b82f6',      // Blue (only accent)
+      secondary: '#6b7280',    // Gray
+      success: '#22c55e',      // Green
+      danger: '#ef4444',       // Red
+      warning: '#f59e0b',      // Amber
+      neutral: '#6b7280',      // Gray
+    },
+    categories: {
+      prediction: '#3b82f6',   // Blue
+      reasoning: '#6b7280',    // Gray
+      judgment: '#3b82f6',     // Blue
+    },
+    confidence: {
+      yes: ['#bbf7d0', '#86efac', '#4ade80', '#22c55e'],
+      no: ['#fecaca', '#fca5a5', '#f87171', '#ef4444'],
+    },
+  },
+
+  // Nature/forest
+  forest: {
+    name: 'Forest',
+    colors: {
+      primary: '#059669',      // Emerald-600
+      secondary: '#0d9488',    // Teal-600
+      success: '#16a34a',      // Green-600
+      danger: '#dc2626',       // Red-600
+      warning: '#ca8a04',      // Yellow-600
+      neutral: '#57534e',      // Stone-600
+    },
+    categories: {
+      prediction: '#ca8a04',   // Yellow-600
+      reasoning: '#059669',    // Emerald
+      judgment: '#0d9488',     // Teal
+    },
+    confidence: {
+      yes: ['#bbf7d0', '#86efac', '#4ade80', '#22c55e'],
+      no: ['#fecaca', '#fca5a5', '#f87171', '#ef4444'],
+    },
+  },
+
+  // Bold neon
+  neon: {
+    name: 'Neon',
+    colors: {
+      primary: '#a855f7',      // Purple-500
+      secondary: '#ec4899',    // Pink-500
+      success: '#22d3ee',      // Cyan-400
+      danger: '#f43f5e',       // Rose-500
+      warning: '#facc15',      // Yellow-400
+      neutral: '#71717a',      // Zinc-500
+    },
+    categories: {
+      prediction: '#facc15',   // Yellow
+      reasoning: '#a855f7',    // Purple
+      judgment: '#22d3ee',     // Cyan
+    },
+    confidence: {
+      yes: ['#a5f3fc', '#67e8f9', '#22d3ee', '#06b6d4'],
+      no: ['#fecdd3', '#fda4af', '#fb7185', '#f43f5e'],
+    },
+  },
+};
+
+// Build full theme from palette (adds shared stuff)
+const buildTheme = (palette) => ({
+  ...palette,
+  assessments: {
+    starter: palette.colors.primary,
+    personality: palette.colors.primary,
+    mind: palette.colors.secondary,
+    character: palette.colors.success,
+    shadow: palette.colors.neutral,
+    relationships: '#d946ef',
+    behavior: palette.colors.warning,
+    quickstart: palette.colors.danger,
+  },
+  mcColors: [
+    { name: 'blue', hex: palette.colors.secondary, shades: generateShades(palette.colors.secondary) },
+    { name: 'teal', hex: '#14b8a6', shades: ['#99f6e4', '#5eead4', '#2dd4bf', '#14b8a6'] },
+    { name: 'emerald', hex: palette.colors.success, shades: generateShades(palette.colors.success) },
+    { name: 'rose', hex: palette.colors.danger, shades: generateShades(palette.colors.danger) },
+    { name: 'violet', hex: palette.colors.primary, shades: generateShades(palette.colors.primary) },
+  ],
+  backgrounds: {
+    dark: '#030712',
+    darkCard: '#111827',
+    light: '#f9fafb',
+    lightCard: '#ffffff',
+  },
+});
+
+// Generate 4 shades from a hex color (light to dark)
+const generateShades = (hex) => {
+  const lighten = (h, amount) => {
+    const num = parseInt(h.slice(1), 16);
+    const r = Math.min(255, ((num >> 16) & 0xff) + amount);
+    const g = Math.min(255, ((num >> 8) & 0xff) + amount);
+    const b = Math.min(255, (num & 0xff) + amount);
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+  };
+  const darken = (h, amount) => lighten(h, -amount);
+  return [lighten(hex, 80), lighten(hex, 40), hex, darken(hex, 30)];
+};
+
+const DEFAULT_THEME = buildTheme(PALETTES.aura);
+
+// ============================================================
+// SAMPLE DATA - Minimal questions for testing UI
+// ============================================================
+const SAMPLE_QUESTIONS = [
+  {
+    id: 1,
+    type: 'binary',
+    category: 'prediction',
+    text: 'Will AI surpass human intelligence by 2030?',
+    evidence: [
+      { type: 'stat', label: 'Expert consensus', value: '45% likely' },
+      { type: 'note', text: 'Depends on definition of "intelligence"' }
+    ]
+  },
+  {
+    id: 2,
+    type: 'multiple',
+    category: 'reasoning',
+    text: 'Is a hot dog a sandwich?',
+    options: ['Yes, bread with filling', 'No, its own category', 'It\'s a taco', 'Depends on definition']
+  },
+  {
+    id: 3,
+    type: 'binary',
+    category: 'judgment',
+    text: 'Should social media require age verification?'
+  },
+  {
+    id: 4,
+    type: 'multiple',
+    category: 'prediction',
+    text: 'What will be the dominant AI interface by 2030?',
+    options: ['Text chat', 'Voice assistants', 'AR/VR agents', 'Brain-computer interfaces']
+  },
+  {
+    id: 5,
+    type: 'binary',
+    category: 'reasoning',
+    text: 'Is free will an illusion?'
+  },
+];
+
+const SAMPLE_ASSESSMENTS = [
+  { id: 'quick-profile', name: 'Quick Profile', icon: '✨', color: 'rose', items: 10, tier: 0 },
+  { id: 'starter-personality', name: 'Personality', icon: '🪞', color: 'indigo', items: 9, tier: 1 },
+  { id: 'bigfive-E', name: 'Extraversion', icon: '🎭', color: 'violet', items: 10, tier: 2 },
+  { id: 'adhd', name: 'ADHD Screener', icon: '🧠', color: 'blue', items: 6, tier: 2 },
+];
+
+// Sample community votes (realistic distribution)
+const SAMPLE_VOTES = {
+  binary: [
+    { answer: 0, confidence: 4 }, { answer: 0, confidence: 3 }, { answer: 0, confidence: 3 },
+    { answer: 0, confidence: 2 }, { answer: 0, confidence: 2 }, { answer: 0, confidence: 2 },
+    { answer: 0, confidence: 1 }, { answer: 0, confidence: 1 },
+    { answer: 1, confidence: 4 }, { answer: 1, confidence: 4 }, { answer: 1, confidence: 3 },
+    { answer: 1, confidence: 3 }, { answer: 1, confidence: 2 }, { answer: 1, confidence: 1 },
+  ],
+  multiple: [
+    { answer: 0, confidence: 3 }, { answer: 0, confidence: 2 }, { answer: 0, confidence: 4 },
+    { answer: 1, confidence: 4 }, { answer: 1, confidence: 3 }, { answer: 1, confidence: 3 },
+    { answer: 1, confidence: 2 }, { answer: 1, confidence: 2 }, { answer: 1, confidence: 1 },
+    { answer: 2, confidence: 3 }, { answer: 2, confidence: 2 },
+    { answer: 3, confidence: 4 }, { answer: 3, confidence: 1 },
+  ],
+};
+
+// Sample assessment questions (Likert scale)
+const SAMPLE_ASSESS_QUESTIONS = [
+  { q: "I am the first person to introduce myself in a group", c: 'extraversion' },
+  { q: "I finish tasks even when they become repetitive or boring", c: 'conscientiousness' },
+  { q: "I replay conversations wondering if I said something wrong", c: 'neuroticism' },
+  { q: "I choose new experiences over sticking to familiar routines", c: 'openness' },
+  { q: "I apologize first after an argument, even if I'm not wrong", c: 'agreeableness' },
+];
+
+const LIKERT_SCALE = [
+  { v: 1, l: 'Not like me at all' },
+  { v: 2, l: 'A little like me' },
+  { v: 3, l: 'Somewhat like me' },
+  { v: 4, l: 'Mostly like me' },
+  { v: 5, l: 'Very much like me' },
+];
+
+// Sample analytics data
+const SAMPLE_ANALYTICS = {
+  totalAnswered: 127,
+  categories: { prediction: 45, reasoning: 52, judgment: 30 },
+  assessments: { completed: 3, total: 8 },
+  personality: { E: 72, A: 58, C: 65, N: 42, O: 81 },
+  streak: { current: 5, best: 12 },
+  weeklyActivity: [3, 7, 5, 2, 8, 4, 6], // Last 7 days
+};
+
+// ============================================================
+// DEVICE PRESETS
+// ============================================================
+const DEVICES = {
+  'iphone-se': { name: 'iPhone SE', width: 375, height: 667, scale: 1 },
+  'iphone-15': { name: 'iPhone 15', width: 393, height: 852, scale: 1 },
+  'iphone-15-max': { name: 'iPhone 15 Pro Max', width: 430, height: 932, scale: 1 },
+  'pixel-7': { name: 'Pixel 7', width: 412, height: 915, scale: 1 },
+  'ipad-mini': { name: 'iPad Mini', width: 768, height: 1024, scale: 0.6 },
+  'desktop': { name: 'Desktop', width: 1280, height: 800, scale: 0.5 },
+};
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+const TH = (type, darkMode) => {
+  const themes = {
+    'text-primary': darkMode ? 'text-white' : 'text-gray-900',
+    'text-muted': darkMode ? 'text-gray-400' : 'text-gray-500',
+    'text-subtle': darkMode ? 'text-gray-500' : 'text-gray-400',
+    'bg-primary': darkMode ? 'bg-gray-950' : 'bg-gray-50',
+    'bg-card': darkMode ? 'bg-gray-900' : 'bg-white',
+    'bg-inverted': darkMode ? 'bg-white' : 'bg-gray-900',
+    'border': darkMode ? 'border-gray-800' : 'border-gray-200',
+  };
+  return themes[type] || '';
+};
+
+const hexToRgb = (hex) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0,0,0';
+};
+
+// ============================================================
+// UI COMPONENTS (Visual only - no business logic)
+// ============================================================
+
+// Confidence Segments - bottom bar on buttons
+const ConfidenceSegments = ({ level, color = 'emerald', active = false, theme }) => {
+  const colors = {
+    emerald: theme.confidence.yes,
+    rose: theme.confidence.no,
+  };
+  const shades = colors[color] || colors.emerald;
+  if (!active || level === 0) return null;
+  return (
+    <div className="absolute bottom-0 left-0 right-0 h-2 flex">
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className={`flex-1 transition-all duration-150 ${i === 1 ? 'rounded-bl-xl' : ''} ${i === 4 ? 'rounded-br-xl' : ''}`}
+          style={{
+            backgroundColor: level >= i ? shades[i - 1] : 'rgba(0,0,0,0.2)',
+            borderRight: i < 4 ? '1px solid rgba(0,0,0,0.3)' : 'none'
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+// Category Chip
+const CategoryChip = ({ category, theme, darkMode }) => {
+  const catConfig = {
+    prediction: { name: 'Predictions', icon: '🔮' },
+    reasoning: { name: 'Reasoning', icon: '🧠' },
+    judgment: { name: 'Judgment', icon: '⚖️' },
+  };
+  const cat = catConfig[category];
+  const color = theme.categories[category];
+  if (!cat) return null;
+  return (
+    <span
+      className="px-2 py-0.5 rounded-full text-sm font-medium"
+      style={{
+        backgroundColor: darkMode ? `${color}20` : `${color}15`,
+        color: darkMode ? color : color
+      }}
+    >
+      {cat.icon} {cat.name}
+    </span>
+  );
+};
+
+// Question Card
+const QuestionCard = ({ question, darkMode, theme, evidenceExpanded, onToggleEvidence }) => {
+  const glowMap = {
+    prediction: 'glow-amber',
+    reasoning: 'glow-violet',
+    judgment: 'glow-teal'
+  };
+  const cardGlow = darkMode && question.category ? glowMap[question.category] || '' : '';
+  const hasEvidence = question.evidence && question.evidence.length > 0;
+
+  return (
+    <div className={`space-y-3 ${cardGlow ? `p-4 rounded-2xl ${cardGlow}` : ''}`}>
+      <div className="flex justify-center">
+        <CategoryChip category={question.category} theme={theme} darkMode={darkMode} />
+      </div>
+      <h2 className={`question-text text-center font-medium ${TH('text-primary', darkMode)}`}>
+        {question.text}
+      </h2>
+      {hasEvidence && (
+        <div className={`rounded-xl overflow-hidden ${darkMode ? 'bg-gradient-to-b from-gray-800/80 to-gray-900/80' : 'bg-white border border-gray-200 shadow-sm'}`}>
+          <button
+            onClick={onToggleEvidence}
+            className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${darkMode ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50'}`}
+          >
+            <span className="flex items-center gap-2">
+              <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${darkMode ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-600'}`}>📊</span>
+              <span className={`text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                Evidence <span className={TH('text-subtle', darkMode)}>({question.evidence.length})</span>
+              </span>
+            </span>
+            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-transform duration-200 ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'} ${evidenceExpanded ? 'rotate-180' : ''}`}>▼</span>
+          </button>
+          {evidenceExpanded && (
+            <div className="px-4 pb-4 space-y-3">
+              {question.evidence.map((item, i) => (
+                <div key={i} className={`rounded-lg p-3 ${darkMode ? 'bg-gray-800/60' : 'bg-gray-50'}`}>
+                  {item.type === 'stat' ? (
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm ${TH('text-muted', darkMode)}`}>{item.label}</span>
+                      <span className={`text-sm font-semibold px-2 py-0.5 rounded ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>{item.value}</span>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <span className={darkMode ? 'text-gray-600' : 'text-gray-300'}>"</span>
+                      <span className={`text-sm italic ${TH('text-muted', darkMode)}`}>{item.text}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Binary Buttons (Yes/No)
+const BinaryButtons = ({ darkMode, theme, selectedAnswer, confidence, onSelect }) => {
+  const getButtonStyle = (answer) => {
+    const isSelected = selectedAnswer === answer;
+    const shades = answer === 0 ? theme.confidence.yes : theme.confidence.no;
+    const conf = confidence || 2;
+
+    if (isSelected) {
+      return {
+        background: `linear-gradient(135deg, ${shades[conf - 1]} 0%, ${shades[Math.min(conf, 3)]} 100%)`,
+        boxShadow: `0 0 ${conf * 8}px rgba(${hexToRgb(shades[3])}, ${0.2 + conf * 0.15})`,
+        color: 'white',
+      };
+    }
+    return {
+      background: darkMode ? 'rgb(31,41,55)' : 'rgb(255,255,255)',
+      color: darkMode ? 'rgb(209,213,219)' : (answer === 0 ? theme.colors.success : theme.colors.danger),
+      border: darkMode ? 'none' : `2px solid ${answer === 0 ? shades[0] : shades[0]}`,
+    };
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {[0, 1].map(answer => (
+        <button
+          key={answer}
+          onClick={() => onSelect(answer)}
+          className={`relative h-14 rounded-xl font-bold overflow-hidden select-none btn-feedback ${
+            selectedAnswer === answer
+              ? (answer === 0 ? 'ring-2 ring-emerald-400 shine-card shine-emerald' : 'ring-2 ring-rose-400 shine-card shine-rose')
+              : ''
+          }`}
+          style={getButtonStyle(answer)}
+        >
+          <ConfidenceSegments level={confidence} color={answer === 0 ? 'emerald' : 'rose'} active={selectedAnswer === answer} theme={theme} />
+          <div className="relative z-10 flex items-center justify-center h-full">
+            <span className="text-xl font-bold">{answer === 0 ? 'YES' : 'NO'}</span>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// Multiple Choice Buttons
+const MCButtons = ({ options, darkMode, theme, selectedAnswer, confidence, onSelect }) => {
+  const getOptionStyle = (index) => {
+    const colorSet = theme.mcColors[index % theme.mcColors.length];
+    const isSelected = selectedAnswer === index;
+    const conf = confidence || 2;
+
+    if (isSelected) {
+      return {
+        background: `linear-gradient(135deg, ${colorSet.shades[conf - 1]} 0%, ${colorSet.shades[Math.min(conf, 3)]} 100%)`,
+        boxShadow: `0 0 ${conf * 6}px rgba(${hexToRgb(colorSet.hex)}, ${0.2 + conf * 0.12})`,
+        color: 'white',
+        border: `2px solid ${colorSet.hex}`,
+      };
+    }
+    return {
+      background: darkMode ? 'rgb(31,41,55)' : 'rgb(255,255,255)',
+      color: darkMode ? 'rgb(209,213,219)' : 'rgb(55,65,81)',
+      border: darkMode ? '2px solid transparent' : '2px solid rgb(229,231,235)',
+    };
+  };
+
+  return (
+    <div className="space-y-2">
+      {options.map((option, index) => (
+        <button
+          key={index}
+          onClick={() => onSelect(index)}
+          className={`w-full text-left px-4 py-3 rounded-xl font-medium btn-feedback ${
+            selectedAnswer === index ? 'shine-card shine-blue' : ''
+          }`}
+          style={getOptionStyle(index)}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// NavBar
+const NavBar = ({ darkMode, theme, stats }) => (
+  <div className={`flex items-center justify-between px-4 py-2 ${darkMode ? 'bg-gray-950/70 border-b border-white/5' : 'bg-white/70 border-b border-gray-200/50'} backdrop-blur-md`}>
+    <button className="text-xl btn-feedback">🌀</button>
+    <div className="flex items-center gap-2">
+      <span className={`text-sm ${TH('text-muted', darkMode)}`}>{stats.answered} answered</span>
+      {stats.streak > 0 && <span className="text-sm text-orange-400">🔥{stats.streak}</span>}
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05))',
+          boxShadow: '0 0 12px 3px rgba(255,255,255,0.3)',
+          border: '1.5px solid rgba(255,255,255,0.3)'
+        }}>
+        <span style={{color: 'rgba(255,255,255,0.9)'}}>👤</span>
+      </div>
+      <button className={`text-xl btn-feedback ${TH('text-muted', darkMode)}`}>☰</button>
+    </div>
+  </div>
+);
+
+// Progress Circle
+const ProgressCircle = ({ progress = 0, size = 48, strokeWidth = 3, color, darkMode, icon, text }) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const gradId = `prog-${Math.random().toString(36).substr(2, 9)}`;
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      {progress > 0 && (
+        <div className="absolute inset-0 rounded-full blur-md opacity-40"
+             style={{ background: color }} />
+      )}
+      <svg width={size} height={size} className="absolute">
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={progress > 0 ? color : '#374151'} />
+            <stop offset="100%" stopColor={progress > 0 ? color : '#4b5563'} />
+          </linearGradient>
+        </defs>
+        <circle cx={size/2} cy={size/2} r={radius} fill="none"
+                stroke={darkMode ? '#1f2937' : '#e5e7eb'} strokeWidth={strokeWidth} />
+        <circle cx={size/2} cy={size/2} r={radius} fill="none"
+                stroke={`url(#${gradId})`} strokeWidth={strokeWidth} strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - progress / 100)}
+                transform={`rotate(-90 ${size/2} ${size/2})`}
+                className="transition-all duration-500" />
+      </svg>
+      {icon && <span className="relative z-10 text-lg">{icon}</span>}
+      {text !== undefined && (
+        <span className="relative z-10 font-bold text-sm" style={{ color: progress > 0 ? color : (darkMode ? '#6b7280' : '#9ca3af') }}>
+          {text}
+        </span>
+      )}
+    </div>
+  );
+};
+
+// Assessment Card
+const AssessmentCard = ({ assessment, darkMode, theme, progress = 0 }) => {
+  const colorHex = theme.assessments[assessment.color] || theme.colors.primary;
+  return (
+    <div
+      className={`p-4 rounded-xl flex items-center gap-3 btn-feedback cursor-pointer ${darkMode ? 'bg-gray-900 hover:bg-gray-800' : 'bg-white hover:bg-gray-50 border border-gray-200'}`}
+      style={{ borderLeft: `3px solid ${colorHex}` }}
+    >
+      <ProgressCircle
+        progress={progress}
+        size={44}
+        color={colorHex}
+        darkMode={darkMode}
+        icon={assessment.icon}
+      />
+      <div className="flex-1">
+        <div className={`font-medium ${TH('text-primary', darkMode)}`}>{assessment.name}</div>
+        <div className={`text-sm ${TH('text-muted', darkMode)}`}>{assessment.items} questions</div>
+      </div>
+      <span className={TH('text-subtle', darkMode)}>→</span>
+    </div>
+  );
+};
+
+// Welcome Screen
+const WelcomeScreen = ({ darkMode, theme }) => (
+  <div className="flex-1 flex flex-col items-center justify-center p-8" style={{backgroundColor: darkMode ? '#030712' : '#f9fafb'}}>
+    <div className="text-6xl mb-6">🌀</div>
+    <h1 className={`text-3xl font-bold mb-3 ${TH('text-primary', darkMode)}`}>Aura</h1>
+    <p className={`text-base mb-12 text-center ${TH('text-muted', darkMode)}`}>Discover yourself, one question at a time</p>
+    <div className="w-full max-w-xs space-y-3">
+      <button className="w-full py-4 px-6 rounded-xl font-semibold text-lg btn-feedback text-white" style={{background: theme.colors.primary}}>
+        Let's Go
+      </button>
+      <button className={`w-full py-3 px-6 rounded-xl font-medium btn-feedback ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+        Sign In
+      </button>
+    </div>
+  </div>
+);
+
+// Settings Screen
+const SettingsScreen = ({ darkMode, theme }) => {
+  const SettingRow = ({ icon, label, value, toggle }) => (
+    <div className={`flex items-center justify-between py-3 px-4 ${darkMode ? 'border-b border-gray-800' : 'border-b border-gray-200'}`}>
+      <div className="flex items-center gap-3">
+        <span className="text-xl">{icon}</span>
+        <span className={TH('text-primary', darkMode)}>{label}</span>
+      </div>
+      {toggle ? (
+        <div className={`w-11 h-6 rounded-full p-1 ${value ? 'bg-violet-600' : (darkMode ? 'bg-gray-700' : 'bg-gray-300')}`}>
+          <div className={`w-4 h-4 rounded-full bg-white transition-transform ${value ? 'translate-x-5' : ''}`} />
+        </div>
+      ) : (
+        <span className={TH('text-muted', darkMode)}>{value}</span>
+      )}
+    </div>
+  );
+  return (
+    <div className={`flex-1 ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <h2 className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Settings</h2>
+      </div>
+      <div className={`mt-2 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <SettingRow icon="🌙" label="Dark Mode" value={true} toggle />
+        <SettingRow icon="🔔" label="Notifications" value={true} toggle />
+        <SettingRow icon="⏱️" label="Undo Delay" value="1 second" />
+        <SettingRow icon="🔥" label="Show Streak" value={true} toggle />
+      </div>
+      <div className={`mt-4 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <SettingRow icon="👤" label="Account" value="→" />
+        <SettingRow icon="📊" label="Export Data" value="→" />
+        <SettingRow icon="🗑️" label="Clear Data" value="→" />
+      </div>
+    </div>
+  );
+};
+
+// Profile Screen
+const ProfileScreen = ({ darkMode, theme }) => {
+  const stats = { answered: 127, streak: 5, xp: 850, level: 4 };
+  const levelTitle = 'Thinker';
+  return (
+    <div className={`flex-1 ${darkMode ? 'bg-gray-950' : 'bg-gray-50'} p-4`}>
+      {/* Profile header */}
+      <div className={`rounded-2xl p-6 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <div className="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl mb-3" style={{background: `linear-gradient(135deg, ${theme.colors.primary}40, ${theme.colors.secondary}40)`}}>
+          👤
+        </div>
+        <h2 className={`text-xl font-bold ${TH('text-primary', darkMode)}`}>Level {stats.level}</h2>
+        <p style={{color: theme.colors.primary}} className="font-medium">{levelTitle}</p>
+        <p className={`text-sm mt-1 ${TH('text-muted', darkMode)}`}>{stats.xp} XP</p>
+      </div>
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          <div className="text-2xl font-bold" style={{color: theme.colors.primary}}>{stats.answered}</div>
+          <div className={`text-sm ${TH('text-muted', darkMode)}`}>Answered</div>
+        </div>
+        <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          <div className="text-2xl font-bold text-orange-400">🔥 {stats.streak}</div>
+          <div className={`text-sm ${TH('text-muted', darkMode)}`}>Day Streak</div>
+        </div>
+      </div>
+      {/* Progress to next level */}
+      <div className={`rounded-xl p-4 mt-4 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <div className="flex justify-between text-sm mb-2">
+          <span className={TH('text-muted', darkMode)}>Next Level</span>
+          <span className={TH('text-primary', darkMode)}>850 / 1000 XP</span>
+        </div>
+        <div className={`h-2 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+          <div className="h-full rounded-full" style={{width: '85%', background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.secondary})`}} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Results/Chart Screen
+const ResultsScreen = ({ darkMode, theme }) => {
+  const results = [
+    { label: 'Yes', pct: 65, color: theme.colors.success },
+    { label: 'No', pct: 35, color: theme.colors.danger },
+  ];
+  return (
+    <div className={`flex-1 ${darkMode ? 'bg-gray-950' : 'bg-gray-50'} p-4`}>
+      <div className={`rounded-2xl p-5 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <h3 className={`text-sm font-medium mb-4 ${TH('text-muted', darkMode)}`}>Community Results</h3>
+        <div className="space-y-3">
+          {results.map(r => (
+            <div key={r.label} className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span style={{color: r.color}} className="font-medium">{r.label}</span>
+                <span className={TH('text-primary', darkMode)}>{r.pct}%</span>
+              </div>
+              <div className={`h-3 rounded-full overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                <div className="h-full rounded-full transition-all" style={{width: `${r.pct}%`, background: r.color}} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className={`text-center text-sm mt-4 ${TH('text-muted', darkMode)}`}>42 responses</div>
+      </div>
+    </div>
+  );
+};
+
+// Modal Overlay wrapper
+const ModalOverlay = ({ children, darkMode }) => (
+  <div className="absolute inset-0 flex items-center justify-center z-40">
+    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+    <div className="relative z-50 w-full max-w-xs mx-4">
+      {children}
+    </div>
+  </div>
+);
+
+// Level Up Modal
+const LevelUpModal = ({ darkMode, theme, level = 5, title = 'Insight Seeker' }) => (
+  <ModalOverlay darkMode={darkMode}>
+    <div className={`rounded-2xl p-6 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`} style={{boxShadow: `0 0 60px ${theme.colors.primary}40`}}>
+      <div className="text-5xl mb-4">🎉</div>
+      <h2 className={`text-2xl font-bold mb-1 ${TH('text-primary', darkMode)}`}>Level Up!</h2>
+      <div className="text-4xl font-bold my-3" style={{color: theme.colors.primary}}>{level}</div>
+      <p className={`text-lg font-medium mb-4`} style={{color: theme.colors.primary}}>{title}</p>
+      <button className="w-full py-3 rounded-xl font-semibold text-white btn-feedback" style={{background: theme.colors.primary}}>
+        Continue
+      </button>
+    </div>
+  </ModalOverlay>
+);
+
+// Confirm Dialog Modal
+const ConfirmModal = ({ darkMode, theme }) => (
+  <ModalOverlay darkMode={darkMode}>
+    <div className={`rounded-2xl p-5 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+      <h3 className={`text-lg font-semibold mb-2 ${TH('text-primary', darkMode)}`}>Clear All Data?</h3>
+      <p className={`text-sm mb-5 ${TH('text-muted', darkMode)}`}>This will reset your answers, assessments, and progress. This cannot be undone.</p>
+      <div className="flex gap-3">
+        <button className={`flex-1 py-2.5 rounded-xl font-medium btn-feedback ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+          Cancel
+        </button>
+        <button className="flex-1 py-2.5 rounded-xl font-medium text-white btn-feedback" style={{background: theme.colors.danger}}>
+          Clear Data
+        </button>
+      </div>
+    </div>
+  </ModalOverlay>
+);
+
+// Assessment Complete Modal
+const CompleteModal = ({ darkMode, theme }) => (
+  <ModalOverlay darkMode={darkMode}>
+    <div className={`rounded-2xl p-6 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`} style={{boxShadow: `0 0 60px ${theme.colors.success}30`}}>
+      <div className="text-5xl mb-3">✨</div>
+      <h2 className={`text-xl font-bold mb-1 ${TH('text-primary', darkMode)}`}>Assessment Complete!</h2>
+      <p className={`text-sm mb-4 ${TH('text-muted', darkMode)}`}>Quick Profile</p>
+      <div className="flex items-center justify-center gap-2 mb-5">
+        <span className="text-2xl font-bold" style={{color: theme.colors.success}}>+50 XP</span>
+      </div>
+      <button className="w-full py-3 rounded-xl font-semibold text-white btn-feedback" style={{background: theme.colors.success}}>
+        View Results
+      </button>
+    </div>
+  </ModalOverlay>
+);
+
+// Binary Chart - shows community vote breakdown with confidence
+const BinaryChart = ({ votes, userResponse, darkMode, theme }) => {
+  const yesColors = theme.confidence.yes;
+  const noColors = theme.confidence.no;
+
+  const data = [
+    { label: 'Yes', answer: 0, confCounts: [0,0,0,0] },
+    { label: 'No', answer: 1, confCounts: [0,0,0,0] },
+  ];
+
+  const allVotes = userResponse ? [...votes, userResponse] : votes;
+  allVotes.forEach(v => {
+    if (v.answer === 0) data[0].confCounts[v.confidence - 1]++;
+    else if (v.answer === 1) data[1].confCounts[v.confidence - 1]++;
+  });
+
+  data.forEach(d => d.count = d.confCounts.reduce((a, b) => a + b, 0));
+  const total = data[0].count + data[1].count;
+  const sorted = [...data].sort((a, b) => b.count - a.count);
+  const maxCount = Math.max(data[0].count, data[1].count, 1);
+  const userConf = userResponse ? userResponse.confidence - 1 : -1;
+
+  return (
+    <div className="space-y-3">
+      {sorted.map((opt) => {
+        const isUserRow = userResponse?.answer === opt.answer;
+        const pct = total > 0 ? Math.round((opt.count / total) * 100) : 0;
+        const colors = opt.answer === 0 ? yesColors : noColors;
+        const barWidth = (opt.count / maxCount) * 100;
+
+        return (
+          <div key={opt.answer} className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className={`text-sm font-medium ${isUserRow ? 'px-2 py-0.5 rounded-full border' : ''}`}
+                    style={{ color: colors[3], borderColor: isUserRow ? colors[3] : 'transparent' }}>
+                {opt.label} {isUserRow && '(You)'}
+              </span>
+              <span className="text-sm font-bold" style={{ color: colors[3] }}>{pct}%</span>
+            </div>
+            <div className={`h-5 rounded-full overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+              <div className="h-full flex" style={{ width: `${barWidth}%` }}>
+                {[3, 2, 1, 0].map(confIdx => {
+                  const count = opt.confCounts[confIdx];
+                  if (count === 0) return null;
+                  const segWidth = (count / opt.count) * 100;
+                  const isUserSeg = isUserRow && confIdx === userConf;
+                  return (
+                    <div key={confIdx} className="h-full"
+                         style={{
+                           width: `${segWidth}%`,
+                           background: colors[confIdx],
+                           ...(isUserSeg ? { boxShadow: 'inset 0 0 0 2px white' } : {})
+                         }} />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <div className={`text-center text-xs ${TH('text-muted', darkMode)}`}>{total} responses</div>
+    </div>
+  );
+};
+
+// Multiple Choice Chart
+const MCChart = ({ votes, options, userResponse, darkMode, theme }) => {
+  const data = options.map((label, i) => {
+    const optVotes = votes.filter(v => v.answer === i);
+    const confCounts = [0, 0, 0, 0];
+    optVotes.forEach(v => confCounts[v.confidence - 1]++);
+    return { label, index: i, count: optVotes.length, confCounts };
+  });
+
+  const allVotes = userResponse ? [...votes, userResponse] : votes;
+  const total = allVotes.length;
+  const sorted = [...data].sort((a, b) => b.count - a.count);
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+  const userConf = userResponse ? userResponse.confidence - 1 : -1;
+
+  return (
+    <div className="space-y-2">
+      {sorted.filter(opt => opt.count > 0).map((opt) => {
+        const isUserRow = userResponse?.answer === opt.index;
+        const pct = total > 0 ? Math.round((opt.count / total) * 100) : 0;
+        const barWidth = (opt.count / maxCount) * 100;
+        const colors = theme.mcColors[opt.index % theme.mcColors.length];
+
+        return (
+          <div key={opt.index} className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className={`text-sm truncate flex-1 ${isUserRow ? 'font-bold' : ''}`} style={{ color: colors.hex }}>
+                {opt.label} {isUserRow && '(You)'}
+              </span>
+              <span className="text-sm font-bold" style={{ color: colors.hex }}>{pct}%</span>
+            </div>
+            <div className={`h-4 rounded-full overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+              <div className="h-full flex" style={{ width: `${barWidth}%` }}>
+                {[3, 2, 1, 0].map(confIdx => {
+                  const count = opt.confCounts[confIdx];
+                  if (count === 0) return null;
+                  const segWidth = (count / opt.count) * 100;
+                  const isUserSeg = isUserRow && confIdx === userConf;
+                  return (
+                    <div key={confIdx} className="h-full"
+                         style={{
+                           width: `${segWidth}%`,
+                           background: colors.shades[confIdx],
+                           ...(isUserSeg ? { boxShadow: 'inset 0 0 0 2px white' } : {})
+                         }} />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <div className={`text-center text-xs ${TH('text-muted', darkMode)}`}>{total} responses</div>
+    </div>
+  );
+};
+
+// Community Results Screen (after answering)
+const CommunityScreen = ({ question, darkMode, theme }) => {
+  const userResponse = { answer: 0, confidence: 3 };
+  const isBinary = question.type === 'binary';
+
+  return (
+    <div className={`flex-1 ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      <div className="p-4 space-y-4">
+        {/* Question recap */}
+        <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          <CategoryChip category={question.category} theme={theme} darkMode={darkMode} />
+          <p className={`mt-2 font-medium ${TH('text-primary', darkMode)}`}>{question.text}</p>
+        </div>
+
+        {/* Chart */}
+        <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          <h3 className={`text-sm font-medium mb-3 ${TH('text-muted', darkMode)}`}>Community Results</h3>
+          {isBinary ? (
+            <BinaryChart votes={SAMPLE_VOTES.binary} userResponse={userResponse} darkMode={darkMode} theme={theme} />
+          ) : (
+            <MCChart votes={SAMPLE_VOTES.multiple} options={question.options} userResponse={{ answer: 1, confidence: 3 }} darkMode={darkMode} theme={theme} />
+          )}
+        </div>
+
+        {/* Your answer */}
+        <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          <h3 className={`text-sm font-medium mb-2 ${TH('text-muted', darkMode)}`}>Your Answer</h3>
+          <div className="flex items-center justify-between">
+            <span className={`font-medium ${TH('text-primary', darkMode)}`}>
+              {isBinary ? (userResponse.answer === 0 ? 'Yes' : 'No') : question.options[1]}
+            </span>
+            <span className={`text-sm ${TH('text-muted', darkMode)}`}>Confidence: {'★'.repeat(userResponse.confidence)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Assessment Question Screen (Likert scale)
+const AssessQuestionScreen = ({ darkMode, theme, questionIndex = 2 }) => {
+  const question = SAMPLE_ASSESS_QUESTIONS[questionIndex];
+  const total = SAMPLE_ASSESS_QUESTIONS.length;
+  const color = 'indigo';
+  const colorHex = '#6366f1';
+
+  const gradients = [
+    darkMode ? 'bg-indigo-950/30 border-indigo-800/40' : 'bg-indigo-50 border-indigo-200',
+    darkMode ? 'bg-indigo-950/50 border-indigo-700/50' : 'bg-indigo-100 border-indigo-300',
+    darkMode ? 'bg-indigo-900/40 border-indigo-600/50' : 'bg-indigo-200 border-indigo-400',
+    darkMode ? 'bg-indigo-900/60 border-indigo-500/60' : 'bg-indigo-300 border-indigo-500',
+    darkMode ? 'bg-indigo-800/70 border-indigo-400/70' : 'bg-indigo-400 border-indigo-600',
+  ];
+
+  return (
+    <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      {/* Nav */}
+      <div className={`h-11 flex items-center justify-between px-3 border-b ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+        <button className={`text-sm font-medium ${TH('text-muted', darkMode)}`}>Save</button>
+        <div className="text-center">
+          <div className="text-xs" style={{ color: colorHex }}>Personality</div>
+          <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>{questionIndex + 1} / {total}</div>
+        </div>
+        <button className={`text-sm font-medium ${TH('text-muted', darkMode)}`}>Exit</button>
+      </div>
+
+      {/* Progress */}
+      <div className={`flex h-2 gap-px px-1 py-0.5 ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+        {Array(total).fill(0).map((_, i) => (
+          <div key={i} className={`flex-1 rounded-sm ${i < questionIndex ? 'bg-indigo-500' : i === questionIndex ? (darkMode ? 'bg-white' : 'bg-gray-900') : (darkMode ? 'bg-gray-800' : 'bg-gray-300')}`} />
+        ))}
+      </div>
+
+      {/* Question */}
+      <div className="flex-1 flex flex-col justify-center px-4 pb-4">
+        <div className={`p-5 rounded-2xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          <h2 className={`text-xl font-medium text-center leading-relaxed ${TH('text-primary', darkMode)}`}>{question.q}</h2>
+        </div>
+      </div>
+
+      {/* Likert options - flex-shrink-0 pins to bottom */}
+      <div className="flex-shrink-0 px-4 pb-4 space-y-2">
+        {LIKERT_SCALE.map((opt, i) => (
+          <button key={opt.v} className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-between border ${gradients[i]} ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+            <span>{opt.l}</span>
+            <span className={`text-sm font-medium ${darkMode ? 'text-indigo-400/70' : 'text-indigo-600/70'}`}>{opt.v}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Analytics Dashboard
+const AnalyticsScreen = ({ darkMode, theme }) => {
+  const data = SAMPLE_ANALYTICS;
+  const traits = ['E', 'A', 'C', 'N', 'O'];
+  const traitNames = { E: 'Extraversion', A: 'Agreeableness', C: 'Conscientiousness', N: 'Neuroticism', O: 'Openness' };
+
+  return (
+    <div className={`flex-1 ${darkMode ? 'bg-gray-950' : 'bg-gray-50'} p-4 overflow-auto`}>
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className={`rounded-xl p-3 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          <div className="text-xl font-bold" style={{ color: theme.colors.primary }}>{data.totalAnswered}</div>
+          <div className={`text-xs ${TH('text-muted', darkMode)}`}>Questions</div>
+        </div>
+        <div className={`rounded-xl p-3 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          <div className="text-xl font-bold text-orange-400">🔥 {data.streak.current}</div>
+          <div className={`text-xs ${TH('text-muted', darkMode)}`}>Streak</div>
+        </div>
+        <div className={`rounded-xl p-3 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          <div className="text-xl font-bold" style={{ color: theme.colors.success }}>{data.assessments.completed}/{data.assessments.total}</div>
+          <div className={`text-xs ${TH('text-muted', darkMode)}`}>Assessments</div>
+        </div>
+      </div>
+
+      {/* Category breakdown */}
+      <div className={`rounded-xl p-4 mb-4 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <h3 className={`text-sm font-medium mb-3 ${TH('text-muted', darkMode)}`}>By Category</h3>
+        <div className="space-y-2">
+          {Object.entries(data.categories).map(([cat, count]) => {
+            const total = Object.values(data.categories).reduce((a, b) => a + b, 0);
+            const pct = Math.round((count / total) * 100);
+            const color = theme.categories[cat];
+            return (
+              <div key={cat} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="capitalize" style={{ color }}>{cat}</span>
+                  <span className={TH('text-primary', darkMode)}>{count}</span>
+                </div>
+                <div className={`h-2 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Personality snapshot */}
+      <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <h3 className={`text-sm font-medium mb-3 ${TH('text-muted', darkMode)}`}>Personality Snapshot</h3>
+        <div className="space-y-3">
+          {traits.map(t => {
+            const score = data.personality[t];
+            return (
+              <div key={t} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className={TH('text-primary', darkMode)}>{traitNames[t]}</span>
+                  <span style={{ color: theme.colors.primary }}>{score}%</span>
+                </div>
+                <div className={`h-2 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                  <div className="h-full rounded-full" style={{ width: `${score}%`, background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.secondary})` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Phone Frame (device mockup)
+const PhoneFrame = ({ children, darkMode, device }) => {
+  const d = DEVICES[device] || DEVICES['iphone-15'];
+  return (
+    <div
+      className="relative bg-[#1a1a1c] rounded-[55px] p-3 shadow-2xl"
+      style={{
+        filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))',
+        transform: `scale(${d.scale})`,
+        transformOrigin: 'top center'
+      }}
+    >
+      {/* Side buttons */}
+      <div className="absolute -left-[3px] top-[100px] w-[3px] h-[28px] bg-[#2a2a2c] rounded-l-sm" />
+      <div className="absolute -left-[3px] top-[145px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
+      <div className="absolute -left-[3px] top-[205px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
+      <div className="absolute -right-[3px] top-[160px] w-[3px] h-[65px] bg-[#2a2a2c] rounded-r-sm" />
+
+      {/* Screen */}
+      <div
+        className={`relative overflow-hidden flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-100'}`}
+        style={{ width: d.width, height: d.height, borderRadius: 44 }}
+      >
+        {/* Notch/Dynamic Island */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[126px] h-[37px] bg-black rounded-full z-30" />
+
+        {/* Status bar */}
+        <div className={`flex-shrink-0 flex items-end justify-between px-8 pb-2 h-[54px] ${TH('text-primary', darkMode)} text-sm font-semibold relative z-20`}>
+          <span>9:41</span>
+          <div className="flex gap-1.5 items-center">
+            <svg className="w-[18px] h-[12px]" viewBox="0 0 18 12" fill="currentColor"><path d="M1 4a1 1 0 011-1h1a1 1 0 011 1v4a1 1 0 01-1 1H2a1 1 0 01-1-1V4zM6 3a1 1 0 011-1h1a1 1 0 011 1v5a1 1 0 01-1 1H7a1 1 0 01-1-1V3zM11 2a1 1 0 011-1h1a1 1 0 011 1v6a1 1 0 01-1 1h-1a1 1 0 01-1-1V2z"/></svg>
+            <svg className="w-[17px] h-[11px]" viewBox="0 0 17 11" fill="currentColor"><path d="M8.5 2.5a6 6 0 014.24 1.76.75.75 0 001.06-1.06A7.5 7.5 0 008.5 1a7.5 7.5 0 00-5.3 2.2.75.75 0 001.06 1.06A6 6 0 018.5 2.5z"/><path d="M8.5 5.5a3 3 0 012.12.88.75.75 0 001.06-1.06 4.5 4.5 0 00-6.36 0 .75.75 0 001.06 1.06A3 3 0 018.5 5.5z"/><circle cx="8.5" cy="9" r="1.5"/></svg>
+            <div className="flex items-center">
+              <div className={`w-[25px] h-[12px] border-[1.5px] ${darkMode ? 'border-white' : 'border-gray-900'} rounded-[3px] flex items-center p-[2px]`}>
+                <div className={`w-[17px] h-[7px] ${TH('bg-inverted', darkMode)} rounded-[1px]`} />
+              </div>
+              <div className={`w-[1.5px] h-[5px] ${TH('bg-inverted', darkMode)} ml-[1px] rounded-r-sm`} />
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
+
+        {/* Home indicator */}
+        <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-[134px] h-[5px] ${TH('bg-inverted', darkMode)} rounded-full opacity-60 z-20`} />
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// PLAYGROUND CONTROLS
+// ============================================================
+
+// Palette Selector with expandable custom editor
+const PaletteSelector = ({ theme, selectedPalette, onPaletteChange, onThemeChange }) => {
+  const [showCustom, setShowCustom] = useState(false);
+
+  const updateColor = (path, value) => {
+    const newTheme = JSON.parse(JSON.stringify(theme));
+    const parts = path.split('.');
+    let obj = newTheme;
+    for (let i = 0; i < parts.length - 1; i++) {
+      obj = obj[parts[i]];
+    }
+    obj[parts[parts.length - 1]] = value;
+    onThemeChange(newTheme);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Palette Grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {Object.entries(PALETTES).map(([id, palette]) => (
+          <button
+            key={id}
+            onClick={() => onPaletteChange(id)}
+            className={`p-2 rounded-lg text-left transition-all ${
+              selectedPalette === id
+                ? 'bg-violet-600 ring-2 ring-violet-400'
+                : 'bg-gray-800 hover:bg-gray-700'
+            }`}
+          >
+            {/* Color preview dots */}
+            <div className="flex gap-1 mb-1.5">
+              <div className="w-4 h-4 rounded-full" style={{ background: palette.colors.primary }} />
+              <div className="w-4 h-4 rounded-full" style={{ background: palette.colors.success }} />
+              <div className="w-4 h-4 rounded-full" style={{ background: palette.colors.danger }} />
+            </div>
+            <span className="text-xs text-gray-200 font-medium">{palette.name}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Custom toggle */}
+      <button
+        onClick={() => setShowCustom(!showCustom)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 rounded-lg text-sm text-gray-300 hover:bg-gray-700"
+      >
+        <span>Custom Colors</span>
+        <span className={`transition-transform ${showCustom ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+
+      {/* Custom color pickers */}
+      {showCustom && (
+        <div className="space-y-3 p-3 bg-gray-800/50 rounded-lg">
+          <div className="text-xs text-gray-500 mb-2">Core Colors</div>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(theme.colors).map(([key, value]) => (
+              <div key={key} className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={value}
+                  onChange={(e) => updateColor(`colors.${key}`, e.target.value)}
+                  className="w-6 h-6"
+                />
+                <span className="text-xs text-gray-400 capitalize">{key}</span>
+              </div>
+            ))}
+          </div>
+          <div className="text-xs text-gray-500 mt-3 mb-2">Categories</div>
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries(theme.categories).map(([key, value]) => (
+              <div key={key} className="flex items-center gap-1">
+                <input
+                  type="color"
+                  value={value}
+                  onChange={(e) => updateColor(`categories.${key}`, e.target.value)}
+                  className="w-5 h-5"
+                />
+                <span className="text-xs text-gray-400 capitalize truncate">{key.slice(0,4)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Editable wrapper - highlights on hover, shows editor on click
+const Editable = ({ id, label, children, selectedElement, onSelect, className = '' }) => {
+  const isSelected = selectedElement?.id === id;
+  return (
+    <div
+      className={`relative cursor-pointer transition-all ${className} ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-transparent' : 'hover:ring-1 hover:ring-blue-400/50'}`}
+      onClick={(e) => { e.stopPropagation(); onSelect({ id, label }); }}
+    >
+      {children}
+      {isSelected && (
+        <div className="absolute -top-5 left-0 px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded">
+          {label}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Scene Picker - fewer, smarter composite views
+const ScenePicker = ({ selected, onSelect }) => {
+  const scenes = [
+    { id: 'question-flow', name: 'Question Flow', desc: 'Question → Answer → Results' },
+    { id: 'assessment-flow', name: 'Assessment Flow', desc: 'Picker → Question → Complete' },
+    { id: 'user-hub', name: 'User Hub', desc: 'Profile + Analytics + Settings' },
+    { id: 'onboarding', name: 'Onboarding', desc: 'Welcome → First Question' },
+    { id: 'all-modals', name: 'All Modals', desc: 'Level up, Confirm, Complete' },
+    { id: 'components', name: 'Component Gallery', desc: 'All UI elements' },
+  ];
+
+  return (
+    <div className="space-y-2">
+      {scenes.map(scene => (
+        <button
+          key={scene.id}
+          onClick={() => onSelect(scene.id)}
+          className={`w-full text-left px-3 py-2 rounded-lg ${
+            selected === scene.id
+              ? 'bg-violet-600 text-white'
+              : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+          }`}
+        >
+          <div className="font-medium text-sm">{scene.name}</div>
+          <div className={`text-xs ${selected === scene.id ? 'text-violet-200' : 'text-gray-500'}`}>{scene.desc}</div>
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// Device Picker
+const DevicePicker = ({ selected, onSelect }) => (
+  <div className="flex flex-wrap gap-2">
+    {Object.entries(DEVICES).map(([id, device]) => (
+      <button
+        key={id}
+        onClick={() => onSelect(id)}
+        className={`px-3 py-1.5 rounded-lg text-xs ${
+          selected === id
+            ? 'bg-violet-600 text-white'
+            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+        }`}
+      >
+        {device.name}
+      </button>
+    ))}
+  </div>
+);
+
+// Element Editor - shows when an element is selected
+const ElementEditor = ({ element, theme, onThemeChange, darkMode }) => {
+  if (!element) return (
+    <div className="text-center text-gray-500 text-sm py-4">
+      Click any element to edit it
+    </div>
+  );
+
+  const updateColor = (path, value) => {
+    const newTheme = JSON.parse(JSON.stringify(theme));
+    const parts = path.split('.');
+    let obj = newTheme;
+    for (let i = 0; i < parts.length - 1; i++) {
+      obj = obj[parts[i]];
+    }
+    obj[parts[parts.length - 1]] = value;
+    onThemeChange(newTheme);
+  };
+
+  // Map element IDs to editable properties
+  const editors = {
+    'nav': (
+      <div className="space-y-2">
+        <div className="text-xs text-gray-400 mb-2">Navigation Bar</div>
+        <label className="flex items-center justify-between text-sm text-gray-300">
+          <span>Background blur</span>
+          <input type="checkbox" defaultChecked className="rounded" />
+        </label>
+      </div>
+    ),
+    'question': (
+      <div className="space-y-2">
+        <div className="text-xs text-gray-400 mb-2">Question Card</div>
+        <label className="block text-sm text-gray-300">
+          <span>Glow effect</span>
+          <select className="mt-1 w-full bg-gray-700 rounded px-2 py-1 text-sm">
+            <option>Category color</option>
+            <option>None</option>
+            <option>Primary</option>
+          </select>
+        </label>
+      </div>
+    ),
+    'buttons-binary': (
+      <div className="space-y-3">
+        <div className="text-xs text-gray-400 mb-2">Answer Buttons</div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-300">Yes color</span>
+          <input type="color" value={theme.colors.success} onChange={(e) => updateColor('colors.success', e.target.value)} className="w-8 h-8" />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-300">No color</span>
+          <input type="color" value={theme.colors.danger} onChange={(e) => updateColor('colors.danger', e.target.value)} className="w-8 h-8" />
+        </div>
+      </div>
+    ),
+    'category-chip': (
+      <div className="space-y-3">
+        <div className="text-xs text-gray-400 mb-2">Category Colors</div>
+        {Object.entries(theme.categories).map(([key, value]) => (
+          <div key={key} className="flex items-center gap-2">
+            <input type="color" value={value} onChange={(e) => updateColor(`categories.${key}`, e.target.value)} className="w-6 h-6" />
+            <span className="text-sm text-gray-300 capitalize">{key}</span>
+          </div>
+        ))}
+      </div>
+    ),
+    'chart': (
+      <div className="space-y-2">
+        <div className="text-xs text-gray-400 mb-2">Results Chart</div>
+        <label className="block text-sm text-gray-300">
+          <span>Bar style</span>
+          <select className="mt-1 w-full bg-gray-700 rounded px-2 py-1 text-sm">
+            <option>Gradient by confidence</option>
+            <option>Solid color</option>
+          </select>
+        </label>
+      </div>
+    ),
+    'progress-circle': (
+      <div className="space-y-3">
+        <div className="text-xs text-gray-400 mb-2">Progress Circle</div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-300">Primary</span>
+          <input type="color" value={theme.colors.primary} onChange={(e) => updateColor('colors.primary', e.target.value)} className="w-8 h-8" />
+        </div>
+      </div>
+    ),
+    'modal': (
+      <div className="space-y-2">
+        <div className="text-xs text-gray-400 mb-2">Modal</div>
+        <label className="block text-sm text-gray-300">
+          <span>Glow color</span>
+          <select className="mt-1 w-full bg-gray-700 rounded px-2 py-1 text-sm">
+            <option>Primary</option>
+            <option>Success</option>
+            <option>None</option>
+          </select>
+        </label>
+      </div>
+    ),
+  };
+
+  return editors[element.id] || (
+    <div className="text-sm text-gray-400">
+      <div className="font-medium text-gray-300 mb-2">{element.label}</div>
+      <div>No editable properties</div>
+    </div>
+  );
+};
+
+// ============================================================
+// PREVIEW CONTENT - Scene-based with clickable elements
+// ============================================================
+const PreviewContent = ({ scene, theme, darkMode, selectedElement, onSelectElement }) => {
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [confidence, setConfidence] = useState(2);
+  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
+  const [step, setStep] = useState(0); // For flows
+
+  const handleSelect = (answer) => {
+    if (selectedAnswer === answer) {
+      setConfidence(Math.min(confidence + 1, 4));
+    } else {
+      setSelectedAnswer(answer);
+      setConfidence(1);
+    }
+  };
+
+  const stats = { answered: 42, streak: 5 };
+  const E = ({ id, label, children, className }) => (
+    <Editable id={id} label={label} selectedElement={selectedElement} onSelect={onSelectElement} className={className}>
+      {children}
+    </Editable>
+  );
+
+  // QUESTION FLOW: Question → Buttons → Results (scrollable)
+  if (scene === 'question-flow') {
+    const q = step === 0 ? SAMPLE_QUESTIONS[0] : SAMPLE_QUESTIONS[1];
+    const isBinary = q.type === 'binary';
+    const answered = selectedAnswer !== null;
+
+    return (
+      <>
+        <E id="nav" label="NavBar">
+          <NavBar darkMode={darkMode} theme={theme} stats={stats} />
+        </E>
+        <div className="flex-1 overflow-auto p-4 space-y-4">
+          {/* Question */}
+          <E id="question" label="Question Card">
+            <QuestionCard question={q} darkMode={darkMode} theme={theme} evidenceExpanded={evidenceExpanded} onToggleEvidence={() => setEvidenceExpanded(!evidenceExpanded)} />
+          </E>
+
+          {/* Answer buttons */}
+          <E id="buttons-binary" label="Answer Buttons">
+            {isBinary ? (
+              <BinaryButtons darkMode={darkMode} theme={theme} selectedAnswer={selectedAnswer} confidence={confidence} onSelect={handleSelect} />
+            ) : (
+              <MCButtons options={q.options} darkMode={darkMode} theme={theme} selectedAnswer={selectedAnswer} confidence={confidence} onSelect={handleSelect} />
+            )}
+          </E>
+
+          {/* Results (shown after answering) */}
+          {answered && (
+            <E id="chart" label="Results Chart">
+              <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+                <h3 className={`text-sm font-medium mb-3 ${TH('text-muted', darkMode)}`}>Community Results</h3>
+                {isBinary ? (
+                  <BinaryChart votes={SAMPLE_VOTES.binary} userResponse={{ answer: selectedAnswer, confidence }} darkMode={darkMode} theme={theme} />
+                ) : (
+                  <MCChart votes={SAMPLE_VOTES.multiple} options={q.options} userResponse={{ answer: selectedAnswer, confidence }} darkMode={darkMode} theme={theme} />
+                )}
+              </div>
+            </E>
+          )}
+
+          {/* Toggle question type */}
+          <div className="flex justify-center gap-2 pt-2">
+            <button onClick={() => { setStep(0); setSelectedAnswer(null); }} className={`px-3 py-1 rounded text-xs ${step === 0 ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-400'}`}>Binary</button>
+            <button onClick={() => { setStep(1); setSelectedAnswer(null); }} className={`px-3 py-1 rounded text-xs ${step === 1 ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-400'}`}>Multiple Choice</button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ASSESSMENT FLOW: Picker → Question → Complete
+  if (scene === 'assessment-flow') {
+    return (
+      <>
+        {step === 0 && (
+          <>
+            <E id="nav" label="NavBar">
+              <NavBar darkMode={darkMode} theme={theme} stats={stats} />
+            </E>
+            <div className="flex-1 overflow-auto p-4 space-y-3">
+              <h2 className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Assessments</h2>
+              {SAMPLE_ASSESSMENTS.map((a, i) => (
+                <E key={a.id} id="progress-circle" label="Assessment Card">
+                  <div onClick={() => setStep(1)}>
+                    <AssessmentCard assessment={a} darkMode={darkMode} theme={theme} progress={i === 0 ? 100 : i === 1 ? 45 : 0} />
+                  </div>
+                </E>
+              ))}
+            </div>
+          </>
+        )}
+        {step === 1 && <AssessQuestionScreen darkMode={darkMode} theme={theme} questionIndex={2} />}
+        {step === 2 && (
+          <div className={`flex-1 flex items-center justify-center ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+            <CompleteModal darkMode={darkMode} theme={theme} />
+          </div>
+        )}
+        {/* Step controls - always at bottom */}
+        <div className={`flex-shrink-0 flex justify-center gap-2 p-3 border-t ${darkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-white'}`}>
+          {['Picker', 'Question', 'Complete'].map((label, i) => (
+            <button key={i} onClick={() => setStep(i)} className={`px-3 py-1 rounded text-xs ${step === i ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-400'}`}>{label}</button>
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  // USER HUB: Profile + Analytics + Settings stacked
+  if (scene === 'user-hub') {
+    return (
+      <>
+        <E id="nav" label="NavBar">
+          <NavBar darkMode={darkMode} theme={theme} stats={stats} />
+        </E>
+        <div className="flex-1 overflow-auto">
+          {step === 0 && <ProfileScreen darkMode={darkMode} theme={theme} />}
+          {step === 1 && <AnalyticsScreen darkMode={darkMode} theme={theme} />}
+          {step === 2 && <SettingsScreen darkMode={darkMode} theme={theme} />}
+          {/* Tab bar */}
+          <div className="flex border-t border-gray-800">
+            {['Profile', 'Analytics', 'Settings'].map((label, i) => (
+              <button key={i} onClick={() => setStep(i)} className={`flex-1 py-3 text-xs font-medium ${step === i ? 'text-violet-400 border-t-2 border-violet-400 -mt-px' : 'text-gray-500'}`}>{label}</button>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ONBOARDING: Welcome → First Question
+  if (scene === 'onboarding') {
+    return (
+      <>
+        {step === 0 && <WelcomeScreen darkMode={darkMode} theme={theme} />}
+        {step === 1 && (
+          <>
+            <E id="nav" label="NavBar">
+              <NavBar darkMode={darkMode} theme={theme} stats={{ answered: 0, streak: 0 }} />
+            </E>
+            <div className="flex-1 flex flex-col p-4">
+              <E id="question" label="Question Card">
+                <QuestionCard question={SAMPLE_QUESTIONS[0]} darkMode={darkMode} theme={theme} />
+              </E>
+              <div className="mt-4">
+                <E id="buttons-binary" label="Buttons">
+                  <BinaryButtons darkMode={darkMode} theme={theme} selectedAnswer={selectedAnswer} confidence={confidence} onSelect={handleSelect} />
+                </E>
+              </div>
+            </div>
+          </>
+        )}
+        <div className="flex justify-center gap-2 p-4 border-t border-gray-800">
+          <button onClick={() => setStep(0)} className={`px-3 py-1 rounded text-xs ${step === 0 ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-400'}`}>Welcome</button>
+          <button onClick={() => setStep(1)} className={`px-3 py-1 rounded text-xs ${step === 1 ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-400'}`}>First Q</button>
+        </div>
+      </>
+    );
+  }
+
+  // ALL MODALS: Show all modals stacked
+  if (scene === 'all-modals') {
+    return (
+      <div className={`flex-1 overflow-auto ${darkMode ? 'bg-gray-950' : 'bg-gray-50'} p-4 space-y-4`}>
+          <h3 className={`text-sm font-medium ${TH('text-muted', darkMode)}`}>Level Up Modal</h3>
+          <E id="modal" label="Level Up">
+            <div className={`rounded-2xl p-6 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`} style={{boxShadow: `0 0 30px ${theme.colors.primary}30`}}>
+              <div className="text-4xl mb-3">🎉</div>
+              <h2 className={`text-xl font-bold ${TH('text-primary', darkMode)}`}>Level Up!</h2>
+              <div className="text-3xl font-bold my-2" style={{color: theme.colors.primary}}>5</div>
+              <p style={{color: theme.colors.primary}}>Insight Seeker</p>
+            </div>
+          </E>
+
+          <h3 className={`text-sm font-medium ${TH('text-muted', darkMode)}`}>Confirm Dialog</h3>
+          <E id="modal" label="Confirm">
+            <div className={`rounded-2xl p-5 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+              <h3 className={`text-lg font-semibold mb-2 ${TH('text-primary', darkMode)}`}>Clear All Data?</h3>
+              <p className={`text-sm mb-4 ${TH('text-muted', darkMode)}`}>This cannot be undone.</p>
+              <div className="flex gap-3">
+                <button className={`flex-1 py-2 rounded-xl ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>Cancel</button>
+                <button className="flex-1 py-2 rounded-xl text-white" style={{background: theme.colors.danger}}>Clear</button>
+              </div>
+            </div>
+          </E>
+
+          <h3 className={`text-sm font-medium ${TH('text-muted', darkMode)}`}>Assessment Complete</h3>
+          <E id="modal" label="Complete">
+            <div className={`rounded-2xl p-6 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`} style={{boxShadow: `0 0 30px ${theme.colors.success}20`}}>
+              <div className="text-4xl mb-3">✨</div>
+              <h2 className={`text-xl font-bold ${TH('text-primary', darkMode)}`}>Complete!</h2>
+              <span className="text-xl font-bold" style={{color: theme.colors.success}}>+50 XP</span>
+            </div>
+          </E>
+      </div>
+    );
+  }
+
+  // COMPONENT GALLERY: All components in one view
+  if (scene === 'components') {
+    return (
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        <h3 className={`text-xs font-medium ${TH('text-muted', darkMode)}`}>Category Chips</h3>
+        <E id="category-chip" label="Category Chip">
+          <div className="flex gap-2">
+            <CategoryChip category="prediction" theme={theme} darkMode={darkMode} />
+            <CategoryChip category="reasoning" theme={theme} darkMode={darkMode} />
+            <CategoryChip category="judgment" theme={theme} darkMode={darkMode} />
+          </div>
+        </E>
+
+        <h3 className={`text-xs font-medium ${TH('text-muted', darkMode)}`}>Binary Buttons</h3>
+        <E id="buttons-binary" label="Binary Buttons">
+          <BinaryButtons darkMode={darkMode} theme={theme} selectedAnswer={0} confidence={3} onSelect={() => {}} />
+        </E>
+
+        <h3 className={`text-xs font-medium ${TH('text-muted', darkMode)}`}>Progress Circles</h3>
+        <E id="progress-circle" label="Progress">
+          <div className="flex gap-3">
+            <ProgressCircle progress={75} size={48} color={theme.colors.primary} darkMode={darkMode} text="75" />
+            <ProgressCircle progress={45} size={48} color={theme.colors.success} darkMode={darkMode} icon="🎯" />
+            <ProgressCircle progress={100} size={48} color={theme.colors.warning} darkMode={darkMode} text="✓" />
+          </div>
+        </E>
+
+        <h3 className={`text-xs font-medium ${TH('text-muted', darkMode)}`}>Assessment Card</h3>
+        <E id="progress-circle" label="Assessment Card">
+          <AssessmentCard assessment={SAMPLE_ASSESSMENTS[1]} darkMode={darkMode} theme={theme} progress={45} />
+        </E>
+
+        <h3 className={`text-xs font-medium ${TH('text-muted', darkMode)}`}>Binary Chart</h3>
+        <E id="chart" label="Chart">
+          <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+            <BinaryChart votes={SAMPLE_VOTES.binary} userResponse={{ answer: 0, confidence: 3 }} darkMode={darkMode} theme={theme} />
+          </div>
+        </E>
+      </div>
+    );
+  }
+
+  // Fallback
+  return <div className={`flex-1 flex items-center justify-center ${TH('text-muted', darkMode)}`}>Select a scene</div>;
+};
+
+// ============================================================
+// MAIN APP
+// ============================================================
+const App = () => {
+  const [selectedPalette, setSelectedPalette] = useState('aura');
+  const [theme, setTheme] = useState(DEFAULT_THEME);
+  const [darkMode, setDarkMode] = useState(true);
+  const [device, setDevice] = useState('iphone-15');
+  const [scene, setScene] = useState('question-flow');
+  const [selectedElement, setSelectedElement] = useState(null);
+  const [showControls, setShowControls] = useState(true);
+
+  const handlePaletteChange = (paletteId) => {
+    setSelectedPalette(paletteId);
+    setTheme(buildTheme(PALETTES[paletteId]));
+  };
+
+  const exportTheme = () => {
+    const json = JSON.stringify(theme, null, 2);
+    navigator.clipboard.writeText(json);
+    alert('Theme copied to clipboard!');
+  };
+
+  const resetTheme = () => {
+    setSelectedPalette('aura');
+    setTheme(DEFAULT_THEME);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-950 flex">
+      {/* Sidebar */}
+      {showControls && (
+        <div className="w-72 bg-gray-900 border-r border-gray-800 p-4 overflow-auto hide-scrollbar">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-xl font-bold text-white">🎨 Design Playground</h1>
+          </div>
+
+          {/* Dark/Light toggle */}
+          <div className="mb-6">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <span className="text-sm text-gray-400">Light</span>
+              <div
+                className={`w-12 h-6 rounded-full p-1 transition-colors ${darkMode ? 'bg-violet-600' : 'bg-gray-600'}`}
+                onClick={() => setDarkMode(!darkMode)}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : ''}`} />
+              </div>
+              <span className="text-sm text-gray-400">Dark</span>
+            </label>
+          </div>
+
+          {/* Device picker */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">Device</h3>
+            <DevicePicker selected={device} onSelect={setDevice} />
+          </div>
+
+          {/* Scene picker */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">Scene</h3>
+            <ScenePicker selected={scene} onSelect={(s) => { setScene(s); setSelectedElement(null); }} />
+          </div>
+
+          {/* Element editor - shows when an element is selected */}
+          {selectedElement && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">Edit: {selectedElement.label}</h3>
+              <ElementEditor element={selectedElement} theme={theme} onThemeChange={setTheme} />
+              <button
+                onClick={() => setSelectedElement(null)}
+                className="mt-2 w-full py-1 text-xs text-gray-400 hover:text-gray-300"
+              >
+                × Deselect
+              </button>
+            </div>
+          )}
+
+          {/* Palette selector */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">Palette</h3>
+            <PaletteSelector
+              theme={theme}
+              selectedPalette={selectedPalette}
+              onPaletteChange={handlePaletteChange}
+              onThemeChange={setTheme}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-2">
+            <button
+              onClick={exportTheme}
+              className="w-full py-2 px-4 bg-violet-600 text-white rounded-lg text-sm hover:bg-violet-500"
+            >
+              📋 Copy Theme JSON
+            </button>
+            <button
+              onClick={resetTheme}
+              className="w-full py-2 px-4 bg-gray-700 text-gray-300 rounded-lg text-sm hover:bg-gray-600"
+            >
+              ↩️ Reset to Default
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toggle sidebar button */}
+      <button
+        onClick={() => setShowControls(!showControls)}
+        className="fixed top-4 left-4 z-50 w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-white hover:bg-gray-700"
+        style={{ left: showControls ? '19rem' : '1rem' }}
+      >
+        {showControls ? '←' : '→'}
+      </button>
+
+      {/* Preview area */}
+      <div className="flex-1 flex items-start justify-center p-8 pt-16 overflow-auto bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+        <PhoneFrame darkMode={darkMode} device={device}>
+          <PreviewContent
+            scene={scene}
+            theme={theme}
+            darkMode={darkMode}
+            selectedElement={selectedElement}
+            onSelectElement={setSelectedElement}
+          />
+        </PhoneFrame>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
