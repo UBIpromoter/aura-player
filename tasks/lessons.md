@@ -16,6 +16,13 @@
 ## UI Patterns
 - **Use CSS tooltips, not title attribute** - Native tooltips have delay. Use instant CSS hover.
 - **Call signOut() in resetDemo()** - Otherwise logged-in user data persists after reset.
+- **Adding a new color requires updates in MULTIPLE places** - When adding a color (e.g., `indigo`), update ALL these locations:
+  - `ASSESS_C` (~line 1768) - base color config
+  - `PROGRESS_GRADIENTS` (~line 2039) - gradient hex values
+  - `.hover-glow-{color}` CSS (~line 116) - hover effect styles
+  - `gradientStyles`, `selectedStyles`, `pendingStyles`, `numColors` in assess-question (~line 5692)
+  - `colorStyles` in AnalysisCard (~line 6408)
+  - Completion celebration glow chain (~line 5714)
 
 ---
 *Add new lessons whenever user corrects a mistake or you discover a gotcha.*
