@@ -1846,16 +1846,38 @@ const getInitialState = () => {
   };
 };
 
+// Truly empty state (no pre-filled demo data)
+const getEmptyState = () => ({
+  answers: {}, skipped: [], saved: [], viewed: [],
+  settings: { darkMode: null, undoDelay: 1, showStreak: true, requireConfirmation: true, showTips: true },
+  stats: { answered: 0, streak: 0, lastAnswerDate: null }
+});
+
 const demoStorage = {
   get: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
-      if (data) return { ...getInitialState(), ...JSON.parse(data) };
+      if (data) {
+        const parsed = JSON.parse(data);
+        // If wasReset flag is set, return empty state structure with saved settings
+        if (parsed.wasReset) {
+          return { ...getEmptyState(), settings: parsed.settings || getEmptyState().settings };
+        }
+        return { ...getInitialState(), ...parsed };
+      }
     } catch (e) {}
     return getInitialState();
   },
   set: (data) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {} },
-  clear: () => { try { localStorage.removeItem(STORAGE_KEY); } catch (e) {} }
+  clear: () => { try { localStorage.removeItem(STORAGE_KEY); } catch (e) {} },
+  markReset: () => {
+    try {
+      // Save just the reset flag and preserve settings
+      const current = localStorage.getItem(STORAGE_KEY);
+      const settings = current ? JSON.parse(current).settings : getEmptyState().settings;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ wasReset: true, settings }));
+    } catch (e) {}
+  }
 };
 // Data now persists! Use resetDemo() or Settings > Clear Data to reset.
 
@@ -4484,8 +4506,8 @@ function App() {
   const resetDemo = () => {
     // Sign out any logged-in user first
     signOut();
-    // Clear all app state
-    demoStorage.clear();
+    // Mark as reset (preserves settings but clears data)
+    demoStorage.markReset();
     // Use truly empty state (not pre-filled demo data)
     setResponses({});
     setCommunityResults(generateDemoCommunityResults());
