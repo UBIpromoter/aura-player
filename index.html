@@ -124,6 +124,7 @@
     .hover-glow-pink:hover, .hover-glow-pink:active { background-color: rgba(236, 72, 153, 0.08); box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.3); }
     .hover-glow-slate:hover, .hover-glow-slate:active { background-color: rgba(100, 116, 139, 0.08); box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.3); }
     .hover-glow-sky:hover, .hover-glow-sky:active { background-color: rgba(14, 165, 233, 0.08); box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.3); }
+    .hover-glow-indigo:hover, .hover-glow-indigo:active { background-color: rgba(99, 102, 241, 0.08); box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.3); }
 
     .starry-bg {
       background: linear-gradient(135deg, rgba(30, 20, 10, 0.9) 0%, rgba(50, 30, 15, 0.8) 100%);
@@ -1410,7 +1411,8 @@ const ASSESS_SCALES = {
 //
 // TEST IDS (used in responses.test_id): bigfive-E, bigfive-A, bigfive-C,
 // bigfive-N, bigfive-O, adhd, cognitive, attachment, risk, integrity,
-// shadow-M, shadow-N, shadow-P, chronotype, reasoning, reasoning-2, reasoning-3
+// shadow-M, shadow-N, shadow-P, chronotype, reasoning, reasoning-2, reasoning-3,
+// starter-personality, starter-motivation, starter-thinking, starter-connection, starter-strategy
 // =====================================================
 const ASSESS_TESTS = {
   // Big Five broken into 5 bite-sized modules by trait
@@ -1685,9 +1687,94 @@ const ASSESS_TESTS = {
       { q: "Mon=1, Tue=2... If today+3=yesterday×2, today is:", o: ['Monday', 'Tuesday', 'Wednesday', 'Thursday'], a: 2 },
       { q: "🟦🟨🟦🟦🟨🟨🟦🟦🟦🟨🟨🟨 — Next 4?", o: ['🟦🟦🟦🟦', '🟨🟨🟨🟨', '🟦🟦🟨🟨', '🟨🟨🟦🟦'], a: 0 },
     ]
+  },
+  // ==================== STARTER PACK v4.3 ====================
+  // 5-module behavioral battery for persona synthesis
+  // Scale: likeme (1: Not like me — 5: Very like me)
+  // Structure: 6-1-1 (6 behavioral, 1 reverse, 1 trade-off) + extras for coverage
+  // Scoring: c = construct, k = polarity (+, -, T)
+  'starter-personality': {
+    name: 'Personality', icon: '🪞', color: 'indigo', scale: 'likeme', parent: 'starter',
+    description: 'Who are you? Core personality traits.',
+    items: [
+      { q: "I am the first person to introduce myself in a group", c: 'extraversion', k: '+' },
+      { q: "I finish tasks even when they become repetitive or boring", c: 'conscientiousness', k: '+' },
+      { q: "I apologize first after an argument, even if I am not wrong", c: 'agreeableness', k: '+' },
+      { q: "I feel physically tense when I have a long to-do list", c: 'neuroticism', k: '+' },
+      { q: "I leave my belongings in random places around the house", c: 'conscientiousness', k: '-' },
+      { q: "I stay quiet when I am in a room full of strangers", c: 'extraversion', k: '-' },
+      { q: "I prioritize my own needs over the feelings of people around me", c: 'agreeableness', k: '-' },
+      { q: "I choose new experiences over sticking to familiar routines", c: 'openness', k: 'T' },
+      { q: "I replay conversations in my head wondering if I said something wrong", c: 'neuroticism', k: '+' },
+    ]
+  },
+  'starter-motivation': {
+    name: 'Motivation', icon: '🎯', color: 'indigo', scale: 'likeme', parent: 'starter',
+    description: 'What do you want? What drives your decisions.',
+    items: [
+      { q: "I set daily targets to track my progress toward a goal", c: 'achievement', k: '+' },
+      { q: "I check my bank balance more than once a day", c: 'security', k: '+' },
+      { q: "I work on projects where I make all the decisions", c: 'autonomy', k: '+' },
+      { q: "I prioritize completing a task over taking a break", c: 'achievement', k: '+' },
+      { q: "I avoid investments where there is a chance of losing money", c: 'risk', k: '-' },
+      { q: "I follow rules even when I am alone", c: 'security', k: '+' },
+      { q: "I let other people lead the way in group settings", c: 'autonomy', k: '-' },
+      { q: "I take a high-risk gamble over a safe, small win", c: 'risk', k: 'T' },
+    ]
+  },
+  'starter-thinking': {
+    name: 'Thinking', icon: '💭', color: 'indigo', scale: 'likeme', parent: 'starter',
+    description: 'How do you think? Your cognitive style.',
+    items: [
+      { q: "I write a plan before starting a new project", c: 'planning', k: '+' },
+      { q: "I read every word of a contract before signing", c: 'depth', k: '+' },
+      { q: "I work in a noisy room without losing focus", c: 'focus', k: '+' },
+      { q: "I search for more data after I have found an answer", c: 'depth', k: '+' },
+      { q: "I lose track of my original goal while working", c: 'focus', k: '-' },
+      { q: "I finish a task faster than others expect me to", c: 'speed', k: '+' },
+      { q: "I jump into a task before reading the instructions", c: 'planning', k: '-' },
+      { q: "I choose a fast decision over a perfect one", c: 'speed', k: 'T' },
+    ]
+  },
+  'starter-connection': {
+    name: 'Connection', icon: '🤝', color: 'indigo', scale: 'likeme', parent: 'starter',
+    description: 'How do you connect? Your relationship patterns.',
+    items: [
+      { q: "I tell friends when I am feeling sad or lonely", c: 'vulnerability', k: '+' },
+      { q: "I check my phone constantly for new messages", c: 'anxiety', k: '+' },
+      { q: "I let others hold my phone or laptop without watching them", c: 'trust', k: '+' },
+      { q: "I choose one-on-one time over attending a large party", c: 'social_depth', k: '+' },
+      { q: "I ask for help the moment I feel overwhelmed", c: 'trust', k: '+' },
+      { q: "I talk about my mistakes with people I have just met", c: 'vulnerability', k: '+' },
+      { q: "I stay calm when I do not see my partner for days", c: 'anxiety', k: '-' },
+      { q: "I prefer a few deep friendships over many casual acquaintances", c: 'social_depth', k: 'T' },
+    ]
+  },
+  'starter-strategy': {
+    name: 'Strategy', icon: '♟️', color: 'indigo', scale: 'likeme', parent: 'starter',
+    description: 'How do you win? Your competitive approach.',
+    items: [
+      { q: "I keep score during a friendly game", c: 'competition', k: '+' },
+      { q: "I visualize the next three steps before taking the first", c: 'strategy', k: '+' },
+      { q: "I take action instead of waiting for others to fix problems", c: 'agency', k: '+' },
+      { q: "I ask for a better price when buying a product", c: 'confidence', k: '+' },
+      { q: "I blame bad luck when a project fails", c: 'agency', k: '-' },
+      { q: "I volunteer to lead a meeting or group", c: 'confidence', k: '+' },
+      { q: "I hide my plans from others until they are finished", c: 'strategy', k: '-' },
+      { q: "I prioritize winning over playing the game fairly", c: 'competition', k: 'T' },
+    ]
   }
 };
 
+// ==================== ASSESSMENT COLORS ====================
+// ADDING A NEW COLOR? Update ALL these places:
+// 1. ASSESS_C (below) - base color config
+// 2. PROGRESS_GRADIENTS (~line 2040) - gradient hex values
+// 3. CSS .hover-glow-{color} (~line 116) - hover effect
+// 4. assess-question screen (~line 5700): gradientStyles, selectedStyles, pendingStyles, numColors
+// 5. AnalysisCard colorStyles (~line 6415)
+// 6. Completion celebration glow (~line 5715) - color.includes() chain
+// =============================================================
 const ASSESS_C = {
   violet: { bg: 'bg-violet-500', text: 'text-violet-400', textLight: 'text-violet-600', light: 'bg-violet-500/20', lightBg: 'bg-violet-100', border: 'border-violet-500/30', borderLight: 'border-violet-300', grad: 'from-violet-600 to-violet-500' },
   blue: { bg: 'bg-blue-500', text: 'text-blue-400', textLight: 'text-blue-600', light: 'bg-blue-500/20', lightBg: 'bg-blue-100', border: 'border-blue-500/30', borderLight: 'border-blue-300', grad: 'from-blue-600 to-blue-500' },
@@ -1697,6 +1784,7 @@ const ASSESS_C = {
   emerald: { bg: 'bg-emerald-500', text: 'text-emerald-400', textLight: 'text-emerald-600', light: 'bg-emerald-500/20', lightBg: 'bg-emerald-100', border: 'border-emerald-500/30', borderLight: 'border-emerald-300', grad: 'from-emerald-600 to-emerald-500' },
   slate: { bg: 'bg-slate-500', text: 'text-slate-400', textLight: 'text-slate-600', light: 'bg-slate-500/20', lightBg: 'bg-slate-100', border: 'border-slate-500/30', borderLight: 'border-slate-300', grad: 'from-slate-600 to-slate-500' },
   amber: { bg: 'bg-amber-500', text: 'text-amber-400', textLight: 'text-amber-600', light: 'bg-amber-500/20', lightBg: 'bg-amber-100', border: 'border-amber-500/30', borderLight: 'border-amber-300', grad: 'from-amber-600 to-amber-500' },
+  indigo: { bg: 'bg-indigo-500', text: 'text-indigo-400', textLight: 'text-indigo-600', light: 'bg-indigo-500/20', lightBg: 'bg-indigo-100', border: 'border-indigo-500/30', borderLight: 'border-indigo-300', grad: 'from-indigo-600 to-indigo-500' },
 };
 const getAssessColor = (color, darkMode) => {
   const c = ASSESS_C[color];
@@ -1705,6 +1793,7 @@ const getAssessColor = (color, darkMode) => {
 
 // Assessment categories for compact picker view
 const ASSESS_CATEGORIES = {
+  starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'] },
   personality: { name: 'Personality', icon: '🎭', color: 'violet', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'] },
   character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'] },
   shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'] },
@@ -1831,6 +1920,29 @@ const calculateAssessResults = (testId, resp) => {
     results.score = Math.round((correct / test.items.length) * 100);
     // Map to percentile-style labels
     results.level = results.score >= 92 ? 'Exceptional' : results.score >= 75 ? 'Above Average' : results.score >= 50 ? 'Average' : 'Developing';
+  } else if (test.parent === 'starter') {
+    // Starter Pack v4.3: score by construct
+    // Group items by construct, apply polarity inversion, calculate 0-100 per construct
+    const constructScores = {};
+    const constructCounts = {};
+    test.items.forEach((item, i) => {
+      if (resp[i]) {
+        const c = item.c;
+        let value = resp[i];
+        // Invert negative polarity items (Trade-offs scored as-is: high = prefers first option)
+        if (item.k === '-') value = 6 - value;
+        constructScores[c] = (constructScores[c] || 0) + value;
+        constructCounts[c] = (constructCounts[c] || 0) + 1;
+      }
+    });
+    // Normalize each construct to 0-100
+    results.constructs = {};
+    for (const c in constructScores) {
+      results.constructs[c] = Math.round((constructScores[c] / (constructCounts[c] * 5)) * 100);
+    }
+    // Overall module score (average of all constructs)
+    const constructValues = Object.values(results.constructs);
+    results.score = constructValues.length > 0 ? Math.round(constructValues.reduce((a, b) => a + b, 0) / constructValues.length) : 0;
   }
   return results;
 };
@@ -1944,6 +2056,7 @@ const PROGRESS_GRADIENTS = {
   amber: { from: '#f59e0b', to: '#fbbf24' },
   gray: { from: '#6b7280', to: '#9ca3af' },
   slate: { from: '#64748b', to: '#94a3b8' },
+  indigo: { from: '#6366f1', to: '#818cf8' },
 };
 
 const ProgressCircle = ({
@@ -4681,6 +4794,8 @@ function App() {
       // Skip tests in the profile's skip list
       if (skipList.includes(testId)) return;
       const test = ASSESS_TESTS[testId];
+      // Skip starter tests in demo mode (no demo data yet)
+      if (test.parent === 'starter') return;
       const answers = {};
       if (test.parent === 'bigfive') {
         // Big Five module - get trait from test.trait
@@ -5593,10 +5708,11 @@ function App() {
         emerald: ['bg-emerald-950/30 border-emerald-800/40', 'bg-emerald-950/50 border-emerald-700/50', 'bg-emerald-900/40 border-emerald-600/50', 'bg-emerald-900/60 border-emerald-500/60', 'bg-emerald-800/70 border-emerald-400/70'],
         slate: ['bg-slate-950/30 border-slate-800/40', 'bg-slate-950/50 border-slate-700/50', 'bg-slate-900/40 border-slate-600/50', 'bg-slate-900/60 border-slate-500/60', 'bg-slate-800/70 border-slate-400/70'],
         amber: ['bg-amber-950/30 border-amber-800/40', 'bg-amber-950/50 border-amber-700/50', 'bg-amber-900/40 border-amber-600/50', 'bg-amber-900/60 border-amber-500/60', 'bg-amber-800/70 border-amber-400/70'],
+        indigo: ['bg-indigo-950/30 border-indigo-800/40', 'bg-indigo-950/50 border-indigo-700/50', 'bg-indigo-900/40 border-indigo-600/50', 'bg-indigo-900/60 border-indigo-500/60', 'bg-indigo-800/70 border-indigo-400/70'],
       };
-      const selectedStyles = { violet: 'bg-violet-600 ring-violet-400 border-violet-400', blue: 'bg-blue-600 ring-blue-400 border-blue-400', teal: 'bg-teal-600 ring-teal-400 border-teal-400', rose: 'bg-rose-600 ring-rose-400 border-rose-400', pink: 'bg-fuchsia-600 ring-fuchsia-400 border-fuchsia-400', emerald: 'bg-emerald-600 ring-emerald-400 border-emerald-400', slate: 'bg-slate-600 ring-slate-400 border-slate-400', amber: 'bg-amber-600 ring-amber-400 border-amber-400' };
-      const pendingStyles = { violet: 'bg-violet-600 border-violet-400', blue: 'bg-blue-600 border-blue-400', teal: 'bg-teal-600 border-teal-400', rose: 'bg-rose-600 border-rose-400', pink: 'bg-fuchsia-600 border-fuchsia-400', emerald: 'bg-emerald-600 border-emerald-400', slate: 'bg-slate-600 border-slate-400', amber: 'bg-amber-600 border-amber-400' };
-      const numColors = { violet: 'text-violet-400/70', blue: 'text-blue-400/70', teal: 'text-teal-400/70', rose: 'text-rose-400/70', pink: 'text-fuchsia-400/70', emerald: 'text-emerald-400/70', slate: 'text-slate-400/70', amber: 'text-amber-400/70' };
+      const selectedStyles = { violet: 'bg-violet-600 ring-violet-400 border-violet-400', blue: 'bg-blue-600 ring-blue-400 border-blue-400', teal: 'bg-teal-600 ring-teal-400 border-teal-400', rose: 'bg-rose-600 ring-rose-400 border-rose-400', pink: 'bg-fuchsia-600 ring-fuchsia-400 border-fuchsia-400', emerald: 'bg-emerald-600 ring-emerald-400 border-emerald-400', slate: 'bg-slate-600 ring-slate-400 border-slate-400', amber: 'bg-amber-600 ring-amber-400 border-amber-400', indigo: 'bg-indigo-600 ring-indigo-400 border-indigo-400' };
+      const pendingStyles = { violet: 'bg-violet-600 border-violet-400', blue: 'bg-blue-600 border-blue-400', teal: 'bg-teal-600 border-teal-400', rose: 'bg-rose-600 border-rose-400', pink: 'bg-fuchsia-600 border-fuchsia-400', emerald: 'bg-emerald-600 border-emerald-400', slate: 'bg-slate-600 border-slate-400', amber: 'bg-amber-600 border-amber-400', indigo: 'bg-indigo-600 border-indigo-400' };
+      const numColors = { violet: 'text-violet-400/70', blue: 'text-blue-400/70', teal: 'text-teal-400/70', rose: 'text-rose-400/70', pink: 'text-fuchsia-400/70', emerald: 'text-emerald-400/70', slate: 'text-slate-400/70', amber: 'text-amber-400/70', indigo: 'text-indigo-400/70' };
 
       return (
         <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`} {...assessSwipeHandlers}>
@@ -5604,7 +5720,7 @@ function App() {
           {assessShowCompletion && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-950/95">
               <div className="relative">
-                <div className="absolute inset-0 rounded-full blur-3xl opacity-60 celebrate-glow" style={{ background: `linear-gradient(135deg, ${assessTestColor.bg.includes('violet') ? '#8b5cf6' : assessTestColor.bg.includes('blue') ? '#3b82f6' : assessTestColor.bg.includes('teal') ? '#14b8a6' : assessTestColor.bg.includes('pink') ? '#ec4899' : assessTestColor.bg.includes('rose') ? '#f43f5e' : '#10b981'}, transparent)`, width: '200px', height: '200px', marginLeft: '-50px', marginTop: '-50px' }} />
+                <div className="absolute inset-0 rounded-full blur-3xl opacity-60 celebrate-glow" style={{ background: `linear-gradient(135deg, ${assessTestColor.bg.includes('violet') ? '#8b5cf6' : assessTestColor.bg.includes('indigo') ? '#6366f1' : assessTestColor.bg.includes('blue') ? '#3b82f6' : assessTestColor.bg.includes('teal') ? '#14b8a6' : assessTestColor.bg.includes('pink') ? '#ec4899' : assessTestColor.bg.includes('rose') ? '#f43f5e' : '#10b981'}, transparent)`, width: '200px', height: '200px', marginLeft: '-50px', marginTop: '-50px' }} />
                 <svg width="140" height="140" className="celebrate-ring"><circle cx="70" cy="70" r="60" fill="none" stroke="url(#complete-grad)" strokeWidth="6" strokeLinecap="round" strokeDasharray="377" /><defs><linearGradient id="complete-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#10b981" /></linearGradient></defs></svg>
                 <div className="absolute inset-0 flex items-center justify-center celebrate-pulse"><span className="text-5xl">{assessCurrentTest.icon}</span></div>
               </div>
@@ -5673,6 +5789,10 @@ function App() {
     // Assessment Results Screen
     if (screen === 'assess-results') {
       const test = ASSESS_TESTS[assessCurrentTestId];
+      if (!test) {
+        setScreen('assess-picker');
+        return null;
+      }
       const results = assessCompleted[assessCurrentTestId];
       const colors = getAssessColor(test.color, darkMode);
 
@@ -5860,6 +5980,89 @@ function App() {
                   {remaining > 0 && (
                     <div className={`text-xs text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                       {remaining} more to complete Shadow Self
+                    </div>
+                  )}
+                </ResultCard>
+              );
+            })()}
+
+            {/* Starter Pack Results */}
+            {test.parent === 'starter' && results && (() => {
+              const starterModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'starter');
+              const completedModules = starterModules.filter(([id]) => assessCompleted[id]);
+              const remaining = starterModules.length - completedModules.length;
+              const starterLabels = {
+                // Personality
+                extraversion: { low: 'Reserved', high: 'Outgoing' },
+                conscientiousness: { low: 'Flexible', high: 'Disciplined' },
+                agreeableness: { low: 'Direct', high: 'Accommodating' },
+                neuroticism: { low: 'Calm', high: 'Sensitive' },
+                openness: { low: 'Traditional', high: 'Adventurous' },
+                // Motivation
+                achievement: { low: 'Process-focused', high: 'Goal-driven' },
+                security: { low: 'Risk-tolerant', high: 'Security-seeking' },
+                autonomy: { low: 'Collaborative', high: 'Independent' },
+                risk: { low: 'Cautious', high: 'Bold' },
+                // Thinking
+                planning: { low: 'Spontaneous', high: 'Methodical' },
+                depth: { low: 'Quick scan', high: 'Deep dive' },
+                focus: { low: 'Multi-tasker', high: 'Single-track' },
+                speed: { low: 'Deliberate', high: 'Fast-mover' },
+                // Connection
+                vulnerability: { low: 'Private', high: 'Open book' },
+                anxiety: { low: 'Secure', high: 'Vigilant' },
+                trust: { low: 'Guarded', high: 'Trusting' },
+                social_depth: { low: 'Wide network', high: 'Inner circle' },
+                // Strategy
+                competition: { low: 'Cooperative', high: 'Competitive' },
+                strategy: { low: 'Transparent', high: 'Strategic' },
+                agency: { low: 'Reactive', high: 'Proactive' },
+                confidence: { low: 'Modest', high: 'Assertive' },
+              };
+              const moduleNames = {
+                'starter-personality': 'Personality',
+                'starter-motivation': 'Motivation',
+                'starter-thinking': 'Thinking',
+                'starter-connection': 'Connection',
+                'starter-strategy': 'Strategy'
+              };
+              return (
+                <ResultCard icon="🚀" title="Starter Pack" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`}>
+                  {/* Show constructs for the current module */}
+                  {results.constructs && (
+                    <div className="space-y-3">
+                      <div className={`text-xs font-medium ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{moduleNames[assessCurrentTestId]} Constructs</div>
+                      {Object.entries(results.constructs).map(([construct, score]) => {
+                        const labels = starterLabels[construct] || { low: 'Low', high: 'High' };
+                        const displayName = construct.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        return (
+                          <TraitSpectrum key={construct} name={displayName} score={score} lowLabel={labels.low} highLabel={labels.high} color="indigo" />
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Progress summary for all modules */}
+                  {completedModules.length > 1 && (
+                    <div className={`mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>All Modules</div>
+                      <div className="flex gap-2">
+                        {starterModules.map(([id, t]) => {
+                          const done = assessCompleted[id];
+                          return (
+                            <div key={id} className={`flex-1 p-2 rounded-lg text-center ${done ? (darkMode ? 'bg-indigo-900/30' : 'bg-indigo-50') : (darkMode ? 'bg-gray-800/50' : 'bg-gray-100')}`}>
+                              <div className="text-lg">{t.icon}</div>
+                              <div className={`text-xs ${done ? (darkMode ? 'text-indigo-400' : 'text-indigo-600') : (darkMode ? 'text-gray-500' : 'text-gray-400')}`}>
+                                {done ? `${done.score}%` : '—'}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {remaining > 0 && (
+                    <div className={`text-xs text-center mt-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      {remaining} more to complete Starter Pack
                     </div>
                   )}
                 </ResultCard>
@@ -6191,6 +6394,7 @@ function App() {
           if (!results) return null;
           if (test.parent === 'bigfive') return `${results.score}%`;
           if (test.parent === 'shadow') return `${results.score}%`;
+          if (test.parent === 'starter') return `${results.score}%`;
           if (testId === 'integrity') return results.score >= 70 ? 'High' : results.score >= 40 ? 'Moderate' : 'Low';
           if (testId === 'adhd') return results.indicators >= 4 ? 'High' : results.indicators >= 2 ? 'Moderate' : 'Low';
           if (testId === 'cognitive') return `${results.score}% ND`;
@@ -6217,6 +6421,7 @@ function App() {
           blue: { bg: darkMode ? 'bg-blue-900/20 border-blue-500/30' : 'bg-blue-50 border-blue-200', text: 'text-blue-400', bar: 'bg-blue-500' },
           pink: { bg: darkMode ? 'bg-fuchsia-900/20 border-fuchsia-500/30' : 'bg-fuchsia-50 border-fuchsia-200', text: 'text-fuchsia-400', bar: 'bg-fuchsia-500' },
           amber: { bg: darkMode ? 'bg-amber-900/20 border-amber-500/30' : 'bg-amber-50 border-amber-200', text: 'text-amber-400', bar: 'bg-amber-500' },
+          indigo: { bg: darkMode ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-indigo-50 border-indigo-200', text: 'text-indigo-400', bar: 'bg-indigo-500' },
         };
         const cs = colorStyles[color] || colorStyles.violet;
         return (
