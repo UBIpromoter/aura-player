@@ -783,6 +783,28 @@ const QUESTIONS = Q_RAW.filter(q => !q.x).map(q => ({
   ...(q.o && { options: q.o }), ...(q.e && { preEvidence: q.e }), _v: q.v,
 }));
 const getCategoryList = () => Object.values(CAT_MAP);
+
+// ==================== ONBOARDING QUESTIONS ====================
+// Fun "world" questions for new users - not about themselves
+// These feel like a game, build momentum before self-discovery
+const ONBOARDING_QUESTIONS = [
+  { id: 'onboard-1', text: "Which came first?", options: ["The chicken", "The egg"], type: 'binary' },
+  { id: 'onboard-2', text: "Better pizza topping:", options: ["Pepperoni", "Pineapple"], type: 'binary' },
+  { id: 'onboard-3', text: "In 10 years, most people will...", options: ["Still drive cars themselves", "Use self-driving cars"], type: 'binary' },
+  { id: 'onboard-4', text: "Is a hot dog a sandwich?", options: ["Yes, obviously", "No way"], type: 'binary' },
+  { id: 'onboard-5', text: "Will humans live on Mars in your lifetime?", options: ["Yes", "No"], type: 'binary' },
+  { id: 'onboard-6', text: "Better superpower:", options: ["Flight", "Invisibility"], type: 'binary' },
+  { id: 'onboard-7', text: "Coffee in the morning?", options: ["Can't function without it", "Don't need it"], type: 'binary' },
+  { id: 'onboard-8', text: "Dogs or cats?", options: ["Dogs", "Cats"], type: 'binary' },
+  { id: 'onboard-9', text: "Will AI replace most jobs?", options: ["Yes, big changes coming", "No, jobs will adapt"], type: 'binary' },
+  { id: 'onboard-10', text: "Is water wet?", options: ["Yes", "No"], type: 'binary' },
+];
+
+// Micro-celebration messages shown after each onboarding answer
+const ONBOARD_CELEBRATIONS = [
+  "Nice!", "Good one!", "Got it!", "Interesting!", "Cool!",
+  "Nice pick!", "Good call!", "Noted!", "Great!", "Love it!"
+];
   </script>
   <script>
     // Supabase Configuration
@@ -1951,10 +1973,13 @@ const calculateAssessResults = (testId, resp) => {
 const STORAGE_KEY = 'aura-demo-vI';
 const getInitialState = () => {
   const demoAnswers = generateDemoAnswers();
+  const answeredCount = Object.keys(demoAnswers).length;
+  // Demo users start with XP matching their answered count
+  const demoXP = answeredCount * 5;
   return {
     answers: demoAnswers, skipped: [], saved: [], viewed: [],
     settings: { darkMode: null, undoDelay: 1, showStreak: true, requireConfirmation: true, showTips: true },
-    stats: { answered: Object.keys(demoAnswers).length, streak: 3, lastAnswerDate: new Date().toDateString() }
+    stats: { answered: answeredCount, streak: 3, lastAnswerDate: new Date().toDateString(), xp: demoXP, level: calculateLevel(demoXP) }
   };
 };
 
@@ -1962,8 +1987,41 @@ const getInitialState = () => {
 const getEmptyState = () => ({
   answers: {}, skipped: [], saved: [], viewed: [],
   settings: { darkMode: null, undoDelay: 1, showStreak: true, requireConfirmation: true, showTips: true },
-  stats: { answered: 0, streak: 0, lastAnswerDate: null }
+  stats: { answered: 0, streak: 0, lastAnswerDate: null, xp: 0, level: 1 }
 });
+
+// ==================== GAMIFICATION SYSTEM ====================
+// XP earning rates
+const XP_RATES = {
+  answer: 5,              // Base XP for answering
+  highConfidence: 2,      // Bonus for confidence 3+
+  assessment: 50,         // Completing an assessment
+  dailyFirst: 10,         // First question of the day
+  streakBonus: 15,        // Streak day bonus (7+ days)
+  categoryMilestone: 30,  // 10 questions in a category
+};
+
+// Level calculation: Level = floor(sqrt(XP / 100)) + 1
+const calculateLevel = (xp) => Math.floor(Math.sqrt(xp / 100)) + 1;
+
+// XP required for a given level
+const xpForLevel = (level) => Math.pow(level - 1, 2) * 100;
+
+// Level titles
+const LEVEL_TITLES = {
+  1: 'Newcomer',
+  2: 'Curious Mind',
+  3: 'Explorer',
+  4: 'Thinker',
+  5: 'Insight Seeker',
+  6: 'Deep Diver',
+  7: 'Pattern Finder',
+  8: 'Wisdom Collector',
+  9: 'Self-Aware',
+  10: 'Master Mind',
+};
+
+const getLevelTitle = (level) => LEVEL_TITLES[Math.min(level, 10)] || 'Master Mind';
 
 const demoStorage = {
   get: () => {
@@ -2288,21 +2346,15 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
   if (mode === 'welcome') {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8" style={{backgroundColor: darkMode ? '#030712' : '#f9fafb'}}>
-        <div className="text-6xl mb-4">🌀</div>
-        <h1 className="text-3xl font-bold mb-2" style={{color: darkMode ? '#fff' : '#111'}}>Welcome to AURA</h1>
-        <p className="text-sm mb-10 text-center" style={{color: darkMode ? '#9ca3af' : '#6b7280'}}>Answer questions. See what others think.<br/>Build your profile.</p>
-        <div className="w-full max-w-xs space-y-3">
-          <button onClick={() => setMode('signin')} className={`w-full py-3 px-6 rounded-xl font-medium btn-feedback flex items-center justify-center gap-2 ${darkMode ? 'bg-gray-800 text-gray-200' : 'bg-gray-200 text-gray-800'}`}>
-            <span>🔑</span> Sign In
-          </button>
-          <button onClick={() => setMode('signup')} className={`w-full py-3 px-6 rounded-xl font-medium btn-feedback flex items-center justify-center gap-2 ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'}`}>
-            <span>✨</span> Create Account
-          </button>
-          <button onClick={onTryFirst} className={`w-full py-3 px-6 rounded-xl font-medium btn-feedback flex items-center justify-center gap-2 ${darkMode ? 'bg-gray-900 text-gray-400 border border-gray-800' : 'bg-white text-gray-600 border border-gray-300'}`}>
-            <span>👀</span> Try It First
+        <div className="text-6xl mb-6">🌀</div>
+        <h1 className="text-3xl font-bold mb-3" style={{color: darkMode ? '#fff' : '#111'}}>Aura</h1>
+        <p className="text-base mb-12 text-center" style={{color: darkMode ? '#9ca3af' : '#6b7280'}}>Discover yourself, one question at a time</p>
+        <div className="w-full max-w-xs space-y-4">
+          <button onClick={onTryFirst} className={`w-full py-4 px-6 rounded-xl font-semibold text-lg btn-feedback ${darkMode ? 'bg-violet-600 text-white hover:bg-violet-500' : 'bg-violet-500 text-white hover:bg-violet-600'}`}>
+            Let's Go
           </button>
         </div>
-        <p className="text-xs mt-8 text-center max-w-xs" style={{color: darkMode ? '#4b5563' : '#9ca3af'}}>"Try It First" saves progress on this device.<br/>Create account anytime to sync across devices.</p>
+        <button onClick={() => setMode('signin')} className="mt-8 text-sm" style={{color: darkMode ? '#6b7280' : '#9ca3af'}}>Sign In</button>
       </div>
     );
   }
@@ -2357,6 +2409,248 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
   );
 };
 
+// ==================== ONBOARDING FLOW ====================
+// Progressive onboarding for new users - fun questions first
+const OnboardingFlow = ({ darkMode, onComplete, onSignIn }) => {
+  const [currentIndex, setCurrentIndex] = React.useState(0);
+  const [answers, setAnswers] = React.useState({});
+  const [tappedAnswer, setTappedAnswer] = React.useState(null);
+  const [tapCount, setTapCount] = React.useState(0);
+  const [showCelebration, setShowCelebration] = React.useState(null);
+  const [showConfidenceHint, setShowConfidenceHint] = React.useState(false);
+
+  const question = ONBOARDING_QUESTIONS[currentIndex];
+  const isAnswered = answers[question?.id] !== undefined;
+  const totalQuestions = ONBOARDING_QUESTIONS.length;
+
+  // Show confidence hint starting at question 6
+  const shouldShowConfidenceHint = currentIndex >= 5 && currentIndex < 8 && !showConfidenceHint;
+
+  const handleTap = (answer) => {
+    if (isAnswered) return;
+
+    if (tappedAnswer === answer) {
+      // Increase confidence on repeat tap
+      setTapCount(Math.min(tapCount + 1, 4));
+      if (currentIndex >= 5 && !showConfidenceHint) {
+        setShowConfidenceHint(true);
+      }
+    } else {
+      setTappedAnswer(answer);
+      setTapCount(1);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (tappedAnswer === null) return;
+
+    // Record answer
+    const newAnswers = { ...answers, [question.id]: { answer: tappedAnswer, confidence: tapCount } };
+    setAnswers(newAnswers);
+
+    // Show celebration
+    const celebrationMsg = ONBOARD_CELEBRATIONS[currentIndex % ONBOARD_CELEBRATIONS.length];
+    setShowCelebration(celebrationMsg);
+
+    // Auto-advance after celebration
+    setTimeout(() => {
+      setShowCelebration(null);
+      setTappedAnswer(null);
+      setTapCount(0);
+
+      if (currentIndex < totalQuestions - 1) {
+        setCurrentIndex(currentIndex + 1);
+      } else {
+        // Completed onboarding
+        onComplete(newAnswers);
+      }
+    }, 600);
+  };
+
+  // Auto-submit on tap (no confirmation needed for onboarding)
+  React.useEffect(() => {
+    if (tappedAnswer !== null && !isAnswered) {
+      const timer = setTimeout(() => {
+        handleSubmit();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [tappedAnswer, tapCount]);
+
+  if (!question) return null;
+
+  // Button gradient styles based on confidence
+  const getButtonStyle = (idx) => {
+    const isSelected = tappedAnswer === idx;
+    const conf = isSelected ? tapCount : 0;
+
+    if (!isSelected) {
+      return darkMode
+        ? 'bg-gray-800/50 border-gray-700 text-gray-300'
+        : 'bg-gray-100 border-gray-300 text-gray-700';
+    }
+
+    // Confidence-based gradients (matching main app style)
+    const shades = darkMode
+      ? [
+          'from-violet-700/80 to-violet-600/80',
+          'from-violet-600 to-violet-500',
+          'from-violet-500 to-violet-400',
+          'from-violet-400 to-violet-300',
+        ]
+      : [
+          'from-violet-300 to-violet-200',
+          'from-violet-400 to-violet-300',
+          'from-violet-500 to-violet-400',
+          'from-violet-600 to-violet-500',
+        ];
+
+    return `bg-gradient-to-r ${shades[conf - 1]} border-violet-500 text-white`;
+  };
+
+  return (
+    <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      {/* Minimal header with Sign In option */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-2">
+        <span className="text-2xl">🌀</span>
+        <button
+          onClick={onSignIn}
+          className={`text-sm ${darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-500'}`}
+        >
+          Sign In
+        </button>
+      </div>
+
+      {/* Progress dots - only show after question 4 */}
+      {currentIndex >= 4 && (
+        <div className="flex justify-center gap-1.5 py-2">
+          {ONBOARDING_QUESTIONS.map((_, i) => (
+            <div
+              key={i}
+              className={`w-2 h-2 rounded-full transition-all ${
+                i < currentIndex
+                  ? (darkMode ? 'bg-violet-500' : 'bg-violet-400')
+                  : i === currentIndex
+                  ? (darkMode ? 'bg-violet-400 scale-125' : 'bg-violet-500 scale-125')
+                  : (darkMode ? 'bg-gray-700' : 'bg-gray-300')
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Question area */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
+        {/* Celebration overlay */}
+        {showCelebration && (
+          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+            <div className={`text-4xl font-bold ${darkMode ? 'text-violet-400' : 'text-violet-500'} animate-bounce`}>
+              {showCelebration}
+            </div>
+          </div>
+        )}
+
+        {/* Question text */}
+        <h1 className={`text-2xl font-bold text-center mb-8 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+          {question.text}
+        </h1>
+
+        {/* Answer buttons */}
+        <div className="w-full max-w-sm space-y-3">
+          {question.options.map((option, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleTap(idx)}
+              disabled={isAnswered}
+              className={`w-full py-4 px-6 rounded-xl font-medium text-lg transition-all border-2 btn-feedback ${getButtonStyle(idx)}`}
+            >
+              {option}
+              {tappedAnswer === idx && tapCount > 1 && (
+                <span className="ml-2 opacity-70">{Array(tapCount).fill('★').join('')}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Confidence hint - appears at question 6 */}
+        {currentIndex >= 5 && currentIndex < 8 && tappedAnswer !== null && (
+          <p className={`mt-4 text-sm text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'} animate-pulse`}>
+            Feeling sure? Tap again to boost confidence
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ==================== PATH CHOICE SCREEN ====================
+// Shown after 10 onboarding questions - user chooses their adventure
+const PathChoiceScreen = ({ darkMode, onReveal, onExplore }) => {
+  return (
+    <div className={`flex-1 flex flex-col items-center justify-center px-6 ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      {/* Celebration header */}
+      <div className="text-center mb-8">
+        <div className="text-5xl mb-4">🎉</div>
+        <h1 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+          Nice! 10 down
+        </h1>
+        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          You're on a roll. What next?
+        </p>
+      </div>
+
+      {/* Path choices */}
+      <div className="w-full max-w-sm space-y-4">
+        {/* Reveal path - Self discovery */}
+        <button
+          onClick={onReveal}
+          className={`w-full p-5 rounded-2xl text-left transition-all shine-card shine-violet glow-violet border ${
+            darkMode
+              ? 'border-violet-500/40 hover:border-violet-400/80 bg-gradient-to-r from-violet-900/40 to-violet-950/60'
+              : 'border-violet-300 hover:border-violet-400 bg-gradient-to-r from-violet-100 to-violet-50'
+          }`}
+        >
+          <div className="flex items-center gap-4">
+            <span className="text-3xl">🪞</span>
+            <div className="flex-1">
+              <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Learn About Yourself
+              </div>
+              <div className={`text-sm ${darkMode ? 'text-violet-400/80' : 'text-violet-600'}`}>
+                Take a quick personality quiz
+              </div>
+            </div>
+            <span className={`text-lg ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>→</span>
+          </div>
+        </button>
+
+        {/* Explore path - Categories */}
+        <button
+          onClick={onExplore}
+          className={`w-full p-5 rounded-2xl text-left transition-all shine-card shine-teal glow-teal border ${
+            darkMode
+              ? 'border-teal-500/40 hover:border-teal-400/80 bg-gradient-to-r from-teal-900/40 to-teal-950/60'
+              : 'border-teal-300 hover:border-teal-400 bg-gradient-to-r from-teal-100 to-teal-50'
+          }`}
+        >
+          <div className="flex items-center gap-4">
+            <span className="text-3xl">🧭</span>
+            <div className="flex-1">
+              <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Explore Topics
+              </div>
+              <div className={`text-sm ${darkMode ? 'text-teal-400/80' : 'text-teal-600'}`}>
+                Answer questions about things you care about
+              </div>
+            </div>
+            <span className={`text-lg ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>→</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // SaveProgressModal - Nudge after 20 responses
 const SaveProgressModal = ({ onCreateAccount, onLater, darkMode }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor: 'rgba(0,0,0,0.7)'}}>
@@ -2374,6 +2668,39 @@ const SaveProgressModal = ({ onCreateAccount, onLater, darkMode }) => (
           Later
         </button>
       </div>
+    </div>
+  </div>
+);
+
+// LevelUpModal - Celebration when user levels up
+const LevelUpModal = ({ level, title, onClose, darkMode }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor: 'rgba(0,0,0,0.85)'}} onClick={onClose}>
+    <div className={`w-full max-w-sm rounded-2xl p-8 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+      {/* Confetti effect using CSS */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-violet-500/20 to-amber-500/20 animate-pulse" />
+        </div>
+        <div className="relative z-10 text-6xl mb-4 celebrate-glow">🎉</div>
+      </div>
+      <h2 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+        Level Up!
+      </h2>
+      <div className={`text-5xl font-bold mb-2 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>
+        {level}
+      </div>
+      <p className={`text-lg font-medium mb-6 ${darkMode ? 'text-violet-300' : 'text-violet-500'}`}>
+        {title}
+      </p>
+      <div className={`text-sm mb-6 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+        Keep going to reach the next level!
+      </div>
+      <button
+        onClick={onClose}
+        className={`w-full py-3 rounded-xl font-medium btn-feedback ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'}`}
+      >
+        Continue
+      </button>
     </div>
   </div>
 );
@@ -3270,13 +3597,22 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
 
   return (
     <div className={`flex-1 flex flex-col relative ${TH('bg-main', darkMode)}`}>
-      {/* Header - a5 style */}
+      {/* Header - with XP and level display */}
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <span className="text-3xl cursor-pointer select-none" onDoubleClick={onResetQotd}>🌀</span>
         <div className="flex items-center gap-3">
-          <span className={`text-sm ${TH('text-muted', darkMode)}`}>
-            {totalAnswered} answered {stats.streak > 0 && <span className="text-orange-400">🔥{stats.streak}</span>}
-          </span>
+          <span className="text-3xl cursor-pointer select-none" onDoubleClick={onResetQotd}>🌀</span>
+          {/* Level badge */}
+          <div className="flex items-center gap-1.5">
+            <span className={`text-sm font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>
+              Lv.{stats.level || 1}
+            </span>
+            <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              {stats.xp || 0} XP
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {stats.streak > 0 && <span className="text-sm text-orange-400 font-medium">🔥{stats.streak}</span>}
           <button onClick={onSettings} className={darkMode ? 'text-gray-500' : 'text-gray-400'}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -4111,6 +4447,14 @@ function App() {
   const [isGuestMode, setIsGuestMode] = useState(() => localStorage.getItem('aura_guest_mode') === 'true');
   const [showSaveNudge, setShowSaveNudge] = useState(false);
   const [nudgeShown, setNudgeShown] = useState(() => localStorage.getItem('aura_nudge_shown') === 'true');
+
+  // Onboarding state - new user progressive reveal
+  const [onboardingComplete, setOnboardingComplete] = useState(() => localStorage.getItem('aura_onboarding_complete') === 'true');
+  const [onboardingAnswers, setOnboardingAnswers] = useState({});
+
+  // Level up celebration state
+  const [levelUpData, setLevelUpData] = useState(null); // { level, title }
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [darkMode, setDarkMode] = useState(getInitialDarkMode);
   const [responses, setResponses] = useState(() => demoStorage.get().answers);
@@ -4434,11 +4778,27 @@ function App() {
     data.answers[currentQuestion.id] = { answer, confidence, timestamp: Date.now() };
     data.stats.answered = Object.keys(data.answers).length;
     const today = new Date().toDateString();
-    if (data.stats.lastAnswerDate !== today) {
+    const isNewDay = data.stats.lastAnswerDate !== today;
+    if (isNewDay) {
       const yesterday = new Date(Date.now() - 86400000).toDateString();
       data.stats.streak = data.stats.lastAnswerDate === yesterday ? data.stats.streak + 1 : 1;
       data.stats.lastAnswerDate = today;
     }
+
+    // Calculate XP earned
+    let xpEarned = XP_RATES.answer;
+    if (confidence >= 3) xpEarned += XP_RATES.highConfidence;
+    if (isNewDay) xpEarned += XP_RATES.dailyFirst;
+    if (data.stats.streak >= 7 && isNewDay) xpEarned += XP_RATES.streakBonus;
+
+    // Initialize XP if not exists
+    const oldXP = data.stats.xp || 0;
+    const oldLevel = data.stats.level || calculateLevel(oldXP);
+    const newXP = oldXP + xpEarned;
+    const newLevel = calculateLevel(newXP);
+    data.stats.xp = newXP;
+    data.stats.level = newLevel;
+
     demoStorage.set(data);
 
     // Capture to Firebase (if configured)
@@ -4459,6 +4819,11 @@ function App() {
     setCommunityResults(prev => ({ ...prev, [currentQuestion.id]: community }));
     setStats(data.stats);
     setPendingSubmit(null);
+
+    // Check for level up
+    if (newLevel > oldLevel) {
+      setLevelUpData({ level: newLevel, title: getLevelTitle(newLevel) });
+    }
 
     // Go straight to next question (no flash of results screen)
     goToNext();
@@ -4602,7 +4967,33 @@ function App() {
   const handleTryFirst = () => {
     localStorage.setItem('aura_guest_mode', 'true');
     setIsGuestMode(true);
-    // Load Alex as default demo profile
+    // Check if user has completed onboarding before
+    if (onboardingComplete) {
+      // Returning user - go straight to categories
+      assessLoadDemoProfile(1);
+      setScreen('categories');
+    } else {
+      // New user - start onboarding flow
+      setScreen('onboarding');
+    }
+  };
+
+  // Handle onboarding completion
+  const handleOnboardingComplete = (answers) => {
+    setOnboardingAnswers(answers);
+    localStorage.setItem('aura_onboarding_complete', 'true');
+    setOnboardingComplete(true);
+    // Show path choice screen
+    setScreen('path-choice');
+  };
+
+  // Handle path choice after onboarding
+  const handleChooseReveal = () => {
+    assessLoadDemoProfile(1);
+    setScreen('assess-picker');
+  };
+
+  const handleChooseExplore = () => {
     assessLoadDemoProfile(1);
     setScreen('categories');
   };
@@ -4663,17 +5054,21 @@ function App() {
     // Use truly empty state (not pre-filled demo data)
     setResponses({});
     setCommunityResults(generateDemoCommunityResults());
-    setStats({ answered: 0, streak: 0, lastAnswerDate: null });
+    setStats({ answered: 0, streak: 0, lastAnswerDate: null, xp: 0, level: 1 });
     setCurrentIndex(0);
     setShowGestureHint(true);
+    setLevelUpData(null);
     setQotdResponse(null);
     setQotdTappedAnswer(null);
     setQotdTapCount(0);
     // Clear all guest/login tracking
     localStorage.removeItem('aura_guest_mode');
     localStorage.removeItem('aura_nudge_shown');
+    localStorage.removeItem('aura_onboarding_complete');
     setIsGuestMode(false);
     setNudgeShown(false);
+    setOnboardingComplete(false);
+    setOnboardingAnswers({});
     // Clear assessments
     localStorage.removeItem(ASSESS_STORAGE_KEY);
     setAssessCompleted({});
@@ -4854,6 +5249,20 @@ function App() {
         onCreateAccount={handleCreateAccount}
         onTryFirst={handleTryFirst}
         darkMode={darkMode}
+      />
+    );
+    if (screen === 'onboarding') return (
+      <OnboardingFlow
+        darkMode={darkMode}
+        onComplete={handleOnboardingComplete}
+        onSignIn={() => setScreen('welcome')}
+      />
+    );
+    if (screen === 'path-choice') return (
+      <PathChoiceScreen
+        darkMode={darkMode}
+        onReveal={handleChooseReveal}
+        onExplore={handleChooseExplore}
       />
     );
     if (screen === 'launch') return <LaunchScreen onDemo={startDemo} onLogin={() => {}} darkMode={darkMode} />;
@@ -7565,6 +7974,7 @@ function App() {
             {renderContent()}
           </div>
           {showSaveNudge && <SaveProgressModal onCreateAccount={handleNudgeCreateAccount} onLater={handleNudgeLater} darkMode={darkMode} />}
+          {levelUpData && <LevelUpModal level={levelUpData.level} title={levelUpData.title} onClose={() => setLevelUpData(null)} darkMode={darkMode} />}
         </PhoneFrame>
       </>
     );
@@ -7590,6 +8000,7 @@ function App() {
       <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
       <div className="safe-bottom" />
       {showSaveNudge && <SaveProgressModal onCreateAccount={handleNudgeCreateAccount} onLater={handleNudgeLater} darkMode={darkMode} />}
+      {levelUpData && <LevelUpModal level={levelUpData.level} title={levelUpData.title} onClose={() => setLevelUpData(null)} darkMode={darkMode} />}
     </div>
   );
 }
