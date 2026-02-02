@@ -1849,6 +1849,28 @@ const ASSESS_TESTS = {
       { q: "I hide my plans from others until they are finished", c: 'strategy', k: '-' },
       { q: "I prioritize winning over playing the game fairly", c: 'competition', k: 'T' },
     ]
+  },
+
+  // Quick Profile - Gateway assessment (10 questions, ~90 seconds)
+  'quick-profile': {
+    name: 'Quick Profile',
+    icon: '✨',
+    color: 'blue',
+    scale: 'likeme',
+    tier: 0,
+    description: 'Who are you in 2 minutes?',
+    items: [
+      { q: "At a party, I'm usually one of the last to leave", c: 'E', k: '+' },
+      { q: "Too much socializing drains me", c: 'E', k: '-' },
+      { q: "I keep my commitments even when I don't feel like it", c: 'C', k: '+' },
+      { q: "I start more projects than I finish", c: 'C', k: '-' },
+      { q: "When someone near me is anxious, I feel it too", c: 'A', k: '+' },
+      { q: "I say uncomfortable truths others avoid", c: 'A', k: '-' },
+      { q: "I overthink things that haven't happened yet", c: 'N', k: '+' },
+      { q: "The unconventional appeals to me more than the traditional", c: 'O', k: '+' },
+      { q: "I trust my gut more than analysis", c: 'intuition', k: '+' },
+      { q: "I'd rather have three close friends than thirty acquaintances", c: 'depth', k: '+' },
+    ]
   }
 };
 
@@ -1878,17 +1900,37 @@ const getAssessColor = (color, darkMode) => {
 };
 
 // Assessment categories for compact picker view
+// Tier system: 0 = always available, 1 = after Quick Profile, 2 = after Starter Pack
 const ASSESS_CATEGORIES = {
-  starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'] },
-  personality: { name: 'Personality', icon: '🎭', color: 'violet', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'] },
-  character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'] },
-  shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'] },
-  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['adhd', 'cognitive', 'chronotype', 'reasoning', 'reasoning-2', 'reasoning-3'] },
-  relationships: { name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'] },
-  behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'] },
+  quickstart: { name: 'Quick Profile', icon: '✨', color: 'blue', tests: ['quick-profile'], tier: 0 },
+  starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], tier: 1 },
+  personality: { name: 'Personality', icon: '🎭', color: 'violet', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], tier: 2 },
+  character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'], tier: 2 },
+  shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'], tier: 2 },
+  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['adhd', 'cognitive', 'chronotype', 'reasoning', 'reasoning-2', 'reasoning-3'], tier: 2 },
+  relationships: { name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'], tier: 2 },
+  behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], tier: 2 },
 };
 
 const ASSESS_TRAITS = { E: 'Extraversion', A: 'Agreeableness', C: 'Conscientiousness', N: 'Neuroticism', O: 'Openness' };
+
+// Calculate user's unlock tier based on completed assessments
+// Tier 0: Default (only Quick Profile available)
+// Tier 1: Quick Profile completed (Starter Pack unlocked)
+// Tier 2: All 5 Starter Pack modules completed (all branches unlocked)
+const calculateAssessTier = (completed) => {
+  if (!completed) return 0;
+
+  // Check for tier 2: all starter modules completed
+  const starterModules = ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'];
+  const starterComplete = starterModules.every(id => completed[id]);
+  if (starterComplete) return 2;
+
+  // Check for tier 1: quick-profile completed
+  if (completed['quick-profile']) return 1;
+
+  return 0;
+};
 
 const ASSESS_DEMO_PROFILES = {
   1: {
@@ -4494,7 +4536,7 @@ const ProfileSection = ({ darkMode }) => {
 };
 
 // SettingsScreen
-const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak, onBack, onReset, onResetAssessments, hasAssessmentData, onHistory }) => (
+const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak, showDemoControls, setShowDemoControls, onBack, onReset, onResetAssessments, hasAssessmentData, onHistory }) => (
   <div className={`flex-1 flex flex-col overflow-hidden ${TH('bg-main', darkMode)}`}>
     <div className={`flex items-center justify-between px-4 py-3 border-b ${TH('border-base', darkMode)}`}>
       <button onClick={onBack} className={`text-sm btn-feedback ${TH('text-violet', darkMode)}`}>← Back</button>
@@ -4547,6 +4589,15 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
           <div><div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Streak Counter</div><div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Show 🔥 during play</div></div>
           <button onClick={() => setShowStreak(!showStreak)} className={`relative w-12 h-6 rounded-full btn-feedback ${showStreak ? 'bg-violet-600' : darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
             <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showStreak ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+      </div>
+      {/* Developer Mode */}
+      <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
+        <div className="flex items-center justify-between">
+          <div><div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Demo Profiles</div><div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>View sample assessment data</div></div>
+          <button onClick={() => setShowDemoControls(!showDemoControls)} className={`relative w-12 h-6 rounded-full btn-feedback ${showDemoControls ? 'bg-violet-600' : darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showDemoControls ? 'translate-x-6' : 'translate-x-0.5'}`} />
           </button>
         </div>
       </div>
@@ -4709,6 +4760,9 @@ function App() {
   });
   const [assessDemoProfile, setAssessDemoProfile] = useState(() => {
     try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).demoProfile || null : null; } catch { return null; }
+  });
+  const [showDemoControls, setShowDemoControls] = useState(() => {
+    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).showDemoControls || false : false; } catch { return false; }
   });
   const [assessSavedUserData, setAssessSavedUserData] = useState(() => {
     try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).savedUserData || null : null; } catch { return null; }
@@ -5150,12 +5204,17 @@ function App() {
 
   // Handle path choice after onboarding
   const handleChooseReveal = () => {
-    assessLoadDemoProfile(1);
-    setScreen('assess-picker');
+    // Check if user needs to complete Quick Profile first
+    const currentTier = calculateAssessTier(assessCompleted);
+    if (currentTier === 0 && !assessCompleted['quick-profile']) {
+      // First time - go directly to Quick Profile
+      assessStartTest('quick-profile');
+    } else {
+      setScreen('assess-picker');
+    }
   };
 
   const handleChooseExplore = () => {
-    assessLoadDemoProfile(1);
     setScreen('categories');
   };
 
@@ -5243,8 +5302,8 @@ function App() {
   };
 
   // ==================== ASSESSMENT FUNCTIONS ====================
-  const assessSaveToStorage = (completed, progress, demoActive = assessDemoActive, savedUserData = assessSavedUserData, demoProfile = assessDemoProfile) => {
-    localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed, inProgress: progress, demoActive, savedUserData, demoProfile }));
+  const assessSaveToStorage = (completed, progress, demoActive = assessDemoActive, savedUserData = assessSavedUserData, demoProfile = assessDemoProfile, demoControls = showDemoControls) => {
+    localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed, inProgress: progress, demoActive, savedUserData, demoProfile, showDemoControls: demoControls }));
   };
 
   const assessCurrentTest = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
@@ -5281,9 +5340,14 @@ function App() {
     assessTimeoutRef.current = setTimeout(() => assessFinalizeSubmit(value), undoDelay * 1000);
   };
 
+  const [assessShowUndoToast, setAssessShowUndoToast] = useState(false);
+
   const assessHandleUndo = () => {
     clearTimeout(assessTimeoutRef.current);
     setAssessPending(null);
+    // Show undo confirmation
+    setAssessShowUndoToast(true);
+    setTimeout(() => setAssessShowUndoToast(false), 1000);
   };
 
   const assessFinalizeSubmit = (value) => {
@@ -5318,6 +5382,8 @@ function App() {
     if (assessCanFinish()) assessCompleteTest(assessResponses);
   };
 
+  const [assessUnlockMessage, setAssessUnlockMessage] = useState(null);
+
   const assessCompleteTest = (resp) => {
     const results = calculateAssessResults(assessCurrentTestId, resp);
     const newCompleted = { ...assessCompleted, [assessCurrentTestId]: results };
@@ -5325,11 +5391,31 @@ function App() {
     const { [assessCurrentTestId]: _, ...remainingProgress } = assessInProgress;
     setAssessInProgress(remainingProgress);
     assessSaveToStorage(newCompleted, remainingProgress);
+
+    // Check for unlock tier changes
+    const prevTier = calculateAssessTier(assessCompleted);
+    const newTier = calculateAssessTier(newCompleted);
+
+    if (newTier > prevTier) {
+      // Show unlock celebration
+      const unlockMessages = {
+        1: { title: "Starter Pack Unlocked!", subtitle: "Begin your deep dive into self-discovery" },
+        2: { title: "All Branches Unlocked!", subtitle: "Explore Personality, Mind, Shadow & more" }
+      };
+      setAssessUnlockMessage(unlockMessages[newTier]);
+    }
+
     setAssessShowCompletion(true);
     setTimeout(() => {
       setAssessShowCompletion(false);
-      setScreen('assess-results');
-    }, 1500);
+      setAssessUnlockMessage(null);
+      // For quick-profile, go to assess-picker to show newly unlocked content
+      if (assessCurrentTestId === 'quick-profile') {
+        setScreen('assess-picker');
+      } else {
+        setScreen('assess-results');
+      }
+    }, assessCurrentTestId === 'quick-profile' ? 2500 : 1500);
   };
 
   const assessLoadDemoProfile = (profileNum) => {
@@ -5361,8 +5447,11 @@ function App() {
         // Shadow module - get trait from test.trait
         const traitData = profile.shadow[test.trait];
         traitData.forEach((val, i) => { answers[i] = val; });
-      } else {
+      } else if (profile[testId]) {
         profile[testId].forEach((val, i) => { answers[i] = val; });
+      } else {
+        // Skip tests without demo data (e.g., quick-profile)
+        return;
       }
       newCompleted[testId] = calculateAssessResults(testId, answers);
     });
@@ -5416,7 +5505,7 @@ function App() {
       <OnboardingFlow
         darkMode={darkMode}
         onComplete={handleOnboardingComplete}
-        onSkip={() => { assessLoadDemoProfile(1); setScreen('categories'); }}
+        onSkip={() => setScreen('categories')}
         onSettings={goToSettings}
         onReset={resetDemo}
       />
@@ -5426,7 +5515,7 @@ function App() {
         darkMode={darkMode}
         onReveal={handleChooseReveal}
         onExplore={handleChooseExplore}
-        onSkip={() => { assessLoadDemoProfile(1); setScreen('categories'); }}
+        onSkip={() => setScreen('categories')}
         onSettings={goToSettings}
         onReset={resetDemo}
       />
@@ -5444,6 +5533,11 @@ function App() {
         setShowTips={setShowTips}
         showStreak={showStreak}
         setShowStreak={setShowStreak}
+        showDemoControls={showDemoControls}
+        setShowDemoControls={(val) => {
+          setShowDemoControls(val);
+          assessSaveToStorage(assessCompleted, assessInProgress, assessDemoActive, assessSavedUserData, assessDemoProfile, val);
+        }}
         onBack={() => setScreen(previousScreen)}
         onReset={resetDemo}
         onResetAssessments={() => {
@@ -5868,9 +5962,10 @@ function App() {
             <button onClick={(e) => { e.stopPropagation(); setScreen('categories'); }} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
             <span className="text-2xl cursor-pointer select-none" onDoubleClick={assessClearDemo}>🪞</span>
             <span className={`font-semibold flex-1 ${TH('text-primary', darkMode)}`}>Reveal</span>
-            <button onClick={(e) => { e.stopPropagation(); setScreen('assess-analysis'); }} className={`px-3 py-1.5 rounded-full text-sm font-medium ${Object.keys(assessCompleted).length > 0 ? 'bg-violet-600 text-white' : (darkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-200 text-gray-400')}`}>Analysis</button>
+            <button onClick={(e) => { e.stopPropagation(); if (assessCompleted['quick-profile']) setScreen('assess-analysis'); }} className={`px-3 py-1.5 rounded-full text-sm font-medium ${assessCompleted['quick-profile'] ? 'bg-violet-600 text-white' : (darkMode ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')}`}>Analysis</button>
           </div>
-          {/* Profile Selector */}
+          {/* Demo Profile Selector - only shown when demo controls enabled in settings */}
+          {showDemoControls && (
           <div className="px-4 py-1.5">
             <div className="flex items-center justify-center gap-2">
               {/* Me button */}
@@ -5924,9 +6019,24 @@ function App() {
               </div>
             )}
           </div>
-          <div className="flex-1 overflow-auto p-4 pb-24 space-y-3 hide-scrollbar">
-            {/* Category-based view with glowing circles */}
-            {Object.entries(ASSESS_CATEGORIES).map(([catId, cat]) => {
+          )}
+          {(() => {
+            const currentTier = calculateAssessTier(assessCompleted);
+            const visibleCategories = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= currentTier);
+            const isFirstTimeUser = currentTier === 0 && !assessCompleted['quick-profile'];
+
+            return (
+          <div className={`flex-1 overflow-auto p-4 pb-24 hide-scrollbar ${isFirstTimeUser ? 'flex flex-col items-center justify-center' : 'space-y-3'}`}>
+            {/* Welcome message for first-time users */}
+            {isFirstTimeUser && (
+              <div className="text-center mb-6 px-4">
+                <div className="text-4xl mb-3">✨</div>
+                <h2 className={`text-xl font-semibold mb-2 ${TH('text-primary', darkMode)}`}>Let's get to know you</h2>
+                <p className={`text-sm ${TH('text-subtle', darkMode)}`}>10 quick questions to unlock your profile</p>
+              </div>
+            )}
+            {/* Category-based view with glowing circles - filtered by unlock tier */}
+            {visibleCategories.map(([catId, cat]) => {
               const catTests = cat.tests.map(id => [id, ASSESS_TESTS[id]]);
               const totalQuestions = catTests.reduce((sum, [_, t]) => sum + t.items.length, 0);
               const answeredQuestions = catTests.reduce((sum, [id, t]) => {
@@ -5945,12 +6055,13 @@ function App() {
               if (!hasModules) {
                 const [testId, test] = catTests[0];
                 const isCompleted = assessCompleted[testId];
+                const isQuickProfileFirstTime = catId === 'quickstart' && isFirstTimeUser;
                 return (
-                  <button key={catId} onClick={() => isCompleted ? (setAssessCurrentTestId(testId), setScreen('assess-results')) : assessStartTest(testId)} className={`w-full p-4 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-4 hover-glow hover-glow-${cat.color}`}>
+                  <button key={catId} onClick={() => isCompleted ? (setAssessCurrentTestId(testId), setScreen('assess-results')) : assessStartTest(testId)} className={`${isQuickProfileFirstTime ? 'w-full max-w-sm p-6' : 'w-full p-4'} rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-4 hover-glow hover-glow-${cat.color} ${isQuickProfileFirstTime ? 'shadow-lg shadow-blue-500/20' : ''}`}>
                     <ProgressCircle
                       progress={progressPct}
-                      size={56}
-                      strokeWidth={4}
+                      size={isQuickProfileFirstTime ? 72 : 56}
+                      strokeWidth={isQuickProfileFirstTime ? 5 : 4}
                       color={cat.color}
                       text={allComplete ? '✓' : totalQuestions}
                       gradientId={`cat-${catId}`}
@@ -5959,11 +6070,12 @@ function App() {
                       orbit={assessProfileSwitching}
                     />
                     <div className="flex-1 text-left">
-                      <div className={`font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
+                      <div className={`${isQuickProfileFirstTime ? 'text-lg' : ''} font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
                       <div className={`text-sm ${colors.text}`}>
-                        {allComplete ? 'Complete' : `${totalQuestions} questions`}
+                        {allComplete ? 'Complete' : isQuickProfileFirstTime ? '~2 minutes' : `${totalQuestions} questions`}
                       </div>
                     </div>
+                    {isQuickProfileFirstTime && <span className={`text-2xl ${darkMode ? 'text-blue-400' : 'text-blue-500'}`}>→</span>}
                   </button>
                 );
               }
@@ -6256,7 +6368,8 @@ function App() {
                   })()}
                 </div>
               );
-            })}
+            });
+            })()}
           </div>
         </div>
       );
@@ -6295,11 +6408,23 @@ function App() {
           {assessShowCompletion && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-950/95">
               <div className="relative">
-                <div className="absolute inset-0 rounded-full blur-3xl opacity-60 celebrate-glow" style={{ background: `linear-gradient(135deg, ${assessTestColor.bg.includes('violet') ? '#8b5cf6' : assessTestColor.bg.includes('indigo') ? '#6366f1' : assessTestColor.bg.includes('blue') ? '#3b82f6' : assessTestColor.bg.includes('teal') ? '#14b8a6' : assessTestColor.bg.includes('pink') ? '#ec4899' : assessTestColor.bg.includes('rose') ? '#f43f5e' : '#10b981'}, transparent)`, width: '200px', height: '200px', marginLeft: '-50px', marginTop: '-50px' }} />
-                <svg width="140" height="140" className="celebrate-ring"><circle cx="70" cy="70" r="60" fill="none" stroke="url(#complete-grad)" strokeWidth="6" strokeLinecap="round" strokeDasharray="377" /><defs><linearGradient id="complete-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#10b981" /></linearGradient></defs></svg>
-                <div className="absolute inset-0 flex items-center justify-center celebrate-pulse"><span className="text-5xl">{assessCurrentTest.icon}</span></div>
+                <div className="absolute inset-0 rounded-full blur-3xl opacity-60 celebrate-glow" style={{ background: `linear-gradient(135deg, ${assessUnlockMessage ? '#6366f1' : assessTestColor.bg.includes('violet') ? '#8b5cf6' : assessTestColor.bg.includes('indigo') ? '#6366f1' : assessTestColor.bg.includes('blue') ? '#3b82f6' : assessTestColor.bg.includes('teal') ? '#14b8a6' : assessTestColor.bg.includes('pink') ? '#ec4899' : assessTestColor.bg.includes('rose') ? '#f43f5e' : '#10b981'}, transparent)`, width: '200px', height: '200px', marginLeft: '-50px', marginTop: '-50px' }} />
+                <svg width="140" height="140" className="celebrate-ring"><circle cx="70" cy="70" r="60" fill="none" stroke={assessUnlockMessage ? "url(#unlock-grad)" : "url(#complete-grad)"} strokeWidth="6" strokeLinecap="round" strokeDasharray="377" /><defs><linearGradient id="complete-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#10b981" /></linearGradient><linearGradient id="unlock-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#6366f1" /></linearGradient></defs></svg>
+                <div className="absolute inset-0 flex items-center justify-center celebrate-pulse"><span className="text-5xl">{assessUnlockMessage ? '🔓' : assessCurrentTest.icon}</span></div>
               </div>
-              <div className="absolute bottom-1/3 text-center"><div className="text-white text-xl font-semibold">Complete!</div><div className="text-gray-400 text-sm mt-1">Calculating your results...</div></div>
+              <div className="absolute bottom-1/3 text-center">
+                {assessUnlockMessage ? (
+                  <><div className="text-white text-xl font-semibold">{assessUnlockMessage.title}</div><div className="text-indigo-300 text-sm mt-1">{assessUnlockMessage.subtitle}</div></>
+                ) : (
+                  <><div className="text-white text-xl font-semibold">Complete!</div><div className="text-gray-400 text-sm mt-1">Calculating your results...</div></>
+                )}
+              </div>
+            </div>
+          )}
+          {/* Undo Toast */}
+          {assessShowUndoToast && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-gray-800 text-white text-sm font-medium shadow-lg animate-pulse">
+              ↩ Undone
             </div>
           )}
           {/* Exit Confirmation Popup */}
@@ -6345,7 +6470,7 @@ function App() {
                 const pendStyle = pendingStyles[assessCurrentTest.color];
                 const numColor = numColors[assessCurrentTest.color];
                 return (
-                  <button key={option.v} onClick={(e) => { e.stopPropagation(); if (!assessPending) assessHandleAnswerTap(option.v); }} className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-between transition-colors border relative overflow-hidden hover-glow hover-glow-${assessCurrentTest.color} ${isSelected ? `${selStyle} text-white ring-2 ring-offset-1 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-white'}` : isPending ? `${pendStyle} text-white` : `${colorTint} ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}`}>
+                  <button key={option.v} onClick={(e) => { e.stopPropagation(); if (assessPending) { assessHandleUndo(); } else { assessHandleAnswerTap(option.v); } }} className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-between transition-colors border relative overflow-hidden hover-glow hover-glow-${assessCurrentTest.color} ${isSelected ? `${selStyle} text-white ring-2 ring-offset-1 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-white'}` : isPending ? `${pendStyle} text-white` : `${colorTint} ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}`}>
                     {isPending && <div className="absolute inset-0 bg-black/30" style={{ animation: `countdownShrink ${undoDelay}s linear forwards`, transformOrigin: 'left' }} />}
                     <span className="text-left relative z-10">{option.l}</span>
                     <div className="flex items-center gap-2 relative z-10">
@@ -6490,6 +6615,88 @@ function App() {
             <div className="w-6" />
           </div>
           <div className="flex-1 overflow-auto p-4 space-y-4 hide-scrollbar">
+
+            {/* Quick Profile Results - Simple personality snapshot */}
+            {assessCurrentTestId === 'quick-profile' && results && (() => {
+              // Generate personality snapshot from trait scores
+              const getTraitDescription = () => {
+                const traits = [];
+                const items = test.items;
+                const resp = results.responses || {};
+
+                // Calculate rough scores for each trait from responses
+                const traitScores = { E: 0, C: 0, A: 0, N: 0, O: 0, intuition: 0, depth: 0 };
+                const traitCounts = { E: 0, C: 0, A: 0, N: 0, O: 0, intuition: 0, depth: 0 };
+
+                items.forEach((item, i) => {
+                  const answer = resp[i];
+                  if (answer !== undefined && item.c) {
+                    const score = item.k === '-' ? (6 - answer) : answer; // Reverse for negative items
+                    traitScores[item.c] = (traitScores[item.c] || 0) + score;
+                    traitCounts[item.c] = (traitCounts[item.c] || 0) + 1;
+                  }
+                });
+
+                // Normalize scores to 0-100
+                Object.keys(traitScores).forEach(k => {
+                  if (traitCounts[k] > 0) {
+                    traitScores[k] = Math.round((traitScores[k] / (traitCounts[k] * 5)) * 100);
+                  }
+                });
+
+                // Build description
+                const E = traitScores.E || 50;
+                const C = traitScores.C || 50;
+                const A = traitScores.A || 50;
+                const N = traitScores.N || 50;
+                const O = traitScores.O || 50;
+
+                if (E > 60) traits.push("outgoing and energized by people");
+                else if (E < 40) traits.push("reserved and recharge through solitude");
+
+                if (C > 60) traits.push("organized and follow-through strong");
+                else if (C < 40) traits.push("spontaneous and flexible");
+
+                if (A > 60) traits.push("deeply empathetic");
+                else if (A < 40) traits.push("direct and truth-seeking");
+
+                if (N > 60) traits.push("reflective and emotionally aware");
+
+                if (O > 60) traits.push("drawn to the unconventional");
+
+                if (traitScores.depth > 60) traits.push("value deep connections over crowds");
+
+                // Combine into flowing sentences
+                let description = "You're ";
+                if (traits.length === 0) {
+                  description += "balanced across many dimensions - adaptable and well-rounded.";
+                } else if (traits.length === 1) {
+                  description += traits[0] + ".";
+                } else if (traits.length === 2) {
+                  description += traits[0] + " and " + traits[1] + ".";
+                } else {
+                  description += traits.slice(0, -1).join(", ") + ", and " + traits[traits.length - 1] + ".";
+                }
+
+                return description;
+              };
+
+              return (
+                <ResultCard icon="✨" title="Quick Profile" subtitle="Your personality snapshot">
+                  <div className={`text-center py-4 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                    <p className="text-lg leading-relaxed italic">"{getTraitDescription()}"</p>
+                  </div>
+                  <div className={`mt-4 p-4 rounded-xl text-center ${darkMode ? 'bg-indigo-900/20' : 'bg-indigo-50'}`}>
+                    <div className={`text-sm font-medium ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>
+                      Ready for more?
+                    </div>
+                    <div className={`text-xs mt-1 ${darkMode ? 'text-indigo-400/70' : 'text-indigo-500'}`}>
+                      Starter Pack awaits with 40 deeper questions
+                    </div>
+                  </div>
+                </ResultCard>
+              );
+            })()}
 
             {/* Big Five Results */}
             {test.parent === 'bigfive' && results && (() => {
@@ -6777,6 +6984,52 @@ function App() {
     // Assessment Analysis Screen
     if (screen === 'assess-analysis') {
       const completedCount = Object.keys(assessCompleted).length;
+      const currentTier = calculateAssessTier(assessCompleted);
+      const quickProfileComplete = assessCompleted['quick-profile'];
+
+      // Quick Profile result generator
+      const getQuickProfileSummary = () => {
+        if (!quickProfileComplete) return null;
+        const responses = quickProfileComplete.responses || {};
+        const traits = { E: 0, C: 0, A: 0, N: 0, O: 0 };
+        const traitCounts = { E: 0, C: 0, A: 0, N: 0, O: 0 };
+
+        // Calculate trait scores from responses (scale: 1-5, with polarity)
+        Object.entries(responses).forEach(([idx, value]) => {
+          const item = ASSESS_TESTS['quick-profile'].items[parseInt(idx)];
+          if (item && item.c && traits[item.c] !== undefined) {
+            const score = item.k === '+' ? value : (6 - value); // Reverse for '-' polarity
+            traits[item.c] += score;
+            traitCounts[item.c]++;
+          }
+        });
+
+        // Normalize to percentages
+        const normalized = {};
+        Object.keys(traits).forEach(t => {
+          if (traitCounts[t] > 0) {
+            normalized[t] = Math.round((traits[t] / (traitCounts[t] * 5)) * 100);
+          }
+        });
+
+        // Generate personality snapshot
+        const phrases = [];
+        if (normalized.E >= 60) phrases.push('outgoing and energized by people');
+        else if (normalized.E <= 40) phrases.push('reserved and thoughtful');
+        if (normalized.C >= 60) phrases.push('organized and reliable');
+        else if (normalized.C <= 40) phrases.push('flexible and spontaneous');
+        if (normalized.A >= 60) phrases.push('empathetic');
+        else if (normalized.A <= 40) phrases.push('direct and honest');
+        if (normalized.N >= 60) phrases.push('reflective');
+        if (normalized.O >= 60) phrases.push('curious and open-minded');
+
+        return {
+          traits: normalized,
+          summary: phrases.length > 0
+            ? `You're ${phrases.slice(0, 3).join(', ')}${phrases.length > 3 ? ', and more' : ''}.`
+            : 'Complete more questions for a fuller picture.'
+        };
+      };
 
       // Helper to get Big Five trait scores from modules
       const getBigFiveScores = () => {
@@ -7052,6 +7305,68 @@ function App() {
           </div>
           <div className="flex-1 overflow-auto p-4 pb-8 space-y-3 hide-scrollbar">
 
+            {/* Quick Profile Result - Always shown first if completed */}
+            {quickProfileComplete && (() => {
+              const summary = getQuickProfileSummary();
+              return (
+                <div className={`p-4 rounded-xl ${darkMode ? 'bg-gradient-to-br from-blue-950/50 to-indigo-950/50 border border-blue-800/30' : 'bg-blue-50 border border-blue-200'}`}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-xl">✨</span>
+                    </div>
+                    <div>
+                      <div className={`font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
+                      <div className={`text-xs ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Your personality snapshot</div>
+                    </div>
+                  </div>
+                  <p className={`text-sm leading-relaxed ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{summary?.summary}</p>
+                  {currentTier < 2 && (
+                    <button onClick={() => setScreen('assess-picker')} className={`mt-3 w-full py-2 rounded-lg text-sm font-medium ${darkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}>
+                      {currentTier === 1 ? 'Continue to Starter Pack →' : 'Unlock Starter Pack →'}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Starter Pack - Show if tier >= 1 */}
+            {currentTier >= 1 && (() => {
+              const starterIds = ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'];
+              const completedStarter = starterIds.filter(id => assessCompleted[id]).length;
+              const allStarterComplete = completedStarter === 5;
+              return (
+                <AnalysisCard id="starter" icon="🚀" title="Starter Pack" subtitle={`${completedStarter}/5 modules`} color="indigo" isComplete={allStarterComplete} progress={(completedStarter/5)*100}
+                  compactContent={allStarterComplete && (
+                    <span className={`text-sm font-semibold text-indigo-400`}>Complete</span>
+                  )}>
+                  <div className="space-y-2">
+                    {starterIds.map(id => {
+                      const test = ASSESS_TESTS[id];
+                      if (!test) return null;
+                      const result = assessCompleted[id];
+                      return (
+                        <button key={id} onClick={() => result ? (setAssessCurrentTestId(id), setScreen('assess-results')) : assessStartTest(id)}
+                          className={`w-full p-3 rounded-lg flex items-center gap-3 ${darkMode ? 'bg-gray-900/50 hover:bg-gray-800/50' : 'bg-white hover:bg-gray-50'}`}>
+                          <span className="text-lg">{test.icon}</span>
+                          <div className="flex-1 text-left">
+                            <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>{test.name}</div>
+                          </div>
+                          {result ? (
+                            <span className="text-xs text-indigo-400">✓ {result.score}%</span>
+                          ) : (
+                            <span className={`text-xs ${TH('text-dim', darkMode)}`}>Start →</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </AnalysisCard>
+              );
+            })()}
+
+            {/* Tier 2 content - Big Five, Shadow, etc. */}
+            {currentTier >= 2 ? (
+              <>
             {/* Big Five */}
             {(() => {
               const bigFiveIds = ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'];
@@ -7356,7 +7671,7 @@ function App() {
               );
             })}
 
-            {/* Meta Analysis */}
+            {/* Meta Analysis - only for tier 2 */}
             {insights.length > 0 ? (
               <div className={`p-4 rounded-xl space-y-3 ${darkMode ? 'bg-gradient-to-br from-violet-950/50 to-purple-950/50 border border-violet-800/30' : 'bg-violet-50 border border-violet-200'}`}>
                 <h3 className={`text-sm font-semibold flex items-center gap-2 ${TH('text-primary', darkMode)}`}>✨ Meta Analysis</h3>
@@ -7374,6 +7689,57 @@ function App() {
                 <div className="text-2xl mb-2">✨</div>
                 <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Meta Analysis</div>
                 <div className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>Complete 3+ assessments to see how your results connect</div>
+              </div>
+            )}
+              </>
+            ) : (
+              /* Locked teasers for tier < 2 */
+              <div className="space-y-3">
+                {/* Locked Personality teaser */}
+                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-gray-900/30 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                      <span className="text-xl opacity-50">🎭</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className={`font-semibold ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Personality</div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>🔒 Complete Starter Pack to unlock</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Locked Mind teaser */}
+                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-gray-900/30 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                      <span className="text-xl opacity-50">🧠</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className={`font-semibold ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Mind</div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>🔒 Complete Starter Pack to unlock</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Locked Shadow teaser */}
+                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-gray-900/30 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                      <span className="text-xl opacity-50">🌑</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className={`font-semibold ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Shadow Self</div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>🔒 Complete Starter Pack to unlock</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* More to come message */}
+                <div className={`p-4 rounded-xl text-center ${darkMode ? 'bg-gradient-to-br from-indigo-950/30 to-violet-950/30 border border-indigo-800/20' : 'bg-indigo-50 border border-indigo-200'}`}>
+                  <div className="text-2xl mb-2">🚀</div>
+                  <div className={`text-sm font-medium ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>More awaits</div>
+                  <div className={`text-xs mt-1 ${darkMode ? 'text-indigo-400/70' : 'text-indigo-600'}`}>Complete the Starter Pack to unlock deeper assessments</div>
+                </div>
               </div>
             )}
           </div>
