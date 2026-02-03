@@ -57,6 +57,59 @@
 const { useState } = React;
 
 // ============================================================
+// CANONICAL CONFIDENCE BAR (synced from index.html)
+// This is the production implementation used across the app.
+// Design: checkmark inside user's segment, overlay highlight with matching border-radius
+// ============================================================
+const renderConfidenceBar = (byConf, colors, maxCount, isUser, userConf, height = 'h-5', darkMode = true) => {
+  const totalCount = byConf.reduce((a, b) => a + b, 0);
+  if (totalCount === 0) return <div className={`flex-1 ${height} rounded-full`} style={{ border: `1px solid ${colors[0]}40` }} />;
+
+  // Build segments array (high conf first: 3,2,1,0)
+  const segments = [];
+  for (let i = 3; i >= 0; i--) {
+    if (byConf[i] > 0) segments.push({ width: (byConf[i] / maxCount) * 100, color: colors[i], conf: i });
+  }
+  const totalWidth = segments.reduce((a, s) => a + s.width, 0);
+  const showEmpty = (100 - totalWidth) > 2;
+
+  // Text color for checkmark: dark text on light segments (conf 0,1), white on dark (conf 2,3)
+  const getCheckColor = (conf) => conf <= 1 ? '#374151' : 'white';
+  // Highlight color: white in dark mode, gray-500 in light mode
+  const highlightColor = darkMode ? 'white' : '#6b7280';
+
+  return (
+    <div className={`flex-1 ${height} rounded-full overflow-hidden flex`} style={{ border: showEmpty ? `1px solid ${colors[0]}40` : 'none' }}>
+      {segments.map((s, i) => {
+        const isUserSeg = isUser && s.conf === userConf;
+        const isLast = i === segments.length - 1;
+        const isFirst = i === 0;
+        // Border-radius for highlight overlay (matches segment position)
+        const segRadius = isFirst && isLast ? '9999px' : isFirst ? '9999px 0 0 9999px' : isLast ? '0 9999px 9999px 0' : '0';
+
+        return (
+          <div key={i} className={`h-full relative flex items-center justify-center ${isLast ? 'rounded-r-full' : ''} ${isFirst ? 'rounded-l-full' : ''}`} style={{
+            width: showEmpty ? `${s.width}%` : (isLast ? undefined : `${s.width}%`),
+            flex: !showEmpty && isLast ? 1 : undefined,
+            backgroundColor: s.color,
+          }}>
+            {isUserSeg && (
+              <>
+                <span className="text-xs font-black relative z-10" style={{ color: getCheckColor(s.conf) }}>✓</span>
+                <div className="absolute inset-0 pointer-events-none" style={{
+                  borderRadius: segRadius,
+                  boxShadow: `inset 0 0 0 3px ${highlightColor}`,
+                }} />
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ============================================================
 // THEME & DATA (same as v1)
 // ============================================================
 const PALETTES = {
