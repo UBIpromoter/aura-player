@@ -810,7 +810,7 @@ const ONBOARDING_QUESTIONS = [
 
     // Generate anonymous session ID
     const AURA_SESSION_ID = localStorage.getItem('aura_session_id') || (() => {
-      const id = 'anon_' + Math.random().toString(36).substr(2, 9);
+      const id = 'anon_' + Math.random().toString(36).slice(2, 11);
       localStorage.setItem('aura_session_id', id);
       return id;
     })();
@@ -1196,6 +1196,36 @@ const ONBOARDING_QUESTIONS = [
   <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
+// ==================== UNIFIED COLOR SYSTEM ====================
+// Single source of truth for all Aura colors. Add new colors here.
+// Everything else derives from this object.
+const COLOR_HEX = {
+  violet:  { base: '#8b5cf6', light: '#a78bfa', rgb: '139, 92, 246' },
+  blue:    { base: '#3b82f6', light: '#60a5fa', rgb: '59, 130, 246' },
+  teal:    { base: '#14b8a6', light: '#2dd4bf', rgb: '20, 184, 166' },
+  rose:    { base: '#f43f5e', light: '#fb7185', rgb: '244, 63, 94' },
+  pink:    { base: '#d946ef', light: '#e879f9', rgb: '217, 70, 239', tw: 'fuchsia' },
+  emerald: { base: '#10b981', light: '#34d399', rgb: '16, 185, 129' },
+  slate:   { base: '#64748b', light: '#94a3b8', rgb: '100, 116, 139' },
+  amber:   { base: '#f59e0b', light: '#fbbf24', rgb: '245, 158, 11' },
+  indigo:  { base: '#6366f1', light: '#818cf8', rgb: '99, 102, 241' },
+  cyan:    { base: '#06b6d4', light: '#67e8f9', rgb: '6, 182, 212' },
+  gray:    { base: '#6b7280', light: '#9ca3af', rgb: '107, 114, 128' },
+};
+const twColor = (c) => COLOR_HEX[c]?.tw || c; // pink -> fuchsia for Tailwind
+
+// Binary answer colors - single source of truth
+// Array order: light→dark (index 0=lightest conf1, index 3=darkest conf4)
+// Iteration [3,2,1,0] displays darkest first (most confident answers prominent)
+const BINARY_COLORS = {
+  yes: ['#a7f3d0', '#6ee7b7', '#34d399', '#10b981'], // emerald light→dark
+  no: ['#fecaca', '#fda4af', '#fb7185', '#f43f5e'],  // rose light→dark
+};
+
+// ==================== CONFIDENCE HELPERS ====================
+// Convert 1-4 confidence to 0-3 index (clamped, with default)
+const normalizeConf = (c) => Math.min(3, Math.max(0, (c || 1) - 1));
+
 // ==================== THEME TOKENS ====================
 // TH(token, darkMode) - returns the appropriate classes for the current theme
 const TH = (token, dark) => ({
@@ -1246,13 +1276,112 @@ const TH = (token, dark) => ({
 // ==================== DATA ====================
 const CATEGORIES = getCategoryList();
 
+// MC option colors - uses COLOR_HEX for base values, keeps specific shades
 const MC_COLORS = [
-  { hex: '#3b82f6', name: 'blue', shades: ['#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'], rgb: '59, 130, 246' },
-  { hex: '#8b5cf6', name: 'violet', shades: ['#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed'], rgb: '139, 92, 246' },
-  { hex: '#14b8a6', name: 'teal', shades: ['#5eead4', '#2dd4bf', '#14b8a6', '#0d9488'], rgb: '20, 184, 166' },
-  { hex: '#06b6d4', name: 'cyan', shades: ['#67e8f9', '#22d3ee', '#06b6d4', '#0891b2'], rgb: '6, 182, 212' },
+  { hex: COLOR_HEX.blue.base, name: 'blue', shades: ['#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'], rgb: COLOR_HEX.blue.rgb },
+  { hex: COLOR_HEX.violet.base, name: 'violet', shades: ['#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed'], rgb: COLOR_HEX.violet.rgb },
+  { hex: COLOR_HEX.teal.base, name: 'teal', shades: ['#5eead4', '#2dd4bf', '#14b8a6', '#0d9488'], rgb: COLOR_HEX.teal.rgb },
+  { hex: COLOR_HEX.cyan.base, name: 'cyan', shades: ['#67e8f9', '#22d3ee', '#06b6d4', '#0891b2'], rgb: COLOR_HEX.cyan.rgb },
   { hex: '#ec4899', name: 'pink', shades: ['#f9a8d4', '#f472b6', '#ec4899', '#db2777'], rgb: '236, 72, 153' },
 ];
+
+// Aggregate evaluators by answer and confidence level
+// userResponse: if provided, used for isUser marking; only included in counts if includeUserInCount=true
+// Returns { rows: [{label, answer, count, pct, byConf, colors, isUser, maxCount}], total, maxCount, userConf }
+const aggregateResults = (evaluators, question, userResponse, includeUserInCount = true) => {
+  // Combine evaluators with user's response if requested
+  const baseVotes = evaluators || [];
+  const allVotes = (userResponse && includeUserInCount) ? [...baseVotes, { ...userResponse, id: 'user' }] : baseVotes;
+  if (!allVotes.length) return { rows: [], total: 0, maxCount: 0, userConf: -1 };
+
+  const isBinary = question?.type === 'binary';
+  const total = allVotes.length;
+  const userAnswer = userResponse?.answer;
+  const userConf = userResponse ? normalizeConf(userResponse.confidence) : -1;
+
+  if (isBinary) {
+    const yesByConf = [0, 0, 0, 0], noByConf = [0, 0, 0, 0];
+    allVotes.forEach(e => {
+      const conf = normalizeConf(e.confidence);
+      if (e.answer === 0) yesByConf[conf]++; else noByConf[conf]++;
+    });
+    const yesTotal = yesByConf.reduce((a, b) => a + b, 0);
+    const noTotal = noByConf.reduce((a, b) => a + b, 0);
+    const maxCount = Math.max(yesTotal, noTotal, 1);
+    const rows = [
+      { label: 'Yes', answer: 0, count: yesTotal, pct: Math.round((yesTotal / total) * 100), byConf: yesByConf, colors: BINARY_COLORS.yes, isUser: userAnswer === 0, maxCount },
+      { label: 'No', answer: 1, count: noTotal, pct: Math.round((noTotal / total) * 100), byConf: noByConf, colors: BINARY_COLORS.no, isUser: userAnswer === 1, maxCount },
+    ];
+    return { rows, total, maxCount, userConf };
+  }
+
+  // Multiple choice
+  const optionData = {};
+  allVotes.forEach(e => {
+    if (!optionData[e.answer]) optionData[e.answer] = { total: 0, byConf: [0, 0, 0, 0] };
+    optionData[e.answer].total++;
+    optionData[e.answer].byConf[normalizeConf(e.confidence)]++;
+  });
+  const maxCount = Math.max(...Object.values(optionData).map(d => d.total), 1);
+  const options = question?.options || [];
+  const rows = options.map((label, idx) => {
+    const data = optionData[idx] || { total: 0, byConf: [0, 0, 0, 0] };
+    const colors = MC_COLORS[idx % MC_COLORS.length].shades;
+    return { label, answer: idx, count: data.total, pct: Math.round((data.total / total) * 100), byConf: data.byConf, colors, isUser: userAnswer === idx, maxCount };
+  });
+  return { rows, total, maxCount, userConf };
+};
+
+// Render confidence bar segments (shared by CommunityResultsRows, FullResultsPanel, AnsweredQuestionView)
+// Returns a flex row of colored segments representing confidence distribution
+// Design: checkmark inside user's segment, overlay highlight with matching border-radius
+const renderConfidenceBar = (byConf, colors, maxCount, isUser, userConf, height = 'h-5', darkMode = true) => {
+  const totalCount = byConf.reduce((a, b) => a + b, 0);
+  if (totalCount === 0) return <div className={`flex-1 ${height} rounded-full`} style={{ border: `1px solid ${colors[0]}40` }} />;
+
+  // Build segments array (high conf first: 3,2,1,0)
+  const segments = [];
+  for (let i = 3; i >= 0; i--) {
+    if (byConf[i] > 0) segments.push({ width: (byConf[i] / maxCount) * 100, color: colors[i], conf: i });
+  }
+  const totalWidth = segments.reduce((a, s) => a + s.width, 0);
+  const showEmpty = (100 - totalWidth) > 2;
+
+  // Text color for checkmark: dark text on light segments (conf 0,1), white on dark (conf 2,3)
+  const getCheckColor = (conf) => conf <= 1 ? '#374151' : 'white';
+  // Highlight color: white in dark mode, gray-500 in light mode
+  const highlightColor = darkMode ? 'white' : '#6b7280';
+
+  return (
+    <div className={`flex-1 ${height} rounded-full overflow-hidden flex`} style={{ border: showEmpty ? `1px solid ${colors[0]}40` : 'none' }}>
+      {segments.map((s, i) => {
+        const isUserSeg = isUser && s.conf === userConf;
+        const isLast = i === segments.length - 1;
+        const isFirst = i === 0;
+        // Border-radius for highlight overlay (matches segment position)
+        const segRadius = isFirst && isLast ? '9999px' : isFirst ? '9999px 0 0 9999px' : isLast ? '0 9999px 9999px 0' : '0';
+
+        return (
+          <div key={i} className={`h-full relative flex items-center justify-center ${isLast ? 'rounded-r-full' : ''} ${isFirst ? 'rounded-l-full' : ''}`} style={{
+            width: showEmpty ? `${s.width}%` : (isLast ? undefined : `${s.width}%`),
+            flex: !showEmpty && isLast ? 1 : undefined,
+            backgroundColor: s.color,
+          }}>
+            {isUserSeg && (
+              <>
+                <span className="text-xs font-black relative z-10" style={{ color: getCheckColor(s.conf) }}>✓</span>
+                <div className="absolute inset-0 pointer-events-none" style={{
+                  borderRadius: segRadius,
+                  boxShadow: `inset 0 0 0 3px ${highlightColor}`,
+                }} />
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const CONFIDENCE_LABELS = { 1: "Hunch", 2: "Leaning", 3: "Firm", 4: "Certain" };
 const getStars = (count) => '★'.repeat(Math.min(Math.max(count, 1), 4));
@@ -1875,29 +2004,48 @@ const ASSESS_TESTS = {
 };
 
 // ==================== ASSESSMENT COLORS ====================
-// ADDING A NEW COLOR? Update ALL these places:
-// 1. ASSESS_C (below) - base color config
-// 2. PROGRESS_GRADIENTS (~line 2040) - gradient hex values
-// 3. CSS .hover-glow-{color} (~line 116) - hover effect
-// 4. assess-question screen (~line 5700): gradientStyles, selectedStyles, pendingStyles, numColors
-// 5. AnalysisCard colorStyles (~line 6415)
-// 6. Completion celebration glow (~line 5715) - color.includes() chain
+// Derived from COLOR_HEX. To add a new color, just add it to COLOR_HEX above.
+// CSS classes (.hover-glow-*, .shine-*) still need manual addition in <style>.
 // =============================================================
-const ASSESS_C = {
-  violet: { bg: 'bg-violet-500', text: 'text-violet-400', textLight: 'text-violet-600', light: 'bg-violet-500/20', lightBg: 'bg-violet-100', border: 'border-violet-500/30', borderLight: 'border-violet-300', grad: 'from-violet-600 to-violet-500' },
-  blue: { bg: 'bg-blue-500', text: 'text-blue-400', textLight: 'text-blue-600', light: 'bg-blue-500/20', lightBg: 'bg-blue-100', border: 'border-blue-500/30', borderLight: 'border-blue-300', grad: 'from-blue-600 to-blue-500' },
-  teal: { bg: 'bg-teal-500', text: 'text-teal-400', textLight: 'text-teal-600', light: 'bg-teal-500/20', lightBg: 'bg-teal-100', border: 'border-teal-500/30', borderLight: 'border-teal-300', grad: 'from-teal-600 to-teal-500' },
-  rose: { bg: 'bg-rose-500', text: 'text-rose-400', textLight: 'text-rose-600', light: 'bg-rose-500/20', lightBg: 'bg-rose-100', border: 'border-rose-500/30', borderLight: 'border-rose-300', grad: 'from-rose-600 to-rose-500' },
-  pink: { bg: 'bg-fuchsia-500', text: 'text-fuchsia-400', textLight: 'text-fuchsia-600', light: 'bg-fuchsia-500/20', lightBg: 'bg-fuchsia-100', border: 'border-fuchsia-500/30', borderLight: 'border-fuchsia-300', grad: 'from-fuchsia-600 to-fuchsia-500' },
-  emerald: { bg: 'bg-emerald-500', text: 'text-emerald-400', textLight: 'text-emerald-600', light: 'bg-emerald-500/20', lightBg: 'bg-emerald-100', border: 'border-emerald-500/30', borderLight: 'border-emerald-300', grad: 'from-emerald-600 to-emerald-500' },
-  slate: { bg: 'bg-slate-500', text: 'text-slate-400', textLight: 'text-slate-600', light: 'bg-slate-500/20', lightBg: 'bg-slate-100', border: 'border-slate-500/30', borderLight: 'border-slate-300', grad: 'from-slate-600 to-slate-500' },
-  amber: { bg: 'bg-amber-500', text: 'text-amber-400', textLight: 'text-amber-600', light: 'bg-amber-500/20', lightBg: 'bg-amber-100', border: 'border-amber-500/30', borderLight: 'border-amber-300', grad: 'from-amber-600 to-amber-500' },
-  indigo: { bg: 'bg-indigo-500', text: 'text-indigo-400', textLight: 'text-indigo-600', light: 'bg-indigo-500/20', lightBg: 'bg-indigo-100', border: 'border-indigo-500/30', borderLight: 'border-indigo-300', grad: 'from-indigo-600 to-indigo-500' },
-};
+const ASSESS_COLORS = ['violet', 'blue', 'teal', 'rose', 'pink', 'emerald', 'slate', 'amber', 'indigo'];
+const ASSESS_C = Object.fromEntries(ASSESS_COLORS.map(c => {
+  const t = twColor(c);
+  return [c, {
+    bg: `bg-${t}-500`, text: `text-${t}-400`, textLight: `text-${t}-600`,
+    light: `bg-${t}-500/20`, lightBg: `bg-${t}-100`,
+    border: `border-${t}-500/30`, borderLight: `border-${t}-300`,
+    grad: `from-${t}-600 to-${t}-500`
+  }];
+}));
 const getAssessColor = (color, darkMode) => {
   const c = ASSESS_C[color];
   return { ...c, text: darkMode ? c.text : c.textLight, light: darkMode ? c.light : c.lightBg, border: darkMode ? c.border : c.borderLight };
 };
+
+// Pre-computed Likert button styles (avoids Object.fromEntries in render)
+const ASSESS_STYLES = (() => {
+  const gradientStyles = Object.fromEntries(ASSESS_COLORS.map(c => {
+    const t = twColor(c);
+    return [c, [
+      `bg-${t}-950/30 border-${t}-800/40`, `bg-${t}-950/50 border-${t}-700/50`,
+      `bg-${t}-900/40 border-${t}-600/50`, `bg-${t}-900/60 border-${t}-500/60`,
+      `bg-${t}-800/70 border-${t}-400/70`
+    ]];
+  }));
+  const selectedStyles = Object.fromEntries(ASSESS_COLORS.map(c => {
+    const t = twColor(c);
+    return [c, `bg-${t}-600 ring-${t}-400 border-${t}-400`];
+  }));
+  const pendingStyles = Object.fromEntries(ASSESS_COLORS.map(c => {
+    const t = twColor(c);
+    return [c, `bg-${t}-600 border-${t}-400`];
+  }));
+  const numColors = Object.fromEntries(ASSESS_COLORS.map(c => {
+    const t = twColor(c);
+    return [c, `text-${t}-400/70`];
+  }));
+  return { gradientStyles, selectedStyles, pendingStyles, numColors };
+})();
 
 // Assessment categories for compact picker view
 // Tier system: 0 = always available, 1 = after Quick Profile, 2 = after Starter Pack
@@ -1985,46 +2133,35 @@ const ASSESS_STORAGE_KEY = 'aura-assessments-v1';
 // Calculate assessment results
 const ASSESS_SHADOW_TRAITS = { M: 'Machiavellianism', N: 'Narcissism', P: 'Psychopathy' };
 
+// Calculate score from Likert scale items (handles reverse-keyed items)
+const calculateScaleScore = (items, resp) => {
+  let sum = 0, count = 0;
+  items.forEach((item, i) => {
+    if (resp[i]) {
+      let value = resp[i];
+      if (item.k === '-') value = 6 - value;
+      sum += value; count++;
+    }
+  });
+  return count > 0 ? Math.round((sum / (count * 5)) * 100) : 0;
+};
+
 const calculateAssessResults = (testId, resp) => {
   const test = ASSESS_TESTS[testId];
   const results = {};
   // Big Five module (single trait)
   if (test.parent === 'bigfive') {
-    let sum = 0, count = 0;
-    test.items.forEach((item, i) => {
-      if (resp[i]) {
-        let value = resp[i];
-        if (item.k === '-') value = 6 - value;
-        sum += value; count++;
-      }
-    });
     results.trait = test.trait;
     results.traitName = ASSESS_TRAITS[test.trait];
-    results.score = count > 0 ? Math.round((sum / (count * 5)) * 100) : 0;
+    results.score = calculateScaleScore(test.items, resp);
   // Shadow module (Dark Triad)
   } else if (test.parent === 'shadow') {
-    let sum = 0, count = 0;
-    test.items.forEach((item, i) => {
-      if (resp[i]) {
-        let value = resp[i];
-        if (item.k === '-') value = 6 - value;
-        sum += value; count++;
-      }
-    });
     results.trait = test.trait;
     results.traitName = ASSESS_SHADOW_TRAITS[test.trait];
-    results.score = count > 0 ? Math.round((sum / (count * 5)) * 100) : 0;
+    results.score = calculateScaleScore(test.items, resp);
   // Integrity (HEXACO)
   } else if (testId === 'integrity') {
-    let sum = 0, count = 0;
-    test.items.forEach((item, i) => {
-      if (resp[i]) {
-        let value = resp[i];
-        if (item.k === '-') value = 6 - value;
-        sum += value; count++;
-      }
-    });
-    results.score = count > 0 ? Math.round((sum / (count * 5)) * 100) : 0;
+    results.score = calculateScaleScore(test.items, resp);
   } else if (testId === 'adhd') {
     results.indicators = Object.values(resp).filter(v => v >= 4).length;
   } else if (testId === 'cognitive') {
@@ -2044,15 +2181,7 @@ const calculateAssessResults = (testId, resp) => {
   } else if (testId === 'risk') {
     results.score = Math.round((Object.values(resp).reduce((a, b) => a + b, 0) / (test.items.length * 5)) * 100);
   } else if (testId === 'chronotype') {
-    let sum = 0, count = 0;
-    test.items.forEach((item, i) => {
-      if (resp[i]) {
-        let value = resp[i];
-        if (item.k === '-') value = 6 - value;
-        sum += value; count++;
-      }
-    });
-    results.score = count > 0 ? Math.round((sum / (count * 5)) * 100) : 0;
+    results.score = calculateScaleScore(test.items, resp);
     // High score = Morning Lark, Low score = Night Owl
     results.type = results.score > 60 ? 'Morning Lark' : results.score < 40 ? 'Night Owl' : 'Third Bird';
   } else if (testId === 'reasoning' || testId === 'reasoning-2' || testId === 'reasoning-3') {
@@ -2248,18 +2377,10 @@ const useSwipe = ({ onSwipeLeft, onSwipeRight, enabled = true }) => {
 // ==================== COMPONENTS ====================
 
 // ProgressCircle - Reusable circular progress indicator with gradient
-const PROGRESS_GRADIENTS = {
-  violet: { from: '#8b5cf6', to: '#a78bfa' },
-  blue: { from: '#3b82f6', to: '#60a5fa' },
-  teal: { from: '#14b8a6', to: '#2dd4bf' },
-  rose: { from: '#f43f5e', to: '#fb7185' },
-  pink: { from: '#d946ef', to: '#e879f9' },
-  emerald: { from: '#10b981', to: '#34d399' },
-  amber: { from: '#f59e0b', to: '#fbbf24' },
-  gray: { from: '#6b7280', to: '#9ca3af' },
-  slate: { from: '#64748b', to: '#94a3b8' },
-  indigo: { from: '#6366f1', to: '#818cf8' },
-};
+// Derived from COLOR_HEX
+const PROGRESS_GRADIENTS = Object.fromEntries(
+  Object.entries(COLOR_HEX).map(([c, hex]) => [c, { from: hex.base, to: hex.light }])
+);
 
 const ProgressCircle = ({
   progress = 0,
@@ -2325,6 +2446,69 @@ const ProgressCircle = ({
           {text}
         </span>
       )}
+    </div>
+  );
+};
+
+// ConfidenceBar - Reusable bar showing confidence distribution
+// Used by BinaryChart, MultipleChoiceChart, and MiniCommunityResults
+const ConfidenceBar = ({
+  label,
+  pct,
+  confCounts,      // [conf1, conf2, conf3, conf4] counts
+  colors,          // [conf1, conf2, conf3, conf4] hex colors (light→dark)
+  maxCount,        // for calculating segment widths relative to max
+  isUserRow = false,
+  userConf = -1,   // 0-3 index of user's confidence level
+  showEmpty = true,
+  labelWidth = 'w-12',
+  labelColor = null,
+  darkMode = true
+}) => {
+  const count = confCounts.reduce((a, b) => a + b, 0);
+  const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
+  const emptyWidth = 100 - barWidth;
+
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={`text-sm truncate ${labelWidth} ${isUserRow ? 'font-bold px-1.5 py-0.5 rounded-full border border-current' : ''}`}
+        style={labelColor ? { color: labelColor } : undefined}
+      >
+        {label}
+      </span>
+      <span className="text-sm w-10" style={labelColor ? { color: labelColor } : undefined}>
+        {pct}%
+      </span>
+      <div
+        className="flex-1 h-4 rounded-full overflow-hidden"
+        style={{ background: darkMode ? 'black' : undefined, border: !darkMode ? `1px solid ${colors[0]}` : undefined }}
+      >
+        <div className="h-full flex">
+          {[3, 2, 1, 0].map(confIdx => {
+            const segCount = confCounts[confIdx];
+            const segWidth = count > 0 ? (segCount / maxCount) * 100 : 0;
+            const isUserSeg = isUserRow && confIdx === userConf;
+            return segWidth > 0 ? (
+              <div
+                key={confIdx}
+                className="h-full"
+                style={{
+                  width: `${segWidth}%`,
+                  background: colors[confIdx],
+                  ...(isUserSeg ? { border: '3px solid white', borderRadius: '12px', zIndex: 10, position: 'relative' } : {})
+                }}
+              />
+            ) : null;
+          })}
+          {showEmpty && emptyWidth > 0 && (
+            <div
+              className="h-full rounded-r-full"
+              style={{ width: `${emptyWidth}%`, border: `1px solid ${colors[0]}`, borderLeft: 'none' }}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -2975,158 +3159,110 @@ const ConfidenceSegments = ({ level, color = 'violet', active = false, darkMode 
   );
 };
 
-// BinaryChart - confidence breakdown
-const BinaryChart = ({ evaluators, userResponse, darkMode = true }) => {
-  if (!evaluators || evaluators.length === 0) return null;
-  const allVotes = userResponse ? [...evaluators, { ...userResponse, id: 'user', score: 50 }] : evaluators;
-  const userConf = userResponse ? Math.min(4, Math.max(1, userResponse.confidence || 1)) - 1 : -1;
-  const data = [
-    { label: 'Yes', answer: 0, confCounts: [0,0,0,0] },
-    { label: 'No', answer: 1, confCounts: [0,0,0,0] },
-  ];
-  allVotes.forEach(v => {
-    if (v.answer === 0) data[0].confCounts[v.confidence - 1]++;
-    else if (v.answer === 1) data[1].confCounts[v.confidence - 1]++;
-  });
-  data.forEach(d => d.count = d.confCounts.reduce((a, b) => a + b, 0));
-  const total = data[0].count + data[1].count;
-  const sorted = [...data].sort((a, b) => b.count - a.count);
-  const maxCount = Math.max(data[0].count, data[1].count, 1);
-  // Colors: index 0=conf1(light), 3=conf4(dark) - display order is conf4→conf1 (dark→light)
-  const yesColors = ['#a7f3d0', '#6ee7b7', '#34d399', '#10b981']; // light→dark
-  const noColors = ['#fecaca', '#fda4af', '#fb7185', '#f43f5e'];   // light→dark
+// ResultChart - unified confidence breakdown for binary and MC questions
+// Uses aggregateResults helper for data aggregation
+const ResultChart = ({ evaluators, userResponse, question, darkMode = true }) => {
+  const { rows, total, maxCount, userConf } = aggregateResults(evaluators, question, userResponse);
+  if (!rows.length) return null;
+
+  const isBinary = question?.type === 'binary';
+  const sorted = [...rows].sort((a, b) => b.count - a.count);
+  const displayRows = isBinary ? sorted : sorted.filter(r => r.count > 0).slice(0, 5);
 
   return (
-    <div className="space-y-2">
-      {sorted.map((opt) => {
-        const isUserRow = userResponse?.answer === opt.answer;
-        const pct = total > 0 ? Math.round((opt.count / total) * 100) : 0;
-        const barWidth = maxCount > 0 ? (opt.count / maxCount) * 100 : 0;
-        const emptyWidth = 100 - barWidth;
-        const colors = opt.answer === 0 ? yesColors : noColors;
+    <div className={isBinary ? "space-y-2" : "space-y-1"}>
+      {displayRows.map((row) => {
+        const labelColor = isBinary
+          ? (row.answer === 0 ? (darkMode ? '#34d399' : '#059669') : (darkMode ? '#fb7185' : '#e11d48'))
+          : MC_COLORS[row.answer % MC_COLORS.length].hex;
         return (
-          <div key={opt.answer} className="flex items-center gap-2">
-            <span className={`text-sm ${opt.answer === 0 ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-rose-400' : 'text-rose-600')} ${isUserRow ? 'font-bold px-1.5 py-0.5 rounded-full border border-current' : 'w-12'}`}>
-              {opt.label}
-            </span>
-            <span className={`text-sm w-10 ${opt.answer === 0 ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-rose-400' : 'text-rose-600')}`}>{pct}%</span>
-            <div className="flex-1 h-4 rounded-full overflow-hidden bg-black">
-              <div className="h-full flex">
-                {[3, 2, 1, 0].map(confIdx => {
-                  const count = opt.confCounts[confIdx];
-                  const segWidth = opt.count > 0 ? (count / maxCount) * 100 : 0;
-                  const isUserSeg = isUserRow && confIdx === userConf;
-                  return segWidth > 0 ? (
-                    <div key={confIdx} className="h-full" style={{ width: `${segWidth}%`, background: colors[confIdx], ...(isUserSeg ? { border: '3px solid white', borderRadius: '12px', zIndex: 10, position: 'relative' } : {}) }} />
-                  ) : null;
-                })}
-                {emptyWidth > 0 && (
-                  <div className="h-full rounded-r-full" style={{ width: `${emptyWidth}%`, border: `1px solid ${colors[0]}`, borderLeft: 'none' }} />
-                )}
-              </div>
-            </div>
-          </div>
+          <ConfidenceBar
+            key={row.answer}
+            label={row.label}
+            pct={row.pct}
+            confCounts={row.byConf}
+            colors={row.colors}
+            maxCount={maxCount}
+            isUserRow={row.isUser}
+            userConf={userConf}
+            showEmpty={isBinary}
+            labelWidth={isBinary ? "w-12" : "w-24"}
+            labelColor={labelColor}
+            darkMode={darkMode}
+          />
         );
       })}
     </div>
   );
 };
 
-// MultipleChoiceChart
-const MultipleChoiceChart = ({ evaluators, userResponse, options, darkMode = true }) => {
-  if (!evaluators || evaluators.length === 0) return null;
-  const allVotes = userResponse ? [...evaluators, { ...userResponse, id: 'user', score: 50 }] : evaluators;
-  const userConf = userResponse ? Math.min(4, Math.max(1, userResponse.confidence || 1)) - 1 : -1;
-  const data = options.map((label, i) => {
-    const votes = allVotes.filter(v => v.answer === i);
-    const confCounts = [0, 0, 0, 0];
-    votes.forEach(v => confCounts[v.confidence - 1]++);
-    return { label, index: i, count: votes.length, confCounts };
-  });
-  const total = allVotes.length;
-  const sorted = [...data].sort((a, b) => b.count - a.count);
-  const maxCount = Math.max(...data.map(d => d.count), 1);
-
-  return (
-    <div className="space-y-1">
-      {sorted.filter(opt => opt.count > 0).slice(0, 5).map((opt, rank) => {
-        const isUserRow = userResponse?.answer === opt.index;
-        const pct = total > 0 ? Math.round((opt.count / total) * 100) : 0;
-        const barWidth = maxCount > 0 ? (opt.count / maxCount) * 100 : 0;
-        const emptyWidth = 100 - barWidth;
-        const optColor = MC_COLORS[opt.index % MC_COLORS.length];
-        return (
-          <div key={opt.index} className="flex items-center gap-2">
-            <span className={`text-sm w-24 truncate ${isUserRow ? 'font-bold px-1.5 py-0.5 rounded-full border border-current' : ''}`} style={{ color: optColor.hex }}>{opt.label}</span>
-            <span className="text-sm w-10" style={{ color: optColor.hex }}>{pct}%</span>
-            <div className="flex-1 h-4 rounded-full overflow-hidden" style={{ border: `1px solid ${optColor.shades[0]}` }}>
-              <div className="h-full flex">
-                {[3, 2, 1, 0].map(confIdx => {
-                  const count = opt.confCounts[confIdx];
-                  const segWidth = opt.count > 0 ? (count / maxCount) * 100 : 0;
-                  const isUserSeg = isUserRow && confIdx === userConf;
-                  return segWidth > 0 ? (
-                    <div key={confIdx} className="h-full" style={{ width: `${segWidth}%`, background: optColor.shades[confIdx], ...(isUserSeg ? { border: '3px solid white', borderRadius: '12px', zIndex: 10, position: 'relative' } : {}) }} />
-                  ) : null;
-                })}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+// Legacy wrappers for backward compatibility
+const BinaryChart = ({ evaluators, userResponse, darkMode = true }) => (
+  <ResultChart evaluators={evaluators} userResponse={userResponse} question={{ type: 'binary' }} darkMode={darkMode} />
+);
+const MultipleChoiceChart = ({ evaluators, userResponse, options, darkMode = true }) => (
+  <ResultChart evaluators={evaluators} userResponse={userResponse} question={{ type: 'multiple', options }} darkMode={darkMode} />
+);
 
 // Mini Community Results - shows comparison with user's answer
 const MiniCommunityResults = ({ question, results, userResponse, darkMode, onClick }) => {
   if (!results || !results.evaluators || !userResponse) return null;
-  const total = results.evaluators.length;
   const isBinary = question.type === 'binary';
-  const userConf = Math.min(4, Math.max(1, userResponse.confidence || 1)) - 1; // 0-3 index
 
-  // Confidence color shades: index 0=conf4(dark), 1=conf3, 2=conf2, 3=conf1(light)
-  const yesColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0']; // emerald dark→light
-  const noColors = ['#ef4444', '#f87171', '#fca5a5', '#fecaca'];   // rose dark→light
+  // Use aggregateResults with includeUserInCount=false (show community stats, mark user position)
+  const { rows: aggRows, total, maxCount, userConf } = aggregateResults(results.evaluators, question, userResponse, false);
+
+  // Highlight color: white in dark mode, gray-500 in light mode
+  const highlightColor = darkMode ? 'white' : '#6b7280';
+  // Text color for checkmark: dark on light segments, white on dark
+  const getCheckColor = (conf) => conf <= 1 ? '#374151' : 'white';
 
   // Build segments: conf4, conf3, conf2, conf1 (left to right, dark to light)
-  // Returns segments with conf index to check for user highlight
   const buildSegments = (byConf, colors, maxWidth) => {
     const segments = [];
-    for (let i = 3; i >= 0; i--) { // conf4(i=3) first, then conf3, conf2, conf1
+    for (let i = 3; i >= 0; i--) {
       if (byConf[i] > 0) {
         segments.push({
           width: (byConf[i] / maxWidth) * 100,
-          color: colors[3 - i], // conf4→colors[0](dark), conf1→colors[3](light)
-          conf: i // original confidence index (0-3 where 3=conf4)
+          color: colors[3 - i],
+          conf: i
         });
       }
     }
     return segments;
   };
 
-  if (isBinary) {
-    const yesByConf = [0, 0, 0, 0];
-    const noByConf = [0, 0, 0, 0];
-    results.evaluators.forEach(e => {
-      const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-      if (e.answer === 0) yesByConf[conf]++;
-      else noByConf[conf]++;
-    });
-    const yesTotal = yesByConf.reduce((a, b) => a + b, 0);
-    const noTotal = noByConf.reduce((a, b) => a + b, 0);
-    const yesPct = Math.round((yesTotal / total) * 100);
-    const noPct = 100 - yesPct;
-    const userIsYes = userResponse.answer === 0;
-    const maxCount = Math.max(yesTotal, noTotal);
+  // Render segment with overlay highlight for user's confidence
+  const renderSegment = (s, i, segments, isUserRow) => {
+    const isUserSegment = isUserRow && s.conf === userConf;
+    const isFirst = i === 0;
+    const isLast = i === segments.length - 1;
+    const segRadius = isFirst && isLast ? '9999px' : isFirst ? '9999px 0 0 9999px' : isLast ? '0 9999px 9999px 0' : '0';
 
-    // Winner on top
-    const yesWins = yesPct >= noPct;
+    return (
+      <div key={i} className={`h-full relative flex items-center justify-center ${isFirst ? 'rounded-l-full' : ''} ${isLast ? 'rounded-r-full' : ''}`}
+        style={{ width: `${s.width}%`, backgroundColor: s.color }}>
+        {isUserSegment && (
+          <>
+            <span className="text-[8px] font-black relative z-10" style={{ color: getCheckColor(s.conf) }}>✓</span>
+            <div className="absolute inset-0 pointer-events-none" style={{
+              borderRadius: segRadius,
+              boxShadow: `inset 0 0 0 2px ${highlightColor}`,
+            }} />
+          </>
+        )}
+      </div>
+    );
+  };
+
+  if (isBinary) {
+    const userIsYes = userResponse.answer === 0;
+    const yesRow = aggRows.find(r => r.answer === 0);
+    const noRow = aggRows.find(r => r.answer === 1);
+    const yesWins = (yesRow?.pct || 0) >= (noRow?.pct || 0);
     const rows = yesWins
-      ? [{ label: 'Yes', pct: yesPct, byConf: yesByConf, colors: yesColors, isYes: true },
-         { label: 'No', pct: noPct, byConf: noByConf, colors: noColors, isYes: false }]
-      : [{ label: 'No', pct: noPct, byConf: noByConf, colors: noColors, isYes: false },
-         { label: 'Yes', pct: yesPct, byConf: yesByConf, colors: yesColors, isYes: true }];
+      ? [{ ...yesRow, isYes: true }, { ...noRow, isYes: false }]
+      : [{ ...noRow, isYes: false }, { ...yesRow, isYes: true }];
     const winnerGlow = yesWins ? 'glow-emerald' : 'glow-rose';
 
     return (
@@ -3142,24 +3278,15 @@ const MiniCommunityResults = ({ question, results, userResponse, darkMode, onCli
             const emptyWidth = 100 - totalWidth;
             return (
               <div key={row.label} className="flex items-center gap-2">
-                <span className={`text-sm ${isUserRow ? 'font-bold px-1.5 py-0.5 rounded-full border border-current' : 'w-8'}`} style={{ color: row.colors[0] }}>
+                <span className={`text-sm ${isUserRow ? 'font-bold px-1.5 py-0.5 rounded-full border-2' : 'w-8'}`}
+                  style={{ color: row.colors[0], borderColor: isUserRow ? highlightColor : 'transparent' }}>
                   {row.label}
                 </span>
                 <span className={`text-sm w-6`} style={{ color: row.colors[0] }}>{row.pct}</span>
-                <div className="flex-1 h-2 rounded-full overflow-hidden bg-black">
+                <div className={`flex-1 h-2 rounded-full overflow-hidden ${darkMode ? 'bg-black' : 'bg-gray-300'}`}>
                   <div className="h-full flex">
-                    {segments.map((s, i) => {
-                      // Highlight only the segment matching user's answer AND confidence
-                      const isUserSegment = isUserRow && s.conf === userConf;
-                      return (
-                        <div key={i} className="h-full" style={{
-                          width: `${s.width}%`,
-                          backgroundColor: s.color,
-                          ...(isUserSegment ? { border: '3px solid white', borderRadius: '12px', zIndex: 10, position: 'relative' } : {})
-                        }} />
-                      );
-                    })}
-                    {/* Empty portion: hollow pill outline (lightest color border, black center) */}
+                    {segments.map((s, i) => renderSegment(s, i, segments, isUserRow))}
+                    {/* Empty portion: hollow pill outline */}
                     {emptyWidth > 0 && (
                       <div className="h-full rounded-r-full" style={{
                         width: `${emptyWidth}%`,
@@ -3179,16 +3306,8 @@ const MiniCommunityResults = ({ question, results, userResponse, darkMode, onCli
   }
 
   // MC - separate bars per option, sorted by popularity
-  const optionData = {};
-  results.evaluators.forEach(e => {
-    if (!optionData[e.answer]) optionData[e.answer] = { total: 0, byConf: [0, 0, 0, 0] };
-    optionData[e.answer].total++;
-    const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-    optionData[e.answer].byConf[conf]++;
-  });
-  const sorted = Object.entries(optionData).sort((a, b) => b[1].total - a[1].total).slice(0, 5);
-  const maxCount = sorted[0]?.[1]?.total || 1;
-  const winnerIdx = sorted[0] ? parseInt(sorted[0][0]) : 0;
+  const sorted = [...aggRows].filter(r => r.count > 0).sort((a, b) => b.count - a.count).slice(0, 5);
+  const winnerIdx = sorted[0]?.answer || 0;
   const mcGlowMap = ['glow-blue', 'glow-teal', 'glow-emerald', 'glow-rose', 'glow-violet'];
   const winnerGlow = mcGlowMap[winnerIdx % mcGlowMap.length];
 
@@ -3198,49 +3317,25 @@ const MiniCommunityResults = ({ question, results, userResponse, darkMode, onCli
         {question.text}
       </div>
       <div className="space-y-1">
-        {sorted.map(([idx, data]) => {
-          const i = parseInt(idx);
-          const isUserRow = i === userResponse.answer;
-          const pct = Math.round((data.total / total) * 100);
-          const color = MC_COLORS[i % MC_COLORS.length];
-          const label = question.options?.[i] || `Option ${i + 1}`;
-          // Build segments: conf4→conf1, dark→light (shades[3]=dark, shades[0]=light)
-          const segments = [];
-          for (let c = 3; c >= 0; c--) {
-            if (data.byConf[c] > 0) {
-              segments.push({
-                width: (data.byConf[c] / maxCount) * 100,
-                color: color.shades[c], // shades[3]=dark, shades[0]=light
-                conf: c
-              });
-            }
-          }
+        {sorted.map((row) => {
+          const segments = buildSegments(row.byConf, row.colors, maxCount);
           const totalWidth = segments.reduce((a, s) => a + s.width, 0);
           const emptyWidth = 100 - totalWidth;
+          const color = MC_COLORS[row.answer % MC_COLORS.length];
           return (
-            <div key={i} className="flex items-center gap-2">
-              <span className={`text-sm w-20 truncate ${isUserRow ? 'font-bold px-1.5 py-0.5 rounded-full border border-current' : ''}`} style={{ color: color.hex }}>
-                {label}
+            <div key={row.answer} className="flex items-center gap-2">
+              <span className={`text-sm w-20 truncate ${row.isUser ? 'font-bold px-1.5 py-0.5 rounded-full border-2' : ''}`}
+                style={{ color: color.hex, borderColor: row.isUser ? highlightColor : 'transparent' }}>
+                {row.label}
               </span>
-              <span className={`text-sm w-6`} style={{ color: color.hex }}>{pct}</span>
-              <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-black">
+              <span className={`text-sm w-6`} style={{ color: color.hex }}>{row.pct}</span>
+              <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${darkMode ? 'bg-black' : 'bg-gray-300'}`}>
                 <div className="h-full flex">
-                  {segments.map((s, si) => {
-                    // Highlight only the segment matching user's answer AND confidence
-                    const isUserSegment = isUserRow && s.conf === userConf;
-                    return (
-                      <div key={si} className="h-full" style={{
-                        width: `${s.width}%`,
-                        backgroundColor: s.color,
-                        ...(isUserSegment ? { border: '3px solid white', borderRadius: '12px', zIndex: 10, position: 'relative' } : {})
-                      }} />
-                    );
-                  })}
-                  {/* Empty portion: hollow pill outline (lightest color border, black center) */}
+                  {segments.map((s, i) => renderSegment(s, i, segments, row.isUser))}
                   {emptyWidth > 0 && (
                     <div className="h-full rounded-r-full" style={{
                       width: `${emptyWidth}%`,
-                      border: `1px solid ${color.shades[0]}`,
+                      border: `1px solid ${row.colors[0]}`,
                       borderLeft: 'none'
                     }} />
                   )}
@@ -3257,87 +3352,26 @@ const MiniCommunityResults = ({ question, results, userResponse, darkMode, onCli
 
 // Shared Community Results Rows - used by FullResultsPanel, AnsweredQuestionView, and QOTD
 const CommunityResultsRows = ({ question, results, userResponse, darkMode, options }) => {
+  if (!results?.evaluators?.length) return null;
   const isBinary = question?.type === 'binary';
-  const total = results?.evaluators?.length || 1;
-  const userAnswer = userResponse?.answer;
-  const userConf = userResponse ? Math.min(4, Math.max(1, userResponse.confidence || 1)) - 1 : -1;
-  const questionOptions = options || question?.options || [];
+  const questionWithOptions = options ? { ...question, options } : question;
 
-  // Build rows data
-  const allRows = [];
-  if (isBinary) {
-    const yesColors = ['#6ee7b7', '#34d399', '#10b981', '#059669'];
-    const noColors = ['#fca5a5', '#f87171', '#ef4444', '#dc2626'];
-    const yesByConf = [0, 0, 0, 0], noByConf = [0, 0, 0, 0];
-    (results?.evaluators || []).forEach(e => {
-      const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-      if (e.answer === 0) yesByConf[conf]++; else noByConf[conf]++;
-    });
-    const yesTotal = yesByConf.reduce((a, b) => a + b, 0);
-    const noTotal = noByConf.reduce((a, b) => a + b, 0);
-    const maxCount = Math.max(yesTotal, noTotal);
-    allRows.push({ label: 'Yes', pct: Math.round((yesTotal / total) * 100), byConf: yesByConf, colors: yesColors, isUser: userAnswer === 0, maxCount });
-    allRows.push({ label: 'No', pct: Math.round((noTotal / total) * 100), byConf: noByConf, colors: noColors, isUser: userAnswer === 1, maxCount });
-  } else {
-    const optionData = {};
-    (results?.evaluators || []).forEach(e => {
-      if (!optionData[e.answer]) optionData[e.answer] = { total: 0, byConf: [0, 0, 0, 0] };
-      optionData[e.answer].total++;
-      const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-      optionData[e.answer].byConf[conf]++;
-    });
-    const maxCount = Math.max(...Object.values(optionData).map(d => d.total), 1);
-    questionOptions.forEach((opt, idx) => {
-      const data = optionData[idx] || { total: 0, byConf: [0, 0, 0, 0] };
-      const pct = Math.round((data.total / total) * 100);
-      const colors = MC_COLORS[idx % MC_COLORS.length].shades;
-      allRows.push({ label: opt, pct, byConf: data.byConf, colors, isUser: userAnswer === idx, maxCount });
-    });
-  }
-  allRows.sort((a, b) => b.pct - a.pct);
-
-  // Render confidence bar
-  const renderBar = (byConf, colors, maxCount, isUser) => {
-    const totalCount = byConf.reduce((a, b) => a + b, 0);
-    if (totalCount === 0) return <div className="flex-1 h-5 rounded-full" style={{ border: `1px solid ${colors[0]}40` }} />;
-    const segments = [];
-    for (let i = 0; i <= 3; i++) {
-      if (byConf[i] > 0) segments.push({ width: (byConf[i] / maxCount) * 100, color: colors[i], conf: i });
-    }
-    segments.reverse();
-    const totalWidth = segments.reduce((a, s) => a + s.width, 0);
-    const showEmpty = (100 - totalWidth) > 2;
-    return (
-      <div className="flex-1 h-5 rounded-full overflow-hidden flex" style={{ border: showEmpty ? `1px solid ${colors[0]}40` : 'none' }}>
-        {segments.map((s, i) => {
-          const isUserSeg = isUser && s.conf === userConf;
-          const isLast = i === segments.length - 1;
-          const isFirst = i === 0;
-          return (
-            <div key={i} className={`h-full ${isLast ? 'rounded-r-full' : ''} ${isFirst ? 'rounded-l-full' : ''}`} style={{
-              width: showEmpty ? `${s.width}%` : (isLast ? undefined : `${s.width}%`),
-              flex: !showEmpty && isLast ? 1 : undefined,
-              backgroundColor: s.color,
-              ...(isUserSeg ? { boxShadow: 'inset 0 0 0 3px white', zIndex: 10, position: 'relative' } : {})
-            }} />
-          );
-        })}
-      </div>
-    );
-  };
+  // Use aggregateResults with includeUserInCount=false (show community stats, mark user position)
+  const { rows, total, userConf } = aggregateResults(results.evaluators, questionWithOptions, userResponse, false);
+  const allRows = [...rows].sort((a, b) => b.pct - a.pct);
 
   return (
     <div className="space-y-1">
       {allRows.map((row, i) => (
         <div key={i} className="flex items-center gap-2">
-          <div className={isBinary ? 'w-10' : 'w-[35%]'} style={{ flexShrink: 0 }}>
-            <span className={`text-sm font-semibold truncate block ${row.isUser ? 'underline' : ''}`}
-              style={{ color: row.colors[1] }}>
+          <div className={isBinary ? 'w-12' : 'w-[35%]'} style={{ flexShrink: 0 }}>
+            <span className={`text-sm font-semibold truncate ${row.isUser ? 'px-2 py-0.5 rounded-full border-2' : 'block'}`}
+              style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>
               {row.label}
             </span>
           </div>
           <span className="text-sm w-9 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}%</span>
-          {renderBar(row.byConf, row.colors, row.maxCount, row.isUser)}
+          {renderConfidenceBar(row.byConf, row.colors, row.maxCount, row.isUser, userConf, 'h-5', darkMode)}
         </div>
       ))}
     </div>
@@ -3348,9 +3382,6 @@ const CommunityResultsRows = ({ question, results, userResponse, darkMode, optio
 const FullResultsPanel = ({ question, results, userResponse, darkMode, onClose, onSwipeLeft, onSwipeRight, isLast = true }) => {
   const isBinary = question.type === 'binary';
   const touchStartX = React.useRef(0);
-  const total = results?.evaluators?.length || 1;
-  const userAnswer = userResponse?.answer;
-  const userConf = userResponse ? Math.min(4, Math.max(1, userResponse.confidence || 1)) - 1 : -1;
 
   const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
   const handleTouchEnd = (e) => {
@@ -3361,68 +3392,9 @@ const FullResultsPanel = ({ question, results, userResponse, darkMode, onClose, 
     }
   };
 
-  // Build rows data - same logic as expanded view
-  const allRows = [];
-  if (isBinary) {
-    const yesColors = ['#6ee7b7', '#34d399', '#10b981', '#059669'];
-    const noColors = ['#fca5a5', '#f87171', '#ef4444', '#dc2626'];
-    const yesByConf = [0, 0, 0, 0], noByConf = [0, 0, 0, 0];
-    (results?.evaluators || []).forEach(e => {
-      const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-      if (e.answer === 0) yesByConf[conf]++; else noByConf[conf]++;
-    });
-    const yesTotal = yesByConf.reduce((a, b) => a + b, 0);
-    const noTotal = noByConf.reduce((a, b) => a + b, 0);
-    const maxCount = Math.max(yesTotal, noTotal);
-    allRows.push({ label: 'Yes', pct: Math.round((yesTotal / total) * 100), byConf: yesByConf, colors: yesColors, isUser: userAnswer === 0, maxCount });
-    allRows.push({ label: 'No', pct: Math.round((noTotal / total) * 100), byConf: noByConf, colors: noColors, isUser: userAnswer === 1, maxCount });
-  } else {
-    const optionData = {};
-    (results?.evaluators || []).forEach(e => {
-      if (!optionData[e.answer]) optionData[e.answer] = { total: 0, byConf: [0, 0, 0, 0] };
-      optionData[e.answer].total++;
-      const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-      optionData[e.answer].byConf[conf]++;
-    });
-    const maxCount = Math.max(...Object.values(optionData).map(d => d.total), 1);
-    question.options?.forEach((opt, idx) => {
-      const data = optionData[idx] || { total: 0, byConf: [0, 0, 0, 0] };
-      const pct = Math.round((data.total / total) * 100);
-      const colors = MC_COLORS[idx % MC_COLORS.length].shades;
-      allRows.push({ label: opt, pct, byConf: data.byConf, colors, isUser: userAnswer === idx, maxCount });
-    });
-  }
-  allRows.sort((a, b) => b.pct - a.pct);
-
-  // Render confidence bar - same as expanded view
-  const renderBar = (byConf, colors, maxCount, isUser) => {
-    const totalCount = byConf.reduce((a, b) => a + b, 0);
-    if (totalCount === 0) return <div className="flex-1 h-5 rounded-full" style={{ border: `1px solid ${colors[0]}40` }} />;
-    const segments = [];
-    for (let i = 0; i <= 3; i++) {
-      if (byConf[i] > 0) segments.push({ width: (byConf[i] / maxCount) * 100, color: colors[i], conf: i });
-    }
-    segments.reverse();
-    const totalWidth = segments.reduce((a, s) => a + s.width, 0);
-    const showEmpty = (100 - totalWidth) > 2;
-    return (
-      <div className="flex-1 h-5 rounded-full overflow-hidden flex" style={{ border: showEmpty ? `1px solid ${colors[0]}40` : 'none' }}>
-        {segments.map((s, i) => {
-          const isUserSeg = isUser && s.conf === userConf;
-          const isLast = i === segments.length - 1;
-          const isFirst = i === 0;
-          return (
-            <div key={i} className={`h-full ${isLast ? 'rounded-r-full' : ''} ${isFirst ? 'rounded-l-full' : ''}`} style={{
-              width: showEmpty ? `${s.width}%` : (isLast ? undefined : `${s.width}%`),
-              flex: !showEmpty && isLast ? 1 : undefined,
-              backgroundColor: s.color,
-              ...(isUserSeg ? { border: '3px solid white', borderRadius: isFirst && isLast ? '999px' : isFirst ? '999px 0 0 999px' : isLast ? '0 999px 999px 0' : '0', zIndex: 10, position: 'relative' } : {})
-            }} />
-          );
-        })}
-      </div>
-    );
-  };
+  // Use aggregateResults with includeUserInCount=false (show community stats, mark user position)
+  const { rows, total, userConf } = aggregateResults(results?.evaluators, question, userResponse, false);
+  const allRows = [...rows].sort((a, b) => b.pct - a.pct);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={onClose}>
@@ -3447,13 +3419,13 @@ const FullResultsPanel = ({ question, results, userResponse, darkMode, onClose, 
           {allRows.map((row, i) => (
             <div key={i} className="flex items-center gap-1">
               <div className={isBinary ? 'w-14 sm:w-12' : 'w-[40%]'} style={{ flexShrink: 0 }}>
-                <span className="text-base sm:text-sm font-semibold inline-block truncate max-w-full px-1.5 py-0.5 rounded-full border"
+                <span className={`text-base sm:text-sm font-semibold inline-block truncate max-w-full px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`}
                   style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>
                   {row.label}
                 </span>
               </div>
               <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
-              {renderBar(row.byConf, row.colors, row.maxCount, row.isUser)}
+              {renderConfidenceBar(row.byConf, row.colors, row.maxCount, row.isUser, userConf, 'h-5', darkMode)}
             </div>
           ))}
         </div>
@@ -3702,72 +3674,9 @@ const AnsweredQuestionView = ({ question, response, results, darkMode, questionF
 
       {/* Community Results - expanded - same style as FullResultsPanel */}
       {(() => {
-        const total = results?.evaluators?.length || 1;
-        const userAnswer = response?.answer;
-        const userConf = response ? Math.min(4, Math.max(1, response.confidence || 1)) - 1 : -1;
-
-        // Build rows data - same logic as FullResultsPanel
-        const allRows = [];
-        if (isBinary) {
-          const yesColors = ['#6ee7b7', '#34d399', '#10b981', '#059669'];
-          const noColors = ['#fca5a5', '#f87171', '#ef4444', '#dc2626'];
-          const yesByConf = [0, 0, 0, 0], noByConf = [0, 0, 0, 0];
-          (results?.evaluators || []).forEach(e => {
-            const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-            if (e.answer === 0) yesByConf[conf]++; else noByConf[conf]++;
-          });
-          const yesTotal = yesByConf.reduce((a, b) => a + b, 0);
-          const noTotal = noByConf.reduce((a, b) => a + b, 0);
-          const maxCount = Math.max(yesTotal, noTotal);
-          allRows.push({ label: 'Yes', pct: Math.round((yesTotal / total) * 100), byConf: yesByConf, colors: yesColors, isUser: userAnswer === 0, maxCount });
-          allRows.push({ label: 'No', pct: Math.round((noTotal / total) * 100), byConf: noByConf, colors: noColors, isUser: userAnswer === 1, maxCount });
-        } else {
-          const optionData = {};
-          (results?.evaluators || []).forEach(e => {
-            if (!optionData[e.answer]) optionData[e.answer] = { total: 0, byConf: [0, 0, 0, 0] };
-            optionData[e.answer].total++;
-            const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-            optionData[e.answer].byConf[conf]++;
-          });
-          const maxCount = Math.max(...Object.values(optionData).map(d => d.total), 1);
-          question.options?.forEach((opt, idx) => {
-            const data = optionData[idx] || { total: 0, byConf: [0, 0, 0, 0] };
-            const pct = Math.round((data.total / total) * 100);
-            const colors = MC_COLORS[idx % MC_COLORS.length].shades;
-            allRows.push({ label: opt, pct, byConf: data.byConf, colors, isUser: userAnswer === idx, maxCount });
-          });
-        }
-        allRows.sort((a, b) => b.pct - a.pct);
-
-        // Render confidence bar - same as FullResultsPanel
-        const renderBar = (byConf, colors, maxCount, isUser) => {
-          const totalCount = byConf.reduce((a, b) => a + b, 0);
-          if (totalCount === 0) return <div className="flex-1 h-5 rounded-full" style={{ border: `1px solid ${colors[0]}40` }} />;
-          const segments = [];
-          for (let i = 0; i <= 3; i++) {
-            if (byConf[i] > 0) segments.push({ width: (byConf[i] / maxCount) * 100, color: colors[i], conf: i });
-          }
-          segments.reverse();
-          const totalWidth = segments.reduce((a, s) => a + s.width, 0);
-          const showEmpty = (100 - totalWidth) > 2;
-          return (
-            <div className="flex-1 h-5 rounded-full overflow-hidden flex" style={{ border: showEmpty ? `1px solid ${colors[0]}40` : 'none' }}>
-              {segments.map((s, i) => {
-                const isUserSeg = isUser && s.conf === userConf;
-                const isLast = i === segments.length - 1;
-                const isFirst = i === 0;
-                return (
-                  <div key={i} className={`h-full ${isLast ? 'rounded-r-full' : ''} ${isFirst ? 'rounded-l-full' : ''}`} style={{
-                    width: showEmpty ? `${s.width}%` : (isLast ? undefined : `${s.width}%`),
-                    flex: !showEmpty && isLast ? 1 : undefined,
-                    backgroundColor: s.color,
-                    ...(isUserSeg ? { border: '3px solid white', borderRadius: isFirst && isLast ? '999px' : isFirst ? '999px 0 0 999px' : isLast ? '0 999px 999px 0' : '0', zIndex: 10, position: 'relative' } : {})
-                  }} />
-                );
-              })}
-            </div>
-          );
-        };
+        // Use aggregateResults with includeUserInCount=false (show community stats, mark user position)
+        const { rows, total, userConf } = aggregateResults(results?.evaluators, question, response, false);
+        const allRows = [...rows].sort((a, b) => b.pct - a.pct);
 
         return (
           <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
@@ -3785,13 +3694,13 @@ const AnsweredQuestionView = ({ question, response, results, darkMode, questionF
               {allRows.map((row, i) => (
                 <div key={i} className="flex items-center gap-1">
                   <div className={isBinary ? 'w-14 sm:w-12' : 'w-[40%]'} style={{ flexShrink: 0 }}>
-                    <span className="text-base sm:text-sm font-semibold inline-block truncate max-w-full px-1.5 py-0.5 rounded-full border"
+                    <span className={`text-base sm:text-sm font-semibold inline-block truncate max-w-full px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`}
                       style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>
                       {row.label}
                     </span>
                   </div>
                   <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
-                  {renderBar(row.byConf, row.colors, row.maxCount, row.isUser)}
+                  {renderConfidenceBar(row.byConf, row.colors, row.maxCount, row.isUser, userConf, 'h-5', darkMode)}
                 </div>
               ))}
             </div>
@@ -6452,20 +6361,8 @@ function App() {
           isCurrent: i === assessCurrentIndex
         });
       }
-      const gradientStyles = {
-        violet: ['bg-violet-950/30 border-violet-800/40', 'bg-violet-950/50 border-violet-700/50', 'bg-violet-900/40 border-violet-600/50', 'bg-violet-900/60 border-violet-500/60', 'bg-violet-800/70 border-violet-400/70'],
-        blue: ['bg-blue-950/30 border-blue-800/40', 'bg-blue-950/50 border-blue-700/50', 'bg-blue-900/40 border-blue-600/50', 'bg-blue-900/60 border-blue-500/60', 'bg-blue-800/70 border-blue-400/70'],
-        teal: ['bg-teal-950/30 border-teal-800/40', 'bg-teal-950/50 border-teal-700/50', 'bg-teal-900/40 border-teal-600/50', 'bg-teal-900/60 border-teal-500/60', 'bg-teal-800/70 border-teal-400/70'],
-        rose: ['bg-rose-950/30 border-rose-800/40', 'bg-rose-950/50 border-rose-700/50', 'bg-rose-900/40 border-rose-600/50', 'bg-rose-900/60 border-rose-500/60', 'bg-rose-800/70 border-rose-400/70'],
-        pink: ['bg-fuchsia-950/30 border-fuchsia-800/40', 'bg-fuchsia-950/50 border-fuchsia-700/50', 'bg-fuchsia-900/40 border-fuchsia-600/50', 'bg-fuchsia-900/60 border-fuchsia-500/60', 'bg-fuchsia-800/70 border-fuchsia-400/70'],
-        emerald: ['bg-emerald-950/30 border-emerald-800/40', 'bg-emerald-950/50 border-emerald-700/50', 'bg-emerald-900/40 border-emerald-600/50', 'bg-emerald-900/60 border-emerald-500/60', 'bg-emerald-800/70 border-emerald-400/70'],
-        slate: ['bg-slate-950/30 border-slate-800/40', 'bg-slate-950/50 border-slate-700/50', 'bg-slate-900/40 border-slate-600/50', 'bg-slate-900/60 border-slate-500/60', 'bg-slate-800/70 border-slate-400/70'],
-        amber: ['bg-amber-950/30 border-amber-800/40', 'bg-amber-950/50 border-amber-700/50', 'bg-amber-900/40 border-amber-600/50', 'bg-amber-900/60 border-amber-500/60', 'bg-amber-800/70 border-amber-400/70'],
-        indigo: ['bg-indigo-950/30 border-indigo-800/40', 'bg-indigo-950/50 border-indigo-700/50', 'bg-indigo-900/40 border-indigo-600/50', 'bg-indigo-900/60 border-indigo-500/60', 'bg-indigo-800/70 border-indigo-400/70'],
-      };
-      const selectedStyles = { violet: 'bg-violet-600 ring-violet-400 border-violet-400', blue: 'bg-blue-600 ring-blue-400 border-blue-400', teal: 'bg-teal-600 ring-teal-400 border-teal-400', rose: 'bg-rose-600 ring-rose-400 border-rose-400', pink: 'bg-fuchsia-600 ring-fuchsia-400 border-fuchsia-400', emerald: 'bg-emerald-600 ring-emerald-400 border-emerald-400', slate: 'bg-slate-600 ring-slate-400 border-slate-400', amber: 'bg-amber-600 ring-amber-400 border-amber-400', indigo: 'bg-indigo-600 ring-indigo-400 border-indigo-400' };
-      const pendingStyles = { violet: 'bg-violet-600 border-violet-400', blue: 'bg-blue-600 border-blue-400', teal: 'bg-teal-600 border-teal-400', rose: 'bg-rose-600 border-rose-400', pink: 'bg-fuchsia-600 border-fuchsia-400', emerald: 'bg-emerald-600 border-emerald-400', slate: 'bg-slate-600 border-slate-400', amber: 'bg-amber-600 border-amber-400', indigo: 'bg-indigo-600 border-indigo-400' };
-      const numColors = { violet: 'text-violet-400/70', blue: 'text-blue-400/70', teal: 'text-teal-400/70', rose: 'text-rose-400/70', pink: 'text-fuchsia-400/70', emerald: 'text-emerald-400/70', slate: 'text-slate-400/70', amber: 'text-amber-400/70', indigo: 'text-indigo-400/70' };
+      // Use pre-computed ASSESS_STYLES (defined at module level)
+      const { gradientStyles, selectedStyles, pendingStyles, numColors } = ASSESS_STYLES;
 
       return (
         <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`} {...assessSwipeHandlers}>
@@ -6473,7 +6370,7 @@ function App() {
           {assessShowCompletion && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-950/95">
               <div className="relative">
-                <div className="absolute inset-0 rounded-full blur-3xl opacity-60 celebrate-glow" style={{ background: `linear-gradient(135deg, ${assessUnlockMessage ? '#6366f1' : assessTestColor.bg.includes('violet') ? '#8b5cf6' : assessTestColor.bg.includes('indigo') ? '#6366f1' : assessTestColor.bg.includes('blue') ? '#3b82f6' : assessTestColor.bg.includes('teal') ? '#14b8a6' : assessTestColor.bg.includes('pink') ? '#ec4899' : assessTestColor.bg.includes('rose') ? '#f43f5e' : '#10b981'}, transparent)`, width: '200px', height: '200px', marginLeft: '-50px', marginTop: '-50px' }} />
+                <div className="absolute inset-0 rounded-full blur-3xl opacity-60 celebrate-glow" style={{ background: `linear-gradient(135deg, ${assessUnlockMessage ? COLOR_HEX.indigo.base : (COLOR_HEX[assessCurrentTest.color]?.base || COLOR_HEX.emerald.base)}, transparent)`, width: '200px', height: '200px', marginLeft: '-50px', marginTop: '-50px' }} />
                 <svg width="140" height="140" className="celebrate-ring"><circle cx="70" cy="70" r="60" fill="none" stroke={assessUnlockMessage ? "url(#unlock-grad)" : "url(#complete-grad)"} strokeWidth="6" strokeLinecap="round" strokeDasharray="377" /><defs><linearGradient id="complete-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#10b981" /></linearGradient><linearGradient id="unlock-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#6366f1" /></linearGradient></defs></svg>
                 <div className="absolute inset-0 flex items-center justify-center celebrate-pulse"><span className="text-5xl">{assessUnlockMessage ? '🔓' : assessCurrentTest.icon}</span></div>
               </div>
@@ -7307,15 +7204,15 @@ function App() {
       // Collapsible Analysis Card component
       const AnalysisCard = ({ id, icon, title, subtitle, color, isComplete, progress = 0, children, compactContent }) => {
         const isExpanded = analysisExpanded[id];
-        const colorStyles = {
-          violet: { bg: darkMode ? 'bg-violet-900/20 border-violet-500/30' : 'bg-violet-50 border-violet-200', text: 'text-violet-400', bar: 'bg-violet-500' },
-          slate: { bg: darkMode ? 'bg-slate-900/40 border-slate-500/30' : 'bg-slate-50 border-slate-200', text: 'text-slate-400', bar: 'bg-slate-500' },
-          emerald: { bg: darkMode ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200', text: 'text-emerald-400', bar: 'bg-emerald-500' },
-          blue: { bg: darkMode ? 'bg-blue-900/20 border-blue-500/30' : 'bg-blue-50 border-blue-200', text: 'text-blue-400', bar: 'bg-blue-500' },
-          pink: { bg: darkMode ? 'bg-fuchsia-900/20 border-fuchsia-500/30' : 'bg-fuchsia-50 border-fuchsia-200', text: 'text-fuchsia-400', bar: 'bg-fuchsia-500' },
-          amber: { bg: darkMode ? 'bg-amber-900/20 border-amber-500/30' : 'bg-amber-50 border-amber-200', text: 'text-amber-400', bar: 'bg-amber-500' },
-          indigo: { bg: darkMode ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-indigo-50 border-indigo-200', text: 'text-indigo-400', bar: 'bg-indigo-500' },
-        };
+        // Derived from ASSESS_COLORS
+        const colorStyles = Object.fromEntries(ASSESS_COLORS.map(c => {
+          const t = twColor(c);
+          return [c, {
+            bg: darkMode ? `bg-${t}-900/20 border-${t}-500/30` : `bg-${t}-50 border-${t}-200`,
+            text: `text-${t}-400`,
+            bar: `bg-${t}-500`
+          }];
+        }));
         const cs = colorStyles[color] || colorStyles.violet;
         return (
           <div className={`rounded-xl border overflow-hidden ${cs.bg}`}>
@@ -7999,54 +7896,9 @@ function App() {
                     );
                   }
 
-                  // Compact mode with confidence-segmented bars (conf 4 in center, lower outward)
-                  const userConf = Math.min(4, Math.max(1, browseResponse?.confidence || 1)) - 1;
-                  const total = browseResults?.evaluators?.length || 1;
-
-                  // Build centered confidence bar: conf4 in center, conf3, conf2, conf1 outward
-                  const renderCenteredBar = (byConf, colors, maxCount, isUser) => {
-                    // Colors: [dark/conf4, mid-dark/conf3, mid-light/conf2, light/conf1]
-                    const totalCount = byConf.reduce((a, b) => a + b, 0);
-                    if (totalCount === 0) return null;
-
-                    // Calculate widths for each confidence level relative to max
-                    const segments = [];
-                    for (let i = 0; i <= 3; i++) { // conf1(i=0) to conf4(i=3)
-                      if (byConf[i] > 0) {
-                        segments.push({
-                          width: (byConf[i] / maxCount) * 100,
-                          color: colors[i],
-                          conf: i
-                        });
-                      }
-                    }
-                    // Reverse so conf4 (dark) is first/left, conf1 (light) is last/right
-                    segments.reverse();
-
-                    const totalWidth = segments.reduce((a, s) => a + s.width, 0);
-                    const emptyWidth = 100 - totalWidth;
-
-                    const showEmpty = emptyWidth > 2; // Only show empty if significant
-                    return (
-                      <div className="flex-1 h-5 rounded-full overflow-hidden flex" style={{ backgroundColor: showEmpty ? 'transparent' : 'transparent', border: showEmpty ? `1px solid ${colors[0]}40` : 'none' }}>
-                        {segments.map((s, i) => {
-                          const isUserSeg = isUser && s.conf === userConf;
-                          const isLast = i === segments.length - 1;
-                          const isFirst = i === 0;
-                          // Border radius: rounded on edges, flat in middle
-                          const userRadius = isFirst && isLast ? '999px' : isFirst ? '999px 0 0 999px' : isLast ? '0 999px 999px 0' : '0';
-                          return (
-                            <div key={i} className={`h-full ${isLast ? 'rounded-r-full' : ''} ${isFirst ? 'rounded-l-full' : ''}`} style={{
-                              width: showEmpty ? `${s.width}%` : (isLast ? undefined : `${s.width}%`),
-                              flex: !showEmpty && isLast ? 1 : undefined,
-                              backgroundColor: s.color,
-                              ...(isUserSeg ? { border: '3px solid white', borderRadius: userRadius, zIndex: 10, position: 'relative' } : {})
-                            }} />
-                          );
-                        })}
-                      </div>
-                    );
-                  };
+                  // Compact mode with confidence-segmented bars
+                  // Use aggregateResults for all aggregation (includeUserInCount=false to show community stats)
+                  const { rows: aggRows, total, maxCount, userConf } = aggregateResults(browseResults?.evaluators, browseQ, browseResponse, false);
 
                   return (
                     <div
@@ -8101,92 +7953,51 @@ function App() {
                         }}
                       >
                         {isBinaryQ ? (() => {
-                          const yesColors = ['#6ee7b7', '#34d399', '#10b981', '#059669'];
-                          const noColors = ['#fca5a5', '#f87171', '#ef4444', '#dc2626'];
-
-                          const yesByConf = [0, 0, 0, 0];
-                          const noByConf = [0, 0, 0, 0];
-                          (browseResults?.evaluators || []).forEach(e => {
-                            const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-                            if (e.answer === 0) yesByConf[conf]++;
-                            else noByConf[conf]++;
-                          });
-
-                          const yesTotal = yesByConf.reduce((a, b) => a + b, 0);
-                          const noTotal = noByConf.reduce((a, b) => a + b, 0);
-                          const yesPct = Math.round((yesTotal / total) * 100);
-                          const noPct = 100 - yesPct;
-                          const maxCount = Math.max(yesTotal, noTotal);
-
-                          const rows = yesPct >= noPct
-                            ? [{ label: 'Yes', pct: yesPct, byConf: yesByConf, colors: yesColors, isYes: true },
-                               { label: 'No', pct: noPct, byConf: noByConf, colors: noColors, isYes: false }]
-                            : [{ label: 'No', pct: noPct, byConf: noByConf, colors: noColors, isYes: false },
-                               { label: 'Yes', pct: yesPct, byConf: yesByConf, colors: yesColors, isYes: true }];
-
+                          // Use pre-aggregated rows, sorted by pct
+                          const rows = [...aggRows].sort((a, b) => b.pct - a.pct);
                           return (
                             <div className="space-y-1">
-                              {rows.map(row => {
-                                const isUser = row.isYes ? userAnswer === 0 : userAnswer === 1;
-                                return (
-                                  <div key={row.label} className="flex items-center gap-1">
-                                    <div className="w-14 sm:w-12 flex-shrink-0">
-                                      <span className="text-base sm:text-sm font-semibold px-1.5 py-0.5 rounded-full border" style={{ color: row.colors[1], borderColor: isUser ? row.colors[1] : 'transparent' }}>{row.label}</span>
-                                    </div>
-                                    <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
-                                    {renderCenteredBar(row.byConf, row.colors, maxCount, isUser)}
+                              {rows.map(row => (
+                                <div key={row.label} className="flex items-center gap-1">
+                                  <div className="w-14 sm:w-12 flex-shrink-0">
+                                    <span className={`text-base sm:text-sm font-semibold px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`} style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>{row.label}</span>
                                   </div>
-                                );
-                              })}
+                                  <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
+                                  {renderConfidenceBar(row.byConf, row.colors, maxCount, row.isUser, userConf, 'h-5', darkMode)}
+                                </div>
+                              ))}
                               <div className={`text-sm text-center pt-1 ${TH('text-subtle', darkMode)}`}>Tap to Expand</div>
                             </div>
                           );
                         })() : (() => {
                           /* MC: show user's pick + top pick, tap to expand all */
-                          const optionData = {};
-                          (browseResults?.evaluators || []).forEach(e => {
-                            if (!optionData[e.answer]) optionData[e.answer] = { total: 0, byConf: [0, 0, 0, 0] };
-                            optionData[e.answer].total++;
-                            const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-                            optionData[e.answer].byConf[conf]++;
-                          });
+                          // Use pre-aggregated rows
+                          const sorted = [...aggRows].sort((a, b) => b.count - a.count);
+                          const topRow = sorted[0];
+                          const secondRow = sorted[1];
+                          const userRow = aggRows.find(r => r.isUser);
+                          const otherRow = userRow === topRow ? secondRow : topRow;
 
-                          const sorted = Object.entries(optionData).sort((a, b) => b[1].total - a[1].total);
-                          const topIdx = parseInt(sorted[0]?.[0] || 0);
-                          const secondIdx = parseInt(sorted[1]?.[0] || 0);
-                          const showSecond = userAnswer === topIdx ? secondIdx : topIdx;
-                          const maxCount = sorted[0]?.[1]?.total || 1;
-
-                          const userPct = Math.round(((optionData[userAnswer]?.total || 0) / total) * 100);
-                          const otherPct = Math.round(((optionData[showSecond]?.total || 0) / total) * 100);
-
-                          // Use actual MC_COLORS for each answer
-                          const userColors = MC_COLORS[userAnswer % MC_COLORS.length].shades;
-                          const otherColors = MC_COLORS[showSecond % MC_COLORS.length].shades;
-
-                          const renderRow = (idx, colors, pct, isUser) => {
-                            const data = optionData[idx] || { total: 0, byConf: [0, 0, 0, 0] };
-                            const label = browseQ.options?.[idx] || '?';
+                          const renderRow = (row) => {
+                            if (!row) return null;
                             return (
-                              <div key={idx} className="flex items-center gap-1">
+                              <div key={row.answer} className="flex items-center gap-1">
                                 <div style={{ width: '40%' }} className="flex-shrink-0">
-                                  <span className="text-base sm:text-sm font-semibold inline-block truncate max-w-full px-1.5 py-0.5 rounded-full border" style={{ color: colors[1], borderColor: isUser ? colors[1] : 'transparent' }}>{label}</span>
+                                  <span className={`text-base sm:text-sm font-semibold inline-block truncate max-w-full px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`} style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>{row.label}</span>
                                 </div>
-                                <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: colors[1] }}>{pct}</span>
-                                {renderCenteredBar(data.byConf, colors, maxCount, isUser)}
+                                <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
+                                {renderConfidenceBar(row.byConf, row.colors, maxCount, row.isUser, userConf, 'h-5', darkMode)}
                               </div>
                             );
                           };
 
-                          const rowsOrdered = userPct >= otherPct
-                            ? [{ idx: userAnswer, colors: userColors, pct: userPct, isUser: true },
-                               { idx: showSecond, colors: otherColors, pct: otherPct, isUser: false }]
-                            : [{ idx: showSecond, colors: otherColors, pct: otherPct, isUser: false },
-                               { idx: userAnswer, colors: userColors, pct: userPct, isUser: true }];
+                          const rowsOrdered = (userRow?.pct || 0) >= (otherRow?.pct || 0)
+                            ? [userRow, otherRow]
+                            : [otherRow, userRow];
 
                           return (
                             <div className="space-y-1">
-                              {rowsOrdered.map(r => renderRow(r.idx, r.colors, r.pct, r.isUser))}
+                              {rowsOrdered.filter(Boolean).map(renderRow)}
                               <div className={`text-sm text-center pt-1 ${TH('text-subtle', darkMode)}`}>Tap to Expand</div>
                             </div>
                           );
@@ -8202,47 +8013,8 @@ function App() {
 
                       {/* Expanded slide-up panel */}
                       {communityExpanded && (() => {
-                        const allRows = [];
-
-                        if (isBinaryQ) {
-                          const yesColors = ['#6ee7b7', '#34d399', '#10b981', '#059669'];
-                          const noColors = ['#fca5a5', '#f87171', '#ef4444', '#dc2626'];
-                          const yesByConf = [0, 0, 0, 0];
-                          const noByConf = [0, 0, 0, 0];
-                          (browseResults?.evaluators || []).forEach(e => {
-                            const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-                            if (e.answer === 0) yesByConf[conf]++;
-                            else noByConf[conf]++;
-                          });
-                          const yesTotal = yesByConf.reduce((a, b) => a + b, 0);
-                          const noTotal = noByConf.reduce((a, b) => a + b, 0);
-                          const yesPct = Math.round((yesTotal / total) * 100);
-                          const noPct = 100 - yesPct;
-                          const maxCount = Math.max(yesTotal, noTotal);
-
-                          allRows.push({ label: 'Yes', pct: yesPct, byConf: yesByConf, colors: yesColors, isUser: userAnswer === 0, maxCount });
-                          allRows.push({ label: 'No', pct: noPct, byConf: noByConf, colors: noColors, isUser: userAnswer === 1, maxCount });
-                          allRows.sort((a, b) => b.pct - a.pct);
-                        } else {
-                          // MC: show ALL options
-                          const optionData = {};
-                          (browseResults?.evaluators || []).forEach(e => {
-                            if (!optionData[e.answer]) optionData[e.answer] = { total: 0, byConf: [0, 0, 0, 0] };
-                            optionData[e.answer].total++;
-                            const conf = Math.min(4, Math.max(1, e.confidence || 1)) - 1;
-                            optionData[e.answer].byConf[conf]++;
-                          });
-                          const maxCount = Math.max(...Object.values(optionData).map(d => d.total), 1);
-
-                          // Add all options, sorted by votes
-                          browseQ.options?.forEach((opt, idx) => {
-                            const data = optionData[idx] || { total: 0, byConf: [0, 0, 0, 0] };
-                            const pct = Math.round((data.total / total) * 100);
-                            const colors = MC_COLORS[idx % MC_COLORS.length].shades;
-                            allRows.push({ label: opt, pct, byConf: data.byConf, colors, isUser: userAnswer === idx, maxCount, idx });
-                          });
-                          allRows.sort((a, b) => b.pct - a.pct);
-                        }
+                        // Use pre-aggregated rows
+                        const allRows = [...aggRows].sort((a, b) => b.pct - a.pct);
 
                         return (
                           <div
@@ -8268,13 +8040,13 @@ function App() {
                                 {allRows.map((row, i) => (
                                   <div key={i} className="flex items-center gap-1">
                                     <div className={isBinaryQ ? 'w-14 sm:w-12' : 'w-[40%]'} style={{ flexShrink: 0 }}>
-                                      <span className="text-base sm:text-sm font-semibold inline-block truncate max-w-full px-1.5 py-0.5 rounded-full border"
+                                      <span className={`text-base sm:text-sm font-semibold inline-block truncate max-w-full px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`}
                                         style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>
                                         {row.label}
                                       </span>
                                     </div>
                                     <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
-                                    {renderCenteredBar(row.byConf, row.colors, row.maxCount, row.isUser)}
+                                    {renderConfidenceBar(row.byConf, row.colors, row.maxCount, row.isUser, userConf, 'h-5', darkMode)}
                                   </div>
                                 ))}
                               </div>
