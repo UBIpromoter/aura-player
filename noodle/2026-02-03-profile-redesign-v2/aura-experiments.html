@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Experiments — Concentric Bands</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0a0a0a; }
+    @keyframes soft-glow {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    @keyframes gentle-drift {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(2px, -1px); }
+      50% { transform: translate(-1px, 2px); }
+      75% { transform: translate(1px, 1px); }
+      100% { transform: translate(0, 0); }
+    }
+    @keyframes aura-breathe {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.03); opacity: 1; }
+    }
+    .neuron { animation: soft-glow 3s ease-in-out infinite, gentle-drift 4s ease-in-out infinite; }
+    .aura-breathe { animation: aura-breathe 6s ease-in-out infinite; }
+  </style>
+</head>
+<body class="text-white p-6">
+  <h1 class="text-xl font-bold text-center mb-2">Aura — Concentric Color Bands</h1>
+  <p class="text-gray-500 text-sm text-center mb-8">Based on reference images: layered rings radiating from center</p>
+
+  <div class="grid grid-cols-4 gap-6 max-w-[1200px] mx-auto">
+
+    <!-- AURA 1: Basic concentric ellipses -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">1. Concentric Ellipses</p>
+      <p class="text-[10px] text-gray-600 mb-3">Stacked ovals, heavy blur</p>
+      <div class="bg-gray-950 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="aura-breathe absolute" style="width: 280px; height: 320px; filter: blur(40px);">
+          <!-- Outer to inner layers -->
+          <div class="absolute inset-0 rounded-[50%] bg-cyan-500/40"></div>
+          <div class="absolute rounded-[50%] bg-pink-500/50" style="inset: 12%;"></div>
+          <div class="absolute rounded-[50%] bg-emerald-500/55" style="inset: 24%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-500/65" style="inset: 36%;"></div>
+          <div class="absolute rounded-[50%] bg-indigo-400/70" style="inset: 48%;"></div>
+          <div class="absolute rounded-[50%] bg-white/30" style="inset: 60%;"></div>
+        </div>
+        <!-- Neurons -->
+        <svg width="160" height="160" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.4)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="5" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="4" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="3" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- AURA 2: More vibrant, tighter bands -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">2. Vibrant Bands</p>
+      <p class="text-[10px] text-gray-600 mb-3">Higher saturation, tighter</p>
+      <div class="bg-gray-950 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="aura-breathe absolute" style="width: 300px; height: 340px; filter: blur(35px);">
+          <div class="absolute inset-0 rounded-[50%] bg-cyan-400/50"></div>
+          <div class="absolute rounded-[50%] bg-blue-500/55" style="inset: 10%;"></div>
+          <div class="absolute rounded-[50%] bg-pink-500/60" style="inset: 20%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-500/70" style="inset: 30%;"></div>
+          <div class="absolute rounded-[50%] bg-emerald-400/60" style="inset: 40%;"></div>
+          <div class="absolute rounded-[50%] bg-yellow-300/50" style="inset: 50%;"></div>
+          <div class="absolute rounded-[50%] bg-white/40" style="inset: 62%;"></div>
+        </div>
+        <svg width="160" height="160" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.45)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="5" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="4" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="3" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- AURA 3: Softer, more ethereal -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">3. Ethereal Soft</p>
+      <p class="text-[10px] text-gray-600 mb-3">Very blurred, dreamy</p>
+      <div class="bg-gray-950 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="aura-breathe absolute" style="width: 320px; height: 360px; filter: blur(55px);">
+          <div class="absolute inset-0 rounded-[50%] bg-indigo-400/35"></div>
+          <div class="absolute rounded-[50%] bg-cyan-400/40" style="inset: 8%;"></div>
+          <div class="absolute rounded-[50%] bg-pink-400/45" style="inset: 18%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-400/55" style="inset: 28%;"></div>
+          <div class="absolute rounded-[50%] bg-emerald-400/50" style="inset: 40%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-300/60" style="inset: 52%;"></div>
+          <div class="absolute rounded-[50%] bg-white/35" style="inset: 65%;"></div>
+        </div>
+        <svg width="160" height="160" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.35)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="5" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="4" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="3" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- AURA 4: Our colors only (violet, emerald, pink, cyan, blue) -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">4. Our Palette</p>
+      <p class="text-[10px] text-gray-600 mb-3">Only our trait colors</p>
+      <div class="bg-gray-950 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="aura-breathe absolute" style="width: 300px; height: 340px; filter: blur(45px);">
+          <div class="absolute inset-0 rounded-[50%] bg-cyan-500/45"></div>
+          <div class="absolute rounded-[50%] bg-pink-500/50" style="inset: 12%;"></div>
+          <div class="absolute rounded-[50%] bg-emerald-500/55" style="inset: 24%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-500/65" style="inset: 36%;"></div>
+          <div class="absolute rounded-[50%] bg-blue-400/60" style="inset: 50%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-300/70" style="inset: 64%;"></div>
+        </div>
+        <svg width="160" height="160" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.4)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="5" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="4" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="3" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Row 2: Variations on band order and intensity -->
+  <div class="grid grid-cols-4 gap-6 max-w-[1200px] mx-auto mt-6">
+
+    <!-- AURA 5: Full bleed, extends past container -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">5. Full Bleed</p>
+      <p class="text-[10px] text-gray-600 mb-3">Aura extends to edges</p>
+      <div class="bg-gray-950 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="aura-breathe absolute" style="width: 400px; height: 450px; filter: blur(50px);">
+          <div class="absolute inset-0 rounded-[50%] bg-indigo-500/30"></div>
+          <div class="absolute rounded-[50%] bg-cyan-500/40" style="inset: 8%;"></div>
+          <div class="absolute rounded-[50%] bg-pink-500/50" style="inset: 16%;"></div>
+          <div class="absolute rounded-[50%] bg-emerald-500/55" style="inset: 26%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-500/65" style="inset: 36%;"></div>
+          <div class="absolute rounded-[50%] bg-blue-400/60" style="inset: 48%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-300/75" style="inset: 60%;"></div>
+          <div class="absolute rounded-[50%] bg-white/30" style="inset: 72%;"></div>
+        </div>
+        <svg width="160" height="160" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.4)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="5" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="4" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="3" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- AURA 6: Bright core focus -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">6. Bright Core</p>
+      <p class="text-[10px] text-gray-600 mb-3">Intense center, soft edge</p>
+      <div class="bg-gray-950 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="aura-breathe absolute" style="width: 340px; height: 380px; filter: blur(45px);">
+          <div class="absolute inset-0 rounded-[50%] bg-indigo-600/25"></div>
+          <div class="absolute rounded-[50%] bg-cyan-500/35" style="inset: 10%;"></div>
+          <div class="absolute rounded-[50%] bg-pink-500/45" style="inset: 20%;"></div>
+          <div class="absolute rounded-[50%] bg-emerald-400/55" style="inset: 30%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-400/70" style="inset: 42%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-300/85" style="inset: 55%;"></div>
+          <div class="absolute rounded-[50%] bg-white/50" style="inset: 70%;"></div>
+        </div>
+        <svg width="160" height="160" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.45)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="5" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="4" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="3" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- AURA 7: Cooler palette (more cyan/violet) -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">7. Cool Tones</p>
+      <p class="text-[10px] text-gray-600 mb-3">Cyan/violet dominant</p>
+      <div class="bg-gray-950 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="aura-breathe absolute" style="width: 320px; height: 360px; filter: blur(45px);">
+          <div class="absolute inset-0 rounded-[50%] bg-blue-600/35"></div>
+          <div class="absolute rounded-[50%] bg-cyan-500/45" style="inset: 10%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-500/55" style="inset: 22%;"></div>
+          <div class="absolute rounded-[50%] bg-indigo-400/60" style="inset: 34%;"></div>
+          <div class="absolute rounded-[50%] bg-cyan-400/55" style="inset: 46%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-300/70" style="inset: 60%;"></div>
+          <div class="absolute rounded-[50%] bg-white/35" style="inset: 75%;"></div>
+        </div>
+        <svg width="160" height="160" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.4)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="5" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="4" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="3" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- AURA 8: Warmer accents -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">8. Warm Accents</p>
+      <p class="text-[10px] text-gray-600 mb-3">Pink/emerald pops</p>
+      <div class="bg-gray-950 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="aura-breathe absolute" style="width: 320px; height: 360px; filter: blur(45px);">
+          <div class="absolute inset-0 rounded-[50%] bg-violet-600/35"></div>
+          <div class="absolute rounded-[50%] bg-pink-500/50" style="inset: 10%;"></div>
+          <div class="absolute rounded-[50%] bg-emerald-500/55" style="inset: 22%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-500/60" style="inset: 34%;"></div>
+          <div class="absolute rounded-[50%] bg-pink-400/55" style="inset: 46%;"></div>
+          <div class="absolute rounded-[50%] bg-emerald-300/60" style="inset: 58%;"></div>
+          <div class="absolute rounded-[50%] bg-violet-200/70" style="inset: 70%;"></div>
+        </div>
+        <svg width="160" height="160" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.4)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="5" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="4" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="3" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="text-center mt-8 text-gray-500 text-sm">
+    <p class="mb-2">Which aura feels right?</p>
+    <p class="text-xs text-gray-600">All have gentle breathing animation. Colors layer in concentric bands.</p>
+  </div>
+
+</body>
+</html>

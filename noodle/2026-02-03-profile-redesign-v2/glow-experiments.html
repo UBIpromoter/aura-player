@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Glow Experiments — 5 Approaches</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0a0a0a; }
+    @keyframes soft-glow {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    @keyframes gentle-drift {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(2px, -1px); }
+      50% { transform: translate(-1px, 2px); }
+      75% { transform: translate(1px, 1px); }
+      100% { transform: translate(0, 0); }
+    }
+    @keyframes rotate-glow {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .neuron { animation: soft-glow 3s ease-in-out infinite, gentle-drift 4s ease-in-out infinite; }
+    .rotate-slow { animation: rotate-glow 20s linear infinite; }
+  </style>
+</head>
+<body class="text-white p-6">
+  <h1 class="text-xl font-bold text-center mb-2">Multi-Color Aura Glow — 5 Experiments</h1>
+  <p class="text-gray-500 text-sm text-center mb-8">Stage 4: Violet + Blue + Emerald + Pink + Cyan</p>
+
+  <div class="grid grid-cols-5 gap-4 max-w-[1400px] mx-auto">
+
+    <!-- EXPERIMENT 1: Sectioned Glow (pie slices) -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">1. Sectioned</p>
+      <p class="text-[10px] text-gray-600 mb-3">Colors in pie-slice regions</p>
+      <div class="bg-gray-900 rounded-2xl p-4 aspect-square flex items-center justify-center">
+        <svg width="220" height="220" viewBox="0 0 200 200">
+          <defs>
+            <!-- Sectioned: conic gradient approximated with multiple radial gradients -->
+            <radialGradient id="glow1-violet" cx="30%" cy="30%" r="70%">
+              <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.9"/>
+              <stop offset="50%" stop-color="#a78bfa" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="glow1-emerald" cx="70%" cy="30%" r="70%">
+              <stop offset="0%" stop-color="#34d399" stop-opacity="0.9"/>
+              <stop offset="50%" stop-color="#34d399" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="glow1-pink" cx="70%" cy="70%" r="70%">
+              <stop offset="0%" stop-color="#f472b6" stop-opacity="0.9"/>
+              <stop offset="50%" stop-color="#f472b6" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#f472b6" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="glow1-cyan" cx="30%" cy="70%" r="70%">
+              <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.9"/>
+              <stop offset="50%" stop-color="#22d3ee" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- Layered color sections -->
+          <circle cx="100" cy="100" r="98" fill="url(#glow1-violet)"/>
+          <circle cx="100" cy="100" r="98" fill="url(#glow1-emerald)"/>
+          <circle cx="100" cy="100" r="98" fill="url(#glow1-pink)"/>
+          <circle cx="100" cy="100" r="98" fill="url(#glow1-cyan)"/>
+          <!-- Neurons -->
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="55" r="4" fill="#22d3ee" class="neuron"/>
+          <circle cx="100" cy="145" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="85" cy="95" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="115" cy="95" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="95" cy="80" r="3" fill="#a78bfa" class="neuron"/>
+          <circle cx="105" cy="115" r="3" fill="#22d3ee" class="neuron"/>
+          <!-- Lines -->
+          <g stroke="rgba(139,92,246,0.4)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="75" y1="75" x2="70" y2="125"/><line x1="125" y1="75" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/><line x1="95" y1="80" x2="105" y2="115"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- EXPERIMENT 2: Concentric Rings -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">2. Concentric Rings</p>
+      <p class="text-[10px] text-gray-600 mb-3">Color bands radiating out</p>
+      <div class="bg-gray-900 rounded-2xl p-4 aspect-square flex items-center justify-center">
+        <svg width="220" height="220" viewBox="0 0 200 200">
+          <!-- Concentric color rings -->
+          <circle cx="100" cy="100" r="95" fill="none" stroke="#22d3ee" stroke-width="25" opacity="0.3"/>
+          <circle cx="100" cy="100" r="70" fill="none" stroke="#f472b6" stroke-width="25" opacity="0.4"/>
+          <circle cx="100" cy="100" r="45" fill="none" stroke="#34d399" stroke-width="20" opacity="0.5"/>
+          <circle cx="100" cy="100" r="25" fill="none" stroke="#a78bfa" stroke-width="20" opacity="0.6"/>
+          <circle cx="100" cy="100" r="10" fill="#a78bfa" opacity="0.8"/>
+          <!-- Neurons -->
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="55" r="4" fill="#22d3ee" class="neuron"/>
+          <circle cx="100" cy="145" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="85" cy="95" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="115" cy="95" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="95" cy="80" r="3" fill="#a78bfa" class="neuron"/>
+          <circle cx="105" cy="115" r="3" fill="#22d3ee" class="neuron"/>
+          <!-- Lines -->
+          <g stroke="rgba(139,92,246,0.4)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="75" y1="75" x2="70" y2="125"/><line x1="125" y1="75" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/><line x1="95" y1="80" x2="105" y2="115"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- EXPERIMENT 3: Gradient Sweep -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">3. Gradient Sweep</p>
+      <p class="text-[10px] text-gray-600 mb-3">Colors blend across glow</p>
+      <div class="bg-gray-900 rounded-2xl p-4 aspect-square flex items-center justify-center">
+        <svg width="220" height="220" viewBox="0 0 200 200">
+          <defs>
+            <!-- Linear gradient across the glow -->
+            <linearGradient id="glow3-sweep" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a78bfa"/>
+              <stop offset="25%" stop-color="#22d3ee"/>
+              <stop offset="50%" stop-color="#34d399"/>
+              <stop offset="75%" stop-color="#f472b6"/>
+              <stop offset="100%" stop-color="#a78bfa"/>
+            </linearGradient>
+            <radialGradient id="glow3-fade" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-opacity="1"/>
+              <stop offset="40%" stop-opacity="0.7"/>
+              <stop offset="70%" stop-opacity="0.3"/>
+              <stop offset="100%" stop-opacity="0"/>
+            </radialGradient>
+            <mask id="glow3-mask">
+              <circle cx="100" cy="100" r="98" fill="url(#glow3-fade)"/>
+            </mask>
+          </defs>
+          <!-- Gradient glow with radial fade mask -->
+          <circle cx="100" cy="100" r="98" fill="url(#glow3-sweep)" mask="url(#glow3-mask)"/>
+          <!-- Neurons -->
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="55" r="4" fill="#22d3ee" class="neuron"/>
+          <circle cx="100" cy="145" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="85" cy="95" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="115" cy="95" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="95" cy="80" r="3" fill="#a78bfa" class="neuron"/>
+          <circle cx="105" cy="115" r="3" fill="#22d3ee" class="neuron"/>
+          <!-- Lines -->
+          <g stroke="rgba(255,255,255,0.3)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="75" y1="75" x2="70" y2="125"/><line x1="125" y1="75" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/><line x1="95" y1="80" x2="105" y2="115"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- EXPERIMENT 4: Color Blooms -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">4. Color Blooms</p>
+      <p class="text-[10px] text-gray-600 mb-3">Soft glows from neuron clusters</p>
+      <div class="bg-gray-900 rounded-2xl p-4 aspect-square flex items-center justify-center">
+        <svg width="220" height="220" viewBox="0 0 200 200">
+          <defs>
+            <radialGradient id="bloom-violet" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.8"/>
+              <stop offset="60%" stop-color="#a78bfa" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="bloom-emerald" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#34d399" stop-opacity="0.8"/>
+              <stop offset="60%" stop-color="#34d399" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="bloom-pink" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#f472b6" stop-opacity="0.8"/>
+              <stop offset="60%" stop-color="#f472b6" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#f472b6" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="bloom-cyan" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.8"/>
+              <stop offset="60%" stop-color="#22d3ee" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- Color blooms positioned near their neurons -->
+          <circle cx="55" cy="60" r="55" fill="url(#bloom-violet)"/>
+          <circle cx="145" cy="60" r="55" fill="url(#bloom-emerald)"/>
+          <circle cx="145" cy="140" r="55" fill="url(#bloom-pink)"/>
+          <circle cx="55" cy="140" r="55" fill="url(#bloom-cyan)"/>
+          <!-- Central white glow to blend -->
+          <circle cx="100" cy="100" r="40" fill="white" opacity="0.1"/>
+          <!-- Neurons -->
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="55" r="4" fill="#22d3ee" class="neuron"/>
+          <circle cx="100" cy="145" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="85" cy="95" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="115" cy="95" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="95" cy="80" r="3" fill="#a78bfa" class="neuron"/>
+          <circle cx="105" cy="115" r="3" fill="#22d3ee" class="neuron"/>
+          <!-- Lines -->
+          <g stroke="rgba(255,255,255,0.3)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="75" y1="75" x2="70" y2="125"/><line x1="125" y1="75" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/><line x1="95" y1="80" x2="105" y2="115"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- EXPERIMENT 5: Rotating Aurora -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">5. Aurora Waves</p>
+      <p class="text-[10px] text-gray-600 mb-3">Slow-rotating color bands</p>
+      <div class="bg-gray-900 rounded-2xl p-4 aspect-square flex items-center justify-center overflow-hidden">
+        <svg width="220" height="220" viewBox="0 0 200 200">
+          <defs>
+            <linearGradient id="aurora" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.7"/>
+              <stop offset="20%" stop-color="#22d3ee" stop-opacity="0.6"/>
+              <stop offset="40%" stop-color="#34d399" stop-opacity="0.7"/>
+              <stop offset="60%" stop-color="#f472b6" stop-opacity="0.6"/>
+              <stop offset="80%" stop-color="#a78bfa" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#22d3ee" stop-opacity="0.6"/>
+            </linearGradient>
+            <radialGradient id="aurora-fade" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-opacity="1"/>
+              <stop offset="50%" stop-opacity="0.6"/>
+              <stop offset="80%" stop-opacity="0.2"/>
+              <stop offset="100%" stop-opacity="0"/>
+            </radialGradient>
+            <mask id="aurora-mask">
+              <circle cx="100" cy="100" r="98" fill="url(#aurora-fade)"/>
+            </mask>
+          </defs>
+          <!-- Rotating aurora background -->
+          <g class="rotate-slow" style="transform-origin: 100px 100px;">
+            <rect x="-50" y="0" width="300" height="200" fill="url(#aurora)" mask="url(#aurora-mask)"/>
+          </g>
+          <!-- Neurons -->
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="55" r="4" fill="#22d3ee" class="neuron"/>
+          <circle cx="100" cy="145" r="4" fill="#60a5fa" class="neuron"/>
+          <circle cx="85" cy="95" r="4" fill="#f472b6" class="neuron"/>
+          <circle cx="115" cy="95" r="4" fill="#34d399" class="neuron"/>
+          <circle cx="95" cy="80" r="3" fill="#a78bfa" class="neuron"/>
+          <circle cx="105" cy="115" r="3" fill="#22d3ee" class="neuron"/>
+          <!-- Lines -->
+          <g stroke="rgba(255,255,255,0.35)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="75" y1="75" x2="70" y2="125"/><line x1="125" y1="75" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/><line x1="95" y1="80" x2="105" y2="115"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="text-center mt-8 text-gray-500 text-sm">
+    <p class="mb-2">Which approach feels right?</p>
+    <p class="text-xs text-gray-600">1=Sectioned | 2=Concentric | 3=Gradient Sweep | 4=Color Blooms | 5=Aurora Waves</p>
+  </div>
+
+</body>
+</html>
