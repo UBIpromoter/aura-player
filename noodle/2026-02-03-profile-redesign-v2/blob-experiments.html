@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Energy Blob Experiments</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0a0a0a; }
+    @keyframes soft-glow {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    @keyframes gentle-drift {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(2px, -1px); }
+      50% { transform: translate(-1px, 2px); }
+      75% { transform: translate(1px, 1px); }
+      100% { transform: translate(0, 0); }
+    }
+    @keyframes blob-morph {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.02) rotate(2deg); }
+      50% { transform: scale(0.98) rotate(-1deg); }
+      75% { transform: scale(1.01) rotate(1deg); }
+    }
+    @keyframes blob-drift-1 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(5px, -3px) scale(1.05); }
+    }
+    @keyframes blob-drift-2 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(-4px, 4px) scale(0.95); }
+    }
+    @keyframes blob-drift-3 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(3px, 5px) scale(1.02); }
+    }
+    .neuron { animation: soft-glow 3s ease-in-out infinite, gentle-drift 4s ease-in-out infinite; }
+    .blob-morph { animation: blob-morph 8s ease-in-out infinite; }
+    .blob-1 { animation: blob-drift-1 6s ease-in-out infinite; }
+    .blob-2 { animation: blob-drift-2 7s ease-in-out infinite; }
+    .blob-3 { animation: blob-drift-3 5s ease-in-out infinite; }
+    .blob-4 { animation: blob-drift-1 8s ease-in-out infinite reverse; }
+  </style>
+</head>
+<body class="text-white p-6">
+  <h1 class="text-xl font-bold text-center mb-2">Energy Blob — Organic Glow</h1>
+  <p class="text-gray-500 text-sm text-center mb-8">Soft, living energy with color aspects</p>
+
+  <div class="grid grid-cols-4 gap-6 max-w-[1200px] mx-auto">
+
+    <!-- BLOB 1: Heavily blurred overlapping ellipses -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">1. Blurred Ellipses</p>
+      <p class="text-[10px] text-gray-600 mb-3">Soft shapes, heavy blur</p>
+      <div class="bg-gray-900 rounded-2xl p-4 aspect-square flex items-center justify-center relative overflow-hidden">
+        <!-- Blurred color blobs -->
+        <div class="absolute inset-0 flex items-center justify-center" style="filter: blur(30px);">
+          <div class="blob-1 absolute w-32 h-24 rounded-full bg-violet-500/70" style="top: 25%; left: 20%;"></div>
+          <div class="blob-2 absolute w-28 h-32 rounded-full bg-emerald-500/60" style="top: 50%; left: 55%;"></div>
+          <div class="blob-3 absolute w-24 h-28 rounded-full bg-pink-500/60" style="top: 20%; left: 50%;"></div>
+          <div class="blob-4 absolute w-28 h-24 rounded-full bg-cyan-500/50" style="top: 55%; left: 25%;"></div>
+        </div>
+        <!-- Neurons on top -->
+        <svg width="180" height="180" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.25)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="75" y1="75" x2="70" y2="125"/><line x1="125" y1="75" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/><line x1="95" y1="80" x2="105" y2="115"/>
+          </g>
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="4" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- BLOB 2: SVG with feGaussianBlur filter -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">2. SVG Blur Filter</p>
+      <p class="text-[10px] text-gray-600 mb-3">Organic shapes, unified blur</p>
+      <div class="bg-gray-900 rounded-2xl p-4 aspect-square flex items-center justify-center">
+        <svg width="220" height="220" viewBox="0 0 200 200">
+          <defs>
+            <filter id="blob-blur" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="12"/>
+            </filter>
+          </defs>
+          <!-- Blurred blob shapes -->
+          <g filter="url(#blob-blur)">
+            <ellipse cx="70" cy="70" rx="45" ry="35" fill="#a78bfa" opacity="0.7" class="blob-1"/>
+            <ellipse cx="140" cy="80" rx="40" ry="45" fill="#34d399" opacity="0.6" class="blob-2"/>
+            <ellipse cx="130" cy="140" rx="45" ry="35" fill="#f472b6" opacity="0.6" class="blob-3"/>
+            <ellipse cx="65" cy="130" rx="35" ry="40" fill="#22d3ee" opacity="0.6" class="blob-4"/>
+            <ellipse cx="100" cy="100" rx="30" ry="30" fill="#60a5fa" opacity="0.5"/>
+          </g>
+          <!-- Lines -->
+          <g stroke="rgba(255,255,255,0.3)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <!-- Neurons -->
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="4" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- BLOB 3: Layered with more organic shapes -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">3. Layered Amoeba</p>
+      <p class="text-[10px] text-gray-600 mb-3">Irregular shapes, breathing</p>
+      <div class="bg-gray-900 rounded-2xl p-4 aspect-square flex items-center justify-center">
+        <svg width="220" height="220" viewBox="0 0 200 200">
+          <defs>
+            <filter id="blob-blur-2" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="15"/>
+            </filter>
+          </defs>
+          <!-- Organic blob using path -->
+          <g filter="url(#blob-blur-2)" class="blob-morph" style="transform-origin: 100px 100px;">
+            <path d="M100,30 Q150,40 160,80 Q170,130 130,160 Q90,180 50,150 Q20,110 40,70 Q60,30 100,30"
+                  fill="#a78bfa" opacity="0.6"/>
+            <path d="M110,40 Q160,50 165,100 Q160,150 110,165 Q60,160 45,110 Q50,60 110,40"
+                  fill="#34d399" opacity="0.5"/>
+            <path d="M90,50 Q130,45 150,90 Q155,140 100,155 Q50,150 40,100 Q45,55 90,50"
+                  fill="#f472b6" opacity="0.5"/>
+            <path d="M100,60 Q140,70 145,110 Q135,145 95,150 Q55,140 55,100 Q65,65 100,60"
+                  fill="#22d3ee" opacity="0.5"/>
+          </g>
+          <!-- Lines -->
+          <g stroke="rgba(255,255,255,0.3)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <!-- Neurons -->
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="4" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- BLOB 4: Single unified blob with color variations inside -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">4. Unified Energy</p>
+      <p class="text-[10px] text-gray-600 mb-3">One blob, color facets</p>
+      <div class="bg-gray-900 rounded-2xl p-4 aspect-square flex items-center justify-center relative overflow-hidden">
+        <!-- Single unified blur layer -->
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="blob-morph absolute w-48 h-48 rounded-full"
+               style="background: radial-gradient(ellipse at 30% 30%, rgba(167,139,250,0.8) 0%, transparent 50%),
+                      radial-gradient(ellipse at 70% 35%, rgba(52,211,153,0.7) 0%, transparent 45%),
+                      radial-gradient(ellipse at 65% 70%, rgba(244,114,182,0.7) 0%, transparent 45%),
+                      radial-gradient(ellipse at 30% 65%, rgba(34,211,238,0.6) 0%, transparent 45%),
+                      radial-gradient(circle at 50% 50%, rgba(96,165,250,0.4) 0%, transparent 60%);
+                      filter: blur(20px);">
+          </div>
+        </div>
+        <!-- Neurons on top -->
+        <svg width="180" height="180" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.3)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="75" y1="75" x2="70" y2="125"/><line x1="125" y1="75" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/><line x1="95" y1="80" x2="105" y2="115"/>
+          </g>
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="4" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Second row: More variations -->
+  <div class="grid grid-cols-4 gap-6 max-w-[1200px] mx-auto mt-6">
+
+    <!-- BLOB 5: Extra large, extending to edges -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">5. Full Bleed</p>
+      <p class="text-[10px] text-gray-600 mb-3">Extends to edges</p>
+      <div class="bg-gray-900 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <!-- Massive blur that bleeds to edges -->
+        <div class="absolute -inset-8" style="filter: blur(40px);">
+          <div class="blob-1 absolute w-40 h-32 rounded-full bg-violet-500/80" style="top: 15%; left: 5%;"></div>
+          <div class="blob-2 absolute w-36 h-40 rounded-full bg-emerald-500/70" style="top: 40%; left: 60%;"></div>
+          <div class="blob-3 absolute w-32 h-36 rounded-full bg-pink-500/70" style="top: 5%; left: 45%;"></div>
+          <div class="blob-4 absolute w-36 h-32 rounded-full bg-cyan-500/60" style="top: 55%; left: 10%;"></div>
+          <div class="absolute w-28 h-28 rounded-full bg-blue-500/50" style="top: 35%; left: 35%;"></div>
+        </div>
+        <!-- Neurons -->
+        <svg width="180" height="180" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.35)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="75" y1="75" x2="70" y2="125"/><line x1="125" y1="75" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="4" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- BLOB 6: Softer, more ethereal -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">6. Ethereal Mist</p>
+      <p class="text-[10px] text-gray-600 mb-3">Very soft, dreamy</p>
+      <div class="bg-gray-900 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="absolute -inset-4" style="filter: blur(50px);">
+          <div class="blob-1 absolute w-48 h-40 rounded-full bg-violet-400/50" style="top: 10%; left: 0%;"></div>
+          <div class="blob-2 absolute w-44 h-48 rounded-full bg-emerald-400/40" style="top: 35%; left: 50%;"></div>
+          <div class="blob-3 absolute w-40 h-44 rounded-full bg-pink-400/40" style="top: 0%; left: 40%;"></div>
+          <div class="blob-4 absolute w-44 h-40 rounded-full bg-cyan-400/35" style="top: 50%; left: 5%;"></div>
+        </div>
+        <svg width="180" height="180" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.25)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="4" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- BLOB 7: More saturated, vibrant -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">7. Vibrant Energy</p>
+      <p class="text-[10px] text-gray-600 mb-3">Higher saturation</p>
+      <div class="bg-gray-900 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="absolute -inset-4" style="filter: blur(35px);">
+          <div class="blob-1 absolute w-36 h-28 rounded-full bg-violet-500" style="top: 15%; left: 10%; opacity: 0.85;"></div>
+          <div class="blob-2 absolute w-32 h-36 rounded-full bg-emerald-500" style="top: 40%; left: 55%; opacity: 0.75;"></div>
+          <div class="blob-3 absolute w-28 h-32 rounded-full bg-pink-500" style="top: 10%; left: 50%; opacity: 0.75;"></div>
+          <div class="blob-4 absolute w-32 h-28 rounded-full bg-cyan-500" style="top: 55%; left: 15%; opacity: 0.7;"></div>
+          <div class="absolute w-24 h-24 rounded-full bg-indigo-400" style="top: 35%; left: 35%; opacity: 0.6;"></div>
+        </div>
+        <svg width="180" height="180" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.4)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="4" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- BLOB 8: Nebula style -->
+    <div class="text-center">
+      <p class="text-xs text-gray-400 mb-2 font-medium">8. Nebula</p>
+      <p class="text-[10px] text-gray-600 mb-3">Space cloud feel</p>
+      <div class="bg-gray-900 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <div class="absolute -inset-6" style="filter: blur(45px);">
+          <div class="blob-1 absolute w-44 h-36 rounded-[40%_60%_70%_30%] bg-violet-600/70" style="top: 10%; left: 5%;"></div>
+          <div class="blob-2 absolute w-40 h-44 rounded-[60%_40%_30%_70%] bg-emerald-500/60" style="top: 35%; left: 50%;"></div>
+          <div class="blob-3 absolute w-36 h-40 rounded-[30%_70%_60%_40%] bg-pink-500/60" style="top: 5%; left: 35%;"></div>
+          <div class="blob-4 absolute w-40 h-36 rounded-[70%_30%_40%_60%] bg-cyan-500/55" style="top: 50%; left: 10%;"></div>
+          <div class="absolute w-32 h-32 rounded-full bg-indigo-500/40" style="top: 30%; left: 30%;"></div>
+        </div>
+        <svg width="180" height="180" viewBox="0 0 200 200" class="relative z-10">
+          <g stroke="rgba(255,255,255,0.35)" stroke-width="1.5">
+            <line x1="50" y1="50" x2="150" y2="55"/><line x1="50" y1="50" x2="45" y2="145"/>
+            <line x1="150" y1="55" x2="155" y2="140"/><line x1="45" y1="145" x2="155" y2="140"/>
+            <line x1="75" y1="75" x2="125" y2="75"/><line x1="70" y1="125" x2="130" y2="125"/>
+            <line x1="85" y1="95" x2="115" y2="95"/>
+          </g>
+          <circle cx="50" cy="50" r="6" fill="#a78bfa" class="neuron"/>
+          <circle cx="150" cy="55" r="6" fill="#34d399" class="neuron"/>
+          <circle cx="45" cy="145" r="6" fill="#22d3ee" class="neuron"/>
+          <circle cx="155" cy="140" r="6" fill="#f472b6" class="neuron"/>
+          <circle cx="75" cy="75" r="5" fill="#60a5fa" class="neuron"/>
+          <circle cx="125" cy="75" r="5" fill="#f472b6" class="neuron"/>
+          <circle cx="70" cy="125" r="5" fill="#34d399" class="neuron"/>
+          <circle cx="130" cy="125" r="5" fill="#a78bfa" class="neuron"/>
+          <circle cx="100" cy="100" r="4" fill="#22d3ee" class="neuron"/>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="text-center mt-8 text-gray-500 text-sm">
+    <p class="mb-2">Which blob energy feels right?</p>
+    <p class="text-xs text-gray-600">All have gentle animation. Pick a direction to refine.</p>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile Redesign v2 — Review</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0a0a0f; }
+    .glow { text-shadow: 0 0 20px rgba(139, 92, 246, 0.5); }
+    .phone {
+      width: 375px;
+      background: linear-gradient(180deg, #0f0a1a 0%, #0a0a12 100%);
+      border-radius: 24px;
+      border: 1px solid rgba(139, 92, 246, 0.15);
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.08);
+    }
+    .card-glow {
+      background: rgba(30, 20, 50, 0.4);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.05);
+    }
+    .hint-card {
+      background: rgba(30, 25, 45, 0.6);
+      border: 1px solid rgba(139, 92, 246, 0.15);
+    }
+
+    /* Neuron animations */
+    @keyframes soft-glow {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+    @keyframes gentle-drift {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(2px, -2px); }
+    }
+    @keyframes orb-pulse {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.03); opacity: 1; }
+    }
+    .neuron { animation: soft-glow 4s ease-in-out infinite, gentle-drift 6s ease-in-out infinite; }
+    .synapse { opacity: 0.3; }
+    .orb { animation: orb-pulse 4s ease-in-out infinite; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .neuron, .orb { animation: none; opacity: 0.8; }
+    }
+  </style>
+</head>
+<body class="text-white p-8">
+
+  <h1 class="text-2xl font-bold text-center mb-2">Profile Redesign v2</h1>
+  <p class="text-gray-500 text-center mb-8">All screens at phone width (375px) — scroll to review</p>
+
+  <div class="flex flex-wrap justify-center gap-8">
+
+    <!-- ============================================ -->
+    <!-- TEASER: Aura Forming (4 stages) -->
+    <!-- ============================================ -->
+
+    <div>
+      <p class="text-xs text-gray-500 mb-2 text-center">TEASER — Stage 1</p>
+      <div class="phone p-5">
+        <p class="text-center text-gray-300 text-sm mb-4">Your Aura</p>
+
+        <!-- Hint with color dot -->
+        <div class="hint-card rounded-xl p-3 mb-4">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-violet-400"></div>
+            <p class="text-gray-100 text-sm font-medium">Strong curiosity</p>
+          </div>
+          <p class="text-gray-500 text-xs ml-4">Drawn to new ideas</p>
+        </div>
+
+        <!-- Neuron network - early stage (5 neurons) -->
+        <div class="relative w-48 h-48 mx-auto mb-4">
+          <svg class="absolute inset-0 w-full h-full" viewBox="0 0 192 192">
+            <line x1="50" y1="60" x2="140" y2="70" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="140" y1="70" x2="120" y2="140" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="50" y1="60" x2="70" y2="130" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="70" y1="130" x2="120" y2="140" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+          </svg>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-violet-400" style="left: 48px; top: 58px; animation-delay: 0s;"></div>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-cyan-400" style="left: 138px; top: 68px; animation-delay: 0.5s;"></div>
+          <div class="neuron absolute w-2.5 h-2.5 rounded-full bg-pink-400" style="left: 68px; top: 128px; animation-delay: 1s;"></div>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-emerald-400" style="left: 118px; top: 138px; animation-delay: 1.5s;"></div>
+          <div class="neuron absolute w-2 h-2 rounded-full bg-violet-300" style="left: 92px; top: 90px; animation-delay: 2s;"></div>
+        </div>
+
+        <p class="text-gray-600 text-xs text-center mb-4">7 more to unlock next insight</p>
+        <button class="w-full bg-violet-600 text-white text-sm font-medium py-3 rounded-xl">Continue →</button>
+      </div>
+    </div>
+
+    <div>
+      <p class="text-xs text-gray-500 mb-2 text-center">TEASER — Stage 2</p>
+      <div class="phone p-5">
+        <p class="text-center text-gray-300 text-sm mb-4">Your Aura</p>
+
+        <!-- 2 hints with color dots -->
+        <div class="space-y-2 mb-4">
+          <div class="hint-card rounded-xl p-3">
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-violet-400"></div>
+              <p class="text-gray-100 text-sm font-medium">Strong curiosity</p>
+            </div>
+          </div>
+          <div class="hint-card rounded-xl p-3">
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+              <p class="text-gray-100 text-sm font-medium">Natural warmth</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Neuron network - growing (8 neurons) -->
+        <div class="relative w-48 h-48 mx-auto mb-4">
+          <svg class="absolute inset-0 w-full h-full" viewBox="0 0 192 192">
+            <line x1="45" y1="55" x2="145" y2="60" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="145" y1="60" x2="130" y2="135" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="45" y1="55" x2="60" y2="125" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="60" y1="125" x2="130" y2="135" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="85" y1="80" x2="110" y2="100" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="85" y1="80" x2="45" y2="55" class="synapse" stroke="rgba(139,92,246,0.25)" stroke-width="1"/>
+            <line x1="110" y1="100" x2="145" y2="60" class="synapse" stroke="rgba(139,92,246,0.25)" stroke-width="1"/>
+          </svg>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-violet-400" style="left: 43px; top: 53px;"></div>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-cyan-400" style="left: 143px; top: 58px; animation-delay: 0.3s;"></div>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-pink-400" style="left: 58px; top: 123px; animation-delay: 0.6s;"></div>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-emerald-400" style="left: 128px; top: 133px; animation-delay: 0.9s;"></div>
+          <div class="neuron absolute w-2.5 h-2.5 rounded-full bg-violet-300" style="left: 83px; top: 78px; animation-delay: 1.2s;"></div>
+          <div class="neuron absolute w-2.5 h-2.5 rounded-full bg-indigo-400" style="left: 108px; top: 98px; animation-delay: 1.5s;"></div>
+          <div class="neuron absolute w-2 h-2 rounded-full bg-amber-400" style="left: 95px; top: 50px; animation-delay: 1.8s;"></div>
+          <div class="neuron absolute w-2 h-2 rounded-full bg-cyan-300" style="left: 75px; top: 145px; animation-delay: 2.1s;"></div>
+        </div>
+
+        <p class="text-gray-600 text-xs text-center mb-4">5 more to unlock next insight</p>
+        <button class="w-full bg-violet-600 text-white text-sm font-medium py-3 rounded-xl">Continue →</button>
+      </div>
+    </div>
+
+    <div>
+      <p class="text-xs text-gray-500 mb-2 text-center">TEASER — Stage 3</p>
+      <div class="phone p-5">
+        <p class="text-center text-gray-300 text-sm mb-4">Your Aura</p>
+
+        <!-- 3 hints with color dots -->
+        <div class="space-y-2 mb-4">
+          <div class="hint-card rounded-xl p-3">
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-violet-400"></div>
+              <p class="text-gray-100 text-sm font-medium">Strong curiosity</p>
+            </div>
+          </div>
+          <div class="hint-card rounded-xl p-3">
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+              <p class="text-gray-100 text-sm font-medium">Natural warmth</p>
+            </div>
+          </div>
+          <div class="hint-card rounded-xl p-3">
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-pink-400"></div>
+              <p class="text-gray-100 text-sm font-medium">Steady under pressure</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Neuron network - coalescing (neurons moving inward) -->
+        <div class="relative w-48 h-48 mx-auto mb-4">
+          <svg class="absolute inset-0 w-full h-full" viewBox="0 0 192 192">
+            <!-- Outer connections -->
+            <line x1="55" y1="60" x2="135" y2="65" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="135" y1="65" x2="125" y2="130" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="55" y1="60" x2="65" y2="125" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <line x1="65" y1="125" x2="125" y2="130" class="synapse" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+            <!-- Inner web -->
+            <line x1="80" y1="80" x2="110" y2="85" class="synapse" stroke="rgba(139,92,246,0.35)" stroke-width="1"/>
+            <line x1="110" y1="85" x2="105" y2="110" class="synapse" stroke="rgba(139,92,246,0.35)" stroke-width="1"/>
+            <line x1="80" y1="80" x2="85" y2="108" class="synapse" stroke="rgba(139,92,246,0.35)" stroke-width="1"/>
+            <line x1="85" y1="108" x2="105" y2="110" class="synapse" stroke="rgba(139,92,246,0.35)" stroke-width="1"/>
+            <!-- Cross connections -->
+            <line x1="80" y1="80" x2="55" y2="60" class="synapse" stroke="rgba(139,92,246,0.25)" stroke-width="1"/>
+            <line x1="110" y1="85" x2="135" y2="65" class="synapse" stroke="rgba(139,92,246,0.25)" stroke-width="1"/>
+            <line x1="85" y1="108" x2="65" y2="125" class="synapse" stroke="rgba(139,92,246,0.25)" stroke-width="1"/>
+            <line x1="105" y1="110" x2="125" y2="130" class="synapse" stroke="rgba(139,92,246,0.25)" stroke-width="1"/>
+          </svg>
+          <!-- Outer neurons -->
+          <div class="neuron absolute w-3 h-3 rounded-full bg-violet-400" style="left: 53px; top: 58px;"></div>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-cyan-400" style="left: 133px; top: 63px; animation-delay: 0.3s;"></div>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-pink-400" style="left: 63px; top: 123px; animation-delay: 0.6s;"></div>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-emerald-400" style="left: 123px; top: 128px; animation-delay: 0.9s;"></div>
+          <!-- Inner neurons -->
+          <div class="neuron absolute w-3 h-3 rounded-full bg-violet-300" style="left: 78px; top: 78px; animation-delay: 1.2s;"></div>
+          <div class="neuron absolute w-3 h-3 rounded-full bg-indigo-400" style="left: 108px; top: 83px; animation-delay: 1.5s;"></div>
+          <div class="neuron absolute w-2.5 h-2.5 rounded-full bg-amber-400" style="left: 83px; top: 106px; animation-delay: 1.8s;"></div>
+          <div class="neuron absolute w-2.5 h-2.5 rounded-full bg-cyan-300" style="left: 103px; top: 108px; animation-delay: 2.1s;"></div>
+        </div>
+
+        <p class="text-gray-600 text-xs text-center mb-4">2 more to complete</p>
+        <button class="w-full bg-violet-600 text-white text-sm font-medium py-3 rounded-xl">Continue →</button>
+      </div>
+    </div>
+
+    <div>
+      <p class="text-xs text-gray-500 mb-2 text-center">TEASER — Stage 4 (Complete)</p>
+      <div class="phone p-5">
+        <p class="text-center text-gray-300 text-sm mb-4">Your Aura</p>
+
+        <!-- 3 hints -->
+        <div class="space-y-2 mb-4">
+          <div class="hint-card rounded-xl p-3">
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-violet-400"></div>
+              <p class="text-gray-100 text-sm font-medium">Strong curiosity</p>
+            </div>
+          </div>
+          <div class="hint-card rounded-xl p-3">
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+              <p class="text-gray-100 text-sm font-medium">Natural warmth</p>
+            </div>
+          </div>
+          <div class="hint-card rounded-xl p-3">
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-pink-400"></div>
+              <p class="text-gray-100 text-sm font-medium">Steady under pressure</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completed aura orb with neurons inside -->
+        <div class="relative w-48 h-48 mx-auto mb-4 flex items-center justify-center">
+          <!-- Outer glow -->
+          <div class="absolute w-40 h-40 rounded-full orb" style="background: radial-gradient(circle, rgba(139,92,246,0.15) 0%, rgba(139,92,246,0.05) 50%, transparent 70%);"></div>
+          <!-- Main orb -->
+          <div class="absolute w-32 h-32 rounded-full orb" style="background: radial-gradient(circle, rgba(139,92,246,0.3) 0%, rgba(99,102,241,0.2) 50%, transparent 70%); box-shadow: 0 0 40px rgba(139,92,246,0.3);"></div>
+          <!-- Inner core -->
+          <div class="absolute w-20 h-20 rounded-full" style="background: radial-gradient(circle, rgba(167,139,250,0.5) 0%, rgba(139,92,246,0.3) 70%, transparent 100%);"></div>
+          <!-- Neurons inside orb -->
+          <div class="neuron absolute w-2.5 h-2.5 rounded-full bg-violet-300" style="left: 82px; top: 78px;"></div>
+          <div class="neuron absolute w-2 h-2 rounded-full bg-cyan-400" style="left: 100px; top: 88px; animation-delay: 0.4s;"></div>
+          <div class="neuron absolute w-2.5 h-2.5 rounded-full bg-pink-400" style="left: 78px; top: 105px; animation-delay: 0.8s;"></div>
+          <div class="neuron absolute w-2 h-2 rounded-full bg-emerald-400" style="left: 105px; top: 102px; animation-delay: 1.2s;"></div>
+          <div class="neuron absolute w-2 h-2 rounded-full bg-indigo-300" style="left: 92px; top: 92px; animation-delay: 1.6s;"></div>
+        </div>
+
+        <p class="text-violet-300 text-center text-sm font-medium glow mb-4">Your Aura is ready</p>
+        <button class="w-full bg-violet-600 text-white text-sm font-medium py-3 rounded-xl">View Your Profile →</button>
+      </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- PROFILE: Quick Profile Section -->
+    <!-- ============================================ -->
+
+    <div>
+      <p class="text-xs text-gray-500 mb-2 text-center">PROFILE — Collapsed</p>
+      <div class="phone p-4">
+        <p class="text-center text-gray-300 text-sm mb-4">Your Profile</p>
+
+        <!-- Quick Profile - collapsed -->
+        <button class="w-full card-glow rounded-xl p-4 flex items-center gap-3 text-left mb-3">
+          <div class="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
+            <span class="text-violet-300">✦</span>
+          </div>
+          <div class="flex-1">
+            <p class="text-gray-100 font-medium">Quick Profile</p>
+            <p class="text-gray-500 text-xs">Composed Innovator</p>
+          </div>
+          <span class="text-violet-400">∨</span>
+        </button>
+
+        <!-- Personality - collapsed -->
+        <button class="w-full card-glow rounded-xl p-4 flex items-center gap-3 text-left mb-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+            <span class="text-indigo-300">◎</span>
+          </div>
+          <div class="flex-1">
+            <p class="text-gray-100 font-medium">Personality</p>
+            <p class="text-emerald-400 text-xs">Complete</p>
+          </div>
+          <span class="text-violet-400">∨</span>
+        </button>
+
+        <!-- Relationships - collapsed -->
+        <button class="w-full card-glow rounded-xl p-4 flex items-center gap-3 text-left">
+          <div class="w-10 h-10 rounded-xl bg-pink-500/20 border border-pink-500/30 flex items-center justify-center">
+            <span class="text-pink-300">♡</span>
+          </div>
+          <div class="flex-1">
+            <p class="text-gray-100 font-medium">Relationships</p>
+            <p class="text-emerald-400 text-xs">Complete</p>
+          </div>
+          <span class="text-violet-400">∨</span>
+        </button>
+      </div>
+    </div>
+
+    <div>
+      <p class="text-xs text-gray-500 mb-2 text-center">PROFILE — Quick Profile Expanded</p>
+      <div class="phone p-4">
+        <p class="text-center text-gray-300 text-sm mb-4">Your Profile</p>
+
+        <!-- Quick Profile - expanded -->
+        <div class="card-glow rounded-xl p-4 mb-3">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
+              <span class="text-violet-300">✦</span>
+            </div>
+            <div class="flex-1">
+              <p class="text-gray-100 font-medium">Quick Profile</p>
+              <p class="text-gray-500 text-xs">Your core pattern</p>
+            </div>
+            <span class="text-violet-400">∧</span>
+          </div>
+
+          <!-- Archetype -->
+          <div class="bg-gray-800/30 rounded-lg p-3 mb-4 text-center">
+            <p class="text-violet-300 text-lg font-semibold glow">Composed Innovator</p>
+            <p class="text-gray-500 text-xs mt-1">Explores new ideas with calm confidence</p>
+          </div>
+
+          <!-- Key traits with colors -->
+          <p class="text-gray-500 text-xs uppercase tracking-wide mb-2">Key Traits</p>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="px-2.5 py-1 rounded-full text-xs bg-violet-500/15 text-violet-300 border border-violet-500/20">Highly curious</span>
+            <span class="px-2.5 py-1 rounded-full text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">Emotionally stable</span>
+            <span class="px-2.5 py-1 rounded-full text-xs bg-cyan-500/15 text-cyan-300 border border-cyan-500/20">Agreeable</span>
+            <span class="px-2.5 py-1 rounded-full text-xs bg-amber-500/15 text-amber-300 border border-amber-500/20">Moderately social</span>
+          </div>
+
+          <!-- Strengths -->
+          <div class="bg-emerald-950/20 border border-emerald-500/15 rounded-lg p-3 mb-3">
+            <p class="text-emerald-400 text-xs font-medium mb-1 flex items-center gap-1">
+              <span>✓</span> Strengths
+            </p>
+            <p class="text-gray-300 text-sm">You stay calm exploring new territory. Others trust your judgment because you think before reacting.</p>
+          </div>
+
+          <!-- Watch out -->
+          <div class="bg-amber-950/20 border border-amber-500/15 rounded-lg p-3 mb-3">
+            <p class="text-amber-400 text-xs font-medium mb-1 flex items-center gap-1">
+              <span>△</span> Watch out for
+            </p>
+            <p class="text-gray-300 text-sm">May dismiss conventional approaches too quickly. Your calm can read as detached.</p>
+          </div>
+
+          <!-- Try this -->
+          <div class="bg-cyan-950/20 border border-cyan-500/15 rounded-lg p-3">
+            <p class="text-cyan-400 text-xs font-medium mb-1 flex items-center gap-1">
+              <span>◇</span> Try this
+            </p>
+            <p class="text-gray-300 text-sm">Balance novel approaches with proven methods. Signal engagement to those who need visible reassurance.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- INSIGHTS: How Traits Combine -->
+    <!-- ============================================ -->
+
+    <div>
+      <p class="text-xs text-gray-500 mb-2 text-center">INSIGHTS — List</p>
+      <div class="phone p-4">
+        <div class="card-glow rounded-xl p-4">
+          <p class="text-gray-200 font-medium mb-3 flex items-center gap-2">
+            <span class="text-violet-400">✦</span> How Your Traits Combine
+          </p>
+
+          <div class="space-y-3">
+            <!-- Insight 1 -->
+            <button class="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl p-3 flex items-center gap-3 text-left hover:border-violet-500/30 transition-colors">
+              <div class="w-10 h-10 rounded-lg bg-violet-900/30 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
+                <span>🧭</span>
+              </div>
+              <div class="flex-1">
+                <p class="text-gray-100 text-sm font-medium">Curious Explorer</p>
+                <p class="text-gray-500 text-xs">High curiosity + emotional stability lets you explore freely.</p>
+              </div>
+            </button>
+
+            <!-- Insight 2 -->
+            <button class="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl p-3 flex items-center gap-3 text-left hover:border-violet-500/30 transition-colors">
+              <div class="w-10 h-10 rounded-lg bg-indigo-900/30 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                <span>📚</span>
+              </div>
+              <div class="flex-1">
+                <p class="text-gray-100 text-sm font-medium">Rich Inner World</p>
+                <p class="text-gray-500 text-xs">Introversion + openness creates deep thought.</p>
+              </div>
+            </button>
+
+            <!-- Insight 3 -->
+            <button class="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl p-3 flex items-center gap-3 text-left hover:border-violet-500/30 transition-colors">
+              <div class="w-10 h-10 rounded-lg bg-cyan-900/30 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                <span>⚖️</span>
+              </div>
+              <div class="flex-1">
+                <p class="text-gray-100 text-sm font-medium">Thoughtful Negotiator</p>
+                <p class="text-gray-500 text-xs">Agreeableness + conscientiousness means you follow through.</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="text-xs text-gray-500 mb-2 text-center">INSIGHTS — Expanded</p>
+      <div class="phone p-4">
+        <button class="text-gray-500 text-sm mb-3 flex items-center gap-1">← Back</button>
+
+        <div class="card-glow rounded-xl p-4">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 rounded-lg bg-violet-900/30 border border-violet-500/20 flex items-center justify-center">
+              <span class="text-xl">🧭</span>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-100 glow">Curious Explorer</h3>
+              <p class="text-gray-500 text-xs">Openness + Emotional Stability</p>
+            </div>
+          </div>
+
+          <div class="bg-gray-800/30 rounded-lg p-3 mb-3">
+            <p class="text-gray-300 text-sm leading-relaxed">
+              Your high openness drives you toward new experiences, ideas, and possibilities. Your emotional stability means you can explore these without the anxiety or overwhelm that sometimes holds others back.
+            </p>
+          </div>
+
+          <div class="bg-emerald-950/20 border border-emerald-500/15 rounded-lg p-3">
+            <p class="text-emerald-400 text-xs font-medium mb-1">Try this</p>
+            <p class="text-gray-300 text-sm">Seek roles that require adapting to new information quickly — you have the curiosity and stability for it.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="text-center text-gray-600 text-xs mt-12">noodle/2026-02-03-profile-redesign-v2/review.html</p>
+
+</body>
+</html>

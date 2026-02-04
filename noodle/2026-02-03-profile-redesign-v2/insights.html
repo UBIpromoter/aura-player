@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Insights Section — Profile Redesign v2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #0f0a1a 0%, #1a1025 50%, #0d0d1a 100%);
+      min-height: 100vh;
+    }
+
+    .glow {
+      text-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    }
+
+    .card-glow {
+      box-shadow:
+        0 0 20px rgba(139, 92, 246, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .insight-glow {
+      box-shadow:
+        0 0 30px rgba(139, 92, 246, 0.15),
+        0 0 60px rgba(139, 92, 246, 0.05);
+    }
+
+    @keyframes soft-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    .pulse-icon {
+      animation: soft-pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes connection-draw {
+      from { stroke-dashoffset: 100; }
+      to { stroke-dashoffset: 0; }
+    }
+
+    .connection-line {
+      stroke-dasharray: 100;
+      animation: connection-draw 1.5s ease-out forwards;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pulse-icon, .connection-line {
+        animation: none;
+      }
+      .connection-line {
+        stroke-dasharray: none;
+      }
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body class="p-8 text-white">
+  <h1 class="text-2xl font-bold text-center mb-8 text-gray-400">Insights Section — How Traits Combine</h1>
+
+  <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+
+    <!-- Column 1: Minimal View (just the section) -->
+    <div class="space-y-4">
+      <p class="text-sm text-gray-500 text-center mb-4">Standalone Section</p>
+
+      <div class="bg-violet-950/30 border border-violet-500/20 rounded-2xl p-6 card-glow">
+        <h2 class="text-lg font-semibold text-gray-200 mb-4 flex items-center gap-2">
+          <span class="text-violet-400">✦</span>
+          How Your Traits Combine
+        </h2>
+
+        <div class="space-y-3">
+          <!-- Insight 1 -->
+          <div class="bg-gray-800/40 border border-gray-700/30 rounded-xl p-4 hover:border-violet-500/30 transition-colors cursor-pointer group">
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 rounded-lg bg-violet-900/40 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
+                <span class="text-lg pulse-icon">🧭</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-gray-200 text-sm font-medium">Curious Explorer</p>
+                <p class="text-gray-400 text-xs mt-1 leading-relaxed">High curiosity + emotional stability lets you explore freely without anxiety holding you back.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Insight 2 -->
+          <div class="bg-gray-800/40 border border-gray-700/30 rounded-xl p-4 hover:border-violet-500/30 transition-colors cursor-pointer group">
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 rounded-lg bg-indigo-900/40 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                <span class="text-lg pulse-icon">📚</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-gray-200 text-sm font-medium">Rich Inner World</p>
+                <p class="text-gray-400 text-xs mt-1 leading-relaxed">Introversion + openness creates deep thought and creative imagination.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Insight 3 -->
+          <div class="bg-gray-800/40 border border-gray-700/30 rounded-xl p-4 hover:border-violet-500/30 transition-colors cursor-pointer group">
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 rounded-lg bg-cyan-900/40 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                <span class="text-lg pulse-icon">⚖️</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-gray-200 text-sm font-medium">Thoughtful Negotiator</p>
+                <p class="text-gray-400 text-xs mt-1 leading-relaxed">High agreeableness + conscientiousness means you follow through on commitments to others.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column 2: Expanded Insight Card -->
+    <div class="space-y-4">
+      <p class="text-sm text-gray-500 text-center mb-4">Expanded View (tapped insight)</p>
+
+      <div class="bg-violet-950/30 border border-violet-500/20 rounded-2xl p-6 insight-glow">
+        <!-- Back nav -->
+        <button class="text-gray-400 text-sm mb-4 flex items-center gap-1 hover:text-gray-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 rounded">
+          <span>←</span> Back to insights
+        </button>
+
+        <!-- Main insight -->
+        <div class="text-center mb-6">
+          <div class="w-16 h-16 rounded-2xl bg-violet-900/40 border border-violet-500/30 flex items-center justify-center mx-auto mb-4">
+            <span class="text-3xl">🧭</span>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-100 glow">Curious Explorer</h3>
+          <p class="text-gray-400 text-sm mt-2">A pattern unique to your profile</p>
+        </div>
+
+        <!-- Trait combination visual -->
+        <div class="relative py-6 mb-6" role="img" aria-label="Openness and Emotional Stability combine to create Curious Explorer pattern">
+          <svg class="w-full h-16" viewBox="0 0 200 60" aria-hidden="true">
+            <!-- Left trait -->
+            <circle cx="30" cy="30" r="20" fill="rgba(139, 92, 246, 0.2)" stroke="rgba(139, 92, 246, 0.4)" stroke-width="1"/>
+            <text x="30" y="34" text-anchor="middle" fill="#a78bfa" font-size="10" font-weight="500">Open</text>
+
+            <!-- Right trait -->
+            <circle cx="170" cy="30" r="20" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" stroke-width="1"/>
+            <text x="170" y="34" text-anchor="middle" fill="#86efac" font-size="10" font-weight="500">Stable</text>
+
+            <!-- Connection -->
+            <line x1="52" y1="30" x2="148" y2="30" stroke="url(#connection-gradient)" stroke-width="2" class="connection-line"/>
+
+            <!-- Center merge point -->
+            <circle cx="100" cy="30" r="8" fill="rgba(139, 92, 246, 0.4)"/>
+            <circle cx="100" cy="30" r="4" fill="#a78bfa"/>
+
+            <defs>
+              <linearGradient id="connection-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="rgba(139, 92, 246, 0.6)"/>
+                <stop offset="50%" stop-color="rgba(139, 92, 246, 0.8)"/>
+                <stop offset="100%" stop-color="rgba(34, 197, 94, 0.6)"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <p class="sr-only">Openness trait combines with Emotional Stability trait</p>
+        </div>
+
+        <!-- Explanation -->
+        <div class="space-y-4">
+          <div class="bg-gray-800/40 border border-gray-700/30 rounded-xl p-4">
+            <h4 class="text-gray-300 text-sm font-medium mb-2">What this means</h4>
+            <p class="text-gray-400 text-sm leading-relaxed">
+              Your high openness drives you toward new experiences, ideas, and possibilities.
+              Your emotional stability means you can explore these without the anxiety or
+              overwhelm that sometimes holds others back.
+            </p>
+          </div>
+
+          <div class="bg-gray-800/40 border border-gray-700/30 rounded-xl p-4">
+            <h4 class="text-gray-300 text-sm font-medium mb-2">You might notice</h4>
+            <ul class="text-gray-400 text-sm space-y-2">
+              <li class="flex items-start gap-2">
+                <span class="text-violet-400 mt-0.5">•</span>
+                <span>You're drawn to unfamiliar situations while others hesitate</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-violet-400 mt-0.5">•</span>
+                <span>Learning new things feels exciting, not stressful</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-violet-400 mt-0.5">•</span>
+                <span>You can sit with uncertainty better than most</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-4">
+            <h4 class="text-emerald-300 text-sm font-medium mb-2">💡 Try this</h4>
+            <p class="text-gray-400 text-sm leading-relaxed">
+              Lean into roles that require adapting to new information quickly —
+              you have the curiosity to seek it out and the stability to process it clearly.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column 3: Multiple Insights in Profile Context -->
+    <div class="space-y-4 md:col-span-2">
+      <p class="text-sm text-gray-500 text-center mb-4">In Full Profile Context</p>
+
+      <div class="bg-violet-950/20 border border-violet-500/10 rounded-2xl p-6">
+        <!-- Profile header mini -->
+        <div class="text-center mb-6 pb-4 border-b border-gray-700/30">
+          <p class="text-violet-300 text-lg font-semibold glow">Composed Innovator</p>
+          <p class="text-gray-500 text-xs mt-1">Your personality pattern</p>
+        </div>
+
+        <!-- Two-column layout for insights -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <!-- Primary Insights -->
+          <div>
+            <h2 class="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+              <span class="text-violet-400">✦</span>
+              Your Unique Patterns
+            </h2>
+
+            <div class="space-y-2">
+              <!-- Insight cards - compact -->
+              <div class="bg-gray-800/30 border border-gray-700/20 rounded-lg p-3 hover:border-violet-500/30 transition-colors cursor-pointer">
+                <div class="flex items-center gap-3">
+                  <span class="text-base">🧭</span>
+                  <div class="flex-1">
+                    <p class="text-gray-200 text-sm">Curious Explorer</p>
+                    <p class="text-gray-500 text-xs">Openness + Stability</p>
+                  </div>
+                  <span class="text-gray-600 text-xs">→</span>
+                </div>
+              </div>
+
+              <div class="bg-gray-800/30 border border-gray-700/20 rounded-lg p-3 hover:border-violet-500/30 transition-colors cursor-pointer">
+                <div class="flex items-center gap-3">
+                  <span class="text-base">📚</span>
+                  <div class="flex-1">
+                    <p class="text-gray-200 text-sm">Rich Inner World</p>
+                    <p class="text-gray-500 text-xs">Introversion + Openness</p>
+                  </div>
+                  <span class="text-gray-600 text-xs">→</span>
+                </div>
+              </div>
+
+              <div class="bg-gray-800/30 border border-gray-700/20 rounded-lg p-3 hover:border-violet-500/30 transition-colors cursor-pointer">
+                <div class="flex items-center gap-3">
+                  <span class="text-base">⚖️</span>
+                  <div class="flex-1">
+                    <p class="text-gray-200 text-sm">Thoughtful Negotiator</p>
+                    <p class="text-gray-500 text-xs">Agreeableness + Conscientiousness</p>
+                  </div>
+                  <span class="text-gray-600 text-xs">→</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cross-Assessment Insights -->
+          <div>
+            <h2 class="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+              <span class="text-cyan-400">◈</span>
+              Cross-Assessment Insights
+            </h2>
+
+            <div class="space-y-2">
+              <div class="bg-gray-800/30 border border-gray-700/20 rounded-lg p-3 hover:border-cyan-500/30 transition-colors cursor-pointer">
+                <div class="flex items-center gap-3">
+                  <span class="text-base">🌙</span>
+                  <div class="flex-1">
+                    <p class="text-gray-200 text-sm">Night Owl Advantage</p>
+                    <p class="text-gray-500 text-xs">Chronotype + Introversion</p>
+                  </div>
+                  <span class="text-gray-600 text-xs">→</span>
+                </div>
+              </div>
+
+              <div class="bg-gray-800/30 border border-gray-700/20 rounded-lg p-3 hover:border-cyan-500/30 transition-colors cursor-pointer">
+                <div class="flex items-center gap-3">
+                  <span class="text-base">🔗</span>
+                  <div class="flex-1">
+                    <p class="text-gray-200 text-sm">Secure Foundation</p>
+                    <p class="text-gray-500 text-xs">Attachment + Stability</p>
+                  </div>
+                  <span class="text-gray-600 text-xs">→</span>
+                </div>
+              </div>
+
+              <div class="bg-gray-800/30 border border-gray-700/20 rounded-lg p-3 opacity-50 cursor-not-allowed">
+                <div class="flex items-center gap-3">
+                  <span class="text-base">🎯</span>
+                  <div class="flex-1">
+                    <p class="text-gray-400 text-sm">Risk Pattern</p>
+                    <p class="text-gray-600 text-xs">Complete risk assessment to unlock</p>
+                  </div>
+                  <span class="text-gray-700 text-xs">🔒</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Unlock prompt -->
+        <div class="mt-6 pt-4 border-t border-gray-700/30 text-center">
+          <p class="text-gray-500 text-xs">5 insights discovered • Complete more assessments to unlock deeper patterns</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="text-center text-gray-600 text-xs mt-8">Profile Redesign v2 — Insights Section</p>
+</body>
+</html>
