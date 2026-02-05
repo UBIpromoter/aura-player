@@ -79,6 +79,11 @@
 **Edited wrong branch** → Didn't check first
 → **Check `git branch` before editing** — never touch main/dev directly
 
+**Pushed without explicit "Ship it"** → Conflated "merge" with "ship"
+→ **"Merge it"** = integrate to main locally (can still review)
+→ **"Ship it"** = push to remote (gone, live, done)
+→ These are separate actions. Never push without the "ship it" trigger.
+
 ---
 
 ## UI Patterns
