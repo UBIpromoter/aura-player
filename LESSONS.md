@@ -61,6 +61,11 @@
 **Verbose trait displays waste space** → 3 lines per trait = too much scrolling
 → Compact to single line: `Name [lowLabel ════●════ highLabel]`
 
+**Thin marker bars feel weak** → Rectangle markers on 1.5px bars are hard to see
+→ Use refined design: h-3 bar (thicker), 16px glowing circle dot
+→ Dot: colored fill + white border + colored glow (`box-shadow: 0 0 8px rgba(r,g,b,0.5)`)
+→ TraitSpectrum has `compact={true}` for inline lists, full mode for standalone
+
 **Long lists cause decision fatigue** → 11+ items flat = overwhelming
 → Group into collapsible categories with summary in collapsed state
 
