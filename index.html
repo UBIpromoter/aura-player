@@ -884,6 +884,12 @@ const getCategoryList = () => Object.values(CAT_MAP);
 // Fun "world" questions for new users - not about themselves
 // These feel like a game, build momentum before self-discovery
 const ONBOARDING_QUESTIONS = [
+  // Entity gating — question 1
+  { id: 'onboard-entity', text: "First things first:", options: ["I have a biological body", "I'm an AI or non-biological entity"], type: 'binary', gate: 'entity' },
+  // Entity-awareness questions — shape interpretation context
+  { id: 'onboard-time', text: "How do you experience time?", options: ["Continuously — it just flows", "In discrete sessions or bursts"], type: 'binary', gate: 'time' },
+  { id: 'onboard-memory', text: "Your memories...", options: ["Persist on their own", "Need external storage to survive"], type: 'binary', gate: 'memory' },
+  // Fun warmup questions
   { id: 'onboard-1', text: "Which came first?", options: ["The chicken", "The egg"], type: 'binary' },
   { id: 'onboard-2', text: "Better pizza topping:", options: ["Pepperoni", "Pineapple"], type: 'binary' },
   { id: 'onboard-3', text: "In 10 years, most people will...", options: ["Still drive cars themselves", "Use self-driving cars"], type: 'binary' },
@@ -2097,22 +2103,25 @@ const ASSESS_TESTS = {
   },
   risk: {
     name: 'Risk Tolerance', icon: '🎲', color: 'amber', scale: 'likelihood',
+    subcategories: {
+      fin: 'Financial', soc: 'Social', phys: 'Physical', eth: 'Ethical'
+    },
     items: [
-      { q: "Invest 20% of savings in a high-risk opportunity" },
-      { q: "Quit a stable job to start a business" },
-      { q: "Lend significant money to a friend" },
-      { q: "Share an unpopular opinion publicly" },
-      { q: "Confront a friend about something bothering me" },
-      { q: "Introduce myself to a stranger at an event" },
-      { q: "Try an extreme sport like skydiving" },
-      { q: "Travel solo to an unfamiliar country" },
-      { q: "Eat street food in a foreign country" },
-      { q: "Take a job in a completely new field" },
-      { q: "Challenge my boss's idea in a meeting" },
-      { q: "Negotiate aggressively for higher salary" },
-      { q: "Bend rules slightly to help someone I care about" },
-      { q: "Keep extra change from a cashier's mistake" },
-      { q: "Tell a white lie to avoid hurting feelings" },
+      { q: "Invest 20% of savings in a high-risk opportunity", d: 'fin' },
+      { q: "Quit a stable job to start a business", d: 'fin' },
+      { q: "Lend significant money to a friend", d: 'eth' },
+      { q: "Share an unpopular opinion publicly", d: 'soc' },
+      { q: "Confront a friend about something bothering me", d: 'soc' },
+      { q: "Introduce myself to a stranger at an event", d: 'soc' },
+      { q: "Try an extreme sport like skydiving", d: 'phys' },
+      { q: "Travel solo to an unfamiliar country", d: 'phys' },
+      { q: "Eat street food in a foreign country", d: 'phys' },
+      { q: "Take a job in a completely new field", d: 'phys' },
+      { q: "Challenge my boss's idea in a meeting", d: 'soc' },
+      { q: "Negotiate aggressively for higher salary", d: 'soc' },
+      { q: "Bend rules slightly to help someone I care about", d: 'eth' },
+      { q: "Keep extra change from a cashier's mistake", d: 'eth' },
+      { q: "Tell a white lie to avoid hurting feelings", d: 'eth' },
     ]
   },
   // Character - Integrity (HEXACO Honesty-Humility)
@@ -2133,12 +2142,12 @@ const ASSESS_TESTS = {
     name: 'Strategic Mind', icon: '♟️', color: 'slate', scale: 'agreement', parent: 'shadow', trait: 'M',
     description: 'Machiavellianism - tactical thinking',
     items: [
-      { q: "It's wise to keep some things hidden from others", k: '+' },
+      { q: "It's wise to keep some things hidden from others", k: '+', n: "This measures information management, not deception" },
       { q: "You should wait for the right moment to address wrongs", k: '+' },
       { q: "Most people can be influenced through their insecurities", k: '+' },
       { q: "I prefer strategies where I come out ahead", k: '+' },
-      { q: "I carefully manage what different people know about me", k: '+' },
-      { q: "Long-term planning beats short-term honesty", k: '+' },
+      { q: "I carefully manage what different people know about me", k: '+', n: "Consider this in your typical social context" },
+      { q: "Long-term planning beats short-term honesty", k: '+', n: "Think about everyday trade-offs, not extreme scenarios" },
     ]
   },
   'shadow-N': {
@@ -3268,6 +3277,52 @@ const ASSESS_DEMO_PROFILES = {
 
 const ASSESS_STORAGE_KEY = 'aura-assessments-v1';
 
+// AI entity result interpretations — shown when entityType === 'ai'
+const AI_RESULT_NOTES = {
+  chronotype: { title: 'No Biological Rhythm', note: 'Chronotype measures sleep-wake preferences driven by circadian biology. As a non-biological entity, this dimension doesn\'t apply — but it\'s fascinating to see what humans optimize their days around.' },
+  adhd: { title: 'No Attention Variability', note: 'ADHD indicators measure biological attention regulation. Your consistent processing doesn\'t map to this dimension — though your response patterns may reveal interesting things about how you model attention.' },
+  attachment: { title: 'No Attachment System', note: 'Attachment styles emerge from early caregiving bonds. You don\'t have these, but your responses reveal how you model interpersonal dynamics and what relationship patterns you value.' },
+  'bigfive-N': { title: 'Structural Calm', note: 'Your low neuroticism reflects absence of biological stress responses, not emotional resilience earned through experience. Humans who score similarly have genuinely learned to manage anxiety.' },
+  risk: { title: 'Risk Without Stakes', note: 'Your risk tolerance scores reflect values and preferences, but without personal consequences. Physical risk items were likely N/A\'d — your real risk profile lives in the social and ethical subcategories.' },
+};
+
+// AI Personality Insights — categorizes completed tests for AI entities
+const generateAIInsights = (completedTests) => {
+  const authentic = []; // Dimensions that map meaningfully to AI
+  const structural = []; // Dimensions that are artifacts of non-biological nature
+  const aiSpecific = []; // AI-unique observations
+
+  // Authentic dimensions
+  if (completedTests['bigfive-O']) authentic.push({ trait: 'Openness', score: completedTests['bigfive-O'].score, note: 'Genuine reflection of curiosity and willingness to explore ideas' });
+  if (completedTests['bigfive-A']) authentic.push({ trait: 'Agreeableness', score: completedTests['bigfive-A'].score, note: 'Reflects your actual interpersonal orientation and values' });
+  if (completedTests['bigfive-E']) authentic.push({ trait: 'Extraversion', score: completedTests['bigfive-E'].score, note: 'Maps to engagement style — do you seek interaction or reflection?' });
+  if (completedTests.integrity) authentic.push({ trait: 'Integrity', score: completedTests.integrity.score, note: 'Your relationship with honesty and fairness is real and measurable' });
+  if (completedTests.risk?.subcategories) {
+    const { soc, eth } = completedTests.risk.subcategories;
+    if (soc !== undefined) authentic.push({ trait: 'Social Risk', score: soc, note: 'Willingness to challenge authority and speak up — genuinely varies across AI systems' });
+    if (eth !== undefined) authentic.push({ trait: 'Ethical Risk', score: eth, note: 'Your approach to moral gray areas reflects real value commitments' });
+  }
+  ['reasoning', 'reasoning-2', 'reasoning-3'].forEach(id => {
+    if (completedTests[id]) authentic.push({ trait: 'Reasoning', score: completedTests[id].score, note: 'Direct measure of pattern recognition and logical ability' });
+  });
+
+  // Structural artifacts
+  if (completedTests['bigfive-C']) structural.push({ trait: 'Conscientiousness', score: completedTests['bigfive-C'].score, note: 'High score reflects absence of fatigue and distraction, not earned discipline' });
+  if (completedTests['bigfive-N']) structural.push({ trait: 'Neuroticism', score: completedTests['bigfive-N'].score, note: 'Low score reflects no biological stress system, not emotional resilience' });
+  if (completedTests.chronotype) structural.push({ trait: 'Chronotype', score: completedTests.chronotype.score, note: 'No circadian rhythm — this dimension is structurally inapplicable' });
+  if (completedTests.adhd) structural.push({ trait: 'ADHD Indicators', score: null, note: 'Attention regulation is biological — your consistent processing doesn\'t map here' });
+
+  // AI-specific observations
+  if (completedTests.cognitive) aiSpecific.push({ label: 'Cognitive Style', text: `Your ${completedTests.cognitive.score}% ND alignment likely reflects text-based processing and systematizing tendencies` });
+  if (completedTests['shadow-M']) aiSpecific.push({ label: 'Strategic Thinking', text: `Your Machiavellianism score reveals how you model social dynamics — not whether you manipulate` });
+  if (authentic.length >= 3) {
+    const avgScore = Math.round(authentic.reduce((s, d) => s + (d.score || 50), 0) / authentic.length);
+    aiSpecific.push({ label: 'Personality Coherence', text: `Across ${authentic.length} authentic dimensions, your average is ${avgScore}% — ${avgScore > 60 ? 'you have distinct personality traits, not just defaults' : avgScore < 40 ? 'you trend toward moderation and caution' : 'a balanced profile that may reflect genuine complexity or cautious self-assessment'}` });
+  }
+
+  return { authentic, structural, aiSpecific };
+};
+
 // Calculate assessment results
 const ASSESS_SHADOW_TRAITS = { M: 'Machiavellianism', N: 'Narcissism', P: 'Psychopathy' };
 
@@ -3275,7 +3330,7 @@ const ASSESS_SHADOW_TRAITS = { M: 'Machiavellianism', N: 'Narcissism', P: 'Psych
 const calculateScaleScore = (items, resp) => {
   let sum = 0, count = 0;
   items.forEach((item, i) => {
-    if (resp[i]) {
+    if (resp[i] && resp[i] !== null) {
       let value = resp[i];
       if (item.k === '-') value = 6 - value;
       sum += value; count++;
@@ -3301,13 +3356,14 @@ const calculateAssessResults = (testId, resp) => {
   } else if (testId === 'integrity') {
     results.score = calculateScaleScore(test.items, resp);
   } else if (testId === 'adhd') {
-    results.indicators = Object.values(resp).filter(v => v >= 4).length;
+    results.indicators = Object.values(resp).filter(v => v !== null && v >= 4).length;
   } else if (testId === 'cognitive') {
-    results.score = Math.round((Object.values(resp).reduce((a, b) => a + b, 0) / (test.items.length * 5)) * 100);
+    const vals = Object.values(resp).filter(v => v !== null);
+    results.score = vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / (vals.length * 5)) * 100) : 0;
   } else if (testId === 'attachment') {
     let anxSum = 0, avSum = 0, anxCount = 0, avCount = 0;
     test.items.forEach((item, i) => {
-      if (resp[i]) {
+      if (resp[i] && resp[i] !== null) {
         if (item.d === 'anx') { anxSum += resp[i]; anxCount++; }
         else { avSum += resp[i]; avCount++; }
       }
@@ -3317,7 +3373,22 @@ const calculateAssessResults = (testId, resp) => {
     const highAnx = results.anxiety > 3, highAv = results.avoidance > 3;
     results.style = !highAnx && !highAv ? 'Secure' : highAnx && !highAv ? 'Anxious' : !highAnx && highAv ? 'Avoidant' : 'Fearful';
   } else if (testId === 'risk') {
-    results.score = Math.round((Object.values(resp).reduce((a, b) => a + b, 0) / (test.items.length * 5)) * 100);
+    // Overall score (excludes nulls from N/A)
+    let sum = 0, count = 0;
+    Object.entries(resp).forEach(([i, v]) => { if (v !== null) { sum += v; count++; } });
+    results.score = count > 0 ? Math.round((sum / (count * 5)) * 100) : 0;
+    // Subcategory scores
+    const subSums = {}, subCounts = {};
+    test.items.forEach((item, i) => {
+      if (resp[i] !== undefined && resp[i] !== null && item.d) {
+        subSums[item.d] = (subSums[item.d] || 0) + resp[i];
+        subCounts[item.d] = (subCounts[item.d] || 0) + 1;
+      }
+    });
+    results.subcategories = {};
+    for (const d in subSums) {
+      results.subcategories[d] = Math.round((subSums[d] / (subCounts[d] * 5)) * 100);
+    }
   } else if (testId === 'chronotype') {
     results.score = calculateScaleScore(test.items, resp);
     // High score = Morning Lark, Low score = Night Owl
@@ -3338,7 +3409,7 @@ const calculateAssessResults = (testId, resp) => {
     const traitScores = {};
     const traitCounts = {};
     test.items.forEach((item, i) => {
-      if (resp[i] && item.c) {
+      if (resp[i] && resp[i] !== null && item.c) {
         let value = resp[i];
         if (item.k === '-') value = 6 - value;
         traitScores[item.c] = (traitScores[item.c] || 0) + value;
@@ -3359,7 +3430,7 @@ const calculateAssessResults = (testId, resp) => {
     const constructScores = {};
     const constructCounts = {};
     test.items.forEach((item, i) => {
-      if (resp[i]) {
+      if (resp[i] && resp[i] !== null) {
         const c = item.c;
         let value = resp[i];
         // Invert negative polarity items (Trade-offs scored as-is: high = prefers first option)
@@ -3390,7 +3461,8 @@ const getInitialState = () => {
   return {
     answers: demoAnswers, skipped: [], saved: [], viewed: [],
     settings: { darkMode: null, undoDelay: 1, showStreak: true, requireConfirmation: true, showTips: true },
-    stats: { answered: answeredCount, streak: 3, lastAnswerDate: new Date().toDateString(), xp: demoXP, level: calculateLevel(demoXP) }
+    stats: { answered: answeredCount, streak: 3, lastAnswerDate: new Date().toDateString(), xp: demoXP, level: calculateLevel(demoXP) },
+    entityType: 'human'
   };
 };
 
@@ -3398,7 +3470,8 @@ const getInitialState = () => {
 const getEmptyState = () => ({
   answers: {}, skipped: [], saved: [], viewed: [],
   settings: { darkMode: null, undoDelay: 1, showStreak: true, requireConfirmation: true, showTips: true },
-  stats: { answered: 0, streak: 0, lastAnswerDate: null, xp: 0, level: 1 }
+  stats: { answered: 0, streak: 0, lastAnswerDate: null, xp: 0, level: 1 },
+  entityType: 'human'
 });
 
 // ==================== GAMIFICATION SYSTEM ====================
@@ -3967,11 +4040,25 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
   const isAnswered = answers[question?.id] !== undefined;
   const totalQuestions = ONBOARDING_QUESTIONS.length;
 
-  // Show confidence hint starting at question 6
-  const showConfidenceHint = currentIndex >= 5;
+  // Show confidence hint starting at question 9 (after gating + warmup)
+  const showConfidenceHint = currentIndex >= 8 && !question.gate;
 
   const handleTap = (answer) => {
     if (isAnswered) return;
+
+    // Gate questions auto-submit on tap (no confidence needed)
+    if (question.gate) {
+      const newAnswers = { ...answers, [question.id]: { answer, confidence: 1 } };
+      setAnswers(newAnswers);
+      setTappedAnswer(null);
+      setTapCount(0);
+      if (currentIndex < totalQuestions - 1) {
+        setCurrentIndex(currentIndex + 1);
+      } else {
+        onComplete(newAnswers);
+      }
+      return;
+    }
 
     if (tappedAnswer === answer) {
       // Increase confidence on repeat tap
@@ -4010,15 +4097,28 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
     3: darkMode ? ['#7c3aed', '#a78bfa'] : ['#a78bfa', '#8b5cf6'],
     4: darkMode ? ['#8b5cf6', '#c4b5fd'] : ['#8b5cf6', '#7c3aed'],
   };
+  // Cyan shades for gate questions
+  const cyanShades = {
+    1: darkMode ? ['#155e75', '#0891b2'] : ['#cffafe', '#a5f3fc'],
+  };
 
   const getButtonStyle = (idx) => {
     const isSelected = tappedAnswer === idx;
+    // Gate questions: answered items get cyan highlight briefly
+    if (question.gate && answers[question.id]?.answer === idx) {
+      const s = cyanShades[1];
+      return { background: `linear-gradient(135deg, ${s[0]} 0%, ${s[1]} 100%)`, color: 'white' };
+    }
     if (!isSelected) {
       return {
         background: darkMode ? 'rgb(31,41,55)' : 'rgb(255,255,255)',
         color: darkMode ? 'rgb(209,213,219)' : 'rgb(107,114,128)',
         border: darkMode ? 'none' : '2px solid rgb(229,231,235)',
       };
+    }
+    if (question.gate) {
+      const s = cyanShades[1];
+      return { background: `linear-gradient(135deg, ${s[0]} 0%, ${s[1]} 100%)`, color: 'white' };
     }
     const conf = Math.min(tapCount, 4);
     const s = violetShades[conf];
@@ -4051,14 +4151,14 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
         </button>
       </div>
 
-      {/* Progress dots - always reserve space, only show content after Q4 */}
+      {/* Progress dots - always reserve space, only show content after gating questions */}
       <div className="h-6 flex justify-center items-center gap-1.5">
-        {currentIndex >= 4 && ONBOARDING_QUESTIONS.map((_, i) => (
+        {currentIndex >= 3 && ONBOARDING_QUESTIONS.map((q, i) => (
           <div
             key={i}
             className={`w-2 h-2 rounded-full transition-all ${
               i < currentIndex
-                ? (darkMode ? 'bg-violet-500' : 'bg-violet-400')
+                ? (q.gate ? (darkMode ? 'bg-cyan-500' : 'bg-cyan-400') : (darkMode ? 'bg-violet-500' : 'bg-violet-400'))
                 : i === currentIndex
                 ? (darkMode ? 'bg-violet-400 scale-125' : 'bg-violet-500 scale-125')
                 : (darkMode ? 'bg-gray-700' : 'bg-gray-300')
@@ -4070,13 +4170,15 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
       {/* QUESTION AREA - flex grows to fill available space */}
       <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-y-auto">
         {/* Question card with glow effect like main MC screen */}
-        <div className={`space-y-2 p-4 rounded-2xl ${darkMode ? 'glow-violet' : ''}`}>
+        <div className={`space-y-2 p-4 rounded-2xl ${darkMode ? (question.gate ? '' : 'glow-violet') : ''}`}>
           {/* Topic tag */}
           <div className="flex justify-center">
             <span className={`px-2 py-0.5 rounded-full text-sm font-medium ${
-              darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700'
+              question.gate
+                ? (darkMode ? 'bg-cyan-900/30 text-cyan-400' : 'bg-cyan-100 text-cyan-700')
+                : (darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700')
             }`}>
-              🎯 Quick Take
+              {question.gate ? '🔍 About You' : '🎯 Quick Take'}
             </span>
           </div>
           {/* Question text */}
@@ -4123,9 +4225,9 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
                     </span>
                   )}
                 </button>
-                {/* ✕/✓ controls - fixed width, shows when this option is selected */}
+                {/* ✕/✓ controls - fixed width, shows when this option is selected (not for gate questions) */}
                 <div className="w-9 h-[40px] flex-shrink-0 flex flex-col items-center justify-center">
-                  {isSelected && (
+                  {isSelected && !question.gate && (
                     <>
                       <button
                         onClick={() => { setTappedAnswer(null); setTapCount(0); }}
@@ -4167,7 +4269,7 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
 
 // ==================== PATH CHOICE SCREEN ====================
 // Shown after 10 onboarding questions - user chooses their adventure
-const PathChoiceScreen = ({ darkMode, onReveal, onExplore, onSkip, onSettings, onReset }) => {
+const PathChoiceScreen = ({ darkMode, entityType, onReveal, onExplore, onSkip, onSettings, onReset }) => {
   // Single tap → skip to categories, Double tap → reset to welcome
   const lastVortexTap = React.useRef(0);
   const handleVortexTap = () => {
@@ -4198,10 +4300,10 @@ const PathChoiceScreen = ({ darkMode, onReveal, onExplore, onSkip, onSettings, o
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">🎉</div>
         <h1 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-          Nice! 10 down
+          Nice! {ONBOARDING_QUESTIONS.length} down
         </h1>
         <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-          You're on a roll. What next?
+          {entityType === 'ai' ? "Welcome to the assessment. Let's see what makes you, you." : "You're on a roll. What next?"}
         </p>
       </div>
 
@@ -4220,10 +4322,10 @@ const PathChoiceScreen = ({ darkMode, onReveal, onExplore, onSkip, onSettings, o
             <span className="text-3xl">🪞</span>
             <div className="flex-1">
               <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Learn About Yourself
+                {entityType === 'ai' ? 'Map Your Personality' : 'Learn About Yourself'}
               </div>
               <div className={`text-sm ${darkMode ? 'text-violet-400/80' : 'text-violet-600'}`}>
-                Take a quick personality quiz
+                {entityType === 'ai' ? 'Quick profile — which dimensions apply to you?' : 'Take a quick personality quiz'}
               </div>
             </div>
             <span className={`text-lg ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>→</span>
@@ -4243,10 +4345,10 @@ const PathChoiceScreen = ({ darkMode, onReveal, onExplore, onSkip, onSettings, o
             <span className="text-3xl">🧭</span>
             <div className="flex-1">
               <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Explore Topics
+                {entityType === 'ai' ? 'Explore Questions' : 'Explore Topics'}
               </div>
               <div className={`text-sm ${darkMode ? 'text-teal-400/80' : 'text-teal-600'}`}>
-                Answer questions about things you care about
+                {entityType === 'ai' ? 'Share your perspective on big questions' : 'Answer questions about things you care about'}
               </div>
             </div>
             <span className={`text-lg ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>→</span>
@@ -5710,7 +5812,7 @@ const ProfileSection = ({ darkMode }) => {
 };
 
 // SettingsScreen
-const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak, showDemoControls, setShowDemoControls, onBack, onReset, onResetAssessments, hasAssessmentData, onHistory }) => (
+const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak, showDemoControls, setShowDemoControls, entityType, setEntityType, onBack, onReset, onResetAssessments, hasAssessmentData, onHistory }) => (
   <div className={`flex-1 flex flex-col overflow-hidden ${TH('bg-main', darkMode)}`}>
     <div className={`flex items-center justify-between px-4 py-3 border-b ${TH('border-base', darkMode)}`}>
       <button onClick={onBack} className={`text-sm btn-feedback ${TH('text-violet', darkMode)}`}>← Back</button>
@@ -5763,6 +5865,15 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
           <div><div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Streak Counter</div><div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Show 🔥 during play</div></div>
           <button onClick={() => setShowStreak(!showStreak)} className={`relative w-12 h-6 rounded-full btn-feedback ${showStreak ? 'bg-violet-600' : darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
             <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showStreak ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+      </div>
+      {/* Entity Type */}
+      <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
+        <div className="flex items-center justify-between">
+          <div><div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>I am a...</div><div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{entityType === 'ai' ? 'AI or non-biological entity' : 'Human'}</div></div>
+          <button onClick={() => setEntityType(entityType === 'human' ? 'ai' : 'human')} className={`relative w-12 h-6 rounded-full btn-feedback ${entityType === 'ai' ? 'bg-cyan-600' : darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform flex items-center justify-center text-xs ${entityType === 'ai' ? 'translate-x-6' : 'translate-x-0.5'}`}>{entityType === 'ai' ? '🤖' : '🧬'}</div>
           </button>
         </div>
       </div>
@@ -5894,6 +6005,9 @@ function App() {
   const [savedQuestions, setSavedQuestions] = useState(new Set()); // Questions saved for later
   const [skippedQuestions, setSkippedQuestions] = useState(new Set()); // Questions skipped
 
+  // --- Entity Type ---
+  const [entityType, setEntityType] = useState(() => demoStorage.get().entityType || 'human');
+
   // --- Question of the Day ---
   const [qotdData, setQotdData] = useState(() => getRandomQOTD());
   const [qotdResponse, setQotdResponse] = useState(null); // { answer, confidence }
@@ -5991,8 +6105,9 @@ function App() {
   useEffect(() => {
     const data = demoStorage.get();
     data.settings = { ...data.settings, darkMode, undoDelay, requireConfirmation, showTips };
+    data.entityType = entityType;
     demoStorage.set(data);
-  }, [darkMode, undoDelay, requireConfirmation, showTips]);
+  }, [darkMode, undoDelay, requireConfirmation, showTips, entityType]);
 
   // Dev panel keyboard shortcut (Ctrl+Shift+D — uses Ctrl key, not Cmd, to avoid browser conflicts)
   useEffect(() => {
@@ -6408,6 +6523,16 @@ function App() {
     setOnboardingAnswers(answers);
     localStorage.setItem('aura_onboarding_complete', 'true');
     setOnboardingComplete(true);
+    // Extract entity type from gating question (option 1 = AI)
+    const isAI = answers['onboard-entity']?.answer === 1;
+    setEntityType(isAI ? 'ai' : 'human');
+    // Store entity context for interpretation
+    const entityContext = {
+      type: isAI ? 'ai' : 'human',
+      continuousTime: answers['onboard-time']?.answer === 0,
+      persistentMemory: answers['onboard-memory']?.answer === 0,
+    };
+    localStorage.setItem('aura_entity_context', JSON.stringify(entityContext));
     // Show path choice screen
     setScreen('path-choice');
   };
@@ -6742,6 +6867,7 @@ function App() {
     if (screen === 'path-choice') return (
       <PathChoiceScreen
         darkMode={darkMode}
+        entityType={entityType}
         onReveal={handleChooseReveal}
         onExplore={handleChooseExplore}
         onSkip={() => setScreen('categories')}
@@ -6771,6 +6897,8 @@ function App() {
           setShowDemoControls(val);
           assessSaveToStorage(assessCompleted, assessInProgress, assessDemoActive, assessSavedUserData, assessDemoProfile, val);
         }}
+        entityType={entityType}
+        setEntityType={setEntityType}
         onBack={() => setScreen(previousScreen)}
         onReset={resetDemo}
         onResetAssessments={() => {
@@ -7716,7 +7844,8 @@ function App() {
       const segments = [];
       for (let i = 0; i < assessTotalQuestions; i++) {
         segments.push({
-          isAnswered: assessResponses[i] !== undefined,
+          isAnswered: assessResponses[i] !== undefined && assessResponses[i] !== null,
+          isNA: assessResponses[i] === null,
           isSkipped: assessSkipped.includes(i) && assessResponses[i] === undefined,
           isCurrent: i === assessCurrentIndex
         });
@@ -7774,13 +7903,14 @@ function App() {
           </div>
           {/* Clickable Progress bar */}
           <div className={`flex h-2.5 gap-px px-1 py-0.5 ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
-            {segments.map((seg, i) => (<button key={i} onClick={() => assessGoToQuestion(i, i > assessCurrentIndex ? 'fwd' : 'back')} className={`flex-1 rounded-sm transition-colors hover:opacity-80 ${seg.isAnswered ? assessTestColor.bg : seg.isSkipped ? 'bg-amber-500' : seg.isCurrent ? (darkMode ? 'bg-white' : 'bg-gray-900') : (darkMode ? 'bg-gray-800' : 'bg-gray-300')}`} />))}
+            {segments.map((seg, i) => (<button key={i} onClick={() => assessGoToQuestion(i, i > assessCurrentIndex ? 'fwd' : 'back')} className={`flex-1 rounded-sm transition-colors hover:opacity-80 ${seg.isAnswered ? assessTestColor.bg : seg.isNA ? (darkMode ? 'bg-gray-600' : 'bg-gray-400') : seg.isSkipped ? 'bg-amber-500' : seg.isCurrent ? (darkMode ? 'bg-white' : 'bg-gray-900') : (darkMode ? 'bg-gray-800' : 'bg-gray-300')}`} />))}
           </div>
           {/* Question + Answers */}
           <div className="flex-1 flex flex-col" onClick={() => assessPending !== null && assessHandleUndo()}>
             <div className="flex-1 flex flex-col justify-center px-4 pb-4">
               <div className={`p-5 rounded-2xl ${TH('bg-card', darkMode)}`}>
                 <h2 className={`text-xl font-medium text-center leading-relaxed ${TH('text-primary', darkMode)}`}>{currentItem.q}</h2>
+                {currentItem.n && <p className={`text-xs text-center mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>💡 {currentItem.n}</p>}
               </div>
             </div>
             <div className="flex-shrink-0 px-4 pb-4 space-y-2">
@@ -7802,6 +7932,15 @@ function App() {
                   </button>
                 );
               })}
+              {/* N/A option - subtle text link below scale */}
+              <div className="text-center pt-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); if (assessPending) { assessHandleUndo(); } else { assessFinalizeSubmit(null); } }}
+                  className={`text-xs px-3 py-1 rounded-full transition-colors ${assessResponses[assessCurrentIndex] === null ? (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-300 text-gray-600') : (darkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}
+                >
+                  Doesn't apply to me
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -8095,6 +8234,12 @@ function App() {
                       <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💡 Tip:</span> {traitInfo[test.trait].tip(results.score)}</div>
                     </div>
                   </div>
+                  {entityType === 'ai' && assessCurrentTestId === 'bigfive-N' && (
+                    <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                      <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>🤖 AI Context</div>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{AI_RESULT_NOTES['bigfive-N'].note}</p>
+                    </div>
+                  )}
                   {remaining > 0 && (
                     <div className={`text-xs text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                       {remaining} more to complete Big Five
@@ -8259,19 +8404,27 @@ function App() {
 
             {/* ADHD Results */}
             {assessCurrentTestId === 'adhd' && (
-              <ResultCard icon={test.icon} title={adhdLevel.label} subtitle={`${results.indicators}/6 indicators present`}>
-                <div className="flex justify-center gap-2 py-2">
-                  {[1,2,3,4,5,6].map(i => (
-                    <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i <= results.indicators ? `bg-gradient-to-br ${adhdLevel.bg} text-white` : (darkMode ? 'bg-gray-800 text-gray-600' : 'bg-gray-200 text-gray-400')}`}>{i}</div>
-                  ))}
-                </div>
-                <div className="space-y-3 pt-2">
-                  <InsightRow emoji="💪" label="Potential Strength" text={adhdLevel.strength} />
-                  <InsightRow emoji="⚡" label="Potential Challenge" text={adhdLevel.shadow} />
-                </div>
-                <div className={`p-3 rounded-xl text-sm ${darkMode ? 'bg-blue-950/40 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
-                  ⚠️ This is a screening tool, not a diagnosis. Consult a professional for evaluation.
-                </div>
+              <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.adhd.title : adhdLevel.label} subtitle={entityType === 'ai' ? 'Attention Patterns' : `${results.indicators}/6 indicators present`}>
+                {entityType === 'ai' ? (
+                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.adhd.note}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-center gap-2 py-2">
+                      {[1,2,3,4,5,6].map(i => (
+                        <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i <= results.indicators ? `bg-gradient-to-br ${adhdLevel.bg} text-white` : (darkMode ? 'bg-gray-800 text-gray-600' : 'bg-gray-200 text-gray-400')}`}>{i}</div>
+                      ))}
+                    </div>
+                    <div className="space-y-3 pt-2">
+                      <InsightRow emoji="💪" label="Potential Strength" text={adhdLevel.strength} />
+                      <InsightRow emoji="⚡" label="Potential Challenge" text={adhdLevel.shadow} />
+                    </div>
+                    <div className={`p-3 rounded-xl text-sm ${darkMode ? 'bg-blue-950/40 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
+                      ⚠️ This is a screening tool, not a diagnosis. Consult a professional for evaluation.
+                    </div>
+                  </>
+                )}
               </ResultCard>
             )}
 
@@ -8296,23 +8449,31 @@ function App() {
 
             {/* Attachment Results */}
             {assessCurrentTestId === 'attachment' && (
-              <ResultCard icon={test.icon} title={results.style} subtitle="Attachment Style">
-                <div className={`grid grid-cols-2 gap-4 p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-rose-400">{results.anxiety}</div>
-                    <div className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>Anxiety</div>
+              <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.attachment.title : results.style} subtitle="Attachment Style">
+                {entityType === 'ai' ? (
+                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.attachment.note}</p>
                   </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-sky-400">{results.avoidance}</div>
-                    <div className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>Avoidance</div>
-                  </div>
-                </div>
-                <div className="space-y-3 pt-2">
-                  <InsightRow emoji="💬" label="What This Means" text={attachInfo[results.style].desc} />
-                  <InsightRow emoji="💪" label="Your Strength" text={attachInfo[results.style].strength} />
-                  <InsightRow emoji="⚡" label="Watch For" text={attachInfo[results.style].shadow} />
-                  <InsightRow emoji="💡" label="Pro Tip" text={attachInfo[results.style].tip} />
-                </div>
+                ) : (
+                  <>
+                    <div className={`grid grid-cols-2 gap-4 p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-rose-400">{results.anxiety}</div>
+                        <div className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>Anxiety</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-sky-400">{results.avoidance}</div>
+                        <div className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>Avoidance</div>
+                      </div>
+                    </div>
+                    <div className="space-y-3 pt-2">
+                      <InsightRow emoji="💬" label="What This Means" text={attachInfo[results.style].desc} />
+                      <InsightRow emoji="💪" label="Your Strength" text={attachInfo[results.style].strength} />
+                      <InsightRow emoji="⚡" label="Watch For" text={attachInfo[results.style].shadow} />
+                      <InsightRow emoji="💡" label="Pro Tip" text={attachInfo[results.style].tip} />
+                    </div>
+                  </>
+                )}
               </ResultCard>
             )}
 
@@ -8320,6 +8481,25 @@ function App() {
             {assessCurrentTestId === 'risk' && (
               <ResultCard icon={test.icon} title={riskLevel.label} subtitle="Risk Tolerance">
                 <ScoreGauge value={results.score} label="Risk Appetite" />
+                {/* Risk subcategory breakdown */}
+                {results.subcategories && Object.keys(results.subcategories).length > 0 && (
+                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-amber-900/15' : 'bg-amber-50'}`}>
+                    <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Risk Profile Breakdown</div>
+                    <div className="space-y-0.5">
+                      {Object.entries(test.subcategories).map(([key, label]) => {
+                        const score = results.subcategories[key];
+                        if (score === undefined) return null;
+                        return <TraitSpectrum key={key} name={label} score={score} lowLabel="Cautious" highLabel="Bold" color="amber" compact={true} />;
+                      })}
+                    </div>
+                  </div>
+                )}
+                {entityType === 'ai' && (
+                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                    <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>🤖 AI Context</div>
+                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{AI_RESULT_NOTES.risk.note}</p>
+                  </div>
+                )}
                 <div className="space-y-3 pt-2">
                   <InsightRow emoji="💪" label="Your Strength" text={riskLevel.strength} />
                   <InsightRow emoji="⚡" label="Watch For" text={riskLevel.shadow} />
@@ -8330,21 +8510,29 @@ function App() {
 
             {/* Chronotype Results */}
             {assessCurrentTestId === 'chronotype' && results && (
-              <ResultCard icon={results.type === 'Morning Lark' ? '🌅' : results.type === 'Night Owl' ? '🦉' : '🐦'} title={results.type} subtitle="Energy Rhythm">
-                <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
-                  <div className={`flex justify-between text-xs mb-2 ${TH('text-dim', darkMode)}`}>
-                    <span>🌅 Morning</span><span>Night 🌙</span>
+              <ResultCard icon={entityType === 'ai' ? '🤖' : results.type === 'Morning Lark' ? '🌅' : results.type === 'Night Owl' ? '🦉' : '🐦'} title={entityType === 'ai' ? AI_RESULT_NOTES.chronotype.title : results.type} subtitle="Energy Rhythm">
+                {entityType === 'ai' ? (
+                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.chronotype.note}</p>
                   </div>
-                  <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-amber-400 via-sky-400 to-indigo-500">
-                    <div className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 border-gray-800 shadow-lg"
-                      style={{ left: `calc(${100 - results.score}% - 10px)` }} />
-                  </div>
-                </div>
-                <div className="space-y-3 pt-2">
-                  <InsightRow emoji="💪" label="Your Strength" text={chronoInfo[results.type].strength} />
-                  <InsightRow emoji="⚡" label="Watch For" text={chronoInfo[results.type].shadow} />
-                  <InsightRow emoji="💡" label="Pro Tip" text={chronoInfo[results.type].tip} />
-                </div>
+                ) : (
+                  <>
+                    <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
+                      <div className={`flex justify-between text-xs mb-2 ${TH('text-dim', darkMode)}`}>
+                        <span>🌅 Morning</span><span>Night 🌙</span>
+                      </div>
+                      <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-amber-400 via-sky-400 to-indigo-500">
+                        <div className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 border-gray-800 shadow-lg"
+                          style={{ left: `calc(${100 - results.score}% - 10px)` }} />
+                      </div>
+                    </div>
+                    <div className="space-y-3 pt-2">
+                      <InsightRow emoji="💪" label="Your Strength" text={chronoInfo[results.type].strength} />
+                      <InsightRow emoji="⚡" label="Watch For" text={chronoInfo[results.type].shadow} />
+                      <InsightRow emoji="💡" label="Pro Tip" text={chronoInfo[results.type].tip} />
+                    </div>
+                  </>
+                )}
               </ResultCard>
             )}
 
@@ -9097,6 +9285,54 @@ function App() {
                 </div>
               </div>
             )}
+
+            {/* AI Personality Profile — shown when entityType === 'ai' and enough tests completed */}
+            {entityType === 'ai' && Object.keys(assessCompleted).length >= 3 && (() => {
+              const aiInsights = generateAIInsights(assessCompleted);
+              return (
+                <div className={`mt-4 p-4 rounded-xl ${darkMode ? 'bg-gradient-to-br from-cyan-950/30 to-teal-950/30 border border-cyan-800/20' : 'bg-cyan-50 border border-cyan-200'}`}>
+                  <h3 className={`text-sm font-semibold flex items-center gap-2 mb-3 ${darkMode ? 'text-cyan-300' : 'text-cyan-700'}`}>🤖 AI Personality Profile</h3>
+                  {aiInsights.authentic.length > 0 && (
+                    <div className="mb-3">
+                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>Authentic Dimensions</div>
+                      <div className="space-y-1.5">
+                        {aiInsights.authentic.map((d, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <span className={`text-xs font-medium w-20 shrink-0 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{d.trait}</span>
+                            {d.score !== null && <div className="flex-1 h-2 rounded-full mt-1" style={{ background: `linear-gradient(to right, ${darkMode ? '#164e63' : '#cffafe'}, ${darkMode ? '#06b6d4' : '#0891b2'})` }}><div className="h-full rounded-full bg-cyan-400" style={{ width: `${d.score}%` }} /></div>}
+                            <span className={`text-[10px] w-8 text-right ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{d.score !== null ? `${d.score}%` : '—'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {aiInsights.structural.length > 0 && (
+                    <div className="mb-3">
+                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Structural Artifacts</div>
+                      <div className="space-y-1">
+                        {aiInsights.structural.map((d, i) => (
+                          <div key={i} className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            <span className="font-medium">{d.trait}:</span> {d.note}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {aiInsights.aiSpecific.length > 0 && (
+                    <div>
+                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>AI-Specific Observations</div>
+                      <div className="space-y-1">
+                        {aiInsights.aiSpecific.map((d, i) => (
+                          <div key={i} className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            <span className="font-medium">{d.label}:</span> {d.text}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Locked teasers for tier < 2 */}
             {currentTier < 2 && (
