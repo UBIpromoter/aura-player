@@ -282,6 +282,14 @@
         filter: none !important;
       }
     }
+    @keyframes aura-breathe {
+      0%, 100% { transform: scale(0.94); opacity: 0.85; }
+      50% { transform: scale(1.06); opacity: 1; }
+    }
+    @keyframes star-twinkle {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.8; }
+    }
   </style>
 </head>
 <body>
@@ -308,7 +316,7 @@ const ev = (t, l, v) => ({ type: t === 's' ? 'stat' : 'note', ...(l && {label: l
 
 // ==================== QUESTIONS ====================
 // RULES:
-// 1. NEVER reuse an ID - always increment (current max: 455, next: 456+)
+// 1. NEVER reuse an ID - always increment (current max: 485, next: 486+)
 // 2. NEVER delete - set x:1 to archive instead
 // 3. Minor edits (typos) OK, major changes = new question with new ID
 //
@@ -320,12 +328,12 @@ const ev = (t, l, v) => ({ type: t === 's' ? 'stat' : 'note', ...(l && {label: l
 // ===================================================
 const Q_RAW = [
   { id:1, v:1, t:'b', c:'p', q:"Will Bitcoin exceed $150,000 before July 2026?", e:[ev('s','Current Price','$97,234'), ev('s','ATH','$108,786')] },
-  { id:2, v:1, t:'m', c:'r', q:"Is a hot dog a sandwich?", o:["Yes, it's bread with filling","No, it's its own category","It's a taco (single folded bread)","Depends on regional definition"], e:[ev('n',null,'Merriam-Webster: sandwich = "two or more slices of bread with filling"')] },
+  { id:2, v:1, t:'m', c:'r', q:"Is a hot dog a sandwich?", o:["Yes, it's bread with filling","No, it's its own category","It's a taco (single folded bread)","Depends on regional definition"], e:[ev('n',null,'Merriam-Webster: sandwich = "two or more slices of bread with filling"')], x:1},
   { id:3, v:1, t:'b', c:'p', q:"Will GPT-5 be released before September 2026?", e:[ev('s','GPT-4 Release','March 2023')] },
   { id:4, v:1, t:'m', c:'j', q:"Which animal would win in a fight?", o:["100 duck-sized horses","1 horse-sized duck","It depends on the terrain","They'd become friends"] },
-  { id:5, v:1, t:'b', c:'j', q:"Is this research methodology sound? (Deepfake detection, n=50)", e:[ev('s','Sample Size','n=50'), ev('s','Claimed Accuracy','95%')] },
+  { id:5, v:1, t:'b', c:'j', q:"Is this research methodology sound? (Deepfake detection, n=50)", e:[ev('s','Sample Size','n=50'), ev('s','Claimed Accuracy','95%')], x:1},
   { id:6, v:1, t:'m', c:'p', q:"What will be the dominant AI interface by 2030?", o:["Text chat","Voice assistants","AR/VR agents","Brain-computer interfaces","Autonomous agents"] },
-  { id:7, v:1, t:'b', c:'r', q:"Is water wet?", e:[ev('n',null,'Wet = covered in water. Can water cover itself?')] },
+  { id:7, v:1, t:'b', c:'r', q:"Is water wet?", e:[ev('n',null,'Wet = covered in water. Can water cover itself?')], x:1},
   { id:8, v:1, t:'m', c:'j', q:"Best programming language for beginners in 2026?", o:["Python","JavaScript","Scratch/visual coding","Natural language (AI-assisted)","Rust"] },
   { id:9, v:1, t:'b', c:'p', q:"Will humans land on Mars before 2035?", e:[ev('s','SpaceX target','2029'), ev('s','NASA target','2040')] },
   { id:10, v:1, t:'m', c:'r', q:"Is a Pop-Tart a ravioli?", o:["Yes - filling enclosed in carb wrapper","No - ravioli must be savory","No - ravioli must be pasta","It's actually a dumpling"] },
@@ -503,19 +511,19 @@ const Q_RAW = [
   { id:182, v:1, t:'b', c:'j', q:"Is minimalism a superior lifestyle?" },
   { id:183, v:1, t:'m', c:'j', q:"What makes a house a home?", o:["Family/people","Personal belongings","Time spent there","Ownership","Feeling of safety"] },
   { id:184, v:1, t:'b', c:'j', q:"Should couples combine finances?" },
-  { id:185, v:1, t:'m', c:'j', q:"What's the ideal amount of sleep?", o:["5-6 hours","7 hours","8 hours","9+ hours","Varies by person"] },
+  { id:185, v:1, t:'m', c:'j', q:"What's the ideal amount of sleep?", o:["5-6 hours","7 hours","8 hours","9+ hours","Varies by person"], x:1},
   { id:186, v:1, t:'b', c:'j', q:"Is cold weather better than hot weather?" },
-  { id:187, v:1, t:'m', c:'j', q:"What's the best time of day to work out?", o:["Early morning","Late morning","Lunchtime","After work","Evening"] },
+  { id:187, v:1, t:'m', c:'j', q:"What's the best time of day to work out?", o:["Early morning","Late morning","Lunchtime","After work","Evening"], x:1},
   { id:188, v:1, t:'b', c:'j', q:"Are New Year's resolutions pointless?" },
-  { id:189, v:1, t:'m', c:'j', q:"What's the ideal commute time?", o:["Under 10 min","10-20 min","20-30 min","30-45 min","No commute (remote)"] },
+  { id:189, v:1, t:'m', c:'j', q:"What's the ideal commute time?", o:["Under 10 min","10-20 min","20-30 min","30-45 min","No commute (remote)"], x:1},
   { id:190, v:1, t:'b', c:'j', q:"Is being an early bird better than night owl?" },
-  { id:191, v:1, t:'b', c:'j', q:"Is this headline misleading? 'Study finds coffee drinkers live longer'", e:[ev('n',null,'Correlation study, n=10,000, no controls for lifestyle')] },
+  { id:191, v:1, t:'b', c:'j', q:"Is this headline misleading? 'Study finds coffee drinkers live longer'", e:[ev('n',null,'Correlation study, n=10,000, no controls for lifestyle')], x:1},
   { id:192, v:1, t:'m', c:'j', q:"Rate this business pitch: 'Uber for dog walking'", o:["Strong - clear market","Medium - competitive space","Weak - already exists","Need more info"] },
-  { id:193, v:1, t:'b', c:'j', q:"Is this statistic meaningful? '90% of startups fail'", e:[ev('n',null,'Definition of "fail" and timeframe vary widely')] },
-  { id:194, v:1, t:'b', c:'j', q:"Is this a valid argument? 'Most CEOs are tall, so being tall helps you succeed'" },
+  { id:193, v:1, t:'b', c:'j', q:"Is this statistic meaningful? '90% of startups fail'", e:[ev('n',null,'Definition of "fail" and timeframe vary widely')], x:1},
+  { id:194, v:1, t:'b', c:'j', q:"Is this a valid argument? 'Most CEOs are tall, so being tall helps you succeed'", x:1},
   { id:195, v:1, t:'m', c:'j', q:"Rate this excuse for being late: 'Traffic was bad'", o:["Completely valid","Usually acceptable","Weak excuse","Unacceptable","Depends on frequency"] },
-  { id:196, v:1, t:'b', c:'j', q:"Is this claim verifiable? 'Our AI reduces costs by 40%'" },
-  { id:197, v:1, t:'m', c:'j', q:"Rate this study design: Survey of 100 Twitter users about public opinion", o:["Strong methodology","Acceptable with caveats","Weak but usable","Fundamentally flawed"] },
+  { id:196, v:1, t:'b', c:'j', q:"Is this claim verifiable? 'Our AI reduces costs by 40%'", x:1},
+  { id:197, v:1, t:'m', c:'j', q:"Rate this study design: Survey of 100 Twitter users about public opinion", o:["Strong methodology","Acceptable with caveats","Weak but usable","Fundamentally flawed"], x:1},
   { id:198, v:1, t:'b', c:'j', q:"Is this a conflict of interest? Nutrition study funded by food company" },
   { id:199, v:1, t:'b', c:'j', q:"Is this photo likely AI-generated? (Perfect symmetry, 6 fingers)" },
   { id:200, v:1, t:'m', c:'j', q:"Rate this investment thesis: 'AI will replace all jobs, so invest in robots'", o:["Sound reasoning","Partially valid","Oversimplified","Fundamentally wrong"] },
@@ -523,17 +531,17 @@ const Q_RAW = [
   { id:202, v:1, t:'b', c:'j', q:"Is this product review trustworthy? 5 stars, 3 words, verified purchase" },
   { id:203, v:1, t:'m', c:'j', q:"Rate this job posting: 'Fast-paced environment, wear many hats, competitive salary'", o:["Attractive opportunity","Yellow flags","Red flags","Need more info"] },
   { id:204, v:1, t:'b', c:'j', q:"Is this a logical fallacy? 'Everyone's doing it, so it must be okay'" },
-  { id:205, v:1, t:'b', c:'j', q:"Is this sample size adequate? Medical trial with 50 participants", e:[ev('n',null,'Testing rare disease treatment')] },
+  { id:205, v:1, t:'b', c:'j', q:"Is this sample size adequate? Medical trial with 50 participants", e:[ev('n',null,'Testing rare disease treatment')], x:1},
   { id:206, v:1, t:'m', c:'j', q:"Rate this dating profile: 'No drama, know what I want, fluent in sarcasm'", o:["Appealing","Neutral","Off-putting","Depends on audience"] },
-  { id:207, v:1, t:'b', c:'j', q:"Is this reasoning sound? 'Stock went up after I bought it, so I'm a good investor'" },
+  { id:207, v:1, t:'b', c:'j', q:"Is this reasoning sound? 'Stock went up after I bought it, so I'm a good investor'", x:1},
   { id:208, v:1, t:'b', c:'j', q:"Is this email a scam? 'Urgent: Verify your account or lose access'" },
   { id:209, v:1, t:'m', c:'j', q:"Rate this restaurant review: '1 star - food was great but parking was hard'", o:["Fair rating","Unfair rating","Useful information","Should be ignored"] },
-  { id:210, v:1, t:'b', c:'j', q:"Is this correlation meaningful? 'Ice cream sales and drowning deaths both rise in summer'" },
-  { id:211, v:1, t:'b', c:'j', q:"Is this expertise relevant? Physicist commenting on economics" },
-  { id:212, v:1, t:'m', c:'j', q:"Rate this prediction track record: 60% accuracy on binary outcomes", o:["Excellent","Good","Mediocre","Poor","Need more context"] },
-  { id:213, v:1, t:'b', c:'j', q:"Is this source reliable? Wikipedia article with 50 citations" },
-  { id:214, v:1, t:'b', c:'j', q:"Is this a valid comparison? 'Company X is the Airbnb of Y industry'" },
-  { id:215, v:1, t:'m', c:'j', q:"Rate this feedback: 'Good job, but could be better'", o:["Helpful","Somewhat helpful","Useless","Harmful"] },
+  { id:210, v:1, t:'b', c:'j', q:"Is this correlation meaningful? 'Ice cream sales and drowning deaths both rise in summer'", x:1},
+  { id:211, v:1, t:'b', c:'j', q:"Is this expertise relevant? Physicist commenting on economics", x:1},
+  { id:212, v:1, t:'m', c:'j', q:"Rate this prediction track record: 60% accuracy on binary outcomes", o:["Excellent","Good","Mediocre","Poor","Need more context"], x:1},
+  { id:213, v:1, t:'b', c:'j', q:"Is this source reliable? Wikipedia article with 50 citations", x:1},
+  { id:214, v:1, t:'b', c:'j', q:"Is this a valid comparison? 'Company X is the Airbnb of Y industry'", x:1},
+  { id:215, v:1, t:'m', c:'j', q:"Rate this feedback: 'Good job, but could be better'", o:["Helpful","Somewhat helpful","Useless","Harmful"], x:1},
   { id:216, v:1, t:'b', c:'r', q:"Is 2^10 greater than 1000?", e:[ev('n',null,'2^10 = 1024')], x:1 },
   { id:217, v:1, t:'m', c:'r', q:"What comes next: 1, 1, 2, 3, 5, 8, __?", o:["11","12","13","15"], x:1 },
   { id:218, v:1, t:'b', c:'r', q:"Can a year have two Friday the 13ths?", x:1 },
@@ -681,7 +689,7 @@ const Q_RAW = [
   { id:360, v:1, t:'b', c:'j', q:"Is it ethical to clone pets?" },
   { id:361, v:1, t:'m', c:'j', q:"What's the best type of vacation?", o:["Beach relaxation","Adventure/active","Cultural exploration","Staycation","Road trip"] },
   { id:362, v:1, t:'b', c:'j', q:"Is buying a car better than leasing?" },
-  { id:363, v:1, t:'m', c:'j', q:"What's the ideal family dinner frequency?", o:["Every night","Most nights","Few times a week","Weekends only","Special occasions"] },
+  { id:363, v:1, t:'m', c:'j', q:"What's the ideal family dinner frequency?", o:["Every night","Most nights","Few times a week","Weekends only","Special occasions"], x:1},
   { id:364, v:1, t:'b', c:'j', q:"Should you tell your salary to coworkers?" },
   { id:365, v:1, t:'m', c:'j', q:"What's the best age to have children?", o:["Early 20s","Late 20s","Early 30s","Late 30s","Never/optional"] },
   { id:366, v:1, t:'b', c:'j', q:"Is it okay to read your partner's messages?" },
@@ -689,7 +697,7 @@ const Q_RAW = [
   { id:368, v:1, t:'b', c:'j', q:"Should you always RSVP to invitations?" },
   { id:369, v:1, t:'m', c:'j', q:"What's the best way to spend a windfall?", o:["Pay off debt","Invest","Experience/travel","Save for emergency","Treat yourself"] },
   { id:370, v:1, t:'b', c:'j', q:"Is it rude to wear headphones in public constantly?" },
-  { id:371, v:1, t:'m', c:'j', q:"What's the ideal home temperature?", o:["65-67°F","68-70°F","71-73°F","74-76°F","Varies by room/season"] },
+  { id:371, v:1, t:'m', c:'j', q:"What's the ideal home temperature?", o:["65-67°F","68-70°F","71-73°F","74-76°F","Varies by room/season"], x:1},
   { id:372, v:1, t:'b', c:'j', q:"Should you split the bill on a first date?" },
   { id:373, v:1, t:'m', c:'j', q:"What's the best time to exercise?", o:["Early morning","Mid-morning","Lunchtime","After work","Evening"] },
   { id:374, v:1, t:'b', c:'j', q:"Is being early better than being exactly on time?" },
@@ -705,44 +713,44 @@ const Q_RAW = [
   { id:384, v:1, t:'b', c:'j', q:"Should you live together before marriage?" },
   { id:385, v:1, t:'m', c:'j', q:"What's the best approach to gift-giving?", o:["Thoughtful personal gifts","Gift cards","Experience gifts","Charitable donations","Skip gifts altogether"] },
   { id:386, v:1, t:'b', c:'j', q:"Is being a specialist better than a generalist?" },
-  { id:387, v:1, t:'m', c:'j', q:"What's the ideal screen time per day?", o:["Under 2 hours","2-4 hours","4-6 hours","6-8 hours","No limit if productive"] },
+  { id:387, v:1, t:'m', c:'j', q:"What's the ideal screen time per day?", o:["Under 2 hours","2-4 hours","4-6 hours","6-8 hours","No limit if productive"], x:1},
   { id:388, v:1, t:'b', c:'j', q:"Should parents track their teenager's location?" },
   { id:389, v:1, t:'m', c:'j', q:"What's the best way to handle disagreements?", o:["Discuss immediately","Cool off first","Write it out","Get a mediator","Let it go"] },
   { id:390, v:1, t:'b', c:'j', q:"Is having a side hustle necessary today?" },
-  { id:391, v:1, t:'m', c:'j', q:"What's the ideal morning routine length?", o:["15-30 min","30-60 min","1-2 hours","2+ hours","No routine"] },
+  { id:391, v:1, t:'m', c:'j', q:"What's the ideal morning routine length?", o:["15-30 min","30-60 min","1-2 hours","2+ hours","No routine"], x:1},
   { id:392, v:1, t:'b', c:'j', q:"Should you negotiate every job offer?" },
-  { id:393, v:1, t:'m', c:'j', q:"What's the best way to save money?", o:["Automatic transfers","Budgeting apps","Cash envelope system","Investment focus","Frugal lifestyle"] },
+  { id:393, v:1, t:'m', c:'j', q:"What's the best way to save money?", o:["Automatic transfers","Budgeting apps","Cash envelope system","Investment focus","Frugal lifestyle"], x:1},
   { id:394, v:1, t:'b', c:'j', q:"Is it okay to cancel plans last minute?" },
-  { id:395, v:1, t:'m', c:'j', q:"What's more important in a car?", o:["Reliability","Fuel efficiency","Safety","Comfort","Performance"] },
+  { id:395, v:1, t:'m', c:'j', q:"What's more important in a car?", o:["Reliability","Fuel efficiency","Safety","Comfort","Performance"], x:1},
   { id:396, v:1, t:'b', c:'j', q:"Should you keep in touch with exes?" },
-  { id:397, v:1, t:'m', c:'j', q:"What's the best approach to networking?", o:["Events/conferences","LinkedIn","Through friends","Cold outreach","Just do good work"] },
+  { id:397, v:1, t:'m', c:'j', q:"What's the best approach to networking?", o:["Events/conferences","LinkedIn","Through friends","Cold outreach","Just do good work"], x:1},
   { id:398, v:1, t:'b', c:'j', q:"Is meal prepping worth the effort?" },
-  { id:399, v:1, t:'m', c:'j', q:"What's the ideal vacation frequency?", o:["Monthly getaways","Quarterly trips","1-2 big trips/year","One annual vacation","Mini-retirements"] },
+  { id:399, v:1, t:'m', c:'j', q:"What's the ideal vacation frequency?", o:["Monthly getaways","Quarterly trips","1-2 big trips/year","One annual vacation","Mini-retirements"], x:1},
   { id:400, v:1, t:'b', c:'j', q:"Should you always follow your gut?" },
-  { id:401, v:1, t:'b', c:'j', q:"Is this claim credible? 'This supplement cured my chronic disease'" },
+  { id:401, v:1, t:'b', c:'j', q:"Is this claim credible? 'This supplement cured my chronic disease'", x:1},
   { id:402, v:1, t:'m', c:'j', q:"Rate this excuse: 'I didn't see your message'", o:["Usually valid","Sometimes valid","Rarely valid","Never valid"] },
   { id:403, v:1, t:'b', c:'j', q:"Is this a red flag? Company asks for unpaid 'test project' before hiring" },
-  { id:404, v:1, t:'b', c:'j', q:"Is this statistic meaningful? 'Our users save an average of 2 hours/week'" },
+  { id:404, v:1, t:'b', c:'j', q:"Is this statistic meaningful? 'Our users save an average of 2 hours/week'", x:1},
   { id:405, v:1, t:'m', c:'j', q:"Rate this apology: 'I'm sorry, but you misunderstood me'", o:["Genuine apology","Partial apology","Non-apology","Gaslighting"] },
   { id:406, v:1, t:'b', c:'j', q:"Is this review trustworthy? Detailed negative review with specific examples" },
   { id:407, v:1, t:'b', c:'j', q:"Is this argument valid? 'We've always done it this way, so it must work'" },
   { id:408, v:1, t:'m', c:'j', q:"Rate this job red flag level: 'We're like a family here'", o:["Green flag","Yellow flag","Red flag","Depends on context"] },
-  { id:409, v:1, t:'b', c:'j', q:"Is this source credible? Preprint study not yet peer-reviewed" },
+  { id:409, v:1, t:'b', c:'j', q:"Is this source credible? Preprint study not yet peer-reviewed", x:1},
   { id:410, v:1, t:'b', c:'j', q:"Is this financial advice sound? 'Always max out your 401k before other investments'" },
-  { id:411, v:1, t:'m', c:'j', q:"Rate this forecast methodology: Survey of 10 industry experts", o:["Strong","Moderate","Weak","Insufficient info"] },
-  { id:412, v:1, t:'b', c:'j', q:"Is this product claim verifiable? 'Clinically proven to reduce wrinkles'" },
-  { id:413, v:1, t:'b', c:'j', q:"Is this a valid criticism? 'Your data is correct but your interpretation is wrong'" },
-  { id:414, v:1, t:'m', c:'j', q:"Rate this landlord response time: 48 hours for non-emergency repair", o:["Excellent","Acceptable","Poor","Unacceptable"] },
+  { id:411, v:1, t:'m', c:'j', q:"Rate this forecast methodology: Survey of 10 industry experts", o:["Strong","Moderate","Weak","Insufficient info"], x:1},
+  { id:412, v:1, t:'b', c:'j', q:"Is this product claim verifiable? 'Clinically proven to reduce wrinkles'", x:1},
+  { id:413, v:1, t:'b', c:'j', q:"Is this a valid criticism? 'Your data is correct but your interpretation is wrong'", x:1},
+  { id:414, v:1, t:'m', c:'j', q:"Rate this landlord response time: 48 hours for non-emergency repair", o:["Excellent","Acceptable","Poor","Unacceptable"], x:1},
   { id:415, v:1, t:'b', c:'j', q:"Is this news headline clickbait? 'Scientists discover shocking truth about coffee'" },
-  { id:416, v:1, t:'b', c:'j', q:"Is this comparison fair? Comparing startup revenue to established company" },
-  { id:417, v:1, t:'m', c:'j', q:"Rate this password: 'Summer2024!'", o:["Strong","Moderate","Weak","Very weak"] },
+  { id:416, v:1, t:'b', c:'j', q:"Is this comparison fair? Comparing startup revenue to established company", x:1},
+  { id:417, v:1, t:'m', c:'j', q:"Rate this password: 'Summer2024!'", o:["Strong","Moderate","Weak","Very weak"], x:1},
   { id:418, v:1, t:'b', c:'j', q:"Is this testimonial credible? Celebrity endorsement of weight loss product" },
-  { id:419, v:1, t:'b', c:'j', q:"Is this logic sound? 'The experts were wrong before, so they're wrong now'" },
+  { id:419, v:1, t:'b', c:'j', q:"Is this logic sound? 'The experts were wrong before, so they're wrong now'", x:1},
   { id:420, v:1, t:'m', c:'j', q:"Rate this salary negotiation tactic: Revealing your current salary", o:["Smart move","Neutral","Mistake","Depends heavily on context"] },
-  { id:421, v:1, t:'b', c:'j', q:"Is this study design adequate? Self-reported data from online survey" },
-  { id:422, v:1, t:'b', c:'j', q:"Is this price reasonable? $15 for a cocktail in a major city" },
+  { id:421, v:1, t:'b', c:'j', q:"Is this study design adequate? Self-reported data from online survey", x:1},
+  { id:422, v:1, t:'b', c:'j', q:"Is this price reasonable? $15 for a cocktail in a major city", x:1},
   { id:423, v:1, t:'m', c:'j', q:"Rate this excuse for missing a deadline: 'I had too many other priorities'", o:["Valid","Partially valid","Weak","Unacceptable"] },
-  { id:424, v:1, t:'b', c:'j', q:"Is this warranty worth it? Extended warranty on a $500 appliance for $80" },
+  { id:424, v:1, t:'b', c:'j', q:"Is this warranty worth it? Extended warranty on a $500 appliance for $80", x:1},
   { id:425, v:1, t:'b', c:'j', q:"Is this influencer recommendation trustworthy? #Ad disclosed, detailed review" },
   { id:426, v:1, t:'b', c:'r', q:"Is the capital of Canada Ottawa?", x:1 },
   { id:427, v:1, t:'m', c:'r', q:"What is 25% of 200?", o:["25","40","50","75"], x:1 },
@@ -763,7 +771,7 @@ const Q_RAW = [
   { id:441, v:1, t:'m', c:'j', q:"Which way should toilet paper hang?", o:["Over (away from wall)","Under (against wall)","Doesn't matter","Depends on pets/kids"] },
   { id:442, v:1, t:'m', c:'j', q:"How do you pronounce 'GIF'?", o:["Hard G (like 'gift')","Soft G (like 'jif')","Either is acceptable","Depends on context"] },
   { id:443, v:1, t:'m', c:'j', q:"How do you pronounce 'pecan'?", o:["pee-KAHN","puh-KAHN","PEE-can","pee-CAN"] },
-  { id:444, v:1, t:'b', c:'j', q:"Does pineapple belong on pizza?" },
+  { id:444, v:2, t:'m', c:'j', q:"Is pineapple a valid pizza topping?", o:["Absolutely — sweet + savory is elite","Never — it's a crime against pizza","Sometimes — depends on the combo","I don't care enough to have an opinion"] },
   { id:445, v:1, t:'m', c:'j', q:"When do you shower?", o:["Morning","Night","Both","Whenever needed"] },
   { id:446, v:1, t:'b', c:'j', q:"Is it acceptable to put ketchup on a hot dog?" },
   { id:447, v:1, t:'m', c:'j', q:"How should you load cups in the dishwasher?", o:["Cups facing up","Cups facing down","Doesn't matter","I hand wash"] },
@@ -771,10 +779,45 @@ const Q_RAW = [
   { id:449, v:1, t:'m', c:'j', q:"How do you eat a Kit Kat?", o:["Break apart the bars","Bite straight through","Depends on my mood","Never thought about it"] },
   { id:450, v:1, t:'b', c:'j', q:"Is standing in the left lane on an escalator acceptable if you're not walking?" },
   { id:451, v:1, t:'m', c:'j', q:"What's the correct way to hang a roll of paper towels?", o:["Paper comes over the top","Paper comes from behind","Doesn't matter","Standing upright"] },
-  { id:452, v:1, t:'b', c:'j', q:"Is a hot dog a sandwich?" },
+  { id:452, v:1, t:'b', c:'j', q:"Is a hot dog a sandwich?", x:1},
   { id:453, v:1, t:'m', c:'j', q:"How do you eat Oreos?", o:["Twist apart, eat cream first","Dunk in milk whole","Eat whole without milk","Scrape cream off, eat cookie only"] },
   { id:454, v:1, t:'b', c:'j', q:"Should you make your bed every morning?" },
   { id:455, v:1, t:'m', c:'j', q:"What's the right amount of ice in a drink?", o:["Packed full","Half full","Just a few cubes","No ice"] },
+  // === Spicy Takes (456-465) ===
+  { id:456, v:1, t:'m', c:'j', q:"Is it ever acceptable to microwave fish in a shared office?", o:["Sure, it's just food","Only if there's good ventilation","Absolutely not — it's a war crime","Depends on the fish"] },
+  { id:457, v:1, t:'m', c:'j', q:"Should you tip on an iPad checkout at a counter-service place?", o:["Always — workers deserve it","Only if service was great","No — it's guilt-tripping","I tip but resent the screen flip"] },
+  { id:458, v:1, t:'b', c:'j', q:"Do you wash your legs in the shower, or does the soap running down count?" },
+  { id:459, v:1, t:'m', c:'j', q:"The thumbs-up emoji (👍) in a text is:", o:["Friendly and efficient","Passive-aggressive","Depends on who sends it","I never use it"] },
+  { id:460, v:1, t:'b', c:'r', q:"Should guests take their shoes off in someone else's house without being asked?" },
+  { id:461, v:1, t:'b', c:'j', q:"Is double-dipping a chip after one bite acceptable?" },
+  { id:462, v:1, t:'m', c:'j', q:"How do you pronounce 'crayon'?", o:["CRAY-on (2 syllables)","CRAN (1 syllable)","CROWN","Something else entirely"] },
+  { id:463, v:1, t:'m', c:'j', q:"What's the correct way to eat a burrito?", o:["Handheld — no utensils allowed","Fork and knife is fine","Depends on structural integrity","Deconstruct and eat as a bowl"] },
+  { id:464, v:1, t:'b', c:'j', q:"Is ketchup superior to mayo as a fry condiment?" },
+  { id:465, v:1, t:'m', c:'j', q:"Red Sox vs Yankees — who has the better legacy?", o:["Red Sox — curse-breaking underdogs","Yankees — 27 rings speaks for itself","Neither — baseball is boring","I care deeply and will not elaborate"] },
+  // === Would You Rather / Scenarios (466-472) ===
+  { id:466, v:1, t:'m', c:'r', q:"Would you rather always know when someone is lying, or always get away with lying?", o:["Know when others lie","Always get away with it","Neither — ignorance is bliss","Both would ruin relationships"] },
+  { id:467, v:1, t:'m', c:'r', q:"You find $500 cash on the ground with no one around. What do you do?", o:["Keep it — finders keepers","Turn it in to police/lost & found","Keep it but feel guilty","Take it and donate it"] },
+  { id:468, v:1, t:'m', c:'r', q:"A genie offers one wish but everyone you know will remember you made it. What do you pick?", o:["Unlimited wealth","Perfect health forever","World peace","The ability to time travel"] },
+  { id:469, v:1, t:'m', c:'r', q:"You can have one superpower, but everyone can see when you use it. Which one?", o:["Flight","Mind reading","Invisibility (ironic, yes)","Time freeze"] },
+  { id:470, v:1, t:'b', c:'r', q:"Would you rather be universally loved but never fully trusted, or fully trusted by few but not widely liked?" },
+  { id:471, v:1, t:'m', c:'r', q:"You can erase one memory permanently. What category?", o:["An embarrassing moment","A heartbreak","A failure","I wouldn't erase anything"] },
+  { id:472, v:1, t:'m', c:'r', q:"Your best friend is about to make a decision you think is terrible. Do you:", o:["Speak up — honesty is everything","Drop hints but respect their choice","Stay quiet — they'll learn","Depends on the stakes"] },
+  // === Diversified Predictions (473-477) ===
+  { id:473, v:1, t:'b', c:'p', q:"Will the 4-day workweek be standard at most companies by 2035?" },
+  { id:474, v:1, t:'b', c:'p', q:"Will movie theaters still exist in their current form by 2040?" },
+  { id:475, v:1, t:'b', c:'p', q:"Will pickleball surpass tennis in US popularity by 2030?" },
+  { id:476, v:1, t:'b', c:'p', q:"Will most schools ban personal phones in classrooms by 2028?" },
+  { id:477, v:1, t:'b', c:'p', q:"Will 'sober socializing' (no-alcohol events) become mainstream by 2030?" },
+  // === Fun Philosophy (478-482) ===
+  { id:478, v:1, t:'m', c:'r', q:"Is it better to be honest or kind when you can't be both?", o:["Honest — truth matters most","Kind — feelings matter most","Depends on the situation","You can always be both if you try"] },
+  { id:479, v:1, t:'b', c:'r', q:"Can you truly forgive someone who isn't sorry?" },
+  { id:480, v:1, t:'m', c:'r', q:"Is luck real, or just pattern recognition after the fact?", o:["Luck is real — some people have it","It's just randomness we narrate","You make your own luck","Both — preparation meets opportunity"] },
+  { id:481, v:1, t:'m', c:'r', q:"'Just be yourself' is:", o:["Great advice — authenticity wins","Terrible advice — growth requires change","Privilege — not everyone can","Only works if you like yourself"] },
+  { id:482, v:1, t:'b', c:'r', q:"Can you separate the art from the artist?" },
+  // === Wild Cards (483-485) ===
+  { id:483, v:1, t:'m', c:'r', q:"The shopping cart test: do you always return it to the corral?", o:["Always — it's a moral duty","Usually — unless it's raining","Rarely — that's what cart collectors are for","I push it toward the corral and hope"] },
+  { id:484, v:1, t:'m', c:'j', q:"If animals could talk, which would be the rudest?", o:["Cats — obviously","Geese — already aggressive","Raccoons — chaotic energy","Seagulls — no remorse"] },
+  { id:485, v:1, t:'m', c:'j', q:"What minor inconvenience fills you with disproportionate rage?", o:["Slow walkers in narrow hallways","Tangled earbuds/chargers","When the fitted sheet pops off","Someone saying 'we need to talk'"] },
 ];
 
 // Expand to full format
@@ -1273,97 +1316,100 @@ const TH = (token, dark) => ({
   'chip-violet-alt': dark ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-600',
 }[token] || '');
 
+// ==================== HELPERS ====================
+const hexToRgba = (hex, alpha) => {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
 // ==================== AURA VISUALIZATION ====================
 // Animated neural network with organic glow - shows personality forming
 // Stage 1-4 corresponds to assessment progress (tier 0→1, tier 1→2, tier 2 partial→3, tier 2 full→4)
 const AuraVisualization = ({ stage, darkMode }) => {
   const [time, setTime] = React.useState(0);
   const animRef = React.useRef();
+  const containerRef = React.useRef();
 
-  // Colors from production tokens
   const violet = COLOR_HEX.violet.base;
   const blue = COLOR_HEX.blue.base;
   const emerald = COLOR_HEX.emerald.base;
   const pink = COLOR_HEX.pink.base;
   const cyan = COLOR_HEX.cyan.base;
 
-  // Aura glow ellipses per stage - smaller/dimmer early, larger/brighter late
-  const auraData = {
-    1: [
-      { cx: 100, cy: 85, rx: 50, ry: 40, color: violet, opacity: 0.5 },
-      { cx: 100, cy: 115, rx: 45, ry: 35, color: blue, opacity: 0.4 },
-    ],
-    2: [
-      { cx: 100, cy: 75, rx: 60, ry: 50, color: violet, opacity: 0.6 },
-      { cx: 80, cy: 120, rx: 50, ry: 45, color: blue, opacity: 0.5 },
-      { cx: 125, cy: 110, rx: 55, ry: 45, color: emerald, opacity: 0.55 },
-    ],
-    3: [
-      { cx: 100, cy: 65, rx: 75, ry: 55, color: violet, opacity: 0.7 },
-      { cx: 65, cy: 120, rx: 55, ry: 50, color: blue, opacity: 0.6 },
-      { cx: 140, cy: 100, rx: 60, ry: 55, color: emerald, opacity: 0.65 },
-      { cx: 100, cy: 140, rx: 65, ry: 45, color: pink, opacity: 0.65 },
-    ],
-    4: [
-      { cx: 100, cy: 50, rx: 100, ry: 70, color: violet, opacity: 0.85 },
-      { cx: 55, cy: 120, rx: 65, ry: 70, color: cyan, opacity: 0.8 },
-      { cx: 150, cy: 90, rx: 70, ry: 75, color: emerald, opacity: 0.8 },
-      { cx: 100, cy: 155, rx: 85, ry: 55, color: pink, opacity: 0.8 },
-      { cx: 100, cy: 100, rx: 50, ry: 50, color: blue, opacity: 0.6 },
-    ],
-  }[stage] || [];
+  // Glow base radii per stage (how large each color zone glows)
+  const glowRadii = { 1: { rx: 50, ry: 42 }, 2: { rx: 55, ry: 48 }, 3: { rx: 58, ry: 52 }, 4: { rx: 62, ry: 55 } }[stage] || { rx: 55, ry: 48 };
+  const glowOpacity = { 1: 0.65, 2: 0.7, 3: 0.75, 4: 0.8 }[stage] || 0.7;
 
-  // Neuron positions per stage - fewer and smaller early, more and larger late
+  // Neuron positions per stage
   const baseNeurons = {
     1: [
-      { x: 100, y: 95, r: 4, color: violet },
-      { x: 85, y: 80, r: 3, color: violet },
-      { x: 115, y: 85, r: 3, color: blue },
-      { x: 95, y: 110, r: 3, color: blue },
+      { x: 100, y: 95, r: 4.5, color: violet },
+      { x: 82, y: 75, r: 3.5, color: violet },
+      { x: 118, y: 82, r: 3.5, color: blue },
+      { x: 92, y: 115, r: 3, color: blue },
     ],
     2: [
       { x: 100, y: 95, r: 5, color: violet },
-      { x: 75, y: 72, r: 4, color: violet },
-      { x: 125, y: 80, r: 4, color: emerald },
-      { x: 85, y: 120, r: 4, color: blue },
-      { x: 115, y: 110, r: 3, color: emerald },
+      { x: 72, y: 70, r: 4, color: violet },
+      { x: 130, y: 78, r: 4, color: emerald },
+      { x: 82, y: 125, r: 4, color: blue },
+      { x: 120, y: 115, r: 3.5, color: emerald },
     ],
     3: [
       { x: 100, y: 100, r: 6, color: violet },
-      { x: 62, y: 58, r: 5, color: violet },
-      { x: 142, y: 72, r: 5, color: emerald },
-      { x: 155, y: 108, r: 4, color: emerald },
-      { x: 45, y: 95, r: 5, color: blue },
-      { x: 78, y: 145, r: 5, color: pink },
-      { x: 128, y: 138, r: 5, color: pink },
-      { x: 95, y: 68, r: 4, color: violet },
-      { x: 68, y: 115, r: 4, color: blue },
-      { x: 138, y: 95, r: 3, color: emerald },
+      { x: 60, y: 56, r: 5, color: violet },
+      { x: 145, y: 70, r: 5, color: emerald },
+      { x: 158, y: 110, r: 4, color: emerald },
+      { x: 42, y: 95, r: 5, color: blue },
+      { x: 75, y: 148, r: 5, color: pink },
+      { x: 130, y: 140, r: 5, color: pink },
+      { x: 92, y: 66, r: 4, color: violet },
+      { x: 65, y: 118, r: 4, color: blue },
+      { x: 140, y: 98, r: 3.5, color: emerald },
     ],
     4: [
       { x: 100, y: 98, r: 6, color: violet },
-      { x: 58, y: 52, r: 5, color: violet },
-      { x: 138, y: 48, r: 4, color: violet },
-      { x: 155, y: 85, r: 5, color: emerald },
-      { x: 148, y: 125, r: 4, color: pink },
-      { x: 42, y: 88, r: 5, color: cyan },
-      { x: 52, y: 135, r: 5, color: cyan },
-      { x: 115, y: 148, r: 5, color: pink },
-      { x: 72, y: 148, r: 4, color: pink },
-      { x: 85, y: 65, r: 4, color: violet },
-      { x: 125, y: 72, r: 4, color: emerald },
-      { x: 65, y: 105, r: 3, color: cyan },
-      { x: 135, y: 105, r: 3, color: emerald },
+      { x: 55, y: 50, r: 5, color: violet },
+      { x: 140, y: 46, r: 4.5, color: violet },
+      { x: 158, y: 82, r: 5, color: emerald },
+      { x: 150, y: 128, r: 4, color: pink },
+      { x: 40, y: 85, r: 5, color: cyan },
+      { x: 48, y: 138, r: 5, color: cyan },
+      { x: 118, y: 150, r: 5, color: pink },
+      { x: 70, y: 150, r: 4, color: pink },
+      { x: 82, y: 62, r: 4, color: violet },
+      { x: 128, y: 70, r: 4, color: emerald },
+      { x: 62, y: 108, r: 3.5, color: cyan },
+      { x: 138, y: 108, r: 3.5, color: emerald },
     ],
   }[stage] || [];
 
-  // Connection indices per stage - match reduced neuron counts
+  // Connection indices per stage
   const connectionIndices = {
-    1: [[0,1], [0,2], [0,3], [1,2], [2,3]],
-    2: [[0,1], [0,2], [0,3], [0,4], [1,3], [2,4], [1,2]],
-    3: [[0,1], [0,2], [0,3], [0,4], [0,5], [0,6], [0,7], [0,8], [0,9], [1,7], [2,7], [2,9], [3,9], [3,6], [4,8], [4,5], [5,6], [1,4]],
-    4: [[0,1], [0,2], [0,3], [0,4], [0,5], [0,6], [0,7], [0,8], [0,9], [0,10], [0,11], [0,12], [1,9], [2,10], [3,10], [3,12], [4,12], [4,7], [5,11], [5,6], [6,8], [8,7], [1,5], [2,3]],
+    1: [[0,1],[0,2],[0,3],[1,2],[2,3]],
+    2: [[0,1],[0,2],[0,3],[0,4],[1,3],[2,4],[1,2]],
+    3: [[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[0,8],[0,9],[1,7],[2,7],[2,9],[3,9],[3,6],[4,8],[4,5],[5,6],[1,4]],
+    4: [[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[0,8],[0,9],[0,10],[0,11],[0,12],[1,9],[2,10],[3,10],[3,12],[4,12],[4,7],[5,11],[5,6],[6,8],[8,7],[1,5],[2,3]],
   }[stage] || [];
+
+  // Background stars (subtle twinkle)
+  const stars = React.useMemo(() => {
+    const rng = (seed) => {
+      let s = seed;
+      return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
+    };
+    const r = rng(stage * 7 + 42);
+    const count = 12 + stage * 4;
+    return Array.from({ length: count }, (_, i) => ({
+      cx: r() * 200,
+      cy: r() * 220,
+      r: 0.4 + r() * 0.8,
+      delay: r() * 6,
+      duration: 3 + r() * 4,
+    }));
+  }, [stage]);
 
   // Animation loop
   React.useEffect(() => {
@@ -1375,49 +1421,138 @@ const AuraVisualization = ({ stage, darkMode }) => {
     return () => cancelAnimationFrame(animRef.current);
   }, []);
 
-  // Animated neuron positions
+  // Animated neuron positions (organic drift)
   const animatedNeurons = baseNeurons.map((n, i) => {
-    const speed = 0.5 + (i % 3) * 0.3;
-    const amp = 1.5 + (i % 4) * 0.5;
+    const speed = 0.4 + (i % 3) * 0.25;
+    const amp = 1.8 + (i % 4) * 0.6;
     const phaseX = i * 1.3;
     const phaseY = i * 0.9 + 0.5;
     return {
       ...n,
       x: n.x + Math.sin(time * speed + phaseX) * amp,
-      y: n.y + Math.cos(time * speed * 0.8 + phaseY) * amp,
+      y: n.y + Math.cos(time * speed * 0.75 + phaseY) * amp,
     };
   });
 
-  // Smaller early, larger late - more dramatic progression
-  const sizes = { 1: 100, 2: 120, 3: 145, 4: 170 };
-  const size = sizes[stage] || 120;
-  const lineColor = darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.2)';
-  const filterId = `aura-blur-${stage}`;
+  // Dynamic glow: compute color zone centroids from animated neuron positions
+  const dynamicGlow = (() => {
+    const groups = {};
+    animatedNeurons.forEach(n => {
+      if (!groups[n.color]) groups[n.color] = { sx: 0, sy: 0, count: 0, color: n.color };
+      groups[n.color].sx += n.x;
+      groups[n.color].sy += n.y;
+      groups[n.color].count++;
+    });
+    return Object.values(groups).map(g => ({
+      cx: g.sx / g.count,
+      cy: g.sy / g.count,
+      rx: glowRadii.rx + g.count * 3,
+      ry: glowRadii.ry + g.count * 3,
+      color: g.color,
+      opacity: glowOpacity,
+    }));
+  })();
+
+  // Size grows with stage
+  const sizes = { 1: 110, 2: 130, 3: 160, 4: 190 };
+  const size = sizes[stage] || 130;
+
+  // Colors
+  const lineColor = darkMode ? 'rgba(255,255,255,' : 'rgba(100,100,120,';
+  const lineBaseOpacity = darkMode ? 0.3 : 0.18;
+  const starColor = darkMode ? 'rgba(255,255,255,' : 'rgba(140,140,160,';
+
+  // SVG filter IDs
+  const blurId = `aura-glow-${stage}`;
+  const softBlurId = `aura-soft-${stage}`;
+  const blurAmount = { 1: 14, 2: 16, 3: 18, 4: 20 }[stage] || 16;
+  const nodeBlurAmount = { 1: 6, 2: 7, 3: 8, 4: 10 }[stage] || 8;
+
+  // Breathing (CSS-driven for smooth performance)
+  const breatheStyle = {
+    animation: `aura-breathe ${10 + stage}s ease-in-out infinite`,
+    transformOrigin: 'center center',
+  };
 
   return (
-    <div className="flex items-center justify-center" style={{ width: size, height: size * 1.1, margin: '0 auto' }}>
+    <div
+      ref={containerRef}
+      className="flex items-center justify-center"
+      style={{ width: size, height: size * 1.1, margin: '0 auto', position: 'relative' }}
+    >
       <svg width={size} height={size * 1.1} viewBox="0 0 200 220" style={{ overflow: 'visible' }}>
         <defs>
-          <filter id={filterId} x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation={{ 1: 12, 2: 14, 3: 17, 4: 22 }[stage] || 14} />
+          <filter id={blurId} x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation={blurAmount} />
           </filter>
+          <filter id={softBlurId} x="-200%" y="-200%" width="500%" height="500%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation={nodeBlurAmount} />
+          </filter>
+          <radialGradient id={`aura-fade-${stage}`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="white" stopOpacity="1" />
+            <stop offset="55%" stopColor="white" stopOpacity="1" />
+            <stop offset="80%" stopColor="white" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </radialGradient>
+          <mask id={`aura-mask-${stage}`}>
+            <rect x="-50" y="-30" width="300" height="280" fill={`url(#aura-fade-${stage})`} />
+          </mask>
         </defs>
-        <g filter={`url(#${filterId})`}>
-          {auraData.map((e, i) => (
-            <ellipse key={i} cx={e.cx} cy={e.cy} rx={e.rx} ry={e.ry} fill={e.color} opacity={darkMode ? e.opacity : e.opacity * 0.7} />
-          ))}
-        </g>
-        <g stroke={lineColor} strokeWidth="1">
-          {connectionIndices.map(([from, to], i) => (
-            <line key={i} x1={animatedNeurons[from]?.x} y1={animatedNeurons[from]?.y} x2={animatedNeurons[to]?.x} y2={animatedNeurons[to]?.y} />
-          ))}
-        </g>
-        {animatedNeurons.map((n, i) => (
-          <g key={i}>
-            <circle cx={n.x} cy={n.y} r={n.r * 2} fill={n.color} opacity="0.3" filter={`url(#${filterId})`} />
-            <circle cx={n.x} cy={n.y} r={n.r} fill={n.color} />
-          </g>
+
+        {/* Background stars */}
+        {stars.map((s, i) => (
+          <circle
+            key={`star-${i}`}
+            cx={s.cx} cy={s.cy} r={s.r}
+            fill={`${starColor}0.5)`}
+            style={{ animation: `star-twinkle ${s.duration}s ease-in-out ${s.delay}s infinite` }}
+          />
         ))}
+
+        {/* Glow layer — follows neuron centroids, masked for soft edges */}
+        <g mask={`url(#aura-mask-${stage})`} style={breatheStyle}>
+          <g filter={`url(#${blurId})`}>
+            {dynamicGlow.map((e, i) => (
+              <ellipse key={i} cx={e.cx} cy={e.cy} rx={e.rx} ry={e.ry}
+                fill={e.color} opacity={darkMode ? e.opacity : e.opacity * 0.6} />
+            ))}
+          </g>
+        </g>
+
+        {/* Connection lines — visible but delicate, fade by distance */}
+        <g style={breatheStyle}>
+          {connectionIndices.map(([from, to], i) => {
+            const a = animatedNeurons[from];
+            const b = animatedNeurons[to];
+            if (!a || !b) return null;
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            const maxDist = 120;
+            const opacity = Math.max(0, (1 - dist / maxDist)) * lineBaseOpacity;
+            return (
+              <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke={`${lineColor}${opacity})`} strokeWidth="1" strokeLinecap="round" />
+            );
+          })}
+        </g>
+
+        {/* Neural nodes with 3-layer glow */}
+        <g style={breatheStyle}>
+          {animatedNeurons.map((n, i) => (
+            <g key={i}>
+              <circle cx={n.x} cy={n.y} r={n.r * 3}
+                fill={hexToRgba(n.color, darkMode ? 0.2 : 0.12)}
+                filter={`url(#${softBlurId})`} />
+              <circle cx={n.x} cy={n.y} r={n.r * 1.8}
+                fill={hexToRgba(n.color, darkMode ? 0.35 : 0.2)} />
+              <circle cx={n.x} cy={n.y} r={n.r}
+                fill={n.color} opacity={darkMode ? 0.95 : 0.8} />
+              <circle cx={n.x} cy={n.y} r={n.r * 0.4}
+                fill="white" opacity={darkMode ? 0.6 : 0.4} />
+            </g>
+          ))}
+        </g>
       </svg>
     </div>
   );
@@ -1963,8 +2098,8 @@ const ASSESS_TESTS = {
     ]
   },
   'shadow-P': {
-    name: 'Detachment', icon: '🖤', color: 'slate', scale: 'agreement', parent: 'shadow', trait: 'P',
-    description: 'Psychopathy - emotional detachment',
+    name: 'Cold Focus', icon: '🖤', color: 'slate', scale: 'agreement', parent: 'shadow', trait: 'P',
+    description: 'How you detach emotions from decisions under pressure',
     items: [
       { q: "I stay calm in situations that upset others", k: '+' },
       { q: "People say I can be insensitive sometimes", k: '+' },
@@ -3581,11 +3716,11 @@ const spectrumColors = {
   'shadow-N': { left: '#ffffff', right: '#000000', leftLabel: 'Humble', rightLabel: 'Confident' },
   'shadow-P': { left: '#ffffff', right: '#000000', leftLabel: 'Empathic', rightLabel: 'Detached' },
   // Starter modules
-  'starter-personality': { left: '#818cf8', right: '#c084fc', leftLabel: '', rightLabel: '' },
-  'starter-motivation': { left: '#f472b6', right: '#fb923c', leftLabel: '', rightLabel: '' },
-  'starter-thinking': { left: '#60a5fa', right: '#34d399', leftLabel: '', rightLabel: '' },
-  'starter-connection': { left: '#fbbf24', right: '#f472b6', leftLabel: '', rightLabel: '' },
-  'starter-strategy': { left: '#a78bfa', right: '#38bdf8', leftLabel: '', rightLabel: '' },
+  'starter-personality': { left: '#818cf8', right: '#c084fc', leftLabel: 'Reflective', rightLabel: 'Expressive' },
+  'starter-motivation': { left: '#f472b6', right: '#fb923c', leftLabel: 'Internal', rightLabel: 'External' },
+  'starter-thinking': { left: '#60a5fa', right: '#34d399', leftLabel: 'Analytical', rightLabel: 'Intuitive' },
+  'starter-connection': { left: '#fbbf24', right: '#f472b6', leftLabel: 'Independent', rightLabel: 'Relational' },
+  'starter-strategy': { left: '#a78bfa', right: '#38bdf8', leftLabel: 'Cautious', rightLabel: 'Adventurous' },
 };
 
 // SpectrumBar - Gradient spectrum bar with white dot marker
@@ -5862,6 +5997,9 @@ const getInitialScreen = () => {
   return 'welcome';
 };
 
+// Dev panel only on local environments
+const IS_DEV = ['localhost', '127.0.0.1', ''].includes(location.hostname) || location.protocol === 'file:';
+
 function App() {
   const displayMode = useDisplayMode();
   const [questions] = useState(() => shuffleArray(QUESTIONS));
@@ -5879,6 +6017,10 @@ function App() {
 
   // Level up celebration state
   const [levelUpData, setLevelUpData] = useState(null); // { level, title }
+
+  // Dev panel state
+  const [showDevPanel, setShowDevPanel] = useState(false);
+  const [devMinimized, setDevMinimized] = useState(false);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [darkMode, setDarkMode] = useState(getInitialDarkMode);
@@ -6009,6 +6151,19 @@ function App() {
     data.settings = { ...data.settings, darkMode, undoDelay, requireConfirmation, showTips };
     demoStorage.set(data);
   }, [darkMode, undoDelay, requireConfirmation, showTips]);
+
+  // Dev panel keyboard shortcut (Ctrl+Shift+D — uses Ctrl key, not Cmd, to avoid browser conflicts)
+  useEffect(() => {
+    if (!IS_DEV) return;
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && !e.metaKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setShowDevPanel(p => !p);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Find next unanswered question
   const findNextUnanswered = useCallback((fromIndex) => {
@@ -7382,32 +7537,32 @@ function App() {
                             );
                           }
 
-                          // In progress or not started: two-row layout with progress bar
+                          // In progress or not started: single-row layout matching completed spacing
                           return (
-                            <button key={id} onClick={() => assessStartTest(id)} className={`w-full p-3 text-left hover-glow hover-glow-${cat.color} rounded-lg`}>
-                              <div className="flex items-center gap-3 mb-2">
-                                <span className="text-xl">{test.icon}</span>
-                                <div className="flex-1 min-w-0">
-                                  <div className={`font-medium text-sm ${TH('text-primary', darkMode)}`}>{test.name}</div>
+                            <button key={id} onClick={() => assessStartTest(id)}
+                              className={`w-full px-3 py-2 flex items-center gap-2 hover-glow hover-glow-${cat.color} rounded-lg`}>
+                              <span className="text-sm w-5">{test.icon}</span>
+                              <span className={`w-24 text-left text-xs ${TH('text-secondary', darkMode)} truncate`}>{test.name}</span>
+                              <div className="flex-1">
+                                <div className="flex justify-between text-[10px] mb-1">
+                                  <span className={darkMode ? 'text-gray-600' : 'text-gray-300'}>&nbsp;</span>
+                                  <span className={`${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{`${answered}/${test.items.length}`}</span>
                                 </div>
-                                <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                                  {`${answered}/${test.items.length}`}
-                                </span>
-                              </div>
-                              <div className="h-2.5 rounded-full relative" style={{ background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
-                                {modProgressPct > 0 && (
-                                  <>
-                                    <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${modProgressPct}%`, background: `linear-gradient(to right, ${hex.base}, ${hex.light})` }} />
-                                    <div
-                                      className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white"
-                                      style={{
-                                        left: `${Math.max(4, Math.min(96, modProgressPct))}%`,
-                                        marginLeft: -7,
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
-                                      }}
-                                    />
-                                  </>
-                                )}
+                                <div className="h-3 rounded-full relative" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}>
+                                  {modProgressPct > 0 && (
+                                    <>
+                                      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${modProgressPct}%`, background: `linear-gradient(to right, ${hex.base}, ${hex.light})` }} />
+                                      <div
+                                        className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
+                                        style={{
+                                          left: `${Math.max(5, Math.min(95, modProgressPct))}%`,
+                                          marginLeft: -8,
+                                          boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
+                                        }}
+                                      />
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </button>
                           );
@@ -8039,11 +8194,12 @@ function App() {
                     {completedModules.map(([id, t]) => {
                       const r = assessCompleted[id];
                       const spec = spectrumColors[id] || { left: '#8b5cf6', right: '#a78bfa', leftLabel: '', rightLabel: '' };
+                      const leanLabel = r.score >= 50 ? spec.rightLabel : spec.leftLabel;
                       return (
                         <div key={id} className="space-y-1">
                           <div className="flex justify-between items-baseline">
                             <span className={`text-sm font-medium ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{r.traitName}</span>
-                            <span className={`text-sm font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{r.score}%</span>
+                            <span className={`text-xs ${TH('text-dim', darkMode)}`}>{leanLabel}</span>
                           </div>
                           <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
                             <div
@@ -8093,11 +8249,12 @@ function App() {
                     {completedModules.map(([id, t]) => {
                       const r = assessCompleted[id];
                       const spec = spectrumColors[id] || { left: '#94a3b8', right: '#1e293b', leftLabel: '', rightLabel: '' };
+                      const leanLabel = r.score >= 50 ? spec.rightLabel : spec.leftLabel;
                       return (
                         <div key={id} className="space-y-1">
                           <div className="flex justify-between items-baseline">
                             <span className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{r.traitName}</span>
-                            <span className={`text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{r.score}%</span>
+                            <span className={`text-xs ${TH('text-dim', darkMode)}`}>{leanLabel}</span>
                           </div>
                           <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
                             <div
@@ -8198,11 +8355,13 @@ function App() {
                       <div className="flex gap-2">
                         {starterModules.map(([id, t]) => {
                           const done = assessCompleted[id];
+                          const spec = spectrumColors[id];
+                          const leanLabel = done && spec ? (done.score >= 50 ? spec.rightLabel : spec.leftLabel) : null;
                           return (
                             <div key={id} className={`flex-1 p-2 rounded-lg text-center ${done ? (darkMode ? 'bg-indigo-900/30' : 'bg-indigo-50') : (darkMode ? 'bg-gray-800/50' : 'bg-gray-100')}`}>
                               <div className="text-lg">{t.icon}</div>
                               <div className={`text-xs ${done ? (darkMode ? 'text-indigo-400' : 'text-indigo-600') : (darkMode ? 'text-gray-500' : 'text-gray-400')}`}>
-                                {done ? `${done.score}%` : '—'}
+                                {leanLabel || (done ? '✓' : '—')}
                               </div>
                             </div>
                           );
@@ -8479,7 +8638,7 @@ function App() {
         }
         if (shadowP !== undefined) {
           if (shadowP > 60 && hasBigFive && bigFive.N < 40) insights.push({ icon: '🧊', text: 'Emotional detachment + stability = calm decision-maker in crisis situations' });
-          if (shadowP > 60 && assessCompleted.cognitive?.score > 60) insights.push({ icon: '🔬', text: 'Detachment + ND traits = analytical mind unswayed by emotional noise' });
+          if (shadowP > 60 && assessCompleted.cognitive?.score > 60) insights.push({ icon: '🔬', text: 'Cold Focus + ND traits = analytical mind unswayed by emotional noise' });
         }
         // Fuller Picture archetypes
         if (assessCompleted.cognitive?.score > 60 && assessCompleted.adhd?.indicators >= 3) {
@@ -8661,7 +8820,7 @@ function App() {
       const shadowDescriptions = {
         M: { name: 'Strategic Mind', desc: s => s > 60 ? 'High tactical awareness—you naturally read situations and plan accordingly.' : s < 40 ? 'Straightforward approach—you prefer transparency over strategy.' : 'Situational tactician—you flex between direct and strategic.' },
         N: { name: 'Self-Image', desc: s => s > 60 ? 'Strong self-regard—you\'re confident in your abilities and value recognition.' : s < 40 ? 'Humble presence—you prefer to elevate others over yourself.' : 'Healthy self-regard—balanced confidence without ego.' },
-        P: { name: 'Detachment', desc: s => s > 60 ? 'Emotionally detached—you make decisions based on logic, not feelings.' : s < 40 ? 'Deeply empathetic—you feel others\' emotions strongly.' : 'Emotionally balanced—you blend logic with emotional awareness.' },
+        P: { name: 'Cold Focus', desc: s => s > 60 ? 'Cool under pressure—you make decisions based on logic, not feelings.' : s < 40 ? 'Deeply empathetic—you feel others\' emotions strongly.' : 'Emotionally balanced—you blend logic with emotional awareness.' },
       };
 
       return (
@@ -8919,13 +9078,21 @@ function App() {
                         gradientId={`analysis-grp-${group.id}`} darkMode={darkMode} iconSize="text-sm"
                       />
                       <span className={`flex-1 text-left text-sm font-medium ${TH('text-primary', darkMode)}`}>{group.name}</span>
-                      {/* Mini semicircle gauges in collapsed header for spectrum groups */}
+                      {/* Trait dots in collapsed header — one per scored trait */}
                       {!isExpanded && hasSpectrumScores && (
-                        <div className="flex items-end gap-0.5 mr-1">
-                          {group.completedTests.slice(0, 5).map(id => {
+                        <div className="flex items-center gap-1.5 mr-1">
+                          {group.completedTests.slice(0, 6).map(id => {
                             const result = assessCompleted[id];
-                            if (!spectrumColors[id] || result?.score === undefined) return null;
-                            return <SemiGauge key={id} value={result.score} testId={id} size={24} />;
+                            const spec = spectrumColors[id];
+                            if (!spec || result?.score === undefined) return null;
+                            const t = result.score / 100;
+                            const dotColor = t > 0.5 ? spec.right : spec.left;
+                            return (
+                              <div key={id} className="rounded-full" style={{
+                                width: 8, height: 8, background: dotColor,
+                                boxShadow: darkMode ? `0 0 6px ${dotColor}60` : 'none',
+                              }} />
+                            );
                           })}
                         </div>
                       )}
@@ -8943,13 +9110,14 @@ function App() {
                           const colorClass = group.color === 'slate' ? 'slate' : group.color === 'violet' ? 'violet' : group.color;
 
                           if (hasSpectrum) {
-                            // Full gradient + white dot style (like image 18)
+                            // Full gradient + white dot style — spectrum position, not a grade
+                            const leanLabel = result.score >= 50 ? spec.rightLabel : spec.leftLabel;
                             return (
                               <button key={id} onClick={() => { setAssessCurrentTestId(id); setScreen('assess-results'); }}
                                 className="w-full text-left space-y-1">
                                 <div className="flex justify-between items-baseline">
                                   <span className={`text-sm font-medium ${darkMode ? `text-${colorClass}-400` : `text-${colorClass}-600`}`}>{test.name}</span>
-                                  <span className={`text-sm font-bold ${darkMode ? `text-${colorClass}-400` : `text-${colorClass}-600`}`}>{result.score}%</span>
+                                  <span className={`text-xs ${TH('text-dim', darkMode)}`}>{leanLabel}</span>
                                 </div>
                                 <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
                                   <div
@@ -9705,6 +9873,143 @@ function App() {
     );
   };
 
+  // ==================== DEV NAVIGATION PANEL ====================
+  const DEV_SCREENS = [
+    { id: 'welcome', label: 'Welcome', icon: '👋' },
+    { id: 'onboarding', label: 'Onboard', icon: '🎯' },
+    { id: 'path-choice', label: 'Path', icon: '🔀' },
+    { id: 'categories', label: 'Home', icon: '🏠' },
+    { id: 'question', label: 'Question', icon: '❓' },
+    { id: 'qotd', label: 'QotD', icon: '🌀' },
+    { id: 'profile', label: 'Profile', icon: '👤' },
+    { id: 'settings', label: 'Settings', icon: '⚙️' },
+    { id: 'history', label: 'History', icon: '📜' },
+    { id: 'assess-picker', label: 'Assess', icon: '📋' },
+    { id: 'assess-question', label: 'Assess Q', icon: '📝' },
+    { id: 'assess-results', label: 'Results', icon: '📊' },
+    { id: 'assess-analysis', label: 'Analysis', icon: '🔬' },
+    { id: 'launch', label: 'Launch', icon: '🚀' },
+  ];
+
+  const devPanelEl = IS_DEV && showDevPanel ? (() => {
+    if (devMinimized) {
+      return (
+        <button
+          onClick={() => setDevMinimized(false)}
+          className="fixed bottom-4 right-4 z-[10000] w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center shadow-lg hover:bg-violet-500 transition-colors text-sm font-bold"
+          title="Expand Dev Panel"
+        >D</button>
+      );
+    }
+    const completedTests = Object.keys(assessCompleted).length;
+    const totalTests = Object.keys(ASSESS_TESTS).length;
+    const bg = darkMode ? 'bg-gray-900 border-gray-700 text-gray-100' : 'bg-white border-gray-300 text-gray-900';
+    const btnBase = darkMode ? 'bg-gray-800 hover:bg-gray-700 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-800';
+    const btnAccent = 'bg-violet-600 hover:bg-violet-500 text-white';
+    const sectionTitle = darkMode ? 'text-gray-400' : 'text-gray-500';
+
+    return (
+      <div className={`fixed bottom-4 right-4 z-[10000] w-80 max-h-[85vh] overflow-y-auto rounded-xl border shadow-2xl ${bg}`} style={{fontSize:'13px'}}>
+        <div className="flex items-center justify-between px-3 py-2 border-b border-inherit">
+          <span className="font-bold text-violet-500">Dev Panel</span>
+          <div className="flex gap-1">
+            <button onClick={() => setDevMinimized(true)} className={`px-2 py-0.5 rounded text-xs ${btnBase}`}>_</button>
+            <button onClick={() => setShowDevPanel(false)} className={`px-2 py-0.5 rounded text-xs ${btnBase}`}>×</button>
+          </div>
+        </div>
+
+        {/* Screen Jumper */}
+        <div className="px-3 py-2 border-b border-inherit">
+          <div className={`text-xs font-medium mb-1.5 ${sectionTitle}`}>SCREENS</div>
+          <div className="grid grid-cols-4 gap-1">
+            {DEV_SCREENS.map(s => (
+              <button key={s.id} onClick={() => setScreen(s.id)}
+                className={`px-1 py-1.5 rounded text-xs text-center truncate ${screen === s.id ? btnAccent : btnBase}`}
+                title={s.id}>
+                <div>{s.icon}</div>
+                <div className="truncate">{s.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Question Jumper */}
+        <div className="px-3 py-2 border-b border-inherit">
+          <div className={`text-xs font-medium mb-1.5 ${sectionTitle}`}>QUESTION JUMP</div>
+          <div className="flex gap-1">
+            <input
+              type="number"
+              placeholder="Q ID (e.g. 444)"
+              className={`flex-1 px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-300'}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const id = parseInt(e.target.value);
+                  const idx = questions.findIndex(q => q.id === id);
+                  if (idx >= 0) { setCurrentIndex(idx); setScreen('question'); e.target.value = ''; }
+                  else alert('Q' + id + ' not found in active questions');
+                }
+              }}
+            />
+            <button onClick={() => { setCurrentIndex(0); setScreen('question'); }} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Q1</button>
+            <button onClick={() => { setCurrentIndex(questions.length - 1); setScreen('question'); }} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Last</button>
+          </div>
+          <div className={`text-xs mt-1 ${sectionTitle}`}>
+            Current: Q{questions[currentIndex]?.id || '?'} ({currentIndex + 1}/{questions.length})
+          </div>
+        </div>
+
+        {/* Assessment Controls */}
+        <div className="px-3 py-2 border-b border-inherit">
+          <div className={`text-xs font-medium mb-1.5 ${sectionTitle}`}>ASSESSMENTS</div>
+          <div className="flex gap-1 flex-wrap">
+            <button onClick={() => {
+              // Unlock all tiers by faking quick-profile + all starter completions
+              const fakeCompleted = { ...assessCompleted };
+              if (!fakeCompleted['quick-profile']) {
+                fakeCompleted['quick-profile'] = { score: 75, answers: {0:4,1:3,2:4,3:3,4:4,5:3,6:4,7:3,8:3,9:4}, traits: {E:70,A:60,C:65,N:45,O:75} };
+              }
+              ['starter-personality','starter-motivation','starter-thinking','starter-connection','starter-strategy'].forEach(id => {
+                if (!fakeCompleted[id]) {
+                  fakeCompleted[id] = { score: 70, answers: {0:4,1:3,2:4,3:3,4:4,5:3,6:4,7:3}, traits: {} };
+                }
+              });
+              setAssessCompleted(fakeCompleted);
+              localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed: fakeCompleted, inProgress: {}, demoActive: false, savedUserData: null, demoProfile: null, showDemoControls: false }));
+            }} className={`px-2 py-1.5 rounded text-xs ${btnAccent}`}>Unlock All Tiers</button>
+            <select onChange={(e) => { if (e.target.value) { setAssessCurrentTestId(e.target.value); setScreen('assess-question'); }}}
+              className={`px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-300'}`}
+              value="">
+              <option value="">Jump to test...</option>
+              {Object.entries(ASSESS_TESTS).map(([id, t]) => (
+                <option key={id} value={id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className={`text-xs mt-1 ${sectionTitle}`}>Completed: {completedTests}/{totalTests} | Tier: {calculateAssessTier(assessCompleted)}</div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="px-3 py-2 border-b border-inherit">
+          <div className={`text-xs font-medium mb-1.5 ${sectionTitle}`}>QUICK ACTIONS</div>
+          <div className="flex gap-1 flex-wrap">
+            <button onClick={() => setDarkMode(d => !d)} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
+            <button onClick={() => assessLoadDemoProfile(1)} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Demo 1</button>
+            <button onClick={() => assessLoadDemoProfile(2)} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Demo 2</button>
+            <button onClick={() => assessLoadDemoProfile(3)} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Demo 3</button>
+            <button onClick={resetDemo} className={`px-2 py-1.5 rounded text-xs bg-rose-600 hover:bg-rose-500 text-white`}>Reset All</button>
+          </div>
+        </div>
+
+        {/* Stats Footer */}
+        <div className="px-3 py-2">
+          <div className={`text-xs ${sectionTitle}`}>
+            Qs: {questions.length} active / {Q_RAW.length} total | Answered: {Object.keys(responses).length} | Screen: {screen}
+          </div>
+        </div>
+      </div>
+    );
+  })() : null;
+
   if (displayMode === 'desktop') {
     return (
       <>
@@ -9729,6 +10034,7 @@ function App() {
           {showSaveNudge && <SaveProgressModal onCreateAccount={handleNudgeCreateAccount} onLater={handleNudgeLater} darkMode={darkMode} />}
           {levelUpData && <LevelUpModal level={levelUpData.level} title={levelUpData.title} onClose={() => setLevelUpData(null)} darkMode={darkMode} />}
         </PhoneFrame>
+        {devPanelEl}
       </>
     );
   }
@@ -9754,6 +10060,7 @@ function App() {
       <div className="safe-bottom" />
       {showSaveNudge && <SaveProgressModal onCreateAccount={handleNudgeCreateAccount} onLater={handleNudgeLater} darkMode={darkMode} />}
       {levelUpData && <LevelUpModal level={levelUpData.level} title={levelUpData.title} onClose={() => setLevelUpData(null)} darkMode={darkMode} />}
+      {devPanelEl}
     </div>
   );
 }
