@@ -1,4 +1,58 @@
 <!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  AURA PLAYER — CODE MAP                                     ║
+  ║  Cmd+F the quoted search terms to jump to any section        ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  FILE LAYOUT
+  ───────────────────────────────────────────────────────────────
+  <style>            CSS reset, animations, hover glows, shine effects
+  <script> #1        Tailwind CDN warning suppression
+  <script> #2        Questions database + onboarding questions
+  <script> #3        Supabase config, sync, auth helpers
+  <script babel>     Main React app (everything below)
+
+  MAIN APP SECTIONS — search: "== SECTION NAME =="
+  ───────────────────────────────────────────────────────────────
+  "UNIFIED COLOR SYSTEM"       COLOR_HEX, twColor, BINARY_COLORS
+  "CONFIDENCE HELPERS"         normalizeConf
+  "THEME TOKENS"               TH() dark/light class helper
+  "HELPERS"                    hexToRgba
+  "AURA VISUALIZATION"         AuraVisualization SVG component
+  "DATA"                       CATEGORIES, MC_COLORS, scoring, community results
+  "DEMO PRE-POPULATION"        Demo data seeding
+  "ASSESSMENTS DATA"           ASSESS_SCALES
+  "ASSESSMENTS"                ASSESS_TESTS (full test definitions)
+  "ARCHETYPE SYSTEM"           ARCHETYPES, pattern matching, descriptions
+  "ASSESSMENT COLORS"          ASSESS_C, ASSESS_STYLES, PROGRESS_GRADIENTS
+  "STORAGE"                    localStorage helpers
+  "GAMIFICATION SYSTEM"        XP, levels, streaks
+  "HOOKS"                      useDisplayMode, custom React hooks
+  "COMPONENTS"                 ProgressCircle, PhoneFrame, NavBar, WelcomeScreen
+  "ONBOARDING FLOW"            OnboardingFlow component
+  "PATH CHOICE SCREEN"         PathChoiceScreen, modals, buttons, CategoryScreen
+  "MAIN APP"                   function App() — state, effects, render
+    "ASSESSMENT FUNCTIONS"       ↳ Assessment logic inside App
+    "ASSESSMENT SCREENS"         ↳ assess-picker, assess-question, assess-results, assess-analysis
+    "DEV NAVIGATION PANEL"       ↳ Dev-only screen switcher
+
+  KEY CONSTANTS
+  ───────────────────────────────────────────────────────────────
+  const COLOR_HEX        All color definitions (single source of truth)
+  const TH               Theme helper — TH('token', darkMode) → Tailwind classes
+  const ASSESS_C         Assessment category → color mapping
+  const ASSESS_TESTS     Full assessment test definitions
+  const ARCHETYPES       29 personality archetype patterns
+  const Q_RAW            All questions array
+
+  KEY PATTERNS
+  ───────────────────────────────────────────────────────────────
+  • Screens: if (screen === 'x') return (...) chain in renderContent()
+  • Theme:   TH('token', darkMode) returns Tailwind classes
+  • Colors:  ASSESS_C[color] for assessment colors, COLOR_HEX[name] for raw hex
+  • Storage: localStorage key 'aura-demo-vI' for main data
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -304,7 +358,6 @@ console.warn = (...args) => {
   </script>
   <script>
 // ==================== QUESTIONS DATABASE (INLINE) ====================
-const BATCHES = { 1: { name: 'Original', date: '2025-01', count: 440 } };
 const CAT_MAP = {
   p: { id: 'prediction', name: 'Predictions', icon: '🔮', color: 'amber' },
   r: { id: 'reasoning', name: 'Reasoning', icon: '🧠', color: 'violet' },
@@ -1271,7 +1324,7 @@ const normalizeConf = (c) => Math.min(3, Math.max(0, (c || 1) - 1));
 
 // ==================== THEME TOKENS ====================
 // TH(token, darkMode) - returns the appropriate classes for the current theme
-const TH = (token, dark) => ({
+const TH = (token, dark) => { const val = {
   // Text colors
   'text-primary': dark ? 'text-white' : 'text-gray-900',
   'text-secondary': dark ? 'text-gray-300' : 'text-gray-700',
@@ -1314,7 +1367,10 @@ const TH = (token, dark) => ({
   'border-bg-main': dark ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white',
   'chip-violet': dark ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700',
   'chip-violet-alt': dark ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-600',
-}[token] || '');
+}[token];
+  if (val === undefined && ['localhost','127.0.0.1',''].includes(location?.hostname)) console.warn(`[TH] Unknown token: "${token}"`);
+  return val || '';
+};
 
 // ==================== HELPERS ====================
 const hexToRgba = (hex, alpha) => {
@@ -3085,90 +3141,6 @@ const calculateArchetype = (completed) => {
   return { primary: scored[0], secondary: scored.slice(1, 4), all: scored };
 };
 
-// Generate cross-pattern insights from trait combinations
-const generateInsights = (completed) => {
-  if (!completed) return [];
-
-  const insights = [];
-
-  // Extract scores for easier access
-  const bigFive = {};
-  ['E', 'A', 'C', 'N', 'O'].forEach(trait => {
-    const test = completed[`bigfive-${trait}`];
-    if (test?.score !== undefined) bigFive[trait] = { score: test.score };
-  });
-
-  const assessments = {
-    adhd: completed.adhd,
-    cognitive: completed.cognitive,
-    attachment: completed.attachment,
-    risk: completed.risk,
-    integrity: completed.integrity,
-    chronotype: completed.chronotype,
-    shadowM: completed['shadow-M'],
-    shadowN: completed['shadow-N'],
-    shadowP: completed['shadow-P']
-  };
-
-  // Big Five + Big Five patterns
-  if (bigFive.O?.score > 60 && bigFive.N?.score < 40) {
-    insights.push({ icon: '🧭', text: 'High curiosity paired with emotional stability lets you explore new ideas without anxiety derailing your process.' });
-  }
-  if (bigFive.E?.score < 40 && bigFive.O?.score > 60) {
-    insights.push({ icon: '📚', text: 'Your introversion and openness suggest a rich inner world—you may prefer deep exploration over broad socialization.' });
-  }
-  if (bigFive.C?.score > 70 && bigFive.N?.score < 40) {
-    insights.push({ icon: '⚓', text: 'High discipline combined with emotional stability makes you exceptionally reliable under pressure.' });
-  }
-  if (bigFive.A?.score > 60 && bigFive.N?.score > 60) {
-    insights.push({ icon: '💝', text: 'Your empathy and emotional sensitivity work together—you feel others\' experiences deeply.' });
-  }
-  if (bigFive.E?.score > 60 && bigFive.A?.score > 60) {
-    insights.push({ icon: '☀️', text: 'High extraversion + agreeableness = warm, approachable social presence that puts people at ease.' });
-  }
-  if (bigFive.N?.score > 60 && bigFive.O?.score > 60) {
-    insights.push({ icon: '🎨', text: 'Emotional depth + openness often fuels artistic or creative expression—your sensitivity is creative fuel.' });
-  }
-
-  // Big Five + Assessment patterns
-  if (assessments.risk?.score > 60 && bigFive.O?.score > 60) {
-    insights.push({ icon: '🎯', text: 'High openness + risk tolerance suggests you\'re drawn to pioneering roles where you can explore uncharted territory.' });
-  }
-  if (assessments.risk?.score < 40 && bigFive.C?.score > 60) {
-    insights.push({ icon: '🏗️', text: 'You prefer proven approaches over risky experiments—your strength is reliable execution, not radical innovation.' });
-  }
-  if (assessments.adhd?.indicators >= 3 && bigFive.O?.score > 60) {
-    insights.push({ icon: '💡', text: 'Your restless mind and intellectual curiosity combine to generate novel ideas rapidly—capture them before they fade.' });
-  }
-  if (assessments.adhd?.indicators >= 3 && bigFive.E?.score > 60) {
-    insights.push({ icon: '🎪', text: 'ADHD traits + extraversion often creates an energetic, entertaining presence that draws people in.' });
-  }
-  if (assessments.cognitive?.score > 60 && bigFive.A?.score < 40) {
-    insights.push({ icon: '🔬', text: 'Your analytical style and directness mean you prioritize accuracy over social comfort when it matters.' });
-  }
-
-  // Shadow patterns
-  if (assessments.shadowM?.score > 70 && assessments.attachment?.style === 'Secure') {
-    insights.push({ icon: '🛡️', text: 'Strategic mind + secure attachment = you use tactics to protect your inner circle, not exploit them.' });
-  }
-  if (assessments.shadowN?.score > 70 && bigFive.E?.score > 60) {
-    insights.push({ icon: '👑', text: 'High self-regard + extraversion = natural performer who commands attention when it matters.' });
-  }
-  if (assessments.shadowP?.score > 60 && bigFive.N?.score < 40) {
-    insights.push({ icon: '🧊', text: 'Emotional detachment + stability = calm decision-maker in crisis situations when others lose their heads.' });
-  }
-
-  // Chronotype patterns
-  if (assessments.chronotype?.type === 'Night Owl' && bigFive.O?.score > 60) {
-    insights.push({ icon: '🌙', text: 'Your creativity peaks in evening hours when the world quiets down—protect that time for your most imaginative work.' });
-  }
-  if (assessments.chronotype?.type === 'Morning Lark' && bigFive.C?.score > 70) {
-    insights.push({ icon: '🌅', text: 'Your disciplined nature aligns with early hours—you accomplish meaningful work before the day\'s distractions begin.' });
-  }
-
-  return insights.slice(0, 5);
-};
-
 // ==================== ASSESSMENT COLORS ====================
 // Derived from COLOR_HEX. To add a new color, just add it to COLOR_HEX above.
 // CSS classes (.hover-glow-*, .shine-*) still need manual addition in <style>.
@@ -3443,9 +3415,6 @@ const XP_RATES = {
 // Level calculation: Level = floor(sqrt(XP / 100)) + 1
 const calculateLevel = (xp) => Math.floor(Math.sqrt(xp / 100)) + 1;
 
-// XP required for a given level
-const xpForLevel = (level) => Math.pow(level - 1, 2) * 100;
-
 // Level titles
 const LEVEL_TITLES = {
   1: 'Newcomer',
@@ -3616,93 +3585,6 @@ const ProgressCircle = ({
   );
 };
 
-// HorseshoeProgress - Semicircle progress with gradient + glowing dot (matches spectrum bar design)
-const HorseshoeProgress = ({
-  progress = 0,
-  size = 48,
-  strokeWidth = 6,
-  color = 'violet',
-  icon = null,
-  text = null,
-  darkMode = true,
-  glow = true,
-  iconSize = 'text-lg',
-  textSize = 'text-sm',
-}) => {
-  const hex = COLOR_HEX[color] || COLOR_HEX.violet;
-  const hasProgress = progress > 0;
-  const radius = (size - strokeWidth) / 2;
-  const centerX = size / 2;
-  const centerY = size / 2;
-
-  // Horseshoe arc: 180 degrees (from left to right, opening at bottom)
-  const startAngle = -180; // Left side
-  const endAngle = 0; // Right side
-  const progressAngle = startAngle + (progress / 100) * 180;
-
-  // Convert angle to coordinates
-  const angleToCoord = (angle) => ({
-    x: centerX + radius * Math.cos(angle * Math.PI / 180),
-    y: centerY + radius * Math.sin(angle * Math.PI / 180)
-  });
-
-  const dotPos = angleToCoord(progressAngle);
-  const dotSize = Math.max(8, strokeWidth * 1.5);
-
-  // Arc path for the horseshoe
-  const arcPath = `M ${angleToCoord(startAngle).x} ${angleToCoord(startAngle).y} A ${radius} ${radius} 0 0 1 ${angleToCoord(endAngle).x} ${angleToCoord(endAngle).y}`;
-
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size * 0.6 }}>
-      {glow && hasProgress && (
-        <div className="absolute rounded-full blur-md opacity-30"
-             style={{
-               width: size * 0.8,
-               height: size * 0.4,
-               top: '10%',
-               background: `linear-gradient(90deg, ${hex.base}, ${hex.light})`
-             }} />
-      )}
-      <svg width={size} height={size * 0.6} viewBox={`0 0 ${size} ${size * 0.6}`} style={{ overflow: 'visible' }}>
-        <defs>
-          <linearGradient id={`horseshoe-${color}-${size}`} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={hasProgress ? hex.base : (darkMode ? '#374151' : '#d1d5db')} />
-            <stop offset="100%" stopColor={hasProgress ? hex.light : (darkMode ? '#4b5563' : '#9ca3af')} />
-          </linearGradient>
-        </defs>
-        {/* Background track */}
-        <path d={arcPath} fill="none" stroke={darkMode ? '#1f2937' : '#e5e7eb'} strokeWidth={strokeWidth} strokeLinecap="round" />
-        {/* Progress arc */}
-        {hasProgress && (
-          <path
-            d={`M ${angleToCoord(startAngle).x} ${angleToCoord(startAngle).y} A ${radius} ${radius} 0 ${progress > 50 ? 1 : 0} 1 ${dotPos.x} ${dotPos.y}`}
-            fill="none"
-            stroke={`url(#horseshoe-${color}-${size})`}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-          />
-        )}
-        {/* Glowing dot at progress position */}
-        {hasProgress && (
-          <>
-            <circle cx={dotPos.x} cy={dotPos.y} r={dotSize * 0.8} fill={hex.light} opacity="0.4" filter="url(#blur)" />
-            <circle cx={dotPos.x} cy={dotPos.y} r={dotSize / 2} fill={hex.light} stroke="white" strokeWidth="1.5" strokeOpacity="0.8" />
-          </>
-        )}
-      </svg>
-      {/* Center content */}
-      <div className="absolute flex items-center justify-center" style={{ top: '30%' }}>
-        {icon && !text && <span className={iconSize}>{icon}</span>}
-        {text !== null && (
-          <span className={`font-bold ${textSize}`} style={{ color: hasProgress ? hex.light : (darkMode ? '#6b7280' : '#9ca3af') }}>
-            {text}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // Spectrum colors for each trait (left color, right color)
 const spectrumColors = {
   // Big Five - distinct color pairs for each dimension
@@ -3821,62 +3703,6 @@ const ConfidenceBar = ({
             />
           )}
         </div>
-      </div>
-    </div>
-  );
-};
-
-// ProgressSquare - Rounded square for completed results (smaller, subtler than circles)
-const ProgressSquare = ({
-  size = 36,
-  borderRadius = 8,
-  color = 'violet',
-  text = null,
-  icon = null,
-  gradientId = 'sq',
-  darkMode = true,
-  glow = true,
-  textSize = 'text-xs',
-  onClick = null
-}) => {
-  const grad = PROGRESS_GRADIENTS[color] || PROGRESS_GRADIENTS.violet;
-
-  return (
-    <div
-      className={`relative flex items-center justify-center ${onClick ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
-      style={{ width: size, height: size }}
-      onClick={onClick}
-    >
-      {glow && (
-        <div className="absolute inset-0 blur-sm opacity-30"
-             style={{
-               background: `linear-gradient(135deg, ${grad.from}, ${grad.to})`,
-               borderRadius: borderRadius + 2
-             }} />
-      )}
-      <svg width={size} height={size} className="absolute">
-        <defs>
-          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={grad.from} />
-            <stop offset="100%" stopColor={grad.to} />
-          </linearGradient>
-        </defs>
-        <rect
-          x={2} y={2}
-          width={size - 4} height={size - 4}
-          rx={borderRadius} ry={borderRadius}
-          fill="none"
-          stroke={`url(#${gradientId})`}
-          strokeWidth={2}
-        />
-      </svg>
-      <div className="relative z-10 flex items-center justify-center">
-        {icon && <span className="text-sm">{icon}</span>}
-        {text !== null && !icon && (
-          <span className={`font-bold ${textSize}`} style={{ color: grad.to }}>
-            {text}
-          </span>
-        )}
       </div>
     </div>
   );
@@ -6000,28 +5826,45 @@ const getInitialScreen = () => {
 // Dev panel only on local environments
 const IS_DEV = ['localhost', '127.0.0.1', ''].includes(location.hostname) || location.protocol === 'file:';
 
+// ==================== ERROR BOUNDARY ====================
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error('[Aura] Component error:', error, info.componentStack); }
+  render() {
+    if (this.state.hasError) return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#030712', color: '#fff', padding: '2rem', textAlign: 'center' }}>
+        <div>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Something went wrong</div>
+          <div style={{ color: '#9ca3af', marginBottom: '1.5rem' }}>Aura hit an unexpected error.</div>
+          <button onClick={() => { this.setState({ hasError: false, error: null }); }} style={{ padding: '0.75rem 1.5rem', borderRadius: '0.75rem', background: '#8b5cf6', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
+          {IS_DEV && this.state.error && <pre style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#f87171', textAlign: 'left', maxHeight: '200px', overflow: 'auto' }}>{this.state.error.toString()}</pre>}
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 function App() {
+
+  // --- Navigation & Auth ---
   const displayMode = useDisplayMode();
   const [questions] = useState(() => shuffleArray(QUESTIONS));
   const [screen, setScreen] = useState(getInitialScreen);
   const [previousScreen, setPreviousScreen] = useState('categories');
-
-  // Guest mode and nudge tracking
   const [isGuestMode, setIsGuestMode] = useState(() => localStorage.getItem('aura_guest_mode') === 'true');
   const [showSaveNudge, setShowSaveNudge] = useState(false);
   const [nudgeShown, setNudgeShown] = useState(() => localStorage.getItem('aura_nudge_shown') === 'true');
-
-  // Onboarding state - new user progressive reveal
   const [onboardingComplete, setOnboardingComplete] = useState(() => localStorage.getItem('aura_onboarding_complete') === 'true');
   const [onboardingAnswers, setOnboardingAnswers] = useState({});
 
-  // Level up celebration state
+  // --- UI Chrome ---
   const [levelUpData, setLevelUpData] = useState(null); // { level, title }
-
-  // Dev panel state
   const [showDevPanel, setShowDevPanel] = useState(false);
   const [devMinimized, setDevMinimized] = useState(false);
 
+  // --- Questions & Responses ---
   const [currentIndex, setCurrentIndex] = useState(0);
   const [darkMode, setDarkMode] = useState(getInitialDarkMode);
   const [responses, setResponses] = useState(() => demoStorage.get().answers);
@@ -6051,7 +5894,7 @@ function App() {
   const [savedQuestions, setSavedQuestions] = useState(new Set()); // Questions saved for later
   const [skippedQuestions, setSkippedQuestions] = useState(new Set()); // Questions skipped
 
-  // Question of the Day state
+  // --- Question of the Day ---
   const [qotdData, setQotdData] = useState(() => getRandomQOTD());
   const [qotdResponse, setQotdResponse] = useState(null); // { answer, confidence }
 
@@ -6083,17 +5926,15 @@ function App() {
     setQotdTapCount(0);
   };
 
-  // Profile/History state
+  // --- Profile & History ---
   const [showStreak, setShowStreak] = useState(true);
   const [historyFilter, setHistoryFilter] = useState('all');
-
-  // Modal state for Can't Answer / None Option
   const [showCantAnswerModal, setShowCantAnswerModal] = useState(null);
   const [showNoneOptionModal, setShowNoneOptionModal] = useState(false);
   const [sessionAnsweredCategories, setSessionAnsweredCategories] = useState(new Set()); // Categories user has answered in this session
   const [sessionAnsweredIds, setSessionAnsweredIds] = useState(new Set()); // Question IDs answered THIS session (show results only for these)
 
-  // Assessment state
+  // --- Assessment System ---
   const [assessCurrentTestId, setAssessCurrentTestId] = useState(null);
   const [assessCurrentIndex, setAssessCurrentIndex] = useState(0);
   const [assessResponses, setAssessResponses] = useState({});
@@ -6126,6 +5967,7 @@ function App() {
   const [assessProfileSwitching, setAssessProfileSwitching] = useState(false);
   const assessTimeoutRef = useRef(null);
 
+  // --- Refs & Derived ---
   const submitTimeoutRef = useRef(null);
   const tapTimeoutRef = useRef(null);
   const graceTimeoutRef = useRef(null);
@@ -6859,6 +6701,23 @@ function App() {
   };
 
   const renderContent = () => {
+    // Screen routing — search: if (screen === 'x')
+    //   welcome        → WelcomeScreen
+    //   onboarding     → OnboardingFlow
+    //   path-choice    → PathChoiceScreen
+    //   launch         → LaunchScreen
+    //   settings       → SettingsScreen
+    //   profile        → inline (stats, archetype, aura viz)
+    //   history        → inline (answered questions list)
+    //   qotd           → inline (question of the day)
+    //   assess-picker  → inline (assessment selection grid)
+    //   assess-question→ inline (Likert scale answering)
+    //   assess-results → inline (trait scores, spectrum bars)
+    //   assess-analysis→ inline (cross-test insights)
+    //   categories     → CategoryScreen (home/hub)
+    //   (default)      → question answering flow
+
+    // Welcome screen
     if (screen === 'welcome') return (
       <WelcomeScreen
         onSignIn={handleSignIn}
@@ -6867,6 +6726,8 @@ function App() {
         darkMode={darkMode}
       />
     );
+
+    // Onboarding screen
     if (screen === 'onboarding') return (
       <OnboardingFlow
         darkMode={darkMode}
@@ -6876,6 +6737,8 @@ function App() {
         onReset={resetDemo}
       />
     );
+
+    // Path choice screen
     if (screen === 'path-choice') return (
       <PathChoiceScreen
         darkMode={darkMode}
@@ -6886,7 +6749,11 @@ function App() {
         onReset={resetDemo}
       />
     );
+
+    // Launch screen
     if (screen === 'launch') return <LaunchScreen onDemo={startDemo} onLogin={() => {}} darkMode={darkMode} />;
+
+    // Settings screen
     if (screen === 'settings') return (
       <SettingsScreen
         darkMode={darkMode}
@@ -7132,7 +6999,7 @@ function App() {
                         <span className={`text-sm font-medium ${q.type === 'binary' ? (q.response.answer === 0 ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-rose-400' : 'text-rose-600')) : (darkMode ? 'text-violet-400' : 'text-violet-600')}`}>
                           {getAnswerLabel(q)}
                         </span>
-                        <ConfidenceDots level={q.response.confidence} />
+                        <span className="flex gap-0.5">{[1,2,3,4].map(i => <span key={i} className={`w-1.5 h-1.5 rounded-full ${i <= q.response.confidence ? (darkMode ? 'bg-violet-400' : 'bg-violet-500') : (darkMode ? 'bg-gray-700' : 'bg-gray-300')}`} />)}</span>
                         <span className="text-sm text-gray-500">{CONFIDENCE_LABELS[q.response.confidence]}</span>
                         {questionFlags[q.id] && <span className="text-sm text-rose-400">⚑</span>}
                         {answerExplanations[q.id] && <span className="text-sm text-amber-400">✎</span>}
@@ -9259,6 +9126,7 @@ function App() {
       );
     }
 
+    // Categories screen (home)
     if (screen === 'categories') return (
       <CategoryScreen
         darkMode={darkMode}
@@ -10065,7 +9933,7 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
   </script>
 </body>
 </html>
