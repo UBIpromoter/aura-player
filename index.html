@@ -105,6 +105,7 @@
     @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     @keyframes sweepFill { from { width: 0%; } to { width: 100%; } }
+    @keyframes ringCountdown { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 75.4; } }
     @keyframes shimmer-pulse {
       0%, 100% { opacity: 0.4; }
       50% { opacity: 0.8; }
@@ -1371,17 +1372,17 @@ const TH = (token, dark) => { const val = {
   'text-inverted': dark ? 'text-gray-900' : 'text-white',
   // Background colors
   'bg-main': dark ? 'bg-gray-950' : 'bg-gray-50',
-  'bg-card': dark ? 'bg-gray-900 border border-gray-800' : 'bg-white border border-gray-200',
-  'bg-card-shine': dark ? 'bg-gray-900 shine-card shine-gray' : 'bg-white border border-gray-200',
-  'bg-elevated': dark ? 'bg-gray-800' : 'bg-gray-200',
-  'bg-input': dark ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400',
-  'bg-surface': dark ? 'bg-gray-900' : 'bg-white',
-  'bg-overlay': dark ? 'bg-gray-900/50' : 'bg-gray-100',
+  'bg-card': dark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-white/80 border border-black/[0.06] shadow-sm',
+  'bg-card-shine': dark ? 'bg-white/[0.04] shine-card shine-gray border border-white/[0.06]' : 'bg-white/80 border border-black/[0.06] shadow-sm',
+  'bg-elevated': dark ? 'bg-white/[0.06]' : 'bg-gray-200',
+  'bg-input': dark ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400',
+  'bg-surface': dark ? 'bg-white/[0.03]' : 'bg-white/90',
+  'bg-overlay': dark ? 'bg-white/[0.04]' : 'bg-gray-100',
   // Border colors
-  'border-base': dark ? 'border-gray-800' : 'border-gray-200',
-  'border-subtle': dark ? 'border-gray-700' : 'border-gray-300',
+  'border-base': dark ? 'border-white/[0.06]' : 'border-gray-200',
+  'border-subtle': dark ? 'border-white/[0.08]' : 'border-gray-300',
   // Interactive states
-  'btn-secondary': dark ? 'bg-gray-800/60 text-gray-500 hover:bg-gray-700/60' : 'bg-gray-200 text-gray-500',
+  'btn-secondary': dark ? 'bg-white/[0.06] text-gray-500 hover:bg-white/[0.10]' : 'bg-gray-200 text-gray-500',
   'btn-ghost': dark ? 'text-gray-300 active:text-white' : 'text-gray-600 active:text-gray-900',
   // Status colors (stay vibrant in both modes)
   'text-emerald': dark ? 'text-emerald-400' : 'text-emerald-600',
@@ -1394,14 +1395,14 @@ const TH = (token, dark) => { const val = {
   'text-bright': dark ? 'text-gray-100' : 'text-gray-900',
   'text-muted-flip': dark ? 'text-gray-300' : 'text-gray-600',
   'text-muted-dark': dark ? 'text-gray-700' : 'text-gray-300',
-  'bg-card-simple': dark ? 'bg-gray-900' : 'bg-white border border-gray-200',
+  'bg-card-simple': dark ? 'bg-white/[0.04]' : 'bg-white/80 border border-black/[0.06]',
   'bg-inverted': dark ? 'bg-white' : 'bg-gray-900',
-  'bg-card-full': dark ? 'bg-gray-900 text-white' : 'bg-white text-gray-900',
-  'bg-disabled': dark ? 'bg-gray-800 text-gray-600' : 'bg-gray-200 text-gray-400',
-  'bg-disabled-alt': dark ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600',
+  'bg-card-full': dark ? 'bg-white/[0.04] text-white' : 'bg-white/80 text-gray-900',
+  'bg-disabled': dark ? 'bg-white/[0.04] text-gray-600' : 'bg-gray-200 text-gray-400',
+  'bg-disabled-alt': dark ? 'bg-white/[0.04] text-gray-400' : 'bg-gray-200 text-gray-600',
   'bg-mid': dark ? 'bg-gray-600' : 'bg-gray-200',
   'text-bright-bg': dark ? 'text-white bg-gray-950' : 'text-gray-900 bg-gray-50',
-  'border-bg-main': dark ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white',
+  'border-bg-main': dark ? 'border-white/[0.06] bg-gray-950' : 'border-gray-200 bg-white',
   'chip-violet': dark ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700',
   'chip-violet-alt': dark ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-600',
 }[token];
@@ -1418,238 +1419,913 @@ const hexToRgba = (hex, alpha) => {
 };
 
 // ==================== AURA VISUALIZATION ====================
-// Animated neural network with organic glow - shows personality forming
-// Stage 1-4 corresponds to assessment progress (tier 0→1, tier 1→2, tier 2 partial→3, tier 2 full→4)
-const AuraVisualization = ({ stage, darkMode }) => {
-  const [time, setTime] = React.useState(0);
-  const animRef = React.useRef();
-  const containerRef = React.useRef();
+// v12: Force-directed constellation organism — canvas-based, answer-driven fingerprint
+const AuraVisualization = React.memo(function AuraVisualization({
+  onboardingAnswers = {},
+  assessCompleted = {},
+  entityType = 'human',
+  darkMode = true,
+  size = 200,
+}) {
+  const canvasRef = React.useRef(null);
+  const stateRef = React.useRef(null);
+  const animRef = React.useRef(null);
+  const propsRef = React.useRef({ onboardingAnswers, assessCompleted, entityType, darkMode, size });
 
-  const violet = COLOR_HEX.violet.base;
-  const blue = COLOR_HEX.blue.base;
-  const emerald = COLOR_HEX.emerald.base;
-  const pink = COLOR_HEX.pink.base;
-  const cyan = COLOR_HEX.cyan.base;
+  // Keep propsRef current
+  propsRef.current = { onboardingAnswers, assessCompleted, entityType, darkMode, size };
 
-  // Glow base radii per stage (how large each color zone glows)
-  const glowRadii = { 1: { rx: 50, ry: 42 }, 2: { rx: 55, ry: 48 }, 3: { rx: 58, ry: 52 }, 4: { rx: 62, ry: 55 } }[stage] || { rx: 55, ry: 48 };
-  const glowOpacity = { 1: 0.65, 2: 0.7, 3: 0.75, 4: 0.8 }[stage] || 0.7;
-
-  // Neuron positions per stage
-  const baseNeurons = {
-    1: [
-      { x: 100, y: 95, r: 4.5, color: violet },
-      { x: 82, y: 75, r: 3.5, color: violet },
-      { x: 118, y: 82, r: 3.5, color: blue },
-      { x: 92, y: 115, r: 3, color: blue },
-    ],
-    2: [
-      { x: 100, y: 95, r: 5, color: violet },
-      { x: 72, y: 70, r: 4, color: violet },
-      { x: 130, y: 78, r: 4, color: emerald },
-      { x: 82, y: 125, r: 4, color: blue },
-      { x: 120, y: 115, r: 3.5, color: emerald },
-    ],
-    3: [
-      { x: 100, y: 100, r: 6, color: violet },
-      { x: 60, y: 56, r: 5, color: violet },
-      { x: 145, y: 70, r: 5, color: emerald },
-      { x: 158, y: 110, r: 4, color: emerald },
-      { x: 42, y: 95, r: 5, color: blue },
-      { x: 75, y: 148, r: 5, color: pink },
-      { x: 130, y: 140, r: 5, color: pink },
-      { x: 92, y: 66, r: 4, color: violet },
-      { x: 65, y: 118, r: 4, color: blue },
-      { x: 140, y: 98, r: 3.5, color: emerald },
-    ],
-    4: [
-      { x: 100, y: 98, r: 6, color: violet },
-      { x: 55, y: 50, r: 5, color: violet },
-      { x: 140, y: 46, r: 4.5, color: violet },
-      { x: 158, y: 82, r: 5, color: emerald },
-      { x: 150, y: 128, r: 4, color: pink },
-      { x: 40, y: 85, r: 5, color: cyan },
-      { x: 48, y: 138, r: 5, color: cyan },
-      { x: 118, y: 150, r: 5, color: pink },
-      { x: 70, y: 150, r: 4, color: pink },
-      { x: 82, y: 62, r: 4, color: violet },
-      { x: 128, y: 70, r: 4, color: emerald },
-      { x: 62, y: 108, r: 3.5, color: cyan },
-      { x: 138, y: 108, r: 3.5, color: emerald },
-    ],
-  }[stage] || [];
-
-  // Connection indices per stage
-  const connectionIndices = {
-    1: [[0,1],[0,2],[0,3],[1,2],[2,3]],
-    2: [[0,1],[0,2],[0,3],[0,4],[1,3],[2,4],[1,2]],
-    3: [[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[0,8],[0,9],[1,7],[2,7],[2,9],[3,9],[3,6],[4,8],[4,5],[5,6],[1,4]],
-    4: [[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[0,8],[0,9],[0,10],[0,11],[0,12],[1,9],[2,10],[3,10],[3,12],[4,12],[4,7],[5,11],[5,6],[6,8],[8,7],[1,5],[2,3]],
-  }[stage] || [];
-
-  // Background stars (subtle twinkle)
-  const stars = React.useMemo(() => {
-    const rng = (seed) => {
-      let s = seed;
-      return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
-    };
-    const r = rng(stage * 7 + 42);
-    const count = 12 + stage * 4;
-    return Array.from({ length: count }, (_, i) => ({
-      cx: r() * 200,
-      cy: r() * 220,
-      r: 0.4 + r() * 0.8,
-      delay: r() * 6,
-      duration: 3 + r() * 4,
-    }));
-  }, [stage]);
-
-  // Animation loop
-  React.useEffect(() => {
-    const animate = () => {
-      setTime(t => t + 0.02);
-      animRef.current = requestAnimationFrame(animate);
-    };
-    animRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animRef.current);
-  }, []);
-
-  // Animated neuron positions (organic drift — multi-harmonic for flowing motion)
-  const animatedNeurons = baseNeurons.map((n, i) => {
-    const speed = 0.5 + (i % 3) * 0.3;
-    const amp = 4.5 + (i % 4) * 1.8;
-    const phaseX = i * 1.3;
-    const phaseY = i * 0.9 + 0.5;
-    return {
-      ...n,
-      x: n.x + Math.sin(time * speed + phaseX) * amp + Math.sin(time * speed * 0.4 + phaseX * 2.1) * amp * 0.5,
-      y: n.y + Math.cos(time * speed * 0.75 + phaseY) * amp + Math.cos(time * speed * 0.35 + phaseY * 1.7) * amp * 0.4,
-    };
-  });
-
-  // Dynamic glow: compute color zone centroids from animated neuron positions
-  const dynamicGlow = (() => {
-    const groups = {};
-    animatedNeurons.forEach(n => {
-      if (!groups[n.color]) groups[n.color] = { sx: 0, sy: 0, count: 0, color: n.color };
-      groups[n.color].sx += n.x;
-      groups[n.color].sy += n.y;
-      groups[n.color].count++;
-    });
-    return Object.values(groups).map(g => ({
-      cx: g.sx / g.count,
-      cy: g.sy / g.count,
-      rx: glowRadii.rx + g.count * 3,
-      ry: glowRadii.ry + g.count * 3,
-      color: g.color,
-      opacity: glowOpacity,
-    }));
-  })();
-
-  // Size grows with stage
-  const sizes = { 1: 110, 2: 130, 3: 160, 4: 190 };
-  const size = sizes[stage] || 130;
-
-  // Colors
-  const lineColor = darkMode ? 'rgba(255,255,255,' : 'rgba(100,100,120,';
-  const lineBaseOpacity = darkMode ? 0.3 : 0.18;
-  const starColor = darkMode ? 'rgba(255,255,255,' : 'rgba(140,140,160,';
-
-  // SVG filter IDs
-  const blurId = `aura-glow-${stage}`;
-  const softBlurId = `aura-soft-${stage}`;
-  const blurAmount = { 1: 14, 2: 16, 3: 18, 4: 20 }[stage] || 16;
-  const nodeBlurAmount = { 1: 6, 2: 7, 3: 8, 4: 10 }[stage] || 8;
-
-  // Breathing (CSS-driven for smooth performance)
-  const breatheStyle = {
-    animation: `aura-breathe ${10 + stage}s ease-in-out infinite`,
-    transformOrigin: 'center center',
+  // -------------------------------------------------------
+  // PALETTE
+  // -------------------------------------------------------
+  const C = {
+    violet:'#8b5cf6', blue:'#3b82f6', teal:'#14b8a6', rose:'#f43f5e',
+    pink:'#d946ef', emerald:'#10b981', amber:'#f59e0b', indigo:'#6366f1', cyan:'#06b6d4',
   };
 
-  return (
-    <div
-      ref={containerRef}
-      className="flex items-center justify-center"
-      style={{ width: size, height: size * 1.1, margin: '0 auto', position: 'relative' }}
-    >
-      <svg width={size} height={size * 1.1} viewBox="0 0 200 220" style={{ overflow: 'visible' }}>
-        <defs>
-          <filter id={blurId} x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation={blurAmount} />
-          </filter>
-          <filter id={softBlurId} x="-200%" y="-200%" width="500%" height="500%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation={nodeBlurAmount} />
-          </filter>
-          <radialGradient id={`aura-fade-${stage}`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="white" stopOpacity="1" />
-            <stop offset="55%" stopColor="white" stopOpacity="1" />
-            <stop offset="80%" stopColor="white" stopOpacity="0.6" />
-            <stop offset="100%" stopColor="white" stopOpacity="0" />
-          </radialGradient>
-          <mask id={`aura-mask-${stage}`}>
-            <rect x="-50" y="-30" width="300" height="280" fill={`url(#aura-fade-${stage})`} />
-          </mask>
-        </defs>
+  function hexRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n>>16)&255, (n>>8)&255, n&255];
+  }
 
-        {/* Background stars */}
-        {stars.map((s, i) => (
-          <circle
-            key={`star-${i}`}
-            cx={s.cx} cy={s.cy} r={s.r}
-            fill={`${starColor}0.5)`}
-            style={{ animation: `star-twinkle ${s.duration}s ease-in-out ${s.delay}s infinite` }}
-          />
-        ))}
+  // -------------------------------------------------------
+  // NEURON MAPPING
+  // -------------------------------------------------------
+  const NEURON_MAP = [
+    { colorQ: 'onboard-1',  posQ: 'onboard-2',  colors: [C.violet, C.blue] },
+    { colorQ: 'onboard-4',  posQ: 'onboard-8',  colors: [C.indigo, C.rose] },
+    { colorQ: 'onboard-5',  posQ: 'onboard-3',  colors: [C.pink, C.teal] },
+    { colorQ: 'onboard-6',  posQ: 'onboard-9',  colors: [C.emerald, C.amber] },
+    { colorQ: 'onboard-7',  posQ: 'onboard-10', colors: [C.cyan, C.violet] },
+  ];
 
-        {/* Glow layer — follows neuron centroids, masked for soft edges */}
-        <g mask={`url(#aura-mask-${stage})`} style={breatheStyle}>
-          <g filter={`url(#${blurId})`}>
-            {dynamicGlow.map((e, i) => (
-              <ellipse key={i} cx={e.cx} cy={e.cy} rx={e.rx} ry={e.ry}
-                fill={e.color} opacity={darkMode ? e.opacity : e.opacity * 0.6} />
-            ))}
-          </g>
-        </g>
+  const SENSITIVE = [false, false, false, true, true];
 
-        {/* Connection lines — visible but delicate, fade by distance */}
-        <g style={breatheStyle}>
-          {connectionIndices.map(([from, to], i) => {
-            const a = animatedNeurons[from];
-            const b = animatedNeurons[to];
-            if (!a || !b) return null;
-            const dx = a.x - b.x;
-            const dy = a.y - b.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            const maxDist = 120;
-            const opacity = Math.max(0, (1 - dist / maxDist)) * lineBaseOpacity;
-            return (
-              <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                stroke={`${lineColor}${opacity})`} strokeWidth="1" strokeLinecap="round" />
-            );
-          })}
-        </g>
+  const HUMAN_CONNS = [[0,1],[0,2],[1,2],[2,3],[2,4],[3,4],[0,3],[1,4]];
+  const AI_CONNS = [[0,1],[0,2],[1,2],[2,3],[2,4],[3,4],[0,4],[1,3],[0,3],[1,4]];
 
-        {/* Neural nodes with 3-layer glow */}
-        <g style={breatheStyle}>
-          {animatedNeurons.map((n, i) => (
-            <g key={i}>
-              <circle cx={n.x} cy={n.y} r={n.r * 3}
-                fill={hexToRgba(n.color, darkMode ? 0.2 : 0.12)}
-                filter={`url(#${softBlurId})`} />
-              <circle cx={n.x} cy={n.y} r={n.r * 1.8}
-                fill={hexToRgba(n.color, darkMode ? 0.35 : 0.2)} />
-              <circle cx={n.x} cy={n.y} r={n.r}
-                fill={n.color} opacity={darkMode ? 0.95 : 0.8} />
-              <circle cx={n.x} cy={n.y} r={n.r * 0.4}
-                fill="white" opacity={darkMode ? 0.6 : 0.4} />
-            </g>
-          ))}
-        </g>
-      </svg>
-    </div>
-  );
-};
+  // -------------------------------------------------------
+  // ASSESSMENT MAP
+  // -------------------------------------------------------
+  const ASSESS_MAP = [
+    { ids: ['starter-personality'], name: 'Personality', color: C.violet, tier: 1, nodes: 3, affinities: [0, 2] },
+    { ids: ['starter-motivation'], name: 'Motivation', color: C.amber, tier: 1, nodes: 3, affinities: [1, 3] },
+    { ids: ['starter-thinking'], name: 'Thinking', color: C.blue, tier: 1, nodes: 3, affinities: [0, 4] },
+    { ids: ['starter-connection'], name: 'Connection', color: C.pink, tier: 1, nodes: 3, affinities: [2, 3] },
+    { ids: ['starter-strategy'], name: 'Strategy', color: C.emerald, tier: 1, nodes: 3, affinities: [1, 4] },
+    { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: C.violet, tier: 2, nodes: 5, affinities: [0, 2, 4] },
+    { ids: ['integrity'], name: 'Character', color: C.emerald, tier: 2, nodes: 3, affinities: [3, 1] },
+    { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: C.indigo, tier: 2, nodes: 4, affinities: [3, 4] },
+    { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: C.cyan, tier: 2, nodes: 4, affinities: [4, 0] },
+    { ids: ['attachment'], name: 'Relationships', color: C.rose, tier: 2, nodes: 3, affinities: [2, 3] },
+    { ids: ['risk'], name: 'Behavior', color: C.amber, tier: 2, nodes: 3, affinities: [1, 4] },
+  ];
+
+  // -------------------------------------------------------
+  // HELPERS
+  // -------------------------------------------------------
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpRgb(a, b, t) { return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
+  function rgbStr(c, a) { return `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a.toFixed(3)})`; }
+
+  function seededRng(seed) {
+    let s = seed;
+    return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
+  }
+
+  // -------------------------------------------------------
+  // DERIVE ANSWERS FROM PROPS
+  // -------------------------------------------------------
+  function deriveAnswers(answers) {
+    const colorAns = new Array(5).fill(null);
+    const posAns = new Array(5).fill(null);
+    for (let i = 0; i < 5; i++) {
+      const nm = NEURON_MAP[i];
+      if (nm.colorQ in answers) colorAns[i] = answers[nm.colorQ];
+      if (nm.posQ in answers) posAns[i] = answers[nm.posQ];
+    }
+    return { colorAns, posAns };
+  }
+
+  function deriveAssessState(completed) {
+    const state = {};
+    ASSESS_MAP.forEach((assess, idx) => {
+      state[idx] = assess.ids.some(id => id in completed);
+    });
+    return state;
+  }
+
+  // -------------------------------------------------------
+  // NODE FACTORY
+  // -------------------------------------------------------
+  function makeNode(opts) {
+    return {
+      x: opts.x || 300, y: opts.y || 300,
+      tx: opts.x || 300, ty: opts.y || 300,
+      color: opts.color ? hexRgb(opts.color) : [70,75,90],
+      tcolor: opts.color ? hexRgb(opts.color) : [70,75,90],
+      r: opts.r || 2, tr: opts.r || 2,
+      halo: opts.halo || 8, thalo: opts.halo || 8,
+      alpha: 0, talpha: 0,
+      phase: Math.random() * Math.PI * 2,
+      orbitAngle: Math.random() * Math.PI * 2,
+      orbitSpeed: (Math.random() - 0.5) * 0.006,
+      driftSpeed: 0.35 + Math.random() * 0.5,
+      driftAmp: 2.5 + Math.random() * 3.5,
+      phaseX: Math.random() * 6, phaseY: Math.random() * 6,
+      flash: 0,
+      type: opts.type || 'primary',
+      parent: opts.parent ?? -1,
+      sensitive: opts.sensitive || false,
+      assessIdx: opts.assessIdx ?? null,
+      affinities: opts.affinities || null,
+      tier: opts.tier || 0,
+      twinklePhase: Math.random() * Math.PI * 2,
+      twinkleSpeed: 0.3 + Math.random() * 0.7,
+      twinklePeak: 0,
+    };
+  }
+
+  // -------------------------------------------------------
+  // ANSWER-DRIVEN SEED POSITIONS
+  // -------------------------------------------------------
+  function answerHash(colorAns, posAns) {
+    let h = 0;
+    for (let i = 0; i < 5; i++) {
+      h = h * 31 + (colorAns[i] !== null ? colorAns[i] + 1 : 0);
+      h = h * 37 + (posAns[i] !== null ? posAns[i] + 1 : 0);
+    }
+    return h;
+  }
+
+  function primarySeedPositions(colorAns, posAns, isAI) {
+    const CX = 300, CY = 300;
+    const hash = answerHash(colorAns, posAns);
+    const rng = seededRng(hash + 7919);
+    const positions = [];
+
+    const baseAngles = [0, 1, 2, 3, 4].map(i => {
+      let angle = (i / 5) * Math.PI * 2;
+      if (posAns[i] !== null) angle += (posAns[i] === 0 ? -0.7 : 0.7);
+      if (colorAns[i] !== null) angle += (colorAns[i] === 0 ? -0.35 : 0.35);
+      angle += (hash % 628) / 100;
+      return angle;
+    });
+
+    for (let i = 0; i < 5; i++) {
+      const answered = colorAns[i] !== null || posAns[i] !== null;
+      const baseR = answered ? 110 + rng() * 70 : 65 + rng() * 45;
+      const angle = baseAngles[i];
+      positions.push({
+        x: CX + Math.cos(angle) * baseR,
+        y: CY + Math.sin(angle) * baseR,
+      });
+    }
+    return positions;
+  }
+
+  // -------------------------------------------------------
+  // BUILD ALL NODES
+  // -------------------------------------------------------
+  function buildAllNodes(assessState, colorAns, posAns, isAI) {
+    const nodes = [];
+    const CX = 300, CY = 300;
+    const seeds = primarySeedPositions(colorAns || [null,null,null,null,null],
+                                        posAns || [null,null,null,null,null], isAI);
+
+    for (let i = 0; i < 5; i++) {
+      nodes.push(makeNode({
+        x: seeds[i].x, y: seeds[i].y, r: 5, halo: 22,
+        type: 'primary', sensitive: SENSITIVE[i],
+      }));
+    }
+
+    for (let i = 0; i < 5; i++) {
+      for (let c = 0; c < 2; c++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 8 + Math.random() * 12;
+        nodes.push(makeNode({
+          x: nodes[i].x + Math.cos(angle) * dist,
+          y: nodes[i].y + Math.sin(angle) * dist,
+          type: 'companion', parent: i, r: 2.5, halo: 10,
+        }));
+      }
+    }
+
+    for (let s = 0; s < 5; s++) {
+      const px = (nodes[s].x + CX) / 2 + (Math.random() - 0.5) * 30;
+      const py = (nodes[s].y + CY) / 2 + (Math.random() - 0.5) * 30;
+      nodes.push(makeNode({
+        x: px, y: py,
+        type: 'satellite', parent: s, r: 2, halo: 7,
+      }));
+    }
+
+    ASSESS_MAP.forEach((assess, ai) => {
+      if (!assessState[ai]) return;
+      const rng = seededRng(ai * 137 + 42);
+      const affs = assess.affinities;
+
+      for (let ni = 0; ni < assess.nodes; ni++) {
+        let mx = 0, my = 0;
+        for (const pi of affs) { mx += nodes[pi].x; my += nodes[pi].y; }
+        mx /= affs.length; my /= affs.length;
+        const x = mx + (rng() - 0.5) * 50;
+        const y = my + (rng() - 0.5) * 50;
+        nodes.push(makeNode({
+          x, y, r: 2 + rng() * 2, halo: 8 + rng() * 10,
+          type: 'assess', color: assess.color,
+          assessIdx: ai, tier: assess.tier,
+          parent: affs[0],
+          affinities: affs,
+        }));
+      }
+    });
+
+    return nodes;
+  }
+
+  // -------------------------------------------------------
+  // EDGE BUILDER
+  // -------------------------------------------------------
+  function buildEdges(nodes, isAI, colorAns, posAns, assessState) {
+    const edges = [];
+    const N = nodes.length;
+    const edgeSet = new Set();
+    function addEdge(a, b, strength, restLen) {
+      const key = Math.min(a,b) * 10000 + Math.max(a,b);
+      if (edgeSet.has(key)) return;
+      edgeSet.add(key);
+      edges.push({ a, b, strength, restLen });
+    }
+
+    const primConns = isAI ? AI_CONNS : HUMAN_CONNS;
+    for (const [a, b] of primConns) {
+      const aAns = colorAns[a], bAns = colorAns[b];
+      const bothAnswered = (aAns !== null) && (bAns !== null);
+      const sameColor = bothAnswered && aAns === bAns;
+      const strength = bothAnswered ? (sameColor ? 1.0 : 0.5) : 0.3;
+      const rest = bothAnswered ? (sameColor ? 60 : 110) : 100;
+      addEdge(a, b, strength, rest);
+    }
+
+    for (let ci = 5; ci < 15; ci++) {
+      const pi = nodes[ci].parent;
+      addEdge(pi, ci, 1.5, 25);
+    }
+
+    for (let i = 0; i < 5; i++) {
+      addEdge(5 + i * 2, 5 + i * 2 + 1, 0.8, 12);
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const next = (i + 1) % 5;
+      addEdge(5 + i * 2 + 1, 5 + next * 2, 0.2, 60);
+    }
+
+    for (let si = 15; si < 20; si++) {
+      addEdge(nodes[si].parent, si, 0.5, 70);
+    }
+    for (let si = 0; si < 5; si++) {
+      addEdge(15 + si, 15 + (si + 1) % 5, 0.15, 70);
+    }
+
+    for (let ai = 20; ai < N; ai++) {
+      const an = nodes[ai];
+      if (an.affinities) {
+        for (const pi of an.affinities) {
+          addEdge(pi, ai, 0.6, 60);
+        }
+      }
+
+      const nearby = [];
+      for (let bi = 0; bi < N; bi++) {
+        if (bi === ai) continue;
+        const dx = nodes[ai].x - nodes[bi].x;
+        const dy = nodes[ai].y - nodes[bi].y;
+        nearby.push({ idx: bi, d: dx * dx + dy * dy });
+      }
+      nearby.sort((a, b) => a.d - b.d);
+      for (let k = 0; k < Math.min(2, nearby.length); k++) {
+        addEdge(ai, nearby[k].idx, 0.15, 40);
+      }
+    }
+
+    return edges;
+  }
+
+  // -------------------------------------------------------
+  // FORCE SIMULATION
+  // -------------------------------------------------------
+  function initVelocities(nodes) {
+    for (const n of nodes) { n.vx = 0; n.vy = 0; }
+  }
+
+  function simulateForces(nodes, edges, isAI, dt) {
+    const CX = 300, CY = 300;
+    const N = nodes.length;
+    if (N === 0) return;
+
+    for (const n of nodes) { n.fx = 0; n.fy = 0; }
+
+    for (const e of edges) {
+      const na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.02 && nb.alpha < 0.02) continue;
+      const dx = nb.x - na.x, dy = nb.y - na.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+      const force = e.strength * (dist - e.restLen) / dist;
+      const fx = dx * force, fy = dy * force;
+      na.fx += fx; na.fy += fy;
+      nb.fx -= fx; nb.fy -= fy;
+    }
+
+    const repulse = isAI ? 3500 : 5500;
+    for (let i = 0; i < N; i++) {
+      if (nodes[i].alpha < 0.02) continue;
+      for (let j = i + 1; j < N; j++) {
+        if (nodes[j].alpha < 0.02) continue;
+        const dx = nodes[j].x - nodes[i].x;
+        const dy = nodes[j].y - nodes[i].y;
+        const dsq = dx * dx + dy * dy;
+        const minDsq = 100;
+        const d = Math.sqrt(Math.max(dsq, minDsq));
+        const force = -repulse / (d * d);
+        const fx = (dx / d) * force, fy = (dy / d) * force;
+        nodes[i].fx += fx; nodes[i].fy += fy;
+        nodes[j].fx -= fx; nodes[j].fy -= fy;
+      }
+    }
+
+    const gravity = 0.04;
+    for (const n of nodes) {
+      if (n.alpha < 0.02) continue;
+      n.fx += (CX - n.x) * gravity;
+      n.fy += (CY - n.y) * gravity;
+    }
+
+    const damping = 0.85;
+    const maxSpeed = 8;
+    for (const n of nodes) {
+      if (n.alpha < 0.02) continue;
+      const mass = n.type === 'primary' ? 3.0 : n.type === 'companion' ? 0.8 : 1.2;
+      n.vx = (n.vx + n.fx / mass * dt) * damping;
+      n.vy = (n.vy + n.fy / mass * dt) * damping;
+      const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+      if (speed > maxSpeed) { n.vx *= maxSpeed / speed; n.vy *= maxSpeed / speed; }
+      n.tx = n.x + n.vx;
+      n.ty = n.y + n.vy;
+      const margin = 40;
+      if (n.tx < margin) n.vx += 2;
+      if (n.tx > 600 - margin) n.vx -= 2;
+      if (n.ty < margin) n.vy += 2;
+      if (n.ty > 600 - margin) n.vy -= 2;
+    }
+  }
+
+  // -------------------------------------------------------
+  // STARS
+  // -------------------------------------------------------
+  function buildStars() {
+    const stars = [];
+    for (let i = 0; i < 100; i++) {
+      stars.push({
+        x: Math.random() * 600, y: Math.random() * 600,
+        r: 0.2 + Math.random() * 0.9,
+        bright: Math.random() * 0.35 + 0.05,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.5 + Math.random() * 2.5,
+      });
+    }
+    return stars;
+  }
+
+  // -------------------------------------------------------
+  // VISUAL CONNECTIONS
+  // -------------------------------------------------------
+  function buildVisualConnections(edges, nodes) {
+    const conns = [];
+    for (const e of edges) {
+      if (nodes[e.a].alpha > 0.03 && nodes[e.b].alpha > 0.03) {
+        conns.push([e.a, e.b]);
+      }
+    }
+    return conns;
+  }
+
+  // -------------------------------------------------------
+  // APPEARANCE
+  // -------------------------------------------------------
+  function computeAppearance(nodes, isAI, colorAns, posAns, assessState) {
+    const answeredCount = colorAns.filter(a => a !== null).length + posAns.filter(a => a !== null).length;
+
+    for (let i = 0; i < 5; i++) {
+      const node = nodes[i];
+      if (colorAns[i] !== null) {
+        node.tcolor = hexRgb(NEURON_MAP[i].colors[colorAns[i]]);
+        node.tr = 12; node.thalo = 45; node.talpha = 1;
+      } else {
+        const c0 = hexRgb(NEURON_MAP[i].colors[0]);
+        const c1 = hexRgb(NEURON_MAP[i].colors[1]);
+        node.tcolor = [
+          Math.round((c0[0] + c1[0]) * 0.18 + 60 * 0.64),
+          Math.round((c0[1] + c1[1]) * 0.18 + 65 * 0.64),
+          Math.round((c0[2] + c1[2]) * 0.18 + 80 * 0.64),
+        ];
+        node.tr = 6; node.thalo = 24; node.talpha = 0.45;
+      }
+      if (posAns[i] !== null && colorAns[i] === null) {
+        const c0 = hexRgb(NEURON_MAP[i].colors[0]);
+        const c1 = hexRgb(NEURON_MAP[i].colors[1]);
+        node.tcolor = [
+          Math.round((c0[0] + c1[0]) * 0.25 + 50 * 0.5),
+          Math.round((c0[1] + c1[1]) * 0.25 + 55 * 0.5),
+          Math.round((c0[2] + c1[2]) * 0.25 + 70 * 0.5),
+        ];
+        node.talpha = 0.6; node.tr = 8; node.thalo = 32;
+      }
+    }
+
+    for (let ci = 0; ci < 10; ci++) {
+      const node = nodes[5 + ci];
+      const parent = nodes[node.parent];
+      const answered = colorAns[node.parent] !== null || posAns[node.parent] !== null;
+      node.tcolor = parent.tcolor;
+      node.tr = answered ? 4 + (ci % 2) * 2 : 2.5;
+      node.thalo = answered ? 16 + (ci % 2) * 6 : 10;
+      node.talpha = answered ? parent.talpha * 0.6 : 0.2;
+    }
+
+    for (let si = 0; si < 5; si++) {
+      const node = nodes[15 + si];
+      const parent = nodes[node.parent];
+      if (answeredCount >= 6 && parent.talpha > 0.3) {
+        node.tcolor = parent.tcolor;
+        node.tr = 4; node.thalo = 14;
+        node.talpha = 0.5 * Math.min(1, (answeredCount - 5) / 4);
+      } else {
+        node.talpha = 0;
+      }
+    }
+
+    for (let ai = 20; ai < nodes.length; ai++) {
+      const node = nodes[ai];
+      if (assessState[node.assessIdx]) {
+        node.talpha = 0.85;
+        node.tr = 5; node.thalo = 18;
+        if (node.affinities && node.affinities.length >= 2) {
+          let ar = 0, ag = 0, ab = 0;
+          for (const pi of node.affinities) {
+            ar += nodes[pi].color[0]; ag += nodes[pi].color[1]; ab += nodes[pi].color[2];
+          }
+          const n = node.affinities.length;
+          const parentBlend = [ar / n, ag / n, ab / n];
+          const primaryStrength = nodes[node.affinities[0]].talpha > 0.6 ? 0.7 : 0.4;
+          node.tcolor = lerpRgb(hexRgb(ASSESS_MAP[node.assessIdx].color), parentBlend, primaryStrength);
+        }
+      } else {
+        node.talpha = 0;
+      }
+    }
+  }
+
+  // -------------------------------------------------------
+  // SHAPE HELPERS
+  // -------------------------------------------------------
+  function diamond(ctx, cx, cy, s) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s);
+    ctx.lineTo(cx + s, cy);
+    ctx.lineTo(cx, cy + s);
+    ctx.lineTo(cx - s, cy);
+    ctx.closePath();
+  }
+
+  function triangle(ctx, cx, cy, s) {
+    const h = s * 1.15;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - h);
+    ctx.lineTo(cx + s, cy + h * 0.5);
+    ctx.lineTo(cx - s, cy + h * 0.5);
+    ctx.closePath();
+  }
+
+  function animPos(n, time, isAI) {
+    const sp = n.driftSpeed;
+    const amp = n.driftAmp * (isAI ? 0.2 : 1.3);
+    const dx = Math.sin(time * sp + n.phaseX) * amp
+             + Math.sin(time * sp * 0.4 + n.phaseX * 2.1) * amp * 0.3;
+    const dy = Math.cos(time * sp * 0.75 + n.phaseY) * amp
+             + Math.cos(time * sp * 0.35 + n.phaseY * 1.7) * amp * 0.25;
+    const wobble = isAI ? 0.6 : 4.0;
+    const ox = Math.cos(n.orbitAngle * 0.7 + time * 0.15) * wobble;
+    const oy = Math.sin(n.orbitAngle * 0.9 + time * 0.12) * wobble;
+    return { x: n.x + dx + ox, y: n.y + dy + oy };
+  }
+
+  // -------------------------------------------------------
+  // RENDER
+  // -------------------------------------------------------
+  function render(ctx, nodes, conns, stars, isAI, time, scale) {
+    const W = 600, H = 600;
+    const CX = 300, CY = 300;
+    const breath = 1 + 0.04 * Math.sin(time * 0.3);
+
+    ctx.save();
+    ctx.scale(scale, scale);
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = isAI ? '#020810' : '#060712';
+    ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    for (const s of stars) {
+      const tw = s.bright * (0.5 + 0.5 * Math.sin(time * s.speed + s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr([180, 200, 255], tw);
+      ctx.fill();
+    }
+
+    // AI hex grid
+    if (isAI) {
+      ctx.save();
+      const gridRotation = time * 0.015;
+      ctx.translate(CX, CY);
+      ctx.rotate(gridRotation);
+      ctx.translate(-CX, -CY);
+      ctx.strokeStyle = '#6b7b93';
+      ctx.lineWidth = 0.6;
+      for (let ring = 1; ring <= 7; ring++) {
+        ctx.globalAlpha = Math.max(0.005, 0.10 - ring * 0.012);
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+          const r = ring * 40;
+          const px = CX + Math.cos(a) * r;
+          const py = CY + Math.sin(a) * r;
+          i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        if (ring > 1) {
+          ctx.globalAlpha = Math.max(0.003, 0.06 - ring * 0.007);
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+            const r1 = (ring - 1) * 40;
+            const r2 = ring * 40;
+            ctx.beginPath();
+            ctx.moveTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+            ctx.lineTo(CX + Math.cos(a) * r2, CY + Math.sin(a) * r2);
+            ctx.stroke();
+          }
+        }
+      }
+      ctx.restore();
+    }
+
+    // Color zone clouds
+    const colorKey = (c) => c[0] + ',' + c[1] + ',' + c[2];
+    const zones = {};
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.alpha < 0.05) continue;
+      const p = animPos(n, time, isAI);
+      const k = colorKey(n.color);
+      if (!zones[k]) zones[k] = { color: n.color, sx: 0, sy: 0, weight: 0, count: 0 };
+      const w = n.alpha * (n.type === 'primary' ? 2.5 : n.type === 'assess' ? 1.5 : 0.8);
+      zones[k].sx += p.x * w;
+      zones[k].sy += p.y * w;
+      zones[k].weight += w;
+      zones[k].count++;
+    }
+    const zoneList = Object.values(zones);
+
+    ctx.save();
+    ctx.filter = 'blur(50px)';
+    for (const zone of zoneList) {
+      const cx = zone.sx / zone.weight;
+      const cy = zone.sy / zone.weight;
+      const zoneR = 70 + zone.count * 16;
+      const zoneAlpha = Math.min(0.65, zone.weight * 0.12) * breath;
+      ctx.fillStyle = rgbStr(zone.color, zoneAlpha);
+      ctx.beginPath();
+      ctx.arc(cx, cy, zoneR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Connections
+    for (const [a, b] of conns) {
+      const na = nodes[a], nb = nodes[b];
+      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+
+      const pa = animPos(na, time, isAI);
+      const pb = animPos(nb, time, isAI);
+      const dx = pa.x - pb.x, dy = pa.y - pb.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const distFade = Math.max(0, 1 - dist / 400);
+      const minA = Math.min(na.alpha, nb.alpha);
+      const isAssessConn = (a >= 20 || b >= 20);
+      const typeMult = isAssessConn ? 0.6 : 1.0;
+      const lineAlpha = distFade * minA * 0.30 * typeMult;
+      if (lineAlpha < 0.005) continue;
+
+      ctx.beginPath();
+      if (isAI) {
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+      } else {
+        const mx = (pa.x + pb.x) / 2 + Math.sin(time * 0.15 + a + b) * 14;
+        const my = (pa.y + pb.y) / 2 + Math.cos(time * 0.1 + a * 0.7) * 14;
+        ctx.moveTo(pa.x, pa.y);
+        ctx.quadraticCurveTo(mx, my, pb.x, pb.y);
+      }
+      ctx.strokeStyle = rgbStr([255, 255, 255], lineAlpha);
+      ctx.lineWidth = 1;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    // Nodes (4-layer)
+    const order = [];
+    for (let i = 0; i < nodes.length; i++) order.push(i);
+    order.sort((aa, bb) => nodes[aa].alpha - nodes[bb].alpha);
+
+    for (const idx of order) {
+      const n = nodes[idx];
+      if (n.alpha < 0.02) continue;
+
+      const p = animPos(n, time, isAI);
+      const c = n.color;
+      const ba = n.alpha;
+      const cR = (n.r + n.flash * 3) * breath;
+
+      // Layer 1: Soft outer halo
+      if (cR > 1) {
+        const outerR = cR * 3;
+        const g1 = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, outerR);
+        g1.addColorStop(0, rgbStr(c, ba * 0.22));
+        g1.addColorStop(0.5, rgbStr(c, ba * 0.08));
+        g1.addColorStop(1, rgbStr(c, 0));
+
+        if (isAI && n.type === 'primary') {
+          ctx.save();
+          if (n.sensitive) triangle(ctx, p.x, p.y, outerR * 1.3);
+          else diamond(ctx, p.x, p.y, outerR * 1.3);
+          ctx.clip();
+          ctx.fillStyle = g1;
+          ctx.fillRect(p.x - outerR, p.y - outerR, outerR * 2, outerR * 2);
+          ctx.restore();
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, outerR, 0, Math.PI * 2);
+          ctx.fillStyle = g1;
+          ctx.fill();
+        }
+      }
+
+      // Layer 2: Mid glow
+      if (cR > 0.5) {
+        const midR = cR * 1.8;
+        ctx.beginPath();
+        if (isAI && n.type === 'primary') {
+          if (n.sensitive) triangle(ctx, p.x, p.y, midR);
+          else diamond(ctx, p.x, p.y, midR);
+        } else {
+          ctx.arc(p.x, p.y, midR, 0, Math.PI * 2);
+        }
+        ctx.fillStyle = rgbStr(c, ba * 0.35);
+        ctx.fill();
+      }
+
+      // Layer 3: Core
+      if (cR > 0.3) {
+        ctx.beginPath();
+        if (isAI && n.type === 'primary') {
+          if (n.sensitive) triangle(ctx, p.x, p.y, cR);
+          else diamond(ctx, p.x, p.y, cR);
+        } else {
+          ctx.arc(p.x, p.y, cR, 0, Math.PI * 2);
+        }
+        ctx.fillStyle = rgbStr(c, ba * 0.95);
+        ctx.fill();
+      }
+
+      // Layer 4: White pip
+      if (cR > 0.8) {
+        const pipR = cR * 0.4;
+        ctx.beginPath();
+        if (isAI && n.type === 'primary') {
+          if (n.sensitive) triangle(ctx, p.x, p.y, pipR);
+          else diamond(ctx, p.x, p.y, pipR);
+        } else {
+          ctx.arc(p.x, p.y, pipR, 0, Math.PI * 2);
+        }
+        ctx.fillStyle = rgbStr([255, 255, 255], ba * 0.65);
+        ctx.fill();
+      }
+
+      // Flash ring
+      if (n.flash > 0.05) {
+        const flashR = cR * (3 + (1 - n.flash) * 8);
+        if (isAI && n.type === 'primary' && n.sensitive) {
+          triangle(ctx, p.x, p.y, flashR);
+        } else if (isAI && n.type === 'primary') {
+          diamond(ctx, p.x, p.y, flashR);
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, flashR, 0, Math.PI * 2);
+        }
+        ctx.strokeStyle = rgbStr(c, n.flash * 0.4);
+        ctx.lineWidth = 2 * n.flash;
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // -------------------------------------------------------
+  // INIT STATE
+  // -------------------------------------------------------
+  React.useEffect(() => {
+    const { onboardingAnswers, assessCompleted, entityType } = propsRef.current;
+    const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+    const assessState = deriveAssessState(assessCompleted);
+    const isAI = entityType === 'ai';
+    const nodes = buildAllNodes(assessState, colorAns, posAns, isAI);
+    initVelocities(nodes);
+    const stars = buildStars();
+    stateRef.current = {
+      nodes,
+      stars,
+      conns: [],
+      lastTime: performance.now(),
+      prevAnswersKey: '',
+      prevAssessKey: '',
+      prevEntityType: '',
+    };
+  }, []);
+
+  // -------------------------------------------------------
+  // PROP CHANGE DETECTION
+  // -------------------------------------------------------
+  React.useEffect(() => {
+    if (!stateRef.current) return;
+    const { nodes } = stateRef.current;
+    const { onboardingAnswers, assessCompleted, entityType } = propsRef.current;
+
+    const answersKey = JSON.stringify(onboardingAnswers);
+    const assessKey = JSON.stringify(Object.keys(assessCompleted).sort());
+    const entityKey = entityType;
+
+    const answersChanged = answersKey !== stateRef.current.prevAnswersKey;
+    const assessChanged = assessKey !== stateRef.current.prevAssessKey;
+    const entityChanged = entityKey !== stateRef.current.prevEntityType;
+
+    stateRef.current.prevAnswersKey = answersKey;
+    stateRef.current.prevAssessKey = assessKey;
+    stateRef.current.prevEntityType = entityKey;
+
+    if (entityChanged) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].alpha > 0.05) nodes[i].flash = 0.6;
+      }
+    }
+
+    if (assessChanged) {
+      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+      const assessState = deriveAssessState(assessCompleted);
+      const isAI = entityType === 'ai';
+      nodes.length = 20;
+      ASSESS_MAP.forEach((assess, ai) => {
+        if (!assessState[ai]) return;
+        const rng = seededRng(ai * 137 + 42);
+        const affs = assess.affinities;
+        for (let ni = 0; ni < assess.nodes; ni++) {
+          let mx = 0, my = 0;
+          for (const pi of affs) { mx += nodes[pi].x; my += nodes[pi].y; }
+          mx /= affs.length; my /= affs.length;
+          const x = mx + (rng() - 0.5) * 50;
+          const y = my + (rng() - 0.5) * 50;
+          const node = makeNode({
+            x, y, r: 2 + rng() * 2, halo: 8 + rng() * 10,
+            type: 'assess', color: assess.color,
+            assessIdx: ai, tier: assess.tier,
+            parent: affs[0], affinities: affs,
+          });
+          node.vx = 0; node.vy = 0;
+          nodes.push(node);
+        }
+      });
+      for (let i = 20; i < nodes.length; i++) nodes[i].flash = 0.5;
+    }
+
+    if (answersChanged && !entityChanged) {
+      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+      const isAI = entityType === 'ai';
+      const newSeeds = primarySeedPositions(colorAns, posAns, isAI);
+      const { colorAns: prevColor, posAns: prevPos } = deriveAnswers(
+        JSON.parse(stateRef.current.prevAnswersKey || '{}')
+      );
+      for (let i = 0; i < 5; i++) {
+        if (colorAns[i] !== prevColor?.[i] || posAns[i] !== prevPos?.[i]) {
+          nodes[i].flash = 1.0;
+          if (nodes[5 + i * 2]) nodes[5 + i * 2].flash = 0.6;
+          if (nodes[5 + i * 2 + 1]) nodes[5 + i * 2 + 1].flash = 0.5;
+          const dx = newSeeds[i].x - nodes[i].x;
+          const dy = newSeeds[i].y - nodes[i].y;
+          nodes[i].vx = (nodes[i].vx || 0) + dx * 0.15;
+          nodes[i].vy = (nodes[i].vy || 0) + dy * 0.15;
+        }
+      }
+    }
+  }, [onboardingAnswers, assessCompleted, entityType]);
+
+  // -------------------------------------------------------
+  // ANIMATION LOOP
+  // -------------------------------------------------------
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    function frame(now) {
+      if (!stateRef.current) {
+        animRef.current = requestAnimationFrame(frame);
+        return;
+      }
+
+      const { nodes, stars } = stateRef.current;
+      const { onboardingAnswers, assessCompleted, entityType, size } = propsRef.current;
+      const scale = size / 600;
+      const isAI = entityType === 'ai';
+      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+      const assessState = deriveAssessState(assessCompleted);
+
+      const dt = Math.min((now - stateRef.current.lastTime) / 1000, 0.05);
+      stateRef.current.lastTime = now;
+      const time = now / 1000;
+
+      computeAppearance(nodes, isAI, colorAns, posAns, assessState);
+
+      const edges = buildEdges(nodes, isAI, colorAns, posAns, assessState);
+      simulateForces(nodes, edges, isAI, dt);
+
+      const conns = buildVisualConnections(edges, nodes);
+      stateRef.current.conns = conns;
+
+      const spd = 6 * dt;
+      const cspd = 6 * dt;
+
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        n.x = lerp(n.x, n.tx, spd);
+        n.y = lerp(n.y, n.ty, spd);
+        n.r = lerp(n.r, n.tr + n.flash * 5, spd);
+        n.halo = lerp(n.halo, n.thalo + n.flash * 20, spd);
+        n.alpha = lerp(n.alpha, n.talpha + n.flash * 0.3, spd * 0.7);
+        n.color = lerpRgb(n.color, n.tcolor, cspd);
+
+        n.orbitAngle += n.orbitSpeed * (isAI ? 0.15 : 1.2);
+
+        n.flash *= 0.91;
+        if (n.flash < 0.01) n.flash = 0;
+
+        const twinkleWave = Math.pow(Math.max(0, Math.sin(time * n.twinkleSpeed + n.twinklePhase)), 8);
+        n.twinklePeak = twinkleWave;
+      }
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = size * dpr;
+      canvas.height = size * dpr;
+      canvas.style.width = size + 'px';
+      canvas.style.height = size + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      render(ctx, nodes, conns, stars, isAI, time, scale);
+
+      animRef.current = requestAnimationFrame(frame);
+    }
+
+    animRef.current = requestAnimationFrame(frame);
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, []);
+
+  const scaledRadius = Math.round(14 * (size / 600));
+
+  return React.createElement('canvas', {
+    ref: canvasRef,
+    style: {
+      display: 'block',
+      borderRadius: scaledRadius + 'px',
+      width: size + 'px',
+      height: size + 'px',
+    },
+  });
+});
 
 // ==================== DATA ====================
 const CATEGORIES = getCategoryList();
@@ -3332,6 +4008,7 @@ const ASSESS_DEMO_PROFILES = {
 };
 
 const ASSESS_STORAGE_KEY = 'aura-assessments-v1';
+const ONBOARD_STORAGE_KEY = 'aura-onboarding-answers-v1';
 
 // AI entity result interpretations — shown when entityType === 'ai'
 const AI_RESULT_NOTES = {
@@ -3846,10 +4523,25 @@ const PHONE_SIZES = [
   { id: 'galaxy', label: 'Galaxy S24', w: 360, h: 780 },
 ];
 
-const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devOffset = false }) => (
+const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devOffset = false }) => {
+  const [scale, setScale] = React.useState(1);
+  React.useEffect(() => {
+    const calc = () => {
+      const totalH = height + 56; // p-3 (24) + outer p-4 (32)
+      const avail = window.innerHeight;
+      setScale(avail < totalH ? avail / totalH : 1);
+    };
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, [height]);
+  const chromeW = width + 24; // p-3 each side
+  const chromeH = height + 24;
+  return (
   <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4"
-    style={devOffset ? { paddingRight: 340 } : undefined}>
-    <div className="relative bg-[#1a1a1c] rounded-[55px] p-3 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))' }}>
+    style={devOffset ? { paddingRight: 280 } : undefined}>
+    <div style={scale < 1 ? { width: chromeW * scale, height: chromeH * scale } : undefined}>
+    <div className="relative bg-[#1a1a1c] rounded-[55px] p-3 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))', transform: scale < 1 ? `scale(${scale.toFixed(3)})` : undefined, transformOrigin: 'top left' }}>
       <div className="absolute -left-[3px] top-[100px] w-[3px] h-[28px] bg-[#2a2a2c] rounded-l-sm" />
       <div className="absolute -left-[3px] top-[145px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
       <div className="absolute -left-[3px] top-[205px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
@@ -3873,8 +4565,10 @@ const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devO
         <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-[134px] h-[5px] ${TH('bg-inverted', darkMode)} rounded-full opacity-60 z-20`} />
       </div>
     </div>
+    </div>
   </div>
-);
+  );
+};
 
 // VortexButton with double-tap detection (works on touch devices)
 // Single tap fires immediately, double tap (within 400ms) fires reset
@@ -4054,7 +4748,7 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           onKeyDown={handleKeyDown}
-          className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
+          className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
         />
         <input
           type="password"
@@ -4063,7 +4757,7 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
           onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
           onKeyDown={handleKeyDown}
           inputMode="numeric"
-          className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
+          className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
         />
         {error && <div className="text-sm text-rose-500 text-center">{error}</div>}
         <button
@@ -4165,16 +4859,20 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
           })()}
         </div>
 
-        {/* Question text with glow */}
-        <div className="max-w-sm px-4"
-          style={(() => {
+        {/* Question text with radial glow (no rectangular card edges) */}
+        <div className="max-w-sm px-4 relative">
+          {(() => {
             const c = COLOR_HEX[question.colors?.[0]] || COLOR_HEX.violet;
-            return darkMode
-              ? { boxShadow: `0 0 20px rgba(${c.rgb},0.15), 0 0 50px rgba(${c.rgb},0.08), 0 0 80px rgba(${c.rgb},0.04)` }
-              : { boxShadow: `0 0 12px rgba(${c.rgb},0.10), 0 0 30px rgba(${c.rgb},0.06)` };
+            return (
+              <div className="absolute inset-0 pointer-events-none" style={{
+                width: '200%', height: '200%', left: '-50%', top: '-50%',
+                background: darkMode
+                  ? `radial-gradient(ellipse at center, rgba(${c.rgb},0.12) 0%, rgba(${c.rgb},0.04) 40%, transparent 70%)`
+                  : `radial-gradient(ellipse at center, rgba(${c.rgb},0.08) 0%, rgba(${c.rgb},0.02) 40%, transparent 70%)`,
+              }} />
+            );
           })()}
-        >
-          <h2 className={`question-text text-center font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h2 className={`question-text text-center font-medium relative z-10 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
             {question.text}
           </h2>
         </div>
@@ -4477,7 +5175,7 @@ const PathChoiceScreen = ({ darkMode, entityType, onboardingAnswers, onReveal, o
 // SaveProgressModal - Nudge after 20 responses
 const SaveProgressModal = ({ onCreateAccount, onLater, darkMode }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor: 'rgba(0,0,0,0.7)'}}>
-    <div className={`w-full max-w-sm rounded-2xl p-6 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+    <div className={`w-full max-w-sm rounded-2xl p-6 backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`}>
       <div className="text-4xl text-center mb-3">🎉</div>
       <h2 className={`text-xl font-bold text-center mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>20 responses!</h2>
       <p className={`text-sm text-center mb-6 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -4487,7 +5185,7 @@ const SaveProgressModal = ({ onCreateAccount, onLater, darkMode }) => (
         <button onClick={onCreateAccount} className={`w-full py-3 rounded-xl font-medium btn-feedback ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'}`}>
           Create Account
         </button>
-        <button onClick={onLater} className={`w-full py-3 rounded-xl font-medium btn-feedback ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+        <button onClick={onLater} className={`w-full py-3 rounded-xl font-medium btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
           Later
         </button>
       </div>
@@ -4498,7 +5196,7 @@ const SaveProgressModal = ({ onCreateAccount, onLater, darkMode }) => (
 // LevelUpModal - Celebration when user levels up
 const LevelUpModal = ({ level, title, onClose, darkMode }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor: 'rgba(0,0,0,0.85)'}} onClick={onClose}>
-    <div className={`w-full max-w-sm rounded-2xl p-8 text-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+    <div className={`w-full max-w-sm rounded-2xl p-8 text-center backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`} onClick={e => e.stopPropagation()}>
       {/* Confetti effect using CSS */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center justify-center">
@@ -4662,7 +5360,7 @@ const MiniCommunityResults = ({ question, results, userResponse, darkMode, onCli
     const winnerGlow = yesWins ? 'glow-emerald' : 'glow-rose';
 
     return (
-      <button onClick={onClick} className={`w-full px-3 py-2 rounded-lg text-left transition-all active:scale-[0.99] ${darkMode ? `bg-gray-900/80 hover:bg-gray-800 shine-card ${winnerGlow}` : 'bg-gray-100 hover:bg-gray-200'}`}>
+      <button onClick={onClick} className={`w-full px-3 py-2 rounded-lg text-left transition-all active:scale-[0.99] ${darkMode ? `bg-white/[0.04] hover:bg-white/[0.08] shine-card ${winnerGlow}` : 'bg-gray-100 hover:bg-gray-200'}`}>
         <div className={`text-sm font-medium mb-1.5 truncate ${TH('text-secondary', darkMode)}`}>
           {question.text}
         </div>
@@ -4708,7 +5406,7 @@ const MiniCommunityResults = ({ question, results, userResponse, darkMode, onCli
   const winnerGlow = mcGlowMap[winnerIdx % mcGlowMap.length];
 
   return (
-    <button onClick={onClick} className={`w-full px-3 py-2 rounded-lg text-left transition-all active:scale-[0.99] ${darkMode ? `bg-gray-900/80 hover:bg-gray-800 shine-card ${winnerGlow}` : 'bg-gray-100 hover:bg-gray-200'}`}>
+    <button onClick={onClick} className={`w-full px-3 py-2 rounded-lg text-left transition-all active:scale-[0.99] ${darkMode ? `bg-white/[0.04] hover:bg-white/[0.08] shine-card ${winnerGlow}` : 'bg-gray-100 hover:bg-gray-200'}`}>
       <div className={`text-sm font-medium mb-1.5 truncate ${TH('text-secondary', darkMode)}`}>
         {question.text}
       </div>
@@ -4795,7 +5493,7 @@ const FullResultsPanel = ({ question, results, userResponse, darkMode, onClose, 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={onClose}>
       <div
-        className={`w-full max-w-md rounded-t-2xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`}
+        className={`w-full max-w-md rounded-t-2xl backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-t border-x border-white/[0.08]' : 'bg-white/95'}`}
         style={{ animation: 'slideUp 0.2s ease-out' }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -4839,8 +5537,8 @@ const FullResultsPanel = ({ question, results, userResponse, darkMode, onClose, 
 const BottomSheet = ({ onClose, darkMode, children }) => (
   <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 pb-8" onClick={onClose}>
     <div
-      className={`rounded-xl p-4 w-[calc(100%-2rem)] max-w-xs ${
-        darkMode ? 'bg-gray-900' : 'bg-white shadow-xl border border-gray-200'
+      className={`rounded-xl p-4 w-[calc(100%-2rem)] max-w-xs backdrop-blur-xl ${
+        darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 shadow-xl border border-black/[0.06]'
       }`}
       onClick={e => e.stopPropagation()}
     >
@@ -4851,7 +5549,7 @@ const BottomSheet = ({ onClose, darkMode, children }) => (
 
 // Shared OptionChip Component
 const OptionChip = ({ label, selected, onClick, darkMode, accentColor = 'violet' }) => {
-  const baseClass = darkMode ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : 'bg-gray-200 text-gray-600 hover:bg-gray-300';
+  const baseClass = darkMode ? 'bg-white/[0.06] text-gray-400 hover:bg-white/[0.10]' : 'bg-gray-200 text-gray-600 hover:bg-gray-300';
   const selectedClass = {
     violet: 'bg-violet-600 text-white',
     rose: 'bg-rose-500 text-white',
@@ -4897,8 +5595,8 @@ const QuestionFlagModal = ({ questionId, onClose, onFlag, onClear, existingFlag,
       />
       <div className="flex gap-2">
         <button onClick={onClose} className={`py-2 px-4 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-gray-800/50 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>Cancel</button>
-        {existingFlag && <button onClick={() => { onClear(questionId); onClose(); }} className={`py-2 px-4 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>Clear</button>}
-        <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${canSubmit ? 'bg-rose-500 text-white' : darkMode ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+        {existingFlag && <button onClick={() => { onClear(questionId); onClose(); }} className={`py-2 px-4 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-300' : 'bg-gray-200 text-gray-700'}`}>Clear</button>}
+        <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${canSubmit ? 'bg-rose-500 text-white' : darkMode ? 'bg-white/[0.04] text-gray-600 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
           {existingFlag ? 'Update' : 'Flag'}
         </button>
       </div>
@@ -4931,7 +5629,7 @@ const ExplanationModal = ({ questionId, onClose, onSave, onClear, existingExplan
             className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
               selected.includes(r)
                 ? 'bg-amber-500 text-white'
-                : darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : darkMode ? 'bg-white/[0.06] text-gray-300 hover:bg-white/[0.10]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >{r}</button>
         ))}
@@ -4940,9 +5638,9 @@ const ExplanationModal = ({ questionId, onClose, onSave, onClear, existingExplan
         className={`w-full px-3 py-2 rounded-lg text-sm mb-3 ${TH('bg-input', darkMode)} border ${TH('border-subtle', darkMode)} focus:outline-none focus:border-amber-500`}
       />
       <div className="flex gap-2">
-        <button onClick={onClose} className={`flex-1 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>Cancel</button>
-        {existingExplanation && <button onClick={() => { onClear(questionId); onClose(); }} className={`flex-1 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>Clear</button>}
-        <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${canSubmit ? 'bg-amber-500 text-white' : darkMode ? 'bg-gray-800 text-gray-600' : 'bg-gray-200 text-gray-400'}`}>
+        <button onClick={onClose} className={`flex-1 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-gray-200 text-gray-600'}`}>Cancel</button>
+        {existingExplanation && <button onClick={() => { onClear(questionId); onClose(); }} className={`flex-1 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-300' : 'bg-gray-200 text-gray-700'}`}>Clear</button>}
+        <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${canSubmit ? 'bg-amber-500 text-white' : darkMode ? 'bg-white/[0.04] text-gray-600' : 'bg-gray-200 text-gray-400'}`}>
           {existingExplanation ? 'Update' : 'Save'}
         </button>
       </div>
@@ -4968,7 +5666,7 @@ const CantAnswerModal = ({ questionId, onClose, onSkip, darkMode = true }) => {
             className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
               selected.includes(r)
                 ? 'bg-violet-600 text-white'
-                : darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : darkMode ? 'bg-white/[0.06] text-gray-300 hover:bg-white/[0.10]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >{r}</button>
         ))}
@@ -4977,8 +5675,8 @@ const CantAnswerModal = ({ questionId, onClose, onSkip, darkMode = true }) => {
         className={`w-full px-3 py-2 rounded-lg text-sm mb-3 ${TH('bg-input', darkMode)} border ${TH('border-subtle', darkMode)} focus:outline-none focus:border-violet-500`}
       />
       <div className="flex gap-2">
-        <button onClick={onClose} className={`flex-1 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>Cancel</button>
-        <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${canSubmit ? 'bg-violet-600 text-white' : darkMode ? 'bg-gray-800 text-gray-600' : 'bg-gray-200 text-gray-400'}`}>Skip Question</button>
+        <button onClick={onClose} className={`flex-1 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-gray-200 text-gray-600'}`}>Cancel</button>
+        <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${canSubmit ? 'bg-violet-600 text-white' : darkMode ? 'bg-white/[0.04] text-gray-600' : 'bg-gray-200 text-gray-400'}`}>Skip Question</button>
       </div>
     </BottomSheet>
   );
@@ -4996,11 +5694,11 @@ const NoneOptionModal = ({ questionId, onClose, onSubmit, darkMode = true }) => 
         <div className={`text-sm font-medium mb-2 ${TH('text-primary', darkMode)}`}>None of these options fit</div>
         <div className={`text-sm mb-3 ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>What would you answer instead?</div>
         <textarea value={customAnswer} onChange={(e) => setCustomAnswer(e.target.value)} placeholder="Your answer..."
-          className={`w-full px-3 py-2 rounded-lg text-sm mb-3 h-20 resize-none ${darkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-100 text-gray-900'} border focus:outline-none focus:border-violet-500`}
+          className={`w-full px-3 py-2 rounded-lg text-sm mb-3 h-20 resize-none ${darkMode ? 'bg-white/[0.06] text-white border-white/[0.08]' : 'bg-gray-100 text-gray-900'} border focus:outline-none focus:border-violet-500`}
         />
         <div className="flex gap-2">
-          <button onClick={onClose} className={`flex-1 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>Cancel</button>
-          <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${canSubmit ? 'bg-violet-600 text-white' : darkMode ? 'bg-gray-800 text-gray-600' : 'bg-gray-200 text-gray-400'}`}>Submit</button>
+          <button onClick={onClose} className={`flex-1 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-gray-200 text-gray-600'}`}>Cancel</button>
+          <button onClick={handleSubmit} disabled={!canSubmit} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${canSubmit ? 'bg-violet-600 text-white' : darkMode ? 'bg-white/[0.04] text-gray-600' : 'bg-gray-200 text-gray-400'}`}>Submit</button>
         </div>
       </div>
     </div>
@@ -5138,9 +5836,9 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
 
   // Category display config matching a5 mockup
   const categoryConfig = {
-    prediction: { icon: '☀️', name: 'Predict', tagline: 'What will happen?', featured: true },
-    reasoning: { icon: '🧠', name: 'Think', tagline: 'Logic puzzles & analysis', featured: false },
-    judgment: { icon: '⚖️', name: 'Judge', tagline: 'Ethics & opinions', featured: false },
+    prediction: { icon: '☀️', name: 'Predict', featured: true },
+    reasoning: { icon: '🧠', name: 'Think', featured: false },
+    judgment: { icon: '⚖️', name: 'Judge', featured: false },
   };
 
   return (
@@ -5156,14 +5854,9 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         <div className="flex items-center gap-3">
           <button className="text-3xl btn-feedback" onDoubleClick={onResetQotd}>🌀</button>
           {/* Level badge */}
-          <div className="flex items-center gap-1.5">
-            <span className={`text-sm font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>
-              Lv.{stats.level || 1}
-            </span>
-            <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-              {stats.xp || 0} XP
-            </span>
-          </div>
+          <span className={`text-sm font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>
+            Lv.{stats.level || 1}
+          </span>
         </div>
         <div className="flex items-center gap-3">
           {stats.streak > 0 && <span className="text-sm text-orange-400 font-medium">🔥{stats.streak}</span>}
@@ -5224,7 +5917,7 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-5 pt-2 pb-8 space-y-5 scroll-smooth">
+      <div className="flex-1 overflow-y-auto px-5 pt-2 pb-8 space-y-4 scroll-smooth">
         {/* QOD Card - a5 style with shine */}
         {qotdData && (
           <button
@@ -5259,12 +5952,8 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         )}
 
         {/* Welcome heading */}
-        <h1 className={`text-3xl font-bold text-center ${TH('text-primary', darkMode)}`}>
-          What's on your mind?
-        </h1>
-
-        {/* Category Cards - a5 style */}
-        <div className="space-y-4">
+        {/* Category Cards */}
+        <div className="space-y-3">
           {categories.map(cat => {
             const config = categoryConfig[cat.id];
             if (!config) return null;
@@ -5295,14 +5984,11 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
                 key={cat.id}
                 onClick={() => handleCategoryClick(cat.id)}
                 disabled={available === 0}
-                className={`w-full ${isFeatured ? 'py-5 px-5' : 'py-4 px-5'} rounded-2xl text-left transition-colors shine-card ${shineClass} ${glowClass} border ${borderColor} ${isFeatured ? (darkMode ? 'starry-bg overflow-hidden' : 'bg-gradient-to-r from-amber-100 to-yellow-50 overflow-hidden') : bgGradient} ${available === 0 ? 'opacity-40' : ''}`}
+                className={`w-full ${isFeatured ? 'py-4 px-5' : 'py-3.5 px-5'} rounded-2xl text-left transition-colors shine-card ${shineClass} ${glowClass} border ${borderColor} ${isFeatured ? (darkMode ? 'starry-bg overflow-hidden' : 'bg-gradient-to-r from-amber-100 to-yellow-50 overflow-hidden') : bgGradient} ${available === 0 ? 'opacity-40' : ''}`}
               >
                 <div className={`flex items-center gap-4 ${isFeatured ? 'relative z-10' : ''}`}>
-                  <span className={isFeatured ? 'text-3xl' : 'text-2xl'}>{config.icon}</span>
-                  <div>
-                    <div className={`${isFeatured ? 'text-xl' : 'text-lg'} font-semibold ${TH('text-primary', darkMode)}`}>{config.name}</div>
-                    <div className={`text-sm ${textColor}`}>{config.tagline}</div>
-                  </div>
+                  <span className={isFeatured ? 'text-2xl' : 'text-xl'}>{config.icon}</span>
+                  <div className={`${isFeatured ? 'text-lg' : 'text-base'} font-semibold ${TH('text-primary', darkMode)}`}>{config.name}</div>
                 </div>
               </button>
             );
@@ -5323,11 +6009,8 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
                 } ${available === 0 ? 'opacity-40' : ''}`}
               >
                 <div className="flex items-center gap-4">
-                  <span className="text-2xl">✨</span>
-                  <div>
-                    <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Surprise me</div>
-                    <div className={`text-sm ${darkMode ? 'text-rose-400/80' : 'text-rose-500'}`}>Explore something unexpected</div>
-                  </div>
+                  <span className="text-xl">✨</span>
+                  <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Surprise me</div>
                 </div>
               </button>
             );
@@ -5343,11 +6026,8 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
             }`}
           >
             <div className="flex items-center gap-4">
-              <span className="text-2xl">🪞</span>
-              <div className="flex-1">
-                <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Reveal</div>
-                <div className={`text-sm ${darkMode ? 'text-sky-400/80' : 'text-sky-600'}`}>Discover yourself</div>
-              </div>
+              <span className="text-xl">🪞</span>
+              <div className={`flex-1 text-base font-semibold ${TH('text-primary', darkMode)}`}>Reveal</div>
             </div>
           </button>
 
@@ -5483,7 +6163,7 @@ const QuestionCard = ({ question, darkMode, evidenceExpanded, onToggleEvidence }
   const glowRgbMap = { prediction: '245, 158, 11', reasoning: '139, 92, 246', judgment: '20, 184, 166' };
   const glowRgb = question.category ? glowRgbMap[question.category] || '139, 92, 246' : '139, 92, 246';
   return (
-    <div className="space-y-2 relative overflow-hidden">
+    <div className="space-y-2 relative">
       {/* Radial glow behind question text — no visible card edges */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
         <div style={{
@@ -5506,43 +6186,40 @@ const QuestionCard = ({ question, darkMode, evidenceExpanded, onToggleEvidence }
       )}
       <h2 className={`question-text text-center font-medium relative z-10 ${TH('text-primary', darkMode)}`}>{question.text}</h2>
       {hasEvidence && (
-        <div className={`rounded-xl overflow-hidden ${darkMode ? 'bg-gradient-to-b from-gray-800/80 to-gray-900/80' : 'bg-white border border-gray-200 shadow-sm'}`}>
+        <div className="relative z-10 mt-1">
           <button
             onClick={onToggleEvidence}
-            className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${
+            className={`w-full px-3 py-2 flex items-center justify-center gap-2 rounded-lg transition-colors ${
               darkMode
-                ? 'hover:bg-gray-700/30'
-                : 'hover:bg-gray-50'
+                ? 'text-gray-400 hover:text-gray-300 hover:bg-white/5'
+                : 'text-gray-500 hover:text-gray-600 hover:bg-black/5'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${
-                darkMode ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-600'
-              }`}>📊</span>
-              <span className={`text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-                Evidence <span className={`ml-1 ${TH('text-subtle', darkMode)}`}>({question.preEvidence.length})</span>
-              </span>
+            <span className="text-xs">📊</span>
+            <span className="text-xs font-medium">
+              {evidenceExpanded ? 'Hide' : 'Evidence'} ({question.preEvidence.length})
             </span>
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-transform duration-200 ${
-              darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'
-            } ${evidenceExpanded ? 'rotate-180' : ''}`}>▼</span>
+            <span className={`text-[10px] transition-transform duration-200 ${evidenceExpanded ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {evidenceExpanded && (
-            <div className={`px-4 pb-4 space-y-3`}>
+            <div className="mt-2 space-y-2">
               {question.preEvidence.map((item, i) => (
-                <div key={i} className={`rounded-lg p-3 ${darkMode ? 'bg-gray-800/60' : 'bg-gray-50'}`}>
+                <div key={i} className={`rounded-lg px-3 py-2.5 ${
+                  darkMode
+                    ? 'bg-white/[0.04] border border-white/[0.06]'
+                    : 'bg-black/[0.03] border border-black/[0.06]'
+                }`}>
                   {item.type === 'stat' ? (
                     <div className="flex items-center justify-between">
                       <span className={`text-sm ${TH('text-muted', darkMode)}`}>{item.label}</span>
-                      <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
-                        darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+                      <span className={`text-sm font-semibold ${
+                        darkMode ? 'text-emerald-400' : 'text-emerald-600'
                       }`}>{item.value}</span>
                     </div>
                   ) : (
-                    <div className={`flex gap-2`}>
-                      <span className={`text-lg leading-none ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>"</span>
-                      <span className={`text-sm italic ${TH('text-muted', darkMode)}`}>{item.text}</span>
-                    </div>
+                    <p className={`text-sm italic leading-relaxed ${TH('text-muted', darkMode)}`}>
+                      "{item.text}"
+                    </p>
                   )}
                 </div>
               ))}
@@ -5866,7 +6543,7 @@ const ProfileSection = ({ darkMode }) => {
             <div className={`text-sm ${TH('text-subtle', darkMode)}`}>{currentEmail}</div>
             <div className={`text-xs ${TH('text-faint', darkMode)}`}>Synced across devices</div>
           </div>
-          <button onClick={handleSignOut} className={`px-3 py-1.5 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
+          <button onClick={handleSignOut} className={`px-3 py-1.5 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
             Sign Out
           </button>
         </div>
@@ -5915,7 +6592,7 @@ const ProfileSection = ({ darkMode }) => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           onKeyDown={handleKeyDown}
-          className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
+          className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
         />
         <input
           type="password"
@@ -5924,7 +6601,7 @@ const ProfileSection = ({ darkMode }) => {
           onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
           onKeyDown={handleKeyDown}
           inputMode="numeric"
-          className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
+          className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
         />
         {error && <div className="text-xs text-rose-500">{error}</div>}
         <button
@@ -5961,7 +6638,7 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
       <div className={`w-full rounded-lg p-3 ${TH('bg-overlay', darkMode)}`}>
         <div className="flex items-center justify-between">
           <div className={`text-sm font-medium ${TH('text-subtle', darkMode)}`}>📋 Answer History</div>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-200 text-gray-500'}`}>Coming Soon</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? 'bg-white/[0.06] text-gray-500' : 'bg-gray-200 text-gray-500'}`}>Coming Soon</span>
         </div>
       </div>
       <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
@@ -6103,7 +6780,9 @@ function App() {
   const [showSaveNudge, setShowSaveNudge] = useState(false);
   const [nudgeShown, setNudgeShown] = useState(() => localStorage.getItem('aura_nudge_shown') === 'true');
   const [onboardingComplete, setOnboardingComplete] = useState(() => localStorage.getItem('aura_onboarding_complete') === 'true');
-  const [onboardingAnswers, setOnboardingAnswers] = useState({});
+  const [onboardingAnswers, setOnboardingAnswers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(ONBOARD_STORAGE_KEY)) || {}; } catch { return {}; }
+  });
 
   // --- UI Chrome ---
   const [levelUpData, setLevelUpData] = useState(null); // { level, title }
@@ -6222,7 +6901,7 @@ function App() {
   const tapTimeoutRef = useRef(null);
   const graceTimeoutRef = useRef(null);
   const pendingSubmitStartRef = useRef(null);
-  const CONFIDENCE_GRACE_PERIOD = 600; // ms to allow additional taps to increase confidence
+  const CONFIDENCE_GRACE_PERIOD = 1200; // ms to allow additional taps to increase confidence
 
   const currentQuestion = questions[currentIndex];
   const currentResponse = currentQuestion ? responses[currentQuestion.id] : null;
@@ -6656,7 +7335,13 @@ function App() {
 
   // Handle onboarding completion
   const handleOnboardingComplete = (answers) => {
-    setOnboardingAnswers(answers);
+    // Normalize to flat { 'onboard-1': 0, ... } format for viz component
+    const flat = {};
+    for (const [key, val] of Object.entries(answers)) {
+      flat[key] = typeof val === 'object' && val !== null ? val.answer : val;
+    }
+    setOnboardingAnswers(flat);
+    localStorage.setItem(ONBOARD_STORAGE_KEY, JSON.stringify(flat));
     localStorage.setItem('aura_onboarding_complete', 'true');
     setOnboardingComplete(true);
     // Extract entity type from gating question (option 1 = AI)
@@ -6750,6 +7435,7 @@ function App() {
     localStorage.removeItem('aura_guest_mode');
     localStorage.removeItem('aura_nudge_shown');
     localStorage.removeItem('aura_onboarding_complete');
+    localStorage.removeItem(ONBOARD_STORAGE_KEY);
     setIsGuestMode(false);
     setNudgeShown(false);
     setOnboardingComplete(false);
@@ -7076,15 +7762,7 @@ function App() {
         };
       };
 
-      // Calculate aura stage
-      const starterModules = ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'];
-      const starterCompleted = starterModules.filter(id => assessCompleted[id]).length;
       const completedCount = Object.keys(assessCompleted).length;
-      const currentTier = calculateAssessTier(assessCompleted);
-      let auraStage = 1;
-      if (currentTier >= 2 && completedCount > 8) auraStage = 4;
-      else if (currentTier >= 2 || starterCompleted >= 3) auraStage = 3;
-      else if (currentTier >= 1) auraStage = 2;
 
       return (
         <div className={`flex-1 flex flex-col overflow-hidden ${darkMode ? 'text-white bg-gray-950' : 'text-gray-900 bg-gray-50'}`}>
@@ -7115,17 +7793,10 @@ function App() {
               className={`w-full rounded-2xl overflow-hidden text-left ${darkMode ? 'bg-gradient-to-br from-violet-950/50 to-indigo-950/60 border border-violet-700/40 hover:border-violet-500/60' : 'bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 hover:border-violet-300'}`}
             >
               <div className="flex items-stretch min-h-[100px]">
-                {/* Aura visualization - left side, scaled to fit */}
-                <div className={`w-[100px] flex-shrink-0 flex items-center justify-center overflow-hidden ${darkMode ? 'bg-gray-950/40' : 'bg-white/50'}`}>
-                  {hasPersonality ? (
-                    <div style={{ transform: 'scale(0.55)', transformOrigin: 'center center' }}>
-                      <AuraVisualization stage={auraStage} darkMode={darkMode} />
-                    </div>
-                  ) : (
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center ${darkMode ? 'bg-violet-900/30 border border-violet-700/30' : 'bg-violet-100 border border-violet-200'}`}>
-                      <span className="text-2xl">🌀</span>
-                    </div>
-                  )}
+                {/* Aura visualization - left side */}
+                <div className="w-[100px] flex-shrink-0 flex items-center justify-center overflow-hidden rounded-l-2xl">
+                  <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
+                    entityType={entityType} darkMode={darkMode} size={100} />
                 </div>
                 {/* Text content - right side */}
                 <div className="flex-1 py-3 px-4 flex flex-col justify-center">
@@ -7140,68 +7811,40 @@ function App() {
                   </p>
                   {hasPersonality && (
                     <div className="flex items-center gap-1.5 mt-2">
-                      {[1,2,3,4].map(s => (
-                        <div key={s} className={`w-2 h-2 rounded-full transition-colors ${s <= auraStage ? (darkMode ? 'bg-violet-400' : 'bg-violet-500') : (darkMode ? 'bg-gray-700' : 'bg-gray-300')}`} />
-                      ))}
-                      <span className={`text-xs ml-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Stage {auraStage}</span>
+                      <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{Object.keys(assessCompleted).length} assessments</span>
                     </div>
                   )}
                 </div>
               </div>
             </button>
 
-            {/* Activity Stats Section */}
-            <div className={`rounded-2xl p-4 ${darkMode ? 'bg-gray-900/40 border border-gray-800/40' : 'bg-white border border-gray-200'}`}>
-              <div className="flex items-center justify-between mb-3">
-                <span className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Activity</span>
-                <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>History coming soon</span>
+            {/* Stats */}
+            <div className={`rounded-2xl px-4 py-3 flex items-center justify-around ${darkMode ? 'bg-gray-900/40 border border-gray-800/40' : 'bg-white border border-gray-200'}`}>
+              <div className="text-center">
+                <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{answered}</div>
+                <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Answered</div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{answered}</div>
-                  <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Answered</div>
-                </div>
-                <div className="text-center">
-                  <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{avgConf}</div>
-                  <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Avg Conf</div>
-                </div>
-                <div className="text-center">
-                  <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedCount}</div>
-                  <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Assessments</div>
-                </div>
+              <div className={`w-px h-8 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
+              <div className="text-center">
+                <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedCount}</div>
+                <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Assessments</div>
               </div>
-              {answered > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-800/30">
-                  <div className={`text-xs mb-1.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Confidence distribution</div>
-                  <div className="h-2 rounded-full overflow-hidden flex bg-gray-800/50">
-                    {confDist.map((count, i) => {
-                      const pct = answered > 0 ? (count / answered) * 100 : 0;
-                      const colors = ['#c4b5fd', '#a78bfa', '#8b5cf6', '#6d28d9'];
-                      if (pct === 0) return null;
-                      return <div key={i} className="h-full" style={{ width: `${pct}%`, background: colors[i] }} />;
-                    })}
-                  </div>
-                </div>
-              )}
+              <div className={`w-px h-8 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
+              <div className="text-center">
+                <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{avgConf}</div>
+                <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Avg Conf</div>
+              </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setScreen('assess-picker')}
-                className={`rounded-2xl p-4 text-center ${darkMode ? 'bg-emerald-950/30 border border-emerald-800/30 hover:border-emerald-500/50 hover:bg-emerald-950/40' : 'bg-emerald-50 border border-emerald-200 hover:border-emerald-300'}`}
-              >
-                <span className="text-2xl">🧩</span>
-                <div className={`text-sm font-medium mt-1 ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>Assessments</div>
-              </button>
-              <div
-                className={`rounded-2xl p-4 text-center opacity-50 cursor-not-allowed ${darkMode ? 'bg-gray-900/30 border border-gray-800/30' : 'bg-gray-100 border border-gray-200'}`}
-              >
-                <span className="text-2xl grayscale">📊</span>
-                <div className={`text-sm font-medium mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>History</div>
-                <div className={`text-xs mt-0.5 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Coming soon</div>
-              </div>
-            </div>
+            {/* Quick Action */}
+            <button
+              onClick={() => setScreen('assess-picker')}
+              className={`w-full rounded-2xl px-4 py-3 flex items-center gap-3 ${darkMode ? 'bg-emerald-950/30 border border-emerald-800/30 hover:border-emerald-500/50' : 'bg-emerald-50 border border-emerald-200 hover:border-emerald-300'}`}
+            >
+              <span className="text-xl">🧩</span>
+              <span className={`text-sm font-medium ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>Assessments</span>
+              <span className={`ml-auto text-sm ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>→</span>
+            </button>
           </div>
         </div>
       );
@@ -7234,7 +7877,7 @@ function App() {
           <div className="flex gap-1 p-2 overflow-x-auto">
             {[{ id: 'all', label: 'All' }, { id: 'binary', label: 'Y/N' }, { id: 'multiple', label: 'MC' }, { id: 'flagged', label: '⚑' }, ...CATEGORIES.map(c => ({ id: c.id, label: c.icon }))].map(f => (
               <button key={f.id} onClick={() => setHistoryFilter(f.id)}
-                className={`px-2.5 py-1 rounded-lg text-sm whitespace-nowrap transition-colors ${historyFilter === f.id ? 'bg-violet-600 text-white' : darkMode ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-600 border border-gray-200'}`}>
+                className={`px-2.5 py-1 rounded-lg text-sm whitespace-nowrap transition-colors ${historyFilter === f.id ? 'bg-violet-600 text-white' : darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-white text-gray-600 border border-gray-200'}`}>
                 {f.label}
               </button>
             ))}
@@ -7323,7 +7966,7 @@ function App() {
           {/* Navigation Bar */}
           <div className={`h-[36px] flex-shrink-0 flex items-center gap-2 px-3 ${darkMode ? 'bg-gray-900/50' : 'bg-white/80 border-b border-gray-200'}`}>
             <button onClick={() => setScreen('categories')} className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${TH('btn-ghost', darkMode)}`}>◀</button>
-            <div className={`flex-1 h-2 rounded-full overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-300'}`}>
+            <div className={`flex-1 h-2 rounded-full overflow-hidden ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-300'}`}>
               <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: hasAnswered ? '100%' : '0%' }} />
             </div>
             <button onClick={goToQuestions} className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${TH('btn-ghost', darkMode)}`}>▶</button>
@@ -7456,7 +8099,7 @@ function App() {
           {/* Demo Menu Overlay */}
           {assessShowDemoMenu && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setAssessShowDemoMenu(false)}>
-              <div className={`mx-4 p-4 rounded-2xl ${darkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+              <div className={`mx-4 p-4 rounded-2xl backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`} onClick={e => e.stopPropagation()}>
                 <div className={`text-center mb-4 ${TH('text-primary', darkMode)}`}>
                   <div className="text-lg font-semibold">{assessDemoActive ? 'Switch Profile' : 'Load Demo Profile'}</div>
                   <div className={`text-xs mt-1 ${TH('text-subtle', darkMode)}`}>
@@ -7474,7 +8117,7 @@ function App() {
                   {Object.entries(ASSESS_DEMO_PROFILES).map(([num, profile]) => {
                     const profColors = { violet: 'bg-violet-600', teal: 'bg-teal-600', amber: 'bg-amber-500', emerald: 'bg-emerald-600', blue: 'bg-blue-600', pink: 'bg-pink-600' };
                     return (
-                      <button key={num} onClick={() => assessLoadDemoProfile(Number(num))} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}`}>
+                      <button key={num} onClick={() => assessLoadDemoProfile(Number(num))} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 ${darkMode ? 'bg-white/[0.06] hover:bg-white/[0.10]' : 'bg-gray-100 hover:bg-gray-200'}`}>
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold text-white ${profColors[profile.color] || 'bg-violet-600'}`}>{num}</div>
                         <div className="flex-1"><div className={`font-medium ${TH('text-primary', darkMode)}`}>{profile.name}</div><div className={`text-xs ${TH('text-dim', darkMode)}`}>{profile.desc}</div></div>
                       </button>
@@ -7492,7 +8135,7 @@ function App() {
             <button onClick={(e) => { e.stopPropagation(); setScreen('categories'); }} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
             <span className="text-2xl cursor-pointer select-none" onDoubleClick={assessClearDemo}>🪞</span>
             <span className={`font-semibold flex-1 ${TH('text-primary', darkMode)}`}>Reveal</span>
-            <button onClick={(e) => { e.stopPropagation(); if (assessCompleted['quick-profile']) setScreen('assess-analysis'); }} className={`px-3 py-1.5 rounded-full text-sm font-medium ${assessCompleted['quick-profile'] ? 'bg-violet-600 text-white' : (darkMode ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')}`}>Analysis</button>
+            <button onClick={(e) => { e.stopPropagation(); if (assessCompleted['quick-profile']) setScreen('assess-analysis'); }} className={`px-3 py-1.5 rounded-full text-sm font-medium ${assessCompleted['quick-profile'] ? 'bg-violet-600 text-white' : (darkMode ? 'bg-white/[0.04] text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')}`}>Analysis</button>
           </div>
           {/* Demo Profile Selector - only shown when demo controls enabled in settings */}
           {showDemoControls && (
@@ -7562,7 +8205,12 @@ function App() {
               const hasProgress = catTests.some(([id]) => assessCompleted[id] || assessInProgress[id]);
               return { catId, cat, catTests, allComplete, hasProgress };
             });
-            const incompleteCategories = categoriesWithStatus.filter(c => !c.allComplete);
+            // Hero priority order for recommended next assessment
+            const heroPriority = ['quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior'];
+            const allIncomplete = categoriesWithStatus.filter(c => !c.allComplete);
+            const heroItem = heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
+            const heroCategory = heroItem || null;
+            const incompleteCategories = allIncomplete.filter(c => c !== heroCategory);
             const completedCategories = categoriesWithStatus.filter(c => c.allComplete);
 
             return (
@@ -7575,6 +8223,55 @@ function App() {
                 <p className={`text-sm ${TH('text-subtle', darkMode)}`}>10 quick questions to unlock your profile</p>
               </div>
             )}
+
+            {/* HERO CARD — Recommended next assessment */}
+            {!isFirstTimeUser && heroCategory && (() => {
+              const { catId, cat, catTests, hasProgress } = heroCategory;
+              const totalQuestions = catTests.reduce((sum, [_, t]) => sum + t.items.length, 0);
+              const answeredQuestions = catTests.reduce((sum, [id, t]) => {
+                if (assessCompleted[id]) return sum + t.items.length;
+                const prog = assessInProgress[id];
+                return sum + (prog ? Object.keys(prog.responses || {}).length : 0);
+              }, 0);
+              const progressPct = (answeredQuestions / totalQuestions) * 100;
+              const hex = COLOR_HEX[cat.color] || COLOR_HEX.violet;
+              const colors = getAssessColor(cat.color, darkMode);
+              const t = twColor(cat.color);
+              const hasModules = catTests.length > 1;
+              const incompleteModules = catTests.filter(([id]) => !assessCompleted[id]);
+              const firstIncomplete = incompleteModules[0];
+              const ctaLabel = progressPct > 0 ? `Continue ${cat.name}` : `Start ${cat.name}`;
+              const handleHeroClick = () => {
+                if (hasModules && firstIncomplete) {
+                  assessStartTest(firstIncomplete[0]);
+                } else if (catTests[0]) {
+                  assessStartTest(catTests[0][0]);
+                }
+              };
+
+              return (
+                <div className="mb-3">
+                  <button onClick={handleHeroClick} className={`w-full relative overflow-hidden rounded-2xl ${darkMode ? `border border-${t}-500/30` : `border border-${t}-300`} text-left`}>
+                    {/* Breathing ambient glow */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="aura-breathe rounded-full" style={{
+                        width: 240, height: 240,
+                        background: `radial-gradient(ellipse at center, rgba(${hex.rgb}, ${darkMode ? 0.12 : 0.08}) 0%, transparent 70%)`,
+                      }} />
+                    </div>
+                    <div className={`relative z-10 p-3.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-white/60'}`}>
+                      <div className="flex items-center gap-3">
+                        <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : cat.icon} gradientId={`hero-${catId}`} darkMode={darkMode} textSize="text-xs" />
+                        <div className={`flex-1 font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
+                        <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${t}-500/25 text-${t}-300 border border-${t}-500/30` : `bg-${t}-100 text-${t}-600`}`}>
+                          {progressPct > 0 ? 'Continue →' : 'Start →'}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* INCOMPLETE CATEGORIES - Prominent, actionable */}
             {!isFirstTimeUser && incompleteCategories.length > 0 && (
@@ -7596,37 +8293,39 @@ function App() {
                   if (!hasModules) {
                     const [testId, test] = catTests[0];
                     return (
-                      <button key={catId} onClick={() => assessStartTest(testId)} className={`w-full p-4 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-4 hover-glow hover-glow-${cat.color}`}>
-                        <ProgressCircle progress={progressPct} size={56} strokeWidth={4} color={cat.color} text={totalQuestions} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-base" orbit={assessProfileSwitching} />
-                        <div className="flex-1 text-left">
-                          <div className={`font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
-                          <div className={`text-sm ${colors.text}`}>{progressPct > 0 ? `${Math.round(progressPct)}% done` : `${totalQuestions} questions`}</div>
-                        </div>
-                        <span className={`text-sm font-medium px-3 py-1.5 rounded-full ${darkMode ? 'bg-' + cat.color + '-600/20 text-' + cat.color + '-400' : 'bg-' + cat.color + '-100 text-' + cat.color + '-600'}`}>{progressPct > 0 ? 'Continue' : 'Start'}</span>
+                      <button key={catId} onClick={() => assessStartTest(testId)} className={`w-full p-3.5 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-3 hover-glow hover-glow-${cat.color}`}>
+                        <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : totalQuestions} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-xs" orbit={assessProfileSwitching} />
+                        <div className={`flex-1 text-left font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
+                        <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${twColor(cat.color)}-500/25 text-${twColor(cat.color)}-300 border border-${twColor(cat.color)}-500/30` : `bg-${twColor(cat.color)}-100 text-${twColor(cat.color)}-600`}`}>{progressPct > 0 ? 'Continue →' : 'Start →'}</span>
                       </button>
                     );
                   }
 
                   // Multi-test incomplete category
+                  // Find next incomplete test for direct CTA
+                  const nextIncomplete = catTests.find(([id, test]) => {
+                    const isLocked = test.requires && !assessCompleted[test.requires];
+                    return !isLocked && !assessCompleted[id];
+                  });
+                  const nextTestId = nextIncomplete ? nextIncomplete[0] : null;
+                  const tw = twColor(cat.color);
+
                   return (
                     <div key={catId} className={`rounded-2xl overflow-hidden ${TH('bg-card', darkMode)}`}>
-                      <button onClick={() => setAssessExpandedCategory(isExpanded ? null : catId)} className={`w-full p-4 text-left flex items-center gap-3 hover-glow hover-glow-${cat.color}`}>
-                        <ProgressCircle progress={progressPct} size={52} strokeWidth={4} color={cat.color} text={incompleteModules} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-sm" orbit={assessProfileSwitching} />
-                        <div className="flex-1 min-w-0">
-                          <div className={`font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
-                          <div className={`text-sm ${colors.text}`}>{incompleteModules} left</div>
+                      <div className={`p-3.5 hover-glow hover-glow-${cat.color} cursor-pointer`} onClick={() => setAssessExpandedCategory(isExpanded ? null : catId)}>
+                        <div className="flex items-center gap-3">
+                          <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={incompleteModules} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-sm" orbit={assessProfileSwitching} />
+                          <div className={`flex-1 min-w-0 font-semibold ${TH('text-primary', darkMode)} flex items-center gap-1.5`}>
+                            {cat.name}
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} style={{stroke: darkMode ? '#94a3b8' : '#64748b', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round', opacity: 0.5}}><polyline points="4 6 8 10 12 6"/></svg>
+                          </div>
+                          {nextTestId && (
+                            <button onClick={(e) => { e.stopPropagation(); assessStartTest(nextTestId); }} className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${tw}-500/25 text-${tw}-300 border border-${tw}-500/30` : `bg-${tw}-100 text-${tw}-600`}`}>
+                              {progressPct > 0 ? 'Continue →' : 'Start →'}
+                            </button>
+                          )}
                         </div>
-                        <div className="flex gap-1 items-center">
-                          {catTests.map(([id, test]) => {
-                            const modCompleted = assessCompleted[id];
-                            const modProgress = assessInProgress[id];
-                            const modAnswered = modCompleted ? test.items.length : modProgress ? Object.keys(modProgress.responses || {}).length : 0;
-                            const modPct = (modAnswered / test.items.length) * 100;
-                            return <ProgressCircle key={id} progress={modPct} size={28} strokeWidth={2} color={cat.color} icon={test.icon} gradientId={`mod-ring-${id}`} darkMode={darkMode} iconSize="text-xs" glow={false} />;
-                          })}
-                        </div>
-                        <span className={`transition-transform ${isExpanded ? 'rotate-90' : ''} ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>›</span>
-                      </button>
+                      </div>
                   {/* Expanded module list */}
                   {isExpanded && (() => {
                     // Group progressive tests (reasoning series)
@@ -7663,31 +8362,37 @@ function App() {
                             );
                           }
 
-                          // In progress or not started: single-row layout matching completed spacing
+                          // Not started
+                          if (answered === 0) {
+                            const isLocked = test.requires && !assessCompleted[test.requires];
+                            return (
+                              <button key={id} onClick={() => !isLocked && assessStartTest(id)}
+                                className={`w-full px-3 py-2 flex items-center gap-2 hover-glow hover-glow-${cat.color} rounded-lg ${isLocked ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                                <span className="text-sm w-5">{test.icon}</span>
+                                <span className={`flex-1 text-left text-xs ${TH('text-secondary', darkMode)} truncate`}>{test.name}</span>
+                                {!isLocked && <span className={`text-xs font-medium ${darkMode ? `text-${twColor(cat.color)}-400` : `text-${twColor(cat.color)}-500`}`}>Start →</span>}
+                                {isLocked && <span className={`text-[10px] ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>🔒</span>}
+                              </button>
+                            );
+                          }
+
+                          // In progress
                           return (
                             <button key={id} onClick={() => assessStartTest(id)}
                               className={`w-full px-3 py-2 flex items-center gap-2 hover-glow hover-glow-${cat.color} rounded-lg`}>
                               <span className="text-sm w-5">{test.icon}</span>
                               <span className={`w-24 text-left text-xs ${TH('text-secondary', darkMode)} truncate`}>{test.name}</span>
                               <div className="flex-1">
-                                <div className="flex justify-between text-[10px] mb-1">
-                                  <span className={darkMode ? 'text-gray-600' : 'text-gray-300'}>&nbsp;</span>
-                                  <span className={`${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{`${answered}/${test.items.length}`}</span>
-                                </div>
-                                <div className="h-3 rounded-full relative" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}>
-                                  {modProgressPct > 0 && (
-                                    <>
-                                      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${modProgressPct}%`, background: `linear-gradient(to right, ${hex.base}, ${hex.light})` }} />
-                                      <div
-                                        className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
-                                        style={{
-                                          left: `${Math.max(5, Math.min(95, modProgressPct))}%`,
-                                          marginLeft: -8,
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
-                                        }}
-                                      />
-                                    </>
-                                  )}
+                                <div className="h-2.5 rounded-full relative" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}>
+                                  <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${modProgressPct}%`, background: `linear-gradient(to right, ${hex.base}, ${hex.light})` }} />
+                                  <div
+                                    className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white"
+                                    style={{
+                                      left: `${Math.max(5, Math.min(95, modProgressPct))}%`,
+                                      marginLeft: -7,
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
+                                    }}
+                                  />
                                 </div>
                               </div>
                             </button>
@@ -7919,42 +8624,30 @@ function App() {
               );
             })()}
 
-            {/* COMPLETED CATEGORIES - Compact, tappable for results */}
+            {/* COMPLETED CATEGORIES - Minimal, recessive */}
             {!isFirstTimeUser && completedCategories.length > 0 && (
-              <div className="mt-2">
-                <div className={`text-xs font-medium uppercase tracking-wide mb-2 px-1 ${TH('text-dim', darkMode)}`}>
-                  Completed · Tap to view results
-                </div>
+              <div className="mt-3">
                 <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)}`}>
                   {completedCategories.map(({ catId, cat, catTests }, idx) => {
-                    const colors = getAssessColor(cat.color, darkMode);
-                    const hasModules = catTests.length > 1;
-
-                    // For completed categories, tap goes to results
                     const handleTap = () => {
-                      if (hasModules) {
-                        // Go to first module's results
-                        setAssessCurrentTestId(catTests[0][0]);
-                      } else {
-                        setAssessCurrentTestId(catTests[0][0]);
-                      }
+                      setAssessCurrentTestId(catTests[0][0]);
                       setScreen('assess-results');
                     };
 
                     return (
-                      <button key={catId} onClick={handleTap} className={`w-full px-3 py-2.5 flex items-center gap-3 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
+                      <button key={catId} onClick={handleTap} className={`w-full px-3 py-2 flex items-center gap-3 opacity-70 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
                         <ProgressCircle
                           progress={100}
-                          size={36}
-                          strokeWidth={3}
+                          size={28}
+                          strokeWidth={2}
                           color={cat.color}
                           icon={cat.icon}
                           gradientId={`complete-${catId}`}
                           darkMode={darkMode}
-                          iconSize="text-sm"
+                          iconSize="text-xs"
                         />
-                        <span className={`flex-1 text-left text-sm font-medium ${TH('text-primary', darkMode)}`}>{cat.name}</span>
-                        <span className={`text-xs ${colors.text}`}>View →</span>
+                        <span className={`flex-1 text-left text-sm font-medium ${TH('text-dim', darkMode)}`}>{cat.name}</span>
+                        <span className={`text-sm ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>›</span>
                       </button>
                     );
                   })}
@@ -8020,14 +8713,14 @@ function App() {
           )}
           {/* Undo Toast */}
           {assessShowUndoToast && (
-            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-gray-800 text-white text-sm font-medium shadow-lg animate-pulse">
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full backdrop-blur-md bg-white/[0.08] border border-white/[0.12] text-white text-sm font-medium shadow-lg animate-pulse">
               ↩ Undone
             </div>
           )}
           {/* Exit Confirmation Popup */}
           {assessShowExitConfirm && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setAssessShowExitConfirm(false)}>
-              <div className={`mx-6 p-5 rounded-2xl ${darkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+              <div className={`mx-6 p-5 rounded-2xl backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`} onClick={e => e.stopPropagation()}>
                 <div className={`text-center mb-4 ${TH('text-primary', darkMode)}`}>
                   <div className="text-lg font-semibold">Exit Assessment?</div>
                   <div className={`text-sm mt-2 ${TH('text-subtle', darkMode)}`}>Your answers will not be saved.</div>
@@ -8043,18 +8736,18 @@ function App() {
           <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
             {assessCanFinish() ? <button onClick={assessFinishAssessment} className={`text-sm font-semibold btn-feedback ${assessTestColor.text}`}>Finish ✓</button> : <button onClick={assessSaveAndExit} className={`text-sm font-semibold btn-feedback ${TH('text-muted-flip', darkMode)}`}>Save</button>}
             <button onClick={() => assessCurrentIndex > 0 && assessGoToQuestion(assessCurrentIndex - 1, 'back')} disabled={assessCurrentIndex === 0} className={`text-xl font-bold w-8 h-8 flex items-center justify-center btn-feedback ${assessCurrentIndex === 0 ? (darkMode ? 'text-gray-700' : 'text-gray-300') : (darkMode ? 'text-gray-300' : 'text-gray-600')}`}>◀</button>
-            <div className="flex-1 text-center"><div className={`text-xs ${assessTestColor.text}`}>{assessCurrentTest.name}</div><div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>{assessCurrentIndex + 1} / {assessTotalQuestions}</div></div>
+            <div className={`flex-1 text-center text-sm font-medium ${TH('text-primary', darkMode)}`}>{assessCurrentIndex + 1} / {assessTotalQuestions}</div>
             <button onClick={() => assessCurrentIndex < assessTotalQuestions - 1 && assessGoToQuestion(assessCurrentIndex + 1, 'fwd')} disabled={assessCurrentIndex === assessTotalQuestions - 1} className={`text-xl font-bold w-8 h-8 flex items-center justify-center btn-feedback ${assessCurrentIndex === assessTotalQuestions - 1 ? (darkMode ? 'text-gray-700' : 'text-gray-300') : (darkMode ? 'text-gray-300' : 'text-gray-600')}`}>▶</button>
             <button onClick={() => setAssessShowExitConfirm(true)} className={`text-sm font-semibold btn-feedback ${TH('text-muted-flip', darkMode)}`}>Exit</button>
           </div>
           {/* Clickable Progress bar */}
-          <div className={`flex h-2.5 gap-px px-1 py-0.5 ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
-            {segments.map((seg, i) => (<button key={i} onClick={() => assessGoToQuestion(i, i > assessCurrentIndex ? 'fwd' : 'back')} className={`flex-1 rounded-sm transition-colors hover:opacity-80 ${seg.isAnswered ? assessTestColor.bg : seg.isNA ? (darkMode ? 'bg-gray-600' : 'bg-gray-400') : seg.isSkipped ? 'bg-amber-500' : seg.isCurrent ? (darkMode ? 'bg-white' : 'bg-gray-900') : (darkMode ? 'bg-gray-800' : 'bg-gray-300')}`} />))}
+          <div className={`flex h-2.5 gap-px px-1 py-0.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-100'}`}>
+            {segments.map((seg, i) => (<button key={i} onClick={() => assessGoToQuestion(i, i > assessCurrentIndex ? 'fwd' : 'back')} className={`flex-1 rounded-sm transition-colors hover:opacity-80 ${seg.isAnswered ? assessTestColor.bg : seg.isNA ? (darkMode ? 'bg-gray-600' : 'bg-gray-400') : seg.isSkipped ? 'bg-amber-500' : seg.isCurrent ? (darkMode ? 'bg-white' : 'bg-gray-900') : (darkMode ? 'bg-white/[0.08]' : 'bg-gray-300')}`} />))}
           </div>
           {/* Question + Answers */}
           <div className="flex-1 flex flex-col" onClick={() => assessPending !== null && assessHandleUndo()}>
             <div className="flex-1 flex flex-col justify-center px-4 pb-4">
-              <div className="p-5 relative overflow-hidden">
+              <div className="p-4 relative overflow-hidden">
                 {/* Radial glow behind assessment question text — no visible card */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
                   {(() => {
@@ -8174,25 +8867,22 @@ function App() {
       };
 
       const ResultCard = ({ icon, title, subtitle, children }) => (
-        <div onClick={(e) => e.stopPropagation()} className={`rounded-2xl overflow-hidden ${darkMode ? 'bg-gray-900/80 border border-gray-800' : 'bg-white border border-gray-200'}`}>
-          <div className={`p-5 bg-gradient-to-br ${colors.grad}`}>
-            <div className="text-center">
-              <span className="text-4xl">{icon}</span>
-              <h2 className="text-white text-xl font-bold mt-2">{title}</h2>
-              {subtitle && <p className="text-white/70 text-sm mt-1">{subtitle}</p>}
+        <div onClick={(e) => e.stopPropagation()} className={`rounded-2xl overflow-hidden backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`}>
+          <div className={`px-4 py-3 bg-gradient-to-br ${colors.grad} flex items-center gap-3`}>
+            <span className="text-2xl">{icon}</span>
+            <div>
+              <h2 className="text-white text-lg font-bold">{title}</h2>
+              {subtitle && <p className="text-white/70 text-xs">{subtitle}</p>}
             </div>
           </div>
-          <div className="p-4 space-y-4">{children}</div>
+          <div className="p-3 space-y-3">{children}</div>
         </div>
       );
 
       const InsightRow = ({ emoji, label, text }) => (
-        <div className="flex gap-3">
-          <span className="text-lg">{emoji}</span>
-          <div className="flex-1">
-            <div className={`text-xs font-medium uppercase tracking-wide ${colors.text}`}>{label}</div>
-            <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{text}</p>
-          </div>
+        <div className="flex gap-2 items-start">
+          <span className="text-sm">{emoji}</span>
+          <p className={`flex-1 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className={`font-medium ${colors.text}`}>{label}:</span> {text}</p>
         </div>
       );
 
@@ -8341,16 +9031,8 @@ function App() {
 
               return (
                 <ResultCard icon="✨" title="Quick Profile" subtitle="Your personality snapshot">
-                  <div className={`text-center py-4 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                    <p className="text-lg leading-relaxed italic">"{getTraitDescription()}"</p>
-                  </div>
-                  <div className={`mt-4 p-4 rounded-xl text-center ${darkMode ? 'bg-indigo-900/20' : 'bg-indigo-50'}`}>
-                    <div className={`text-sm font-medium ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>
-                      Ready for more?
-                    </div>
-                    <div className={`text-xs mt-1 ${darkMode ? 'text-indigo-400/70' : 'text-indigo-500'}`}>
-                      Starter Pack awaits with 40 deeper questions
-                    </div>
+                  <div className={`text-center py-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                    <p className="text-sm leading-relaxed italic">"{getTraitDescription()}"</p>
                   </div>
                 </ResultCard>
               );
@@ -8363,31 +9045,27 @@ function App() {
               const remaining = bigFiveModules.length - completedModules.length;
               return (
                 <ResultCard icon="🎭" title="Big Five" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`}>
-                  {/* All completed trait spectrums - full gradient + white dot style */}
-                  <div className="space-y-4">
+                  {/* Completed trait spectrums */}
+                  <div className="space-y-3">
                     {completedModules.map(([id, t]) => {
                       const r = assessCompleted[id];
                       const spec = spectrumColors[id] || { left: '#8b5cf6', right: '#a78bfa', leftLabel: '', rightLabel: '' };
-                      const leanLabel = r.score >= 50 ? spec.rightLabel : spec.leftLabel;
                       return (
-                        <div key={id} className="space-y-1">
-                          <div className="flex justify-between items-baseline">
-                            <span className={`text-sm font-medium ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{r.traitName}</span>
-                            <span className={`text-xs ${TH('text-dim', darkMode)}`}>{leanLabel}</span>
-                          </div>
-                          <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
+                        <div key={id}>
+                          <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{r.traitName}</div>
+                          <div className="h-2.5 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
                             <div
-                              className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
+                              className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white"
                               style={{
                                 left: `${Math.max(5, Math.min(95, r.score))}%`,
-                                marginLeft: -8,
+                                marginLeft: -7,
                                 boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
                               }}
                             />
                           </div>
-                          <div className="flex justify-between">
-                            <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.leftLabel}</span>
-                            <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.rightLabel}</span>
+                          <div className="flex justify-between mt-0.5">
+                            <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.leftLabel}</span>
+                            <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.rightLabel}</span>
                           </div>
                         </div>
                       );
@@ -8396,10 +9074,9 @@ function App() {
                   {/* Current trait insights */}
                   <div className={`mt-4 p-3 rounded-xl ${darkMode ? 'bg-violet-900/20' : 'bg-violet-50'}`}>
                     <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{results.traitName} Insights</div>
-                    <div className="space-y-2">
-                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💪 Strength:</span> {traitInfo[test.trait].strength(results.score)}</div>
-                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">⚡ Watch:</span> {traitInfo[test.trait].shadow(results.score)}</div>
-                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💡 Tip:</span> {traitInfo[test.trait].tip(results.score)}</div>
+                    <div className="space-y-1.5">
+                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💪</span> {traitInfo[test.trait].strength(results.score)}</div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💡</span> {traitInfo[test.trait].tip(results.score)}</div>
                     </div>
                   </div>
                   {entityType === 'ai' && assessCurrentTestId === 'bigfive-N' && (
@@ -8581,7 +9258,7 @@ function App() {
                   <>
                     <div className="flex justify-center gap-2 py-2">
                       {[1,2,3,4,5,6].map(i => (
-                        <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i <= results.indicators ? `bg-gradient-to-br ${adhdLevel.bg} text-white` : (darkMode ? 'bg-gray-800 text-gray-600' : 'bg-gray-200 text-gray-400')}`}>{i}</div>
+                        <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i <= results.indicators ? `bg-gradient-to-br ${adhdLevel.bg} text-white` : (darkMode ? 'bg-white/[0.04] text-gray-600' : 'bg-gray-200 text-gray-400')}`}>{i}</div>
                       ))}
                     </div>
                     <div className="space-y-3 pt-2">
@@ -9055,22 +9732,11 @@ function App() {
           </div>
           <div className="flex-1 overflow-auto p-4 pb-8 hide-scrollbar">
 
-            {/* Aura Visualization - Neural network showing personality forming */}
-            {(() => {
-              // Map tier to aura stage: tier 0→1, tier 1→2, tier 2 partial→3, tier 2 full→4
-              const starterModules = ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'];
-              const starterCompleted = starterModules.filter(id => assessCompleted[id]).length;
-              let auraStage = 1;
-              if (currentTier >= 2 && completedCount > 8) auraStage = 4;
-              else if (currentTier >= 2 || starterCompleted >= 3) auraStage = 3;
-              else if (currentTier >= 1) auraStage = 2;
-
-              return (
-                <div className={`mb-3 rounded-xl overflow-hidden ${darkMode ? 'bg-gray-900/30' : 'bg-gray-100/50'}`}>
-                  <AuraVisualization stage={auraStage} darkMode={darkMode} />
-                </div>
-              );
-            })()}
+            {/* Aura Visualization - Force-directed constellation */}
+            <div className="mb-3 rounded-xl overflow-hidden">
+              <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
+                entityType={entityType} darkMode={darkMode} size={280} />
+            </div>
 
             {/* Archetype Header - Shows primary archetype if matched */}
             {(() => {
@@ -9515,7 +10181,7 @@ function App() {
                     { icon: '🌑', name: 'Shadow Self' },
                   ].map((item, idx) => (
                     <div key={item.name} className={`px-3 py-2.5 flex items-center gap-3 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
                         <span className="text-sm">{item.icon}</span>
                       </div>
                       <span className={`flex-1 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{item.name}</span>
@@ -9650,7 +10316,7 @@ function App() {
                   onClick={() => switchTrack('binary')}
                   style={{ cursor: 'pointer' }}
                 >
-                  <div className={`q-circle-inner ${TH('bg-card-full', darkMode)}`}>
+                  <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
                     {ynCount > 0 ? ynCount : '✓'}
                   </div>
                 </div>
@@ -9660,7 +10326,7 @@ function App() {
                   onClick={() => switchTrack('multiple')}
                   style={{ cursor: 'pointer' }}
                 >
-                  <div className={`q-circle-inner ${TH('bg-card-full', darkMode)}`}>
+                  <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
                     {mcCount > 0 ? mcCount : '✓'}
                   </div>
                 </div>
@@ -9670,7 +10336,7 @@ function App() {
                   onClick={() => switchTrack(null)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <div className={`q-circle-inner ${TH('bg-card-full', darkMode)}`}>
+                  <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
                     {allCount > 0 ? 'Mix' : '✓'}
                   </div>
                 </div>
@@ -9706,7 +10372,7 @@ function App() {
           /* Previously answered question - show empty space to maintain layout */
           <div className="flex-1 flex flex-col">
             <div className="flex-1" /> {/* Empty space */}
-            <div className={`flex-shrink-0 border-t px-4 py-6 ${darkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white'}`}>
+            <div className={`flex-shrink-0 px-4 py-6 ${darkMode ? 'bg-white/[0.02]' : 'bg-black/[0.02]'}`}>
               <div className={`text-center text-sm ${TH('text-faint', darkMode)}`}>
                 Already answered · Use arrows to navigate
               </div>
@@ -9715,7 +10381,7 @@ function App() {
         ) : (
           <>
             {/* QUESTION AREA - centered in available space */}
-            <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-y-auto">
+            <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-y-auto overflow-x-hidden">
               <QuestionCard
                 question={currentQuestion}
                 darkMode={darkMode}
@@ -9744,7 +10410,7 @@ function App() {
                     <button
                       onClick={clearUndoneState}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                        darkMode ? 'bg-white/[0.06] text-gray-300 hover:bg-white/[0.10]' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                       }`}
                     >
                       Clear
@@ -9832,20 +10498,58 @@ function App() {
                 </div>
 
                 {/* Action buttons row */}
-                <div className={`relative h-[36px] px-4 mt-2 flex items-center justify-center`}>
+                <div className={`relative ${pendingSubmit ? 'min-h-[48px]' : 'h-[36px]'} px-4 mt-2 flex items-center justify-center`}>
                   {pendingSubmit ? (
-                    /* Undo hint text - colored to match answer */
-                    <div
-                      onClick={handleUndo}
-                      className="cursor-pointer text-sm font-medium"
-                      style={{
-                        color: isBinary
-                          ? (pendingSubmit.answer === 0 ? '#10b981' : '#ef4444')
-                          : MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6'
-                      }}
-                    >
-                      Tap anywhere to Undo
-                    </div>
+                    /* Prominent undo notification bar */
+                    (() => {
+                      const undoColor = isBinary
+                        ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+                        : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
+                      const answerLabel = isBinary
+                        ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
+                        : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
+                      return (
+                        <div
+                          onClick={handleUndo}
+                          className="cursor-pointer w-full rounded-xl px-4 py-2.5 flex items-center gap-3 transition-all"
+                          style={{
+                            background: darkMode
+                              ? `rgba(${undoColor.rgb}, 0.12)`
+                              : `rgba(${undoColor.rgb}, 0.10)`,
+                            border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.4)` : `rgba(${undoColor.rgb}, 0.3)`}`,
+                          }}
+                        >
+                          {/* Countdown ring */}
+                          <div className="flex-shrink-0 w-7 h-7 relative">
+                            <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                              <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                              <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                                strokeDasharray="75.4"
+                                strokeDashoffset="0"
+                                style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                              />
+                            </svg>
+                          </div>
+                          {/* Text */}
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                              Answered: {answerLabel}
+                            </div>
+                          </div>
+                          {/* Undo button */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleUndo(); }}
+                            className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                            style={{
+                              background: darkMode ? `rgba(${undoColor.rgb}, 0.25)` : `rgba(${undoColor.rgb}, 0.15)`,
+                              color: undoColor.hex,
+                            }}
+                          >
+                            Undo
+                          </button>
+                        </div>
+                      );
+                    })()
                   ) : !isAnswered ? (
                     <div className="flex gap-1.5">
                       <button
@@ -9859,7 +10563,7 @@ function App() {
                         className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${
                           answerExplanations[currentQuestion?.id]
                             ? 'bg-amber-900/30 text-amber-400'
-                            : darkMode ? 'bg-gray-800/60 text-gray-500 hover:bg-gray-700/60' : 'bg-gray-200 text-gray-500'
+                            : darkMode ? 'bg-white/[0.06] text-gray-500 hover:bg-white/[0.10]' : 'bg-gray-200 text-gray-500'
                         }`}
                       >
                         Explain
@@ -9875,7 +10579,7 @@ function App() {
                         className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${
                           savedQuestions.has(currentQuestion?.id)
                             ? 'bg-violet-900/30 text-violet-400'
-                            : darkMode ? 'bg-gray-800/60 text-gray-500 hover:bg-gray-700/60' : 'bg-gray-200 text-gray-500'
+                            : darkMode ? 'bg-white/[0.06] text-gray-500 hover:bg-white/[0.10]' : 'bg-gray-200 text-gray-500'
                         }`}
                       >
                         {savedQuestions.has(currentQuestion?.id) ? '✓ Saved' : 'Save'}
@@ -9925,7 +10629,7 @@ function App() {
                         <button
                           onClick={() => { if (pendingSubmit) { handleUndo(); return; } setCommunityDisplayMode('compact'); }}
                           className={`w-8 h-8 rounded-full flex items-center justify-center text-lg font-light ${
-                            darkMode ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                            darkMode ? 'bg-white/[0.06] text-gray-400 hover:bg-white/[0.10]' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
                           } transition-colors`}
                         >+</button>
                         <div className={`flex-1 h-px ${TH('bg-elevated', darkMode)}`} />
@@ -10060,7 +10764,7 @@ function App() {
                           >
                             {/* Slide-up panel - click anywhere closes */}
                             <div
-                              className={`absolute bottom-0 left-0 right-0 rounded-t-2xl ${darkMode ? 'bg-gray-900' : 'bg-white'} shadow-2xl`}
+                              className={`absolute bottom-0 left-0 right-0 rounded-t-2xl backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-t border-x border-white/[0.08]' : 'bg-white/95'} shadow-2xl`}
                               style={{ animation: 'slideUp 0.2s ease-out' }}
                             >
                               {/* Header - full question text in expanded view */}
@@ -10222,7 +10926,7 @@ function App() {
     const sectionTitle = darkMode ? 'text-gray-400' : 'text-gray-500';
 
     return (
-      <div className={`fixed bottom-4 right-4 z-[10000] w-80 max-h-[85vh] overflow-y-auto rounded-xl border shadow-2xl ${bg}`} style={{fontSize:'13px'}}>
+      <div className={`fixed top-4 right-4 z-[10000] w-64 max-h-[92vh] overflow-y-auto rounded-xl border shadow-2xl ${bg}`} style={{fontSize:'11px'}}>
         <div className="flex items-center justify-between px-3 py-2 border-b border-inherit">
           <span className="font-bold text-violet-500">Dev Panel</span>
           <div className="flex gap-1">
