@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz — SVG vs Canvas Comparison</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #030712; color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh; padding: 24px;
+  }
+  .page { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .header { text-align: center; }
+  .header h1 { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: 0.02em; }
+  .header p { font-size: 11px; color: #6b7280; margin-top: 4px; }
+
+  .comparison {
+    display: flex; gap: 32px; justify-content: center; align-items: flex-start;
+  }
+  .panel {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .panel-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    font-weight: 600; padding: 4px 12px; border-radius: 20px;
+  }
+  .panel-label.svg-label { color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+  .panel-label.canvas-label { color: #8b5cf6; border: 1px solid rgba(139,92,246,0.3); }
+  .panel-label.warm-label { color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+  .panel-sub { font-size: 9px; color: #4b5563; }
+
+  .viz-frame {
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+    max-width: 700px; margin: 0 auto;
+  }
+  .ctrl-btn {
+    padding: 7px 14px; border: 1px solid #374151; border-radius: 8px;
+    background: transparent; color: #9ca3af; font-size: 11px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s; font-family: inherit;
+  }
+  .ctrl-btn:hover { border-color: #6b7280; color: #fff; }
+  .ctrl-btn.active { border-color: #8b5cf6; color: #fff; background: rgba(139,92,246,0.12); }
+  .ctrl-btn.preset { border-color: #f59e0b; color: #f59e0b; }
+  .ctrl-btn.preset:hover { background: rgba(245,158,11,0.08); }
+  .ctrl-btn.preset.active { background: rgba(245,158,11,0.15); color: #fbbf24; }
+
+  .section-label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: #6b7280; font-weight: 600; text-align: center; width: 100%;
+  }
+  .divider { width: 100%; max-width: 500px; height: 1px; background: #1f2937; margin: 4px auto; }
+
+  .tier-grid { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+  .assess-toggle {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 8px; border: 1px solid #1f2937; border-radius: 6px;
+    background: transparent; color: #6b7280; font-size: 10px; cursor: pointer;
+    transition: all 0.25s; font-family: inherit; white-space: nowrap;
+  }
+  .assess-toggle:hover { border-color: #374151; color: #9ca3af; }
+  .assess-toggle.on { color: #e5e7eb; background: rgba(99,102,241,0.08); }
+  .assess-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    opacity: 0.4; transition: opacity 0.2s;
+  }
+  .assess-toggle.on .assess-dot { opacity: 1; }
+
+  .qualities {
+    display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+    max-width: 600px; margin: 0 auto;
+  }
+  .quality-card {
+    padding: 8px 12px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+    text-align: center; min-width: 100px;
+  }
+  .quality-card .val { font-size: 13px; font-weight: 600; color: #fff; }
+  .quality-card .lbl { font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .slider-row { display: flex; align-items: center; gap: 8px; justify-content: center; }
+  .slider-row label { font-size: 11px; color: #9ca3af; }
+  .slider-row input[type="range"] { width: 120px; accent-color: #8b5cf6; }
+  .slider-val { font-size: 11px; color: #6b7280; min-width: 36px; }
+
+  @keyframes star-twinkle {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
+  @keyframes aura-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+  }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+
+// ═══════════════════════════════════════════════════════
+// COLOR SYSTEM (from production)
+// ═══════════════════════════════════════════════════════
+const COLOR_HEX = {
+  violet:  { base: '#8b5cf6', light: '#a78bfa', rgb: '139, 92, 246' },
+  blue:    { base: '#3b82f6', light: '#60a5fa', rgb: '59, 130, 246' },
+  teal:    { base: '#14b8a6', light: '#2dd4bf', rgb: '20, 184, 166' },
+  rose:    { base: '#f43f5e', light: '#fb7185', rgb: '244, 63, 94' },
+  pink:    { base: '#d946ef', light: '#e879f9', rgb: '217, 70, 239' },
+  emerald: { base: '#10b981', light: '#34d399', rgb: '16, 185, 129' },
+  amber:   { base: '#f59e0b', light: '#fbbf24', rgb: '245, 158, 11' },
+  indigo:  { base: '#6366f1', light: '#818cf8', rgb: '99, 102, 241' },
+  cyan:    { base: '#06b6d4', light: '#67e8f9', rgb: '6, 182, 212' },
+};
+
+const hexToRgba = (hex, alpha) => {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
+
+// ═══════════════════════════════════════════════════════
+// SVG MINI-AURA (extracted from PathChoiceScreen)
+// The one Philip loves — warm, alive, gentle
+// ═══════════════════════════════════════════════════════
+const SvgMiniAura = React.memo(function SvgMiniAura({
+  onboardingAnswers = {},
+  entityType = 'human',
+  darkMode = true,
+  size = 280,
+}) {
+  const [time, setTime] = React.useState(0);
+  const animRef = React.useRef();
+
+  React.useEffect(() => {
+    const animate = () => {
+      setTime(t => t + 0.02);
+      animRef.current = requestAnimationFrame(animate);
+    };
+    animRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animRef.current);
+  }, []);
+
+  // Note: PathChoiceScreen used .answer accessor but production data is flat
+  // We accept flat format directly: { 'onboard-1': 0, ... }
+  const getA = (id) => onboardingAnswers?.[id] ?? 0;
+  const violet = COLOR_HEX.violet.base;
+  const blue = COLOR_HEX.blue.base;
+  const teal = COLOR_HEX.teal.base;
+  const pink = COLOR_HEX.pink.base;
+  const cyan = COLOR_HEX.cyan.base;
+  const emerald = COLOR_HEX.emerald.base;
+
+  const coreColor = entityType === 'ai' ? cyan : violet;
+  const palette = [violet, blue, emerald, pink];
+  const pickColor = (a1, a2) => palette[a1 * 2 + a2];
+
+  const baseNeurons = [
+    { x: 100, y: 100, r: 4.5, color: coreColor },
+    { x: 70 + getA('onboard-1') * 10, y: 66 + getA('onboard-2') * 8, r: 3.5, color: pickColor(getA('onboard-1'), getA('onboard-2')) },
+    { x: 130 - getA('onboard-3') * 8, y: 70 + getA('onboard-4') * 10, r: 3.5, color: pickColor(getA('onboard-3'), getA('onboard-4')) },
+    { x: 75 + getA('onboard-5') * 8, y: 130 - getA('onboard-6') * 8, r: 3, color: pickColor(getA('onboard-5'), getA('onboard-6')) },
+    { x: 125 - getA('onboard-7') * 8, y: 128 + getA('onboard-8') * 6, r: 3, color: pickColor(getA('onboard-7'), getA('onboard-8')) },
+  ];
+  const connections = [[0,1],[0,2],[0,3],[0,4],[1,2],[3,4],[1,3],[2,4]];
+
+  const answerHash = Object.values(onboardingAnswers || {}).reduce((h, v) => h * 3 + (v ?? 0) + 1, 7);
+  const stars = React.useMemo(() => {
+    let s = answerHash;
+    const rng = () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
+    return Array.from({ length: 16 }, () => ({
+      cx: rng() * 200, cy: rng() * 220,
+      r: 0.3 + rng() * 0.6,
+      delay: rng() * 6, duration: 3 + rng() * 4,
+    }));
+  }, [answerHash]);
+
+  const animatedNeurons = baseNeurons.map((n, i) => {
+    const speed = 0.5 + (i % 3) * 0.3;
+    const amp = 4 + (i % 4) * 1.5;
+    const px = i * 1.3, py = i * 0.9 + 0.5;
+    return {
+      ...n,
+      x: n.x + Math.sin(time * speed + px) * amp + Math.sin(time * speed * 0.4 + px * 2.1) * amp * 0.5,
+      y: n.y + Math.cos(time * speed * 0.75 + py) * amp + Math.cos(time * speed * 0.35 + py * 1.7) * amp * 0.4,
+    };
+  });
+
+  const glowGroups = {};
+  animatedNeurons.forEach(n => {
+    if (!glowGroups[n.color]) glowGroups[n.color] = { sx: 0, sy: 0, count: 0, color: n.color };
+    glowGroups[n.color].sx += n.x;
+    glowGroups[n.color].sy += n.y;
+    glowGroups[n.color].count++;
+  });
+  const glowZones = Object.values(glowGroups).map(g => ({
+    cx: g.sx / g.count, cy: g.sy / g.count,
+    rx: 45 + g.count * 4, ry: 38 + g.count * 4,
+    color: g.color,
+  }));
+
+  const lineColor = darkMode ? 'rgba(255,255,255,' : 'rgba(100,100,120,';
+  const lineBaseOpacity = darkMode ? 0.25 : 0.15;
+  const starColor = darkMode ? 'rgba(255,255,255,' : 'rgba(140,140,160,';
+
+  const scale = size / 200;
+  const viewH = 220;
+
+  return (
+    <div className="viz-frame" style={{ width: size, height: size * (viewH / 200), background: darkMode ? '#060712' : '#f9fafb' }}>
+      <svg width={size} height={size * (viewH / 200)} viewBox={`0 0 200 ${viewH}`} style={{ overflow: 'visible', display: 'block' }}>
+        <defs>
+          <filter id="pc-glow" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="14" />
+          </filter>
+          <filter id="pc-soft" x="-200%" y="-200%" width="500%" height="500%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+          </filter>
+          <radialGradient id="pc-fade" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="white" stopOpacity="1" />
+            <stop offset="55%" stopColor="white" stopOpacity="1" />
+            <stop offset="80%" stopColor="white" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </radialGradient>
+          <mask id="pc-mask">
+            <rect x="-50" y="-30" width="300" height="280" fill="url(#pc-fade)" />
+          </mask>
+        </defs>
+
+        {stars.map((s, i) => (
+          <circle key={i} cx={s.cx} cy={s.cy} r={s.r}
+            fill={`${starColor}0.5)`}
+            style={{ animation: `star-twinkle ${s.duration}s ease-in-out ${s.delay}s infinite` }}
+          />
+        ))}
+
+        <g mask="url(#pc-mask)" style={{ animation: 'aura-breathe 10s ease-in-out infinite', transformOrigin: 'center center' }}>
+          <g filter="url(#pc-glow)">
+            {glowZones.map((z, i) => (
+              <ellipse key={i} cx={z.cx} cy={z.cy} rx={z.rx} ry={z.ry}
+                fill={z.color} opacity={darkMode ? 0.6 : 0.35} />
+            ))}
+          </g>
+        </g>
+
+        <g style={{ animation: 'aura-breathe 10s ease-in-out infinite', transformOrigin: 'center center' }}>
+          {connections.map(([from, to], i) => {
+            const a = animatedNeurons[from], b = animatedNeurons[to];
+            if (!a || !b) return null;
+            const dx = a.x - b.x, dy = a.y - b.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            const opacity = Math.max(0, (1 - dist / 120)) * lineBaseOpacity;
+            return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+              stroke={`${lineColor}${opacity})`} strokeWidth="1" strokeLinecap="round" />;
+          })}
+        </g>
+
+        <g style={{ animation: 'aura-breathe 10s ease-in-out infinite', transformOrigin: 'center center' }}>
+          {animatedNeurons.map((n, i) => (
+            <g key={i}>
+              <circle cx={n.x} cy={n.y} r={n.r * 3}
+                fill={hexToRgba(n.color, darkMode ? 0.2 : 0.12)}
+                filter="url(#pc-soft)" />
+              <circle cx={n.x} cy={n.y} r={n.r * 1.8}
+                fill={hexToRgba(n.color, darkMode ? 0.35 : 0.2)} />
+              <circle cx={n.x} cy={n.y} r={n.r}
+                fill={n.color} opacity={darkMode ? 0.95 : 0.8} />
+              <circle cx={n.x} cy={n.y} r={n.r * 0.4}
+                fill="white" opacity={darkMode ? 0.6 : 0.4} />
+            </g>
+          ))}
+        </g>
+      </svg>
+    </div>
+  );
+});
+
+
+// ═══════════════════════════════════════════════════════
+// CANVAS AURA VISUALIZATION (v12 — from production)
+// ═══════════════════════════════════════════════════════
+const AuraVisualization = React.memo(function AuraVisualization({
+  onboardingAnswers = {},
+  assessCompleted = {},
+  entityType = 'human',
+  darkMode = true,
+  size = 200,
+}) {
+  const canvasRef = React.useRef(null);
+  const stateRef = React.useRef(null);
+  const animRef = React.useRef(null);
+  const propsRef = React.useRef({ onboardingAnswers, assessCompleted, entityType, darkMode, size });
+  propsRef.current = { onboardingAnswers, assessCompleted, entityType, darkMode, size };
+
+  const C = {
+    violet:'#8b5cf6', blue:'#3b82f6', teal:'#14b8a6', rose:'#f43f5e',
+    pink:'#d946ef', emerald:'#10b981', amber:'#f59e0b', indigo:'#6366f1', cyan:'#06b6d4',
+  };
+
+  function hexRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n>>16)&255, (n>>8)&255, n&255];
+  }
+
+  const NEURON_MAP = [
+    { colorQ: 'onboard-1',  posQ: 'onboard-2',  colors: [C.violet, C.blue] },
+    { colorQ: 'onboard-4',  posQ: 'onboard-8',  colors: [C.indigo, C.rose] },
+    { colorQ: 'onboard-5',  posQ: 'onboard-3',  colors: [C.pink, C.teal] },
+    { colorQ: 'onboard-6',  posQ: 'onboard-9',  colors: [C.emerald, C.amber] },
+    { colorQ: 'onboard-7',  posQ: 'onboard-10', colors: [C.cyan, C.violet] },
+  ];
+
+  const SENSITIVE = [false, false, false, true, true];
+  const HUMAN_CONNS = [[0,1],[0,2],[1,2],[2,3],[2,4],[3,4],[0,3],[1,4]];
+  const AI_CONNS = [[0,1],[0,2],[1,2],[2,3],[2,4],[3,4],[0,4],[1,3],[0,3],[1,4]];
+
+  const ASSESS_MAP = [
+    { ids: ['starter-personality'], name: 'Personality', color: C.violet, tier: 1, nodes: 3, affinities: [0, 2] },
+    { ids: ['starter-motivation'], name: 'Motivation', color: C.amber, tier: 1, nodes: 3, affinities: [1, 3] },
+    { ids: ['starter-thinking'], name: 'Thinking', color: C.blue, tier: 1, nodes: 3, affinities: [0, 4] },
+    { ids: ['starter-connection'], name: 'Connection', color: C.pink, tier: 1, nodes: 3, affinities: [2, 3] },
+    { ids: ['starter-strategy'], name: 'Strategy', color: C.emerald, tier: 1, nodes: 3, affinities: [1, 4] },
+    { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: C.violet, tier: 2, nodes: 5, affinities: [0, 2, 4] },
+    { ids: ['integrity'], name: 'Character', color: C.emerald, tier: 2, nodes: 3, affinities: [3, 1] },
+    { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: C.indigo, tier: 2, nodes: 4, affinities: [3, 4] },
+    { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: C.cyan, tier: 2, nodes: 4, affinities: [4, 0] },
+    { ids: ['attachment'], name: 'Relationships', color: C.rose, tier: 2, nodes: 3, affinities: [2, 3] },
+    { ids: ['risk'], name: 'Behavior', color: C.amber, tier: 2, nodes: 3, affinities: [1, 4] },
+  ];
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpRgb(a, b, t) { return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
+  function rgbStr(c, a) { return `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a.toFixed(3)})`; }
+
+  function seededRng(seed) {
+    let s = seed;
+    return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
+  }
+
+  function deriveAnswers(answers) {
+    const colorAns = new Array(5).fill(null);
+    const posAns = new Array(5).fill(null);
+    for (let i = 0; i < 5; i++) {
+      const nm = NEURON_MAP[i];
+      if (nm.colorQ in answers) colorAns[i] = answers[nm.colorQ];
+      if (nm.posQ in answers) posAns[i] = answers[nm.posQ];
+    }
+    return { colorAns, posAns };
+  }
+
+  function deriveAssessState(completed) {
+    const state = {};
+    ASSESS_MAP.forEach((assess, idx) => {
+      state[idx] = assess.ids.some(id => id in completed);
+    });
+    return state;
+  }
+
+  function makeNode(opts) {
+    return {
+      x: opts.x || 300, y: opts.y || 300,
+      tx: opts.x || 300, ty: opts.y || 300,
+      color: opts.color ? hexRgb(opts.color) : [70,75,90],
+      tcolor: opts.color ? hexRgb(opts.color) : [70,75,90],
+      r: opts.r || 2, tr: opts.r || 2,
+      halo: opts.halo || 8, thalo: opts.halo || 8,
+      alpha: 0, talpha: 0,
+      phase: Math.random() * Math.PI * 2,
+      orbitAngle: Math.random() * Math.PI * 2,
+      orbitSpeed: (Math.random() - 0.5) * 0.006,
+      driftSpeed: 0.35 + Math.random() * 0.5,
+      driftAmp: 2.5 + Math.random() * 3.5,
+      phaseX: Math.random() * 6, phaseY: Math.random() * 6,
+      flash: 0,
+      type: opts.type || 'primary',
+      parent: opts.parent ?? -1,
+      sensitive: opts.sensitive || false,
+      assessIdx: opts.assessIdx ?? null,
+      affinities: opts.affinities || null,
+      tier: opts.tier || 0,
+      twinklePhase: Math.random() * Math.PI * 2,
+      twinkleSpeed: 0.3 + Math.random() * 0.7,
+      twinklePeak: 0,
+    };
+  }
+
+  function answerHashFn(colorAns, posAns) {
+    let h = 0;
+    for (let i = 0; i < 5; i++) {
+      h = h * 31 + (colorAns[i] !== null ? colorAns[i] + 1 : 0);
+      h = h * 37 + (posAns[i] !== null ? posAns[i] + 1 : 0);
+    }
+    return h;
+  }
+
+  function primarySeedPositions(colorAns, posAns, isAI) {
+    const CX = 300, CY = 300;
+    const hash = answerHashFn(colorAns, posAns);
+    const rng = seededRng(hash + 7919);
+    const positions = [];
+    const baseAngles = [0, 1, 2, 3, 4].map(i => {
+      let angle = (i / 5) * Math.PI * 2;
+      if (posAns[i] !== null) angle += (posAns[i] === 0 ? -0.7 : 0.7);
+      if (colorAns[i] !== null) angle += (colorAns[i] === 0 ? -0.35 : 0.35);
+      angle += (hash % 628) / 100;
+      return angle;
+    });
+    for (let i = 0; i < 5; i++) {
+      const answered = colorAns[i] !== null || posAns[i] !== null;
+      const baseR = answered ? 110 + rng() * 70 : 65 + rng() * 45;
+      const angle = baseAngles[i];
+      positions.push({ x: CX + Math.cos(angle) * baseR, y: CY + Math.sin(angle) * baseR });
+    }
+    return positions;
+  }
+
+  function buildAllNodes(assessState, colorAns, posAns, isAI) {
+    const nodes = [];
+    const CX = 300, CY = 300;
+    const seeds = primarySeedPositions(colorAns || [null,null,null,null,null], posAns || [null,null,null,null,null], isAI);
+
+    for (let i = 0; i < 5; i++) {
+      nodes.push(makeNode({ x: seeds[i].x, y: seeds[i].y, r: 5, halo: 22, type: 'primary', sensitive: SENSITIVE[i] }));
+    }
+    for (let i = 0; i < 5; i++) {
+      for (let c = 0; c < 2; c++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 8 + Math.random() * 12;
+        nodes.push(makeNode({ x: nodes[i].x + Math.cos(angle) * dist, y: nodes[i].y + Math.sin(angle) * dist, type: 'companion', parent: i, r: 2.5, halo: 10 }));
+      }
+    }
+    for (let s = 0; s < 5; s++) {
+      const px = (nodes[s].x + CX) / 2 + (Math.random() - 0.5) * 30;
+      const py = (nodes[s].y + CY) / 2 + (Math.random() - 0.5) * 30;
+      nodes.push(makeNode({ x: px, y: py, type: 'satellite', parent: s, r: 2, halo: 7 }));
+    }
+    ASSESS_MAP.forEach((assess, ai) => {
+      if (!assessState[ai]) return;
+      const rng = seededRng(ai * 137 + 42);
+      const affs = assess.affinities;
+      for (let ni = 0; ni < assess.nodes; ni++) {
+        let mx = 0, my = 0;
+        for (const pi of affs) { mx += nodes[pi].x; my += nodes[pi].y; }
+        mx /= affs.length; my /= affs.length;
+        nodes.push(makeNode({ x: mx + (rng() - 0.5) * 50, y: my + (rng() - 0.5) * 50, r: 2 + rng() * 2, halo: 8 + rng() * 10, type: 'assess', color: assess.color, assessIdx: ai, tier: assess.tier, parent: affs[0], affinities: affs }));
+      }
+    });
+    return nodes;
+  }
+
+  function buildEdges(nodes, isAI, colorAns, posAns, assessState) {
+    const edges = [];
+    const N = nodes.length;
+    const edgeSet = new Set();
+    function addEdge(a, b, strength, restLen) {
+      const key = Math.min(a,b) * 10000 + Math.max(a,b);
+      if (edgeSet.has(key)) return;
+      edgeSet.add(key);
+      edges.push({ a, b, strength, restLen });
+    }
+    const primConns = isAI ? AI_CONNS : HUMAN_CONNS;
+    for (const [a, b] of primConns) {
+      const aAns = colorAns[a], bAns = colorAns[b];
+      const bothAnswered = (aAns !== null) && (bAns !== null);
+      const sameColor = bothAnswered && aAns === bAns;
+      addEdge(a, b, bothAnswered ? (sameColor ? 1.0 : 0.5) : 0.3, bothAnswered ? (sameColor ? 60 : 110) : 100);
+    }
+    for (let ci = 5; ci < 15; ci++) addEdge(nodes[ci].parent, ci, 1.5, 25);
+    for (let i = 0; i < 5; i++) addEdge(5 + i * 2, 5 + i * 2 + 1, 0.8, 12);
+    for (let i = 0; i < 5; i++) addEdge(5 + i * 2 + 1, 5 + ((i + 1) % 5) * 2, 0.2, 60);
+    for (let si = 15; si < 20; si++) addEdge(nodes[si].parent, si, 0.5, 70);
+    for (let si = 0; si < 5; si++) addEdge(15 + si, 15 + (si + 1) % 5, 0.15, 70);
+    for (let ai = 20; ai < N; ai++) {
+      const an = nodes[ai];
+      if (an.affinities) for (const pi of an.affinities) addEdge(pi, ai, 0.6, 60);
+      const nearby = [];
+      for (let bi = 0; bi < N; bi++) {
+        if (bi === ai) continue;
+        const dx = nodes[ai].x - nodes[bi].x, dy = nodes[ai].y - nodes[bi].y;
+        nearby.push({ idx: bi, d: dx * dx + dy * dy });
+      }
+      nearby.sort((a, b) => a.d - b.d);
+      for (let k = 0; k < Math.min(2, nearby.length); k++) addEdge(ai, nearby[k].idx, 0.15, 40);
+    }
+    return edges;
+  }
+
+  function initVelocities(nodes) { for (const n of nodes) { n.vx = 0; n.vy = 0; } }
+
+  function simulateForces(nodes, edges, isAI, dt) {
+    const CX = 300, CY = 300, N = nodes.length;
+    if (N === 0) return;
+    for (const n of nodes) { n.fx = 0; n.fy = 0; }
+    for (const e of edges) {
+      const na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.02 && nb.alpha < 0.02) continue;
+      const dx = nb.x - na.x, dy = nb.y - na.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+      const force = e.strength * (dist - e.restLen) / dist;
+      na.fx += dx * force; na.fy += dy * force;
+      nb.fx -= dx * force; nb.fy -= dy * force;
+    }
+    const repulse = isAI ? 3500 : 5500;
+    for (let i = 0; i < N; i++) {
+      if (nodes[i].alpha < 0.02) continue;
+      for (let j = i + 1; j < N; j++) {
+        if (nodes[j].alpha < 0.02) continue;
+        const dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y;
+        const d = Math.sqrt(Math.max(dx*dx + dy*dy, 100));
+        const force = -repulse / (d * d);
+        const fx = (dx / d) * force, fy = (dy / d) * force;
+        nodes[i].fx += fx; nodes[i].fy += fy;
+        nodes[j].fx -= fx; nodes[j].fy -= fy;
+      }
+    }
+    for (const n of nodes) {
+      if (n.alpha < 0.02) continue;
+      n.fx += (CX - n.x) * 0.04;
+      n.fy += (CY - n.y) * 0.04;
+    }
+    for (const n of nodes) {
+      if (n.alpha < 0.02) continue;
+      const mass = n.type === 'primary' ? 3.0 : n.type === 'companion' ? 0.8 : 1.2;
+      n.vx = (n.vx + n.fx / mass * dt) * 0.85;
+      n.vy = (n.vy + n.fy / mass * dt) * 0.85;
+      const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+      if (speed > 8) { n.vx *= 8 / speed; n.vy *= 8 / speed; }
+      n.tx = n.x + n.vx;
+      n.ty = n.y + n.vy;
+      if (n.tx < 40) n.vx += 2;
+      if (n.tx > 560) n.vx -= 2;
+      if (n.ty < 40) n.vy += 2;
+      if (n.ty > 560) n.vy -= 2;
+    }
+  }
+
+  function buildStars() {
+    const stars = [];
+    for (let i = 0; i < 100; i++) {
+      stars.push({ x: Math.random() * 600, y: Math.random() * 600, r: 0.2 + Math.random() * 0.9, bright: Math.random() * 0.35 + 0.05, phase: Math.random() * Math.PI * 2, speed: 0.5 + Math.random() * 2.5 });
+    }
+    return stars;
+  }
+
+  function computeAppearance(nodes, isAI, colorAns, posAns, assessState) {
+    const answeredCount = colorAns.filter(a => a !== null).length + posAns.filter(a => a !== null).length;
+    for (let i = 0; i < 5; i++) {
+      const node = nodes[i];
+      if (colorAns[i] !== null) {
+        node.tcolor = hexRgb(NEURON_MAP[i].colors[colorAns[i]]);
+        node.tr = 12; node.thalo = 45; node.talpha = 1;
+      } else {
+        const c0 = hexRgb(NEURON_MAP[i].colors[0]), c1 = hexRgb(NEURON_MAP[i].colors[1]);
+        node.tcolor = [Math.round((c0[0]+c1[0])*0.18+60*0.64), Math.round((c0[1]+c1[1])*0.18+65*0.64), Math.round((c0[2]+c1[2])*0.18+80*0.64)];
+        node.tr = 6; node.thalo = 24; node.talpha = 0.45;
+      }
+      if (posAns[i] !== null && colorAns[i] === null) {
+        const c0 = hexRgb(NEURON_MAP[i].colors[0]), c1 = hexRgb(NEURON_MAP[i].colors[1]);
+        node.tcolor = [Math.round((c0[0]+c1[0])*0.25+50*0.5), Math.round((c0[1]+c1[1])*0.25+55*0.5), Math.round((c0[2]+c1[2])*0.25+70*0.5)];
+        node.talpha = 0.6; node.tr = 8; node.thalo = 32;
+      }
+    }
+    for (let ci = 0; ci < 10; ci++) {
+      const node = nodes[5 + ci], parent = nodes[node.parent];
+      const answered = colorAns[node.parent] !== null || posAns[node.parent] !== null;
+      node.tcolor = parent.tcolor;
+      node.tr = answered ? 4 + (ci % 2) * 2 : 2.5;
+      node.thalo = answered ? 16 + (ci % 2) * 6 : 10;
+      node.talpha = answered ? parent.talpha * 0.6 : 0.2;
+    }
+    for (let si = 0; si < 5; si++) {
+      const node = nodes[15 + si], parent = nodes[node.parent];
+      if (answeredCount >= 6 && parent.talpha > 0.3) {
+        node.tcolor = parent.tcolor; node.tr = 4; node.thalo = 14;
+        node.talpha = 0.5 * Math.min(1, (answeredCount - 5) / 4);
+      } else { node.talpha = 0; }
+    }
+    for (let ai = 20; ai < nodes.length; ai++) {
+      const node = nodes[ai];
+      if (assessState[node.assessIdx]) {
+        node.talpha = 0.85; node.tr = 5; node.thalo = 18;
+        if (node.affinities && node.affinities.length >= 2) {
+          let ar = 0, ag = 0, ab = 0;
+          for (const pi of node.affinities) { ar += nodes[pi].color[0]; ag += nodes[pi].color[1]; ab += nodes[pi].color[2]; }
+          const n = node.affinities.length;
+          const parentBlend = [ar/n, ag/n, ab/n];
+          node.tcolor = lerpRgb(hexRgb(ASSESS_MAP[node.assessIdx].color), parentBlend, nodes[node.affinities[0]].talpha > 0.6 ? 0.7 : 0.4);
+        }
+      } else { node.talpha = 0; }
+    }
+  }
+
+  function diamond(ctx, cx, cy, s) { ctx.beginPath(); ctx.moveTo(cx, cy-s); ctx.lineTo(cx+s, cy); ctx.lineTo(cx, cy+s); ctx.lineTo(cx-s, cy); ctx.closePath(); }
+  function triangle(ctx, cx, cy, s) { const h = s*1.15; ctx.beginPath(); ctx.moveTo(cx, cy-h); ctx.lineTo(cx+s, cy+h*0.5); ctx.lineTo(cx-s, cy+h*0.5); ctx.closePath(); }
+
+  function animPos(n, time, isAI) {
+    const sp = n.driftSpeed, amp = n.driftAmp * (isAI ? 0.2 : 1.3);
+    const dx = Math.sin(time*sp + n.phaseX)*amp + Math.sin(time*sp*0.4 + n.phaseX*2.1)*amp*0.3;
+    const dy = Math.cos(time*sp*0.75 + n.phaseY)*amp + Math.cos(time*sp*0.35 + n.phaseY*1.7)*amp*0.25;
+    const wobble = isAI ? 0.6 : 4.0;
+    return { x: n.x + dx + Math.cos(n.orbitAngle*0.7+time*0.15)*wobble, y: n.y + dy + Math.sin(n.orbitAngle*0.9+time*0.12)*wobble };
+  }
+
+  function render(ctx, nodes, conns, stars, isAI, time, scale) {
+    const W = 600, H = 600, CX = 300, CY = 300;
+    const breath = 1 + 0.04 * Math.sin(time * 0.3);
+    ctx.save(); ctx.scale(scale, scale);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = isAI ? '#020810' : '#060712';
+    ctx.fillRect(0, 0, W, H);
+
+    for (const s of stars) {
+      const tw = s.bright * (0.5 + 0.5 * Math.sin(time * s.speed + s.phase));
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = rgbStr([180,200,255], tw); ctx.fill();
+    }
+
+    if (isAI) {
+      ctx.save();
+      ctx.translate(CX, CY); ctx.rotate(time * 0.015); ctx.translate(-CX, -CY);
+      ctx.strokeStyle = '#6b7b93'; ctx.lineWidth = 0.6;
+      for (let ring = 1; ring <= 7; ring++) {
+        ctx.globalAlpha = Math.max(0.005, 0.10 - ring * 0.012);
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const a = (i/6)*Math.PI*2 - Math.PI/6, r = ring*40;
+          const px = CX + Math.cos(a)*r, py = CY + Math.sin(a)*r;
+          i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        if (ring > 1) {
+          ctx.globalAlpha = Math.max(0.003, 0.06 - ring * 0.007);
+          for (let i = 0; i < 6; i++) {
+            const a = (i/6)*Math.PI*2 - Math.PI/6;
+            ctx.beginPath();
+            ctx.moveTo(CX + Math.cos(a)*(ring-1)*40, CY + Math.sin(a)*(ring-1)*40);
+            ctx.lineTo(CX + Math.cos(a)*ring*40, CY + Math.sin(a)*ring*40);
+            ctx.stroke();
+          }
+        }
+      }
+      ctx.restore();
+    }
+
+    const colorKey = (c) => c[0]+','+c[1]+','+c[2];
+    const zones = {};
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.alpha < 0.05) continue;
+      const p = animPos(n, time, isAI);
+      const k = colorKey(n.color);
+      if (!zones[k]) zones[k] = { color: n.color, sx:0, sy:0, weight:0, count:0 };
+      const w = n.alpha * (n.type === 'primary' ? 2.5 : n.type === 'assess' ? 1.5 : 0.8);
+      zones[k].sx += p.x*w; zones[k].sy += p.y*w; zones[k].weight += w; zones[k].count++;
+    }
+    ctx.save(); ctx.filter = 'blur(50px)';
+    for (const zone of Object.values(zones)) {
+      const cx = zone.sx/zone.weight, cy = zone.sy/zone.weight;
+      ctx.fillStyle = rgbStr(zone.color, Math.min(0.65, zone.weight*0.12)*breath);
+      ctx.beginPath(); ctx.arc(cx, cy, 70 + zone.count*16, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+
+    for (const [a, b] of conns) {
+      const na = nodes[a], nb = nodes[b];
+      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+      const pa = animPos(na, time, isAI), pb = animPos(nb, time, isAI);
+      const dx = pa.x-pb.x, dy = pa.y-pb.y, dist = Math.sqrt(dx*dx+dy*dy);
+      const lineAlpha = Math.max(0, 1-dist/400) * Math.min(na.alpha, nb.alpha) * 0.30 * (a >= 20 || b >= 20 ? 0.6 : 1.0);
+      if (lineAlpha < 0.005) continue;
+      ctx.beginPath();
+      if (isAI) { ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); }
+      else { ctx.moveTo(pa.x, pa.y); ctx.quadraticCurveTo((pa.x+pb.x)/2+Math.sin(time*0.15+a+b)*14, (pa.y+pb.y)/2+Math.cos(time*0.1+a*0.7)*14, pb.x, pb.y); }
+      ctx.strokeStyle = rgbStr([255,255,255], lineAlpha); ctx.lineWidth = 1; ctx.lineCap = 'round'; ctx.stroke();
+    }
+
+    const order = []; for (let i = 0; i < nodes.length; i++) order.push(i);
+    order.sort((aa, bb) => nodes[aa].alpha - nodes[bb].alpha);
+    for (const idx of order) {
+      const n = nodes[idx]; if (n.alpha < 0.02) continue;
+      const p = animPos(n, time, isAI), c = n.color, ba = n.alpha;
+      const cR = (n.r + n.flash * 3) * breath;
+
+      if (cR > 1) {
+        const outerR = cR * 3;
+        const g1 = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, outerR);
+        g1.addColorStop(0, rgbStr(c, ba*0.22)); g1.addColorStop(0.5, rgbStr(c, ba*0.08)); g1.addColorStop(1, rgbStr(c, 0));
+        if (isAI && n.type === 'primary') {
+          ctx.save();
+          if (n.sensitive) triangle(ctx, p.x, p.y, outerR*1.3); else diamond(ctx, p.x, p.y, outerR*1.3);
+          ctx.clip(); ctx.fillStyle = g1; ctx.fillRect(p.x-outerR, p.y-outerR, outerR*2, outerR*2); ctx.restore();
+        } else { ctx.beginPath(); ctx.arc(p.x, p.y, outerR, 0, Math.PI*2); ctx.fillStyle = g1; ctx.fill(); }
+      }
+      if (cR > 0.5) {
+        ctx.beginPath();
+        if (isAI && n.type === 'primary') { if (n.sensitive) triangle(ctx, p.x, p.y, cR*1.8); else diamond(ctx, p.x, p.y, cR*1.8); }
+        else ctx.arc(p.x, p.y, cR*1.8, 0, Math.PI*2);
+        ctx.fillStyle = rgbStr(c, ba*0.35); ctx.fill();
+      }
+      if (cR > 0.3) {
+        ctx.beginPath();
+        if (isAI && n.type === 'primary') { if (n.sensitive) triangle(ctx, p.x, p.y, cR); else diamond(ctx, p.x, p.y, cR); }
+        else ctx.arc(p.x, p.y, cR, 0, Math.PI*2);
+        ctx.fillStyle = rgbStr(c, ba*0.95); ctx.fill();
+      }
+      if (cR > 0.8) {
+        ctx.beginPath();
+        if (isAI && n.type === 'primary') { if (n.sensitive) triangle(ctx, p.x, p.y, cR*0.4); else diamond(ctx, p.x, p.y, cR*0.4); }
+        else ctx.arc(p.x, p.y, cR*0.4, 0, Math.PI*2);
+        ctx.fillStyle = rgbStr([255,255,255], ba*0.65); ctx.fill();
+      }
+      if (n.flash > 0.05) {
+        const flashR = cR * (3 + (1-n.flash)*8);
+        if (isAI && n.type === 'primary' && n.sensitive) triangle(ctx, p.x, p.y, flashR);
+        else if (isAI && n.type === 'primary') diamond(ctx, p.x, p.y, flashR);
+        else { ctx.beginPath(); ctx.arc(p.x, p.y, flashR, 0, Math.PI*2); }
+        ctx.strokeStyle = rgbStr(c, n.flash*0.4); ctx.lineWidth = 2*n.flash; ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  React.useEffect(() => {
+    const { onboardingAnswers, assessCompleted, entityType } = propsRef.current;
+    const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+    const assessState = deriveAssessState(assessCompleted);
+    const isAI = entityType === 'ai';
+    const nodes = buildAllNodes(assessState, colorAns, posAns, isAI);
+    initVelocities(nodes);
+    stateRef.current = { nodes, stars: buildStars(), conns: [], lastTime: performance.now(), prevAnswersKey: '', prevAssessKey: '', prevEntityType: '' };
+  }, []);
+
+  React.useEffect(() => {
+    if (!stateRef.current) return;
+    const { nodes } = stateRef.current;
+    const { onboardingAnswers, assessCompleted, entityType } = propsRef.current;
+    const answersKey = JSON.stringify(onboardingAnswers);
+    const assessKey = JSON.stringify(Object.keys(assessCompleted).sort());
+    const answersChanged = answersKey !== stateRef.current.prevAnswersKey;
+    const assessChanged = assessKey !== stateRef.current.prevAssessKey;
+    const entityChanged = entityType !== stateRef.current.prevEntityType;
+    stateRef.current.prevAnswersKey = answersKey;
+    stateRef.current.prevAssessKey = assessKey;
+    stateRef.current.prevEntityType = entityType;
+
+    if (entityChanged) { for (const n of nodes) if (n.alpha > 0.05) n.flash = 0.6; }
+    if (assessChanged) {
+      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+      const assessState = deriveAssessState(assessCompleted);
+      const isAI = entityType === 'ai';
+      nodes.length = 20;
+      ASSESS_MAP.forEach((assess, ai) => {
+        if (!assessState[ai]) return;
+        const rng = seededRng(ai * 137 + 42);
+        const affs = assess.affinities;
+        for (let ni = 0; ni < assess.nodes; ni++) {
+          let mx = 0, my = 0;
+          for (const pi of affs) { mx += nodes[pi].x; my += nodes[pi].y; }
+          mx /= affs.length; my /= affs.length;
+          const node = makeNode({ x: mx + (rng()-0.5)*50, y: my + (rng()-0.5)*50, r: 2+rng()*2, halo: 8+rng()*10, type: 'assess', color: assess.color, assessIdx: ai, tier: assess.tier, parent: affs[0], affinities: affs });
+          node.vx = 0; node.vy = 0; nodes.push(node);
+        }
+      });
+      for (let i = 20; i < nodes.length; i++) nodes[i].flash = 0.5;
+    }
+    if (answersChanged && !entityChanged) {
+      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+      const isAI = entityType === 'ai';
+      const newSeeds = primarySeedPositions(colorAns, posAns, isAI);
+      const { colorAns: prevColor, posAns: prevPos } = deriveAnswers(JSON.parse(stateRef.current.prevAnswersKey || '{}'));
+      for (let i = 0; i < 5; i++) {
+        if (colorAns[i] !== prevColor?.[i] || posAns[i] !== prevPos?.[i]) {
+          nodes[i].flash = 1.0;
+          if (nodes[5+i*2]) nodes[5+i*2].flash = 0.6;
+          if (nodes[5+i*2+1]) nodes[5+i*2+1].flash = 0.5;
+          nodes[i].vx = (nodes[i].vx||0) + (newSeeds[i].x - nodes[i].x) * 0.15;
+          nodes[i].vy = (nodes[i].vy||0) + (newSeeds[i].y - nodes[i].y) * 0.15;
+        }
+      }
+    }
+  }, [onboardingAnswers, assessCompleted, entityType]);
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    function frame(now) {
+      if (!stateRef.current) { animRef.current = requestAnimationFrame(frame); return; }
+      const { nodes, stars } = stateRef.current;
+      const { onboardingAnswers, assessCompleted, entityType, size } = propsRef.current;
+      const scale = size / 600, isAI = entityType === 'ai';
+      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+      const assessState = deriveAssessState(assessCompleted);
+      const dt = Math.min((now - stateRef.current.lastTime) / 1000, 0.05);
+      stateRef.current.lastTime = now;
+      const time = now / 1000;
+      computeAppearance(nodes, isAI, colorAns, posAns, assessState);
+      const edges = buildEdges(nodes, isAI, colorAns, posAns, assessState);
+      simulateForces(nodes, edges, isAI, dt);
+      const conns = [];
+      for (const e of edges) { if (nodes[e.a].alpha > 0.03 && nodes[e.b].alpha > 0.03) conns.push([e.a, e.b]); }
+      stateRef.current.conns = conns;
+      const spd = 6 * dt;
+      for (const n of nodes) {
+        n.x = lerp(n.x, n.tx, spd); n.y = lerp(n.y, n.ty, spd);
+        n.r = lerp(n.r, n.tr + n.flash*5, spd);
+        n.halo = lerp(n.halo, n.thalo + n.flash*20, spd);
+        n.alpha = lerp(n.alpha, n.talpha + n.flash*0.3, spd*0.7);
+        n.color = lerpRgb(n.color, n.tcolor, spd);
+        n.orbitAngle += n.orbitSpeed * (isAI ? 0.15 : 1.2);
+        n.flash *= 0.91; if (n.flash < 0.01) n.flash = 0;
+      }
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = size * dpr; canvas.height = size * dpr;
+      canvas.style.width = size + 'px'; canvas.style.height = size + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      render(ctx, nodes, conns, stars, isAI, time, scale);
+      animRef.current = requestAnimationFrame(frame);
+    }
+    animRef.current = requestAnimationFrame(frame);
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, []);
+
+  return React.createElement('canvas', {
+    ref: canvasRef,
+    className: 'viz-frame',
+    style: { display: 'block', borderRadius: Math.round(14*(size/600))+'px', width: size+'px', height: size+'px' },
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════
+// COMPARISON HARNESS
+// ═══════════════════════════════════════════════════════
+const ASSESS_DEFS = [
+  { ids: ['starter-personality'], name: 'Personality', color: '#8b5cf6', tier: 1 },
+  { ids: ['starter-motivation'], name: 'Motivation', color: '#f59e0b', tier: 1 },
+  { ids: ['starter-thinking'], name: 'Thinking', color: '#3b82f6', tier: 1 },
+  { ids: ['starter-connection'], name: 'Connection', color: '#d946ef', tier: 1 },
+  { ids: ['starter-strategy'], name: 'Strategy', color: '#10b981', tier: 1 },
+  { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: '#8b5cf6', tier: 2 },
+  { ids: ['integrity'], name: 'Character', color: '#10b981', tier: 2 },
+  { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: '#6366f1', tier: 2 },
+  { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: '#06b6d4', tier: 2 },
+  { ids: ['attachment'], name: 'Relationships', color: '#f43f5e', tier: 2 },
+  { ids: ['risk'], name: 'Behavior', color: '#f59e0b', tier: 2 },
+];
+
+const PRESETS = {
+  empty: { label: 'Empty', answers: {}, assessments: {} },
+  'few-answers': {
+    label: '3 Answers',
+    answers: { 'onboard-1': 0, 'onboard-2': 1, 'onboard-5': 0 },
+    assessments: {},
+  },
+  'half-onboard': {
+    label: '5 Answers',
+    answers: { 'onboard-1': 1, 'onboard-2': 0, 'onboard-3': 1, 'onboard-5': 0, 'onboard-7': 1 },
+    assessments: {},
+  },
+  'full-onboard': {
+    label: 'Full Onboarding',
+    answers: { 'onboard-1': 0, 'onboard-2': 1, 'onboard-3': 0, 'onboard-4': 1, 'onboard-5': 1, 'onboard-6': 0, 'onboard-7': 1, 'onboard-8': 0, 'onboard-9': 1, 'onboard-10': 0 },
+    assessments: {},
+  },
+  'onboard-plus-tier1': {
+    label: 'Onboard + Tier 1',
+    answers: { 'onboard-1': 0, 'onboard-2': 1, 'onboard-3': 0, 'onboard-4': 1, 'onboard-5': 1, 'onboard-6': 0, 'onboard-7': 1, 'onboard-8': 0, 'onboard-9': 1, 'onboard-10': 0 },
+    assessments: { 'starter-personality': { score: 72 }, 'starter-motivation': { score: 60 }, 'starter-thinking': { score: 55 } },
+  },
+  'full-depth': {
+    label: 'Full Depth',
+    answers: { 'onboard-1': 1, 'onboard-2': 0, 'onboard-3': 1, 'onboard-4': 0, 'onboard-5': 0, 'onboard-6': 1, 'onboard-7': 0, 'onboard-8': 1, 'onboard-9': 0, 'onboard-10': 1 },
+    assessments: { 'starter-personality': { score: 72 }, 'starter-motivation': { score: 60 }, 'starter-thinking': { score: 55 }, 'starter-connection': { score: 80 }, 'starter-strategy': { score: 45 }, 'bigfive-E': { score: 85 }, 'integrity': { score: 78 }, 'attachment': { score: 65 } },
+  },
+};
+
+function ComparisonHarness() {
+  const [entityType, setEntityType] = React.useState('human');
+  const [onboardingAnswers, setOnboardingAnswers] = React.useState({});
+  const [assessToggles, setAssessToggles] = React.useState({});
+  const [vizSize, setVizSize] = React.useState(280);
+  const [activePreset, setActivePreset] = React.useState('empty');
+
+  const assessCompleted = React.useMemo(() => {
+    const obj = {};
+    ASSESS_DEFS.forEach((def, idx) => {
+      if (assessToggles[idx]) obj[def.ids[0]] = { score: 1 };
+    });
+    return obj;
+  }, [assessToggles]);
+
+  const answeredCount = Object.keys(onboardingAnswers).length;
+  const assessCount = Object.keys(assessCompleted).length;
+
+  function applyPreset(key) {
+    const preset = PRESETS[key];
+    setOnboardingAnswers(preset.answers);
+    setActivePreset(key);
+    // Convert assessments to toggles
+    const toggles = {};
+    ASSESS_DEFS.forEach((def, idx) => {
+      toggles[idx] = def.ids.some(id => id in preset.assessments);
+    });
+    setAssessToggles(toggles);
+  }
+
+  function randomize() {
+    const answers = {};
+    for (let i = 1; i <= 10; i++) answers['onboard-' + i] = Math.random() < 0.5 ? 0 : 1;
+    setOnboardingAnswers(answers);
+    setEntityType(Math.random() < 0.85 ? 'human' : 'ai');
+    const toggles = {};
+    ASSESS_DEFS.forEach((_, i) => toggles[i] = Math.random() < 0.3);
+    setAssessToggles(toggles);
+    setActivePreset(null);
+  }
+
+  function toggleQuestion(qNum) {
+    setOnboardingAnswers(prev => {
+      const key = 'onboard-' + qNum;
+      const next = { ...prev };
+      if (key in next) delete next[key];
+      else next[key] = Math.random() < 0.5 ? 0 : 1;
+      return next;
+    });
+    setActivePreset(null);
+  }
+
+  function toggleAssess(idx) {
+    setAssessToggles(prev => ({ ...prev, [idx]: !prev[idx] }));
+    setActivePreset(null);
+  }
+
+  return React.createElement('div', { className: 'page' },
+    // Header
+    React.createElement('div', { className: 'header' },
+      React.createElement('h1', null, 'SVG Mini-Aura vs Canvas Constellation'),
+      React.createElement('p', null, 'Same data, two renderers. Find the warmth gap.'),
+    ),
+
+    // Data level stats
+    React.createElement('div', { className: 'qualities' },
+      React.createElement('div', { className: 'quality-card' },
+        React.createElement('div', { className: 'val' }, answeredCount + '/10'),
+        React.createElement('div', { className: 'lbl' }, 'Answers'),
+      ),
+      React.createElement('div', { className: 'quality-card' },
+        React.createElement('div', { className: 'val' }, assessCount),
+        React.createElement('div', { className: 'lbl' }, 'Assessments'),
+      ),
+      React.createElement('div', { className: 'quality-card' },
+        React.createElement('div', { className: 'val' }, entityType === 'ai' ? 'AI' : 'Human'),
+        React.createElement('div', { className: 'lbl' }, 'Entity'),
+      ),
+      React.createElement('div', { className: 'quality-card' },
+        React.createElement('div', { className: 'val' }, vizSize + 'px'),
+        React.createElement('div', { className: 'lbl' }, 'Size'),
+      ),
+    ),
+
+    // Side-by-side comparison
+    React.createElement('div', { className: 'comparison' },
+      // SVG panel
+      React.createElement('div', { className: 'panel' },
+        React.createElement('span', { className: 'panel-label svg-label' }, 'SVG Mini-Aura'),
+        React.createElement('div', { className: 'panel-sub' }, 'PathChoiceScreen original — the warm one'),
+        React.createElement(SvgMiniAura, {
+          onboardingAnswers,
+          entityType,
+          darkMode: true,
+          size: vizSize,
+        }),
+        React.createElement('div', { className: 'panel-sub' },
+          '5 neurons, feGaussianBlur glow, multi-harmonic drift'
+        ),
+      ),
+
+      // Canvas panel
+      React.createElement('div', { className: 'panel' },
+        React.createElement('span', { className: 'panel-label canvas-label' }, 'Canvas v12'),
+        React.createElement('div', { className: 'panel-sub' }, 'Force-directed constellation — production'),
+        React.createElement(AuraVisualization, {
+          onboardingAnswers,
+          assessCompleted,
+          entityType,
+          darkMode: true,
+          size: vizSize,
+        }),
+        React.createElement('div', { className: 'panel-sub' },
+          `${20 + Object.values(assessToggles).filter(Boolean).length * 3}+ nodes, force sim, blur clouds`
+        ),
+      ),
+    ),
+
+    // Preset buttons
+    React.createElement('div', { className: 'section-label' }, 'Data Level Presets'),
+    React.createElement('div', { className: 'controls' },
+      ...Object.entries(PRESETS).map(([key, preset]) =>
+        React.createElement('button', {
+          key,
+          className: 'ctrl-btn preset' + (activePreset === key ? ' active' : ''),
+          onClick: () => applyPreset(key),
+        }, preset.label),
+      ),
+      React.createElement('button', {
+        className: 'ctrl-btn',
+        onClick: randomize,
+        style: { borderColor: '#8b5cf6' },
+      }, 'Random'),
+    ),
+
+    // Entity + Size
+    React.createElement('div', { className: 'controls' },
+      React.createElement('button', {
+        className: 'ctrl-btn' + (entityType === 'human' ? ' active' : ''),
+        onClick: () => setEntityType('human'),
+      }, 'Human'),
+      React.createElement('button', {
+        className: 'ctrl-btn' + (entityType === 'ai' ? ' active' : ''),
+        onClick: () => setEntityType('ai'),
+      }, 'AI'),
+      React.createElement('div', { className: 'slider-row' },
+        React.createElement('label', null, 'Size:'),
+        React.createElement('input', {
+          type: 'range', min: 140, max: 400, value: vizSize,
+          onChange: (e) => setVizSize(Number(e.target.value)),
+        }),
+        React.createElement('span', { className: 'slider-val' }, vizSize + 'px'),
+      ),
+    ),
+
+    React.createElement('div', { className: 'divider' }),
+
+    // Onboarding toggles
+    React.createElement('div', { className: 'section-label' }, 'Onboarding Questions'),
+    React.createElement('div', { className: 'tier-grid' },
+      Array.from({ length: 10 }, (_, i) => {
+        const qNum = i + 1, isOn = ('onboard-' + qNum) in onboardingAnswers;
+        return React.createElement('button', {
+          key: qNum,
+          className: 'assess-toggle' + (isOn ? ' on' : ''),
+          style: { borderColor: isOn ? '#8b5cf6' : undefined },
+          onClick: () => toggleQuestion(qNum),
+        },
+          React.createElement('span', { className: 'assess-dot', style: { background: '#8b5cf6', opacity: isOn ? 1 : 0.3 } }),
+          'Q' + qNum,
+        );
+      }),
+    ),
+
+    React.createElement('div', { className: 'divider' }),
+
+    // Assessment toggles
+    React.createElement('div', { className: 'section-label' }, 'Tier 1 — Starter Pack'),
+    React.createElement('div', { className: 'tier-grid' },
+      ASSESS_DEFS.filter(d => d.tier === 1).map(def => {
+        const idx = ASSESS_DEFS.indexOf(def);
+        return React.createElement('button', {
+          key: idx,
+          className: 'assess-toggle' + (assessToggles[idx] ? ' on' : ''),
+          style: { borderColor: assessToggles[idx] ? def.color : undefined },
+          onClick: () => toggleAssess(idx),
+        },
+          React.createElement('span', { className: 'assess-dot', style: { background: def.color, opacity: assessToggles[idx] ? 1 : 0.4 } }),
+          def.name,
+        );
+      }),
+    ),
+
+    React.createElement('div', { className: 'section-label', style: { marginTop: '8px' } }, 'Tier 2 — Deep Assessments'),
+    React.createElement('div', { className: 'tier-grid' },
+      ASSESS_DEFS.filter(d => d.tier === 2).map(def => {
+        const idx = ASSESS_DEFS.indexOf(def);
+        return React.createElement('button', {
+          key: idx,
+          className: 'assess-toggle' + (assessToggles[idx] ? ' on' : ''),
+          style: { borderColor: assessToggles[idx] ? def.color : undefined },
+          onClick: () => toggleAssess(idx),
+        },
+          React.createElement('span', { className: 'assess-dot', style: { background: def.color, opacity: assessToggles[idx] ? 1 : 0.4 } }),
+          def.name,
+        );
+      }),
+    ),
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(ComparisonHarness));
+</script>
+</body>
+</html>
