@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz — Warm Canvas v3</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #030712; color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh; padding: 20px;
+  }
+  .page { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .header { text-align: center; }
+  .header h1 { font-size: 15px; font-weight: 700; color: #fff; }
+  .header p { font-size: 11px; color: #6b7280; margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  .cell {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.015);
+    cursor: pointer; transition: all 0.3s;
+  }
+  .cell:hover { border-color: rgba(139,92,246,0.3); }
+  .cell.picked { border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.04); }
+  .cell-label { font-size: 11px; font-weight: 600; color: #fff; }
+  .cell-desc { font-size: 9px; color: #6b7280; text-align: center; line-height: 1.4; }
+  .cell-tag { font-size: 8px; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  .tag-ref { color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+  .tag-var { color: #8b5cf6; border: 1px solid rgba(139,92,246,0.3); }
+
+  /* Controls bar */
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+  .controls-group { display: flex; gap: 6px; align-items: center; }
+  .group-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: #4b5563; font-weight: 600; margin-right: 2px; }
+
+  /* Persona buttons — each tier gets its own color */
+  .tier-btn {
+    padding: 7px 16px; border-radius: 8px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: all 0.2s; font-family: inherit;
+    border: 2px solid; background: transparent;
+  }
+  .tier-new { color: #10b981; border-color: #10b981; }
+  .tier-new.active { background: #10b981; color: #030712; }
+  .tier-regular { color: #8b5cf6; border-color: #8b5cf6; }
+  .tier-regular.active { background: #8b5cf6; color: #fff; }
+  .tier-power { color: #f59e0b; border-color: #f59e0b; }
+  .tier-power.active { background: #f59e0b; color: #030712; }
+
+  /* Entity gate button */
+  .entity-btn {
+    padding: 7px 16px; border-radius: 8px;
+    font-size: 11px; font-weight: 700; cursor: pointer;
+    transition: all 0.2s; font-family: inherit;
+    border: 2px solid; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .entity-human { color: #f9a8d4; border-color: #f9a8d4; background: rgba(249,168,212,0.08); }
+  .entity-human.active { background: #f9a8d4; color: #030712; }
+  .entity-ai { color: #67e8f9; border-color: #67e8f9; background: rgba(103,232,249,0.08); }
+  .entity-ai.active { background: #67e8f9; color: #030712; }
+
+  .random-btn {
+    padding: 7px 14px; border: 2px solid #6366f1; border-radius: 8px;
+    background: transparent; color: #6366f1; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; font-family: inherit;
+  }
+  .random-btn:hover { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+
+  .divider { width: 100%; max-width: 500px; height: 1px; background: #1f2937; margin: 0 auto; }
+  .section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; font-weight: 600; text-align: center; }
+  .pick-bar {
+    display: flex; gap: 8px; justify-content: center; padding: 8px;
+    background: rgba(16,185,129,0.06); border-radius: 8px; border: 1px solid rgba(16,185,129,0.15);
+  }
+  .pick-bar span { font-size: 11px; color: #10b981; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+
+// ═══════════════════════════════════════════════════════
+// WARM AURA VIZ v3 — Massive glow, space, entity gate
+// ═══════════════════════════════════════════════════════
+
+const WarmAuraViz = React.memo(function WarmAuraViz({
+  onboardingAnswers = {},
+  assessCompleted = {},
+  entityType = 'human',
+  darkMode = true,
+  size = 240,
+  tuning = {},
+}) {
+  const canvasRef = React.useRef(null);
+  const stateRef = React.useRef(null);
+  const animRef = React.useRef(null);
+  const propsRef = React.useRef({ onboardingAnswers, assessCompleted, entityType, darkMode, size, tuning });
+  propsRef.current = { onboardingAnswers, assessCompleted, entityType, darkMode, size, tuning };
+
+  const C = {
+    violet:'#8b5cf6', blue:'#3b82f6', teal:'#14b8a6', rose:'#f43f5e',
+    pink:'#d946ef', emerald:'#10b981', amber:'#f59e0b', indigo:'#6366f1', cyan:'#06b6d4',
+  };
+
+  function hexRgb(hex) { const n=parseInt(hex.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+  function lerp(a,b,t) { return a+(b-a)*t; }
+  function lerpRgb(a,b,t) { return [lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)]; }
+  function rgbStr(c,a) { return `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a.toFixed(3)})`; }
+  function seededRng(seed) { let s=seed; return()=>{s=(s*16807+0)%2147483647;return s/2147483647;}; }
+
+  const NEURON_MAP = [
+    { colorQ:'onboard-1', posQ:'onboard-2', colors:[C.violet,C.blue] },
+    { colorQ:'onboard-4', posQ:'onboard-8', colors:[C.indigo,C.rose] },
+    { colorQ:'onboard-5', posQ:'onboard-3', colors:[C.pink,C.teal] },
+    { colorQ:'onboard-6', posQ:'onboard-9', colors:[C.emerald,C.amber] },
+    { colorQ:'onboard-7', posQ:'onboard-10', colors:[C.cyan,C.violet] },
+  ];
+  const SENSITIVE=[false,false,false,true,true];
+  const HUMAN_CONNS=[[0,1],[0,2],[1,2],[2,3],[2,4],[3,4],[0,3],[1,4]];
+  const AI_CONNS=[[0,1],[0,2],[1,2],[2,3],[2,4],[3,4],[0,4],[1,3],[0,3],[1,4]];
+  const ASSESS_MAP = [
+    {ids:['starter-personality'],color:C.violet,tier:1,nodes:3,affinities:[0,2]},
+    {ids:['starter-motivation'],color:C.amber,tier:1,nodes:3,affinities:[1,3]},
+    {ids:['starter-thinking'],color:C.blue,tier:1,nodes:3,affinities:[0,4]},
+    {ids:['starter-connection'],color:C.pink,tier:1,nodes:3,affinities:[2,3]},
+    {ids:['starter-strategy'],color:C.emerald,tier:1,nodes:3,affinities:[1,4]},
+    {ids:['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'],color:C.violet,tier:2,nodes:5,affinities:[0,2,4]},
+    {ids:['integrity'],color:C.emerald,tier:2,nodes:3,affinities:[3,1]},
+    {ids:['shadow-M','shadow-N','shadow-P'],color:C.indigo,tier:2,nodes:4,affinities:[3,4]},
+    {ids:['adhd','cognitive','chronotype','reasoning'],color:C.cyan,tier:2,nodes:4,affinities:[4,0]},
+    {ids:['attachment'],color:C.rose,tier:2,nodes:3,affinities:[2,3]},
+    {ids:['risk'],color:C.amber,tier:2,nodes:3,affinities:[1,4]},
+  ];
+
+  function deriveAnswers(answers) {
+    const colorAns=new Array(5).fill(null),posAns=new Array(5).fill(null);
+    for(let i=0;i<5;i++){const nm=NEURON_MAP[i];if(nm.colorQ in answers)colorAns[i]=answers[nm.colorQ];if(nm.posQ in answers)posAns[i]=answers[nm.posQ];}
+    return{colorAns,posAns};
+  }
+  function deriveAssessState(completed){const s={};ASSESS_MAP.forEach((a,i)=>{s[i]=a.ids.some(id=>id in completed);});return s;}
+
+  function makeNode(o) {
+    return {
+      x:o.x||300,y:o.y||300,tx:o.x||300,ty:o.y||300,
+      color:o.color?hexRgb(o.color):[70,75,90],tcolor:o.color?hexRgb(o.color):[70,75,90],
+      r:o.r||2,tr:o.r||2,halo:o.halo||8,thalo:o.halo||8,alpha:0,talpha:0,
+      phase:Math.random()*Math.PI*2,orbitAngle:Math.random()*Math.PI*2,
+      orbitSpeed:(Math.random()-0.5)*0.006,
+      driftSpeed:0.35+Math.random()*0.5,driftAmp:2.5+Math.random()*3.5,
+      phaseX:Math.random()*6,phaseY:Math.random()*6,flash:0,
+      type:o.type||'primary',parent:o.parent??-1,sensitive:o.sensitive||false,
+      assessIdx:o.assessIdx??null,affinities:o.affinities||null,tier:o.tier||0,
+    };
+  }
+
+  function answerHashFn(ca,pa){let h=0;for(let i=0;i<5;i++){h=h*31+(ca[i]!==null?ca[i]+1:0);h=h*37+(pa[i]!==null?pa[i]+1:0);}return h;}
+
+  function primarySeedPositions(colorAns,posAns,isAI,t) {
+    const CX=300,CY=300,hash=answerHashFn(colorAns,posAns),rng=seededRng(hash+7919);
+    const answeredCount=colorAns.filter(a=>a!==null).length+posAns.filter(a=>a!==null).length;
+    // v3: less tight clustering, more spread
+    const spread=t.tightCluster?(0.6+answeredCount*0.04):1.0;
+    const baseAngles=[0,1,2,3,4].map(i=>{
+      let a=(i/5)*Math.PI*2;
+      if(posAns[i]!==null) a+=(posAns[i]===0?-0.7:0.7);
+      if(colorAns[i]!==null) a+=(colorAns[i]===0?-0.35:0.35);
+      a+=(hash%628)/100; return a;
+    });
+    return [0,1,2,3,4].map(i=>{
+      const ans=colorAns[i]!==null||posAns[i]!==null;
+      // v3: push primaries further out for more breathing room
+      const r=(ans?130+rng()*80:80+rng()*50)*spread;
+      return{x:CX+Math.cos(baseAngles[i])*r,y:CY+Math.sin(baseAngles[i])*r};
+    });
+  }
+
+  function buildAllNodes(assessState,colorAns,posAns,isAI,t) {
+    const nodes=[],CX=300,CY=300;
+    const seeds=primarySeedPositions(colorAns,posAns,isAI,t);
+    for(let i=0;i<5;i++) nodes.push(makeNode({x:seeds[i].x,y:seeds[i].y,r:5,halo:22,type:'primary',sensitive:SENSITIVE[i]}));
+    if(!t.primariesOnly){
+      for(let i=0;i<5;i++) for(let c=0;c<2;c++){
+        const a=Math.random()*Math.PI*2,d=8+Math.random()*12;
+        nodes.push(makeNode({x:nodes[i].x+Math.cos(a)*d,y:nodes[i].y+Math.sin(a)*d,type:'companion',parent:i,r:2.5,halo:10}));
+      }
+      for(let s=0;s<5;s++) nodes.push(makeNode({x:(nodes[s].x+CX)/2+(Math.random()-0.5)*30,y:(nodes[s].y+CY)/2+(Math.random()-0.5)*30,type:'satellite',parent:s,r:2,halo:7}));
+      ASSESS_MAP.forEach((assess,ai)=>{
+        if(!assessState[ai])return;
+        const rng=seededRng(ai*137+42),affs=assess.affinities;
+        for(let ni=0;ni<assess.nodes;ni++){
+          let mx=0,my=0;for(const pi of affs){mx+=nodes[pi].x;my+=nodes[pi].y;}mx/=affs.length;my/=affs.length;
+          nodes.push(makeNode({x:mx+(rng()-0.5)*50,y:my+(rng()-0.5)*50,r:2+rng()*2,halo:8+rng()*10,type:'assess',color:assess.color,assessIdx:ai,tier:assess.tier,parent:affs[0],affinities:affs}));
+        }
+      });
+    }
+    return nodes;
+  }
+
+  function buildEdges(nodes,isAI,colorAns,posAns,t) {
+    const edges=[],N=nodes.length,s=new Set();
+    function add(a,b,str,rest){const k=Math.min(a,b)*10000+Math.max(a,b);if(s.has(k))return;s.add(k);edges.push({a,b,strength:str,restLen:rest});}
+    const rs=t.tightCluster?0.8:1.0;
+    const pc=isAI?AI_CONNS:HUMAN_CONNS;
+    // v3: longer rest lengths for more breathing room
+    for(const[a,b]of pc){const aa=colorAns[a],bb=colorAns[b],both=aa!==null&&bb!==null,same=both&&aa===bb;add(a,b,both?(same?1:0.5):0.3,(both?(same?80:130):120)*rs);}
+    if(!t.primariesOnly){
+      for(let ci=5;ci<15;ci++) add(nodes[ci].parent,ci,1.5,30*rs);
+      for(let i=0;i<5;i++) add(5+i*2,5+i*2+1,0.8,14*rs);
+      for(let i=0;i<5;i++) add(5+i*2+1,5+((i+1)%5)*2,0.2,70*rs);
+      for(let si=15;si<20;si++) add(nodes[si].parent,si,0.5,80*rs);
+      for(let si=0;si<5;si++) add(15+si,15+(si+1)%5,0.15,80*rs);
+      for(let ai=20;ai<N;ai++){
+        const an=nodes[ai];if(an.affinities)for(const pi of an.affinities)add(pi,ai,0.6,70*rs);
+      }
+    }
+    return edges;
+  }
+
+  function simulateForces(nodes,edges,isAI,dt,t) {
+    if(t.noForce) return;
+    const CX=300,CY=300,N=nodes.length;if(N===0)return;
+    for(const n of nodes){n.fx=0;n.fy=0;}
+    for(const e of edges){
+      const na=nodes[e.a],nb=nodes[e.b];if(na.alpha<0.02&&nb.alpha<0.02)continue;
+      const dx=nb.x-na.x,dy=nb.y-na.y,dist=Math.sqrt(dx*dx+dy*dy)||0.1;
+      const f=e.strength*(dist-e.restLen)/dist;na.fx+=dx*f;na.fy+=dy*f;nb.fx-=dx*f;nb.fy-=dy*f;
+    }
+    // v3: higher default repulsion, more space
+    const rep=(isAI?4500:7000)*(t.repulsionScale??1);
+    for(let i=0;i<N;i++){if(nodes[i].alpha<0.02)continue;for(let j=i+1;j<N;j++){if(nodes[j].alpha<0.02)continue;
+      const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y,d=Math.sqrt(Math.max(dx*dx+dy*dy,100));
+      const f=-rep/(d*d),fx=(dx/d)*f,fy=(dy/d)*f;nodes[i].fx+=fx;nodes[i].fy+=fy;nodes[j].fx-=fx;nodes[j].fy-=fy;
+    }}
+    // v3: much lower default gravity — let things breathe
+    const grav=t.gravity??0.02;
+    for(const n of nodes){if(n.alpha<0.02)continue;n.fx+=(CX-n.x)*grav;n.fy+=(CY-n.y)*grav;}
+    for(const n of nodes){if(n.alpha<0.02)continue;
+      const mass=n.type==='primary'?3:n.type==='companion'?0.8:1.2;
+      n.vx=(n.vx+n.fx/mass*dt)*0.85;n.vy=(n.vy+n.fy/mass*dt)*0.85;
+      const sp=Math.sqrt(n.vx*n.vx+n.vy*n.vy);if(sp>8){n.vx*=8/sp;n.vy*=8/sp;}
+      n.tx=n.x+n.vx;n.ty=n.y+n.vy;
+      if(n.tx<40)n.vx+=2;if(n.tx>560)n.vx-=2;if(n.ty<40)n.vy+=2;if(n.ty>560)n.vy-=2;
+    }
+  }
+
+  function computeAppearance(nodes,isAI,colorAns,posAns,assessState,t) {
+    const ac=colorAns.filter(a=>a!==null).length+posAns.filter(a=>a!==null).length;
+    for(let i=0;i<5;i++){
+      const node=nodes[i];
+      if(colorAns[i]!==null){
+        node.tcolor=hexRgb(NEURON_MAP[i].colors[colorAns[i]]);
+        node.tr=t.answeredR??12;node.thalo=t.answeredHalo??45;node.talpha=1;
+      } else if(posAns[i]!==null){
+        const c0=hexRgb(NEURON_MAP[i].colors[0]),c1=hexRgb(NEURON_MAP[i].colors[1]);
+        node.tcolor=lerpRgb(c0,c1,0.5);
+        node.talpha=0.6;node.tr=8;node.thalo=32;
+      } else {
+        const c0=hexRgb(NEURON_MAP[i].colors[0]),c1=hexRgb(NEURON_MAP[i].colors[1]);
+        node.tcolor=lerpRgb(c0,c1,0.5);
+        node.tr=t.ghostR??6;node.thalo=24;node.talpha=t.ghostAlpha??0.45;
+      }
+    }
+    if(!t.primariesOnly){
+      for(let ci=0;ci<10;ci++){
+        const node=nodes[5+ci],parent=nodes[node.parent];
+        const ans=colorAns[node.parent]!==null||posAns[node.parent]!==null;
+        if(t.earnedCompanions&&!ans){node.talpha=0;}
+        else if(ans){node.tcolor=parent.tcolor;node.tr=4+(ci%2)*2;node.thalo=16+(ci%2)*6;node.talpha=parent.talpha*(t.companionAlpha??0.6);}
+        else{node.tcolor=parent.tcolor;node.tr=2.5;node.thalo=10;node.talpha=t.companionGhostAlpha??0.2;}
+      }
+      const satT=t.satThreshold??6;
+      for(let si=0;si<5;si++){
+        const node=nodes[15+si],parent=nodes[node.parent];
+        if(ac>=satT&&parent.talpha>0.3){node.tcolor=parent.tcolor;node.tr=4;node.thalo=14;node.talpha=0.5*Math.min(1,(ac-satT+1)/4);}
+        else{node.talpha=0;}
+      }
+      for(let ai=20;ai<nodes.length;ai++){
+        const node=nodes[ai];
+        if(assessState[node.assessIdx]){
+          node.talpha=0.85;node.tr=5;node.thalo=18;
+          if(node.affinities&&node.affinities.length>=2){
+            let ar=0,ag=0,ab=0;for(const pi of node.affinities){ar+=nodes[pi].color[0];ag+=nodes[pi].color[1];ab+=nodes[pi].color[2];}
+            const n=node.affinities.length;node.tcolor=lerpRgb(hexRgb(ASSESS_MAP[node.assessIdx].color),[ar/n,ag/n,ab/n],0.6);
+          }
+        }else{node.talpha=0;}
+      }
+    }
+  }
+
+  function diamond(ctx,cx,cy,s){ctx.beginPath();ctx.moveTo(cx,cy-s);ctx.lineTo(cx+s,cy);ctx.lineTo(cx,cy+s);ctx.lineTo(cx-s,cy);ctx.closePath();}
+  function triangle(ctx,cx,cy,s){const h=s*1.15;ctx.beginPath();ctx.moveTo(cx,cy-h);ctx.lineTo(cx+s,cy+h*0.5);ctx.lineTo(cx-s,cy+h*0.5);ctx.closePath();}
+
+  function animPos(n,time,isAI,t) {
+    const dm=t.driftMult??1,sp=n.driftSpeed,amp=n.driftAmp*(isAI?0.2:1.3)*dm;
+    const sh=t.secondHarmonic??0.3;
+    const dx=Math.sin(time*sp+n.phaseX)*amp+Math.sin(time*sp*0.4+n.phaseX*2.1)*amp*sh;
+    const dy=Math.cos(time*sp*0.75+n.phaseY)*amp+Math.cos(time*sp*0.35+n.phaseY*1.7)*amp*sh*0.83;
+    const w=isAI?0.6:(t.wobble??4);
+    return{x:n.x+dx+Math.cos(n.orbitAngle*0.7+time*0.15)*w,y:n.y+dy+Math.sin(n.orbitAngle*0.9+time*0.12)*w};
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // RENDER — v3 glow system: layered radial + blur wash
+  // ═══════════════════════════════════════════════════════
+  function render(ctx,nodes,conns,stars,isAI,time,scale,t) {
+    const W=600,H=600,CX=300,CY=300;
+    const breathAmp=t.breathAmp??0.04,breathSpd=t.breathSpd??0.3;
+    const breath=1+breathAmp*Math.sin(time*breathSpd);
+
+    ctx.save();ctx.scale(scale,scale);
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle=isAI?'#020810':'#060712';ctx.fillRect(0,0,W,H);
+
+    // Stars
+    const starCount=t.stars??100;
+    for(let i=0;i<Math.min(starCount,stars.length);i++){
+      const s=stars[i];
+      const tw=s.bright*(0.5+0.5*Math.sin(time*s.speed+s.phase));
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=rgbStr([180,200,255],tw);ctx.fill();
+    }
+
+    // AI grid
+    if(isAI&&!t.noGrid){
+      ctx.save();ctx.translate(CX,CY);ctx.rotate(time*0.015);ctx.translate(-CX,-CY);
+      ctx.strokeStyle='#6b7b93';ctx.lineWidth=0.6;
+      for(let ring=1;ring<=7;ring++){ctx.globalAlpha=Math.max(0.005,0.10-ring*0.012);ctx.beginPath();
+        for(let i=0;i<=6;i++){const a=(i/6)*Math.PI*2-Math.PI/6,r=ring*40;i===0?ctx.moveTo(CX+Math.cos(a)*r,CY+Math.sin(a)*r):ctx.lineTo(CX+Math.cos(a)*r,CY+Math.sin(a)*r);}
+        ctx.stroke();}
+      ctx.restore();
+    }
+
+    // ═══ GLOW SYSTEM v3 ═══
+    const glowMode = t.glowMode ?? 'aggregate';
+
+    if (glowMode === 'layered') {
+      // v3 LAYERED: per-primary radial gradients (big, bright) PLUS a blur wash on top
+      // This gets the distinct multi-color feel of the SVG with the atmospheric
+      // depth of the production blur
+      const glowR = t.glowRadius ?? 200;
+      const glowAlpha = t.glowAlpha ?? 0.7;
+      const passes = t.glowPasses ?? 2;
+
+      // Pass 1: Large, bright per-primary radial gradients
+      for (let pass = 0; pass < passes; pass++) {
+        const passScale = 1 - pass * 0.25; // Each pass slightly smaller
+        const passAlpha = pass === 0 ? 1.0 : 0.6; // Subsequent passes dimmer
+        for (let i = 0; i < 5; i++) {
+          const n = nodes[i];
+          if (n.alpha < 0.03) continue;
+          const p = animPos(n, time, isAI, t);
+          const r = glowR * passScale * (0.5 + n.alpha * 0.5) * breath;
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+          const a = n.alpha * glowAlpha * passAlpha;
+          // Slower falloff than v2 — hold color longer
+          g.addColorStop(0, rgbStr(n.color, a * 0.9));
+          g.addColorStop(0.2, rgbStr(n.color, a * 0.7));
+          g.addColorStop(0.45, rgbStr(n.color, a * 0.4));
+          g.addColorStop(0.7, rgbStr(n.color, a * 0.15));
+          g.addColorStop(1, rgbStr(n.color, 0));
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // Pass 2: Blur wash — paint the same positions with a blurred layer
+      // This adds the atmospheric diffusion that makes production feel immersive
+      const washBlur = t.glowWashBlur ?? 40;
+      const washAlpha = t.glowWashAlpha ?? 0.25;
+      if (washBlur > 0 && washAlpha > 0) {
+        ctx.save();
+        ctx.filter = `blur(${washBlur}px)`;
+        for (let i = 0; i < 5; i++) {
+          const n = nodes[i];
+          if (n.alpha < 0.03) continue;
+          const p = animPos(n, time, isAI, t);
+          ctx.fillStyle = rgbStr(n.color, n.alpha * washAlpha * breath);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 50 + n.alpha * 30, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    } else if (glowMode === 'perPrimary') {
+      // v3: cranked up from v2 — much bigger radius, higher alpha, slower falloff
+      const glowR = t.glowRadius ?? 200;
+      const glowAlpha = t.glowAlpha ?? 0.75;
+      for (let i = 0; i < 5; i++) {
+        const n = nodes[i];
+        if (n.alpha < 0.03) continue;
+        const p = animPos(n, time, isAI, t);
+        const r = glowR * (0.5 + n.alpha * 0.5) * breath;
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        const a = n.alpha * glowAlpha;
+        g.addColorStop(0, rgbStr(n.color, a * 0.85));
+        g.addColorStop(0.25, rgbStr(n.color, a * 0.6));
+        g.addColorStop(0.5, rgbStr(n.color, a * 0.3));
+        g.addColorStop(0.75, rgbStr(n.color, a * 0.1));
+        g.addColorStop(1, rgbStr(n.color, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (glowMode === 'perNode') {
+      // Per-node glow — every visible node radiates, weighted by importance
+      const baseR = t.glowRadius ?? 100;
+      const glowAlpha = t.glowAlpha ?? 0.5;
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i]; if (n.alpha < 0.05) continue;
+        const p = animPos(n, time, isAI, t);
+        const weight = n.type === 'primary' ? 1.0 : n.type === 'companion' ? 0.4 : n.type === 'assess' ? 0.5 : 0.25;
+        const r = baseR * weight * (0.5 + n.alpha * 0.5) * breath;
+        if (r < 5) continue;
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        const a = n.alpha * glowAlpha * weight;
+        g.addColorStop(0, rgbStr(n.color, a * 0.8));
+        g.addColorStop(0.35, rgbStr(n.color, a * 0.4));
+        g.addColorStop(0.7, rgbStr(n.color, a * 0.12));
+        g.addColorStop(1, rgbStr(n.color, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      }
+    } else {
+      // 'aggregate' — v12 production style: group by color, one blur blob per zone
+      const colorKey=(c)=>c[0]+','+c[1]+','+c[2];
+      const zones={};
+      for(let i=0;i<nodes.length;i++){
+        const n=nodes[i];if(n.alpha<0.05)continue;
+        const p=animPos(n,time,isAI,t),k=colorKey(n.color);
+        if(!zones[k])zones[k]={color:n.color,sx:0,sy:0,weight:0,count:0};
+        const w=n.alpha*(n.type==='primary'?2.5:n.type==='assess'?1.5:0.8);
+        zones[k].sx+=p.x*w;zones[k].sy+=p.y*w;zones[k].weight+=w;zones[k].count++;
+      }
+      ctx.save();ctx.filter=`blur(${t.glowBlur??50}px)`;
+      for(const zone of Object.values(zones)){
+        const cx=zone.sx/zone.weight,cy=zone.sy/zone.weight;
+        ctx.fillStyle=rgbStr(zone.color,Math.min(0.65,zone.weight*0.12)*breath*(t.glowOpacity??1));
+        ctx.beginPath();ctx.arc(cx,cy,70+zone.count*16,0,Math.PI*2);ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Connections
+    if (!t.noConnections) {
+      const cAlpha=t.connAlpha??0.3,cCurve=t.connCurve??14;
+      for(const[a,b]of conns){
+        const na=nodes[a],nb=nodes[b];if(na.alpha<0.03||nb.alpha<0.03)continue;
+        const pa=animPos(na,time,isAI,t),pb=animPos(nb,time,isAI,t);
+        const dx=pa.x-pb.x,dy=pa.y-pb.y,dist=Math.sqrt(dx*dx+dy*dy);
+        const lineA=Math.max(0,1-dist/400)*Math.min(na.alpha,nb.alpha)*cAlpha*(a>=20||b>=20?0.6:1);
+        if(lineA<0.005)continue;
+        ctx.beginPath();
+        if(isAI){ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);}
+        else{ctx.moveTo(pa.x,pa.y);ctx.quadraticCurveTo((pa.x+pb.x)/2+Math.sin(time*0.15+a+b)*cCurve,(pa.y+pb.y)/2+Math.cos(time*0.1+a*0.7)*cCurve,pb.x,pb.y);}
+        ctx.strokeStyle=rgbStr([255,255,255],lineA);ctx.lineWidth=t.connWidth??1;ctx.lineCap='round';ctx.stroke();
+      }
+    }
+
+    // Nodes
+    const order=[];for(let i=0;i<nodes.length;i++)order.push(i);
+    order.sort((a,b)=>nodes[a].alpha-nodes[b].alpha);
+    const haloScale=t.haloScale??3;
+    for(const idx of order){
+      const n=nodes[idx];if(n.alpha<0.02)continue;
+      const p=animPos(n,time,isAI,t),c=n.color,ba=n.alpha;
+      const cR=(n.r+n.flash*3)*breath;
+      // Outer halo
+      if(cR>1){
+        const outerR=cR*haloScale;
+        const g1=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,outerR);
+        g1.addColorStop(0,rgbStr(c,ba*(t.haloInner??0.22)));g1.addColorStop(0.5,rgbStr(c,ba*(t.haloMid??0.08)));g1.addColorStop(1,rgbStr(c,0));
+        if(isAI&&n.type==='primary'){ctx.save();if(n.sensitive)triangle(ctx,p.x,p.y,outerR*1.3);else diamond(ctx,p.x,p.y,outerR*1.3);ctx.clip();ctx.fillStyle=g1;ctx.fillRect(p.x-outerR,p.y-outerR,outerR*2,outerR*2);ctx.restore();}
+        else{ctx.beginPath();ctx.arc(p.x,p.y,outerR,0,Math.PI*2);ctx.fillStyle=g1;ctx.fill();}
+      }
+      // Mid glow
+      if(cR>0.5){ctx.beginPath();if(isAI&&n.type==='primary'){if(n.sensitive)triangle(ctx,p.x,p.y,cR*1.8);else diamond(ctx,p.x,p.y,cR*1.8);}else ctx.arc(p.x,p.y,cR*1.8,0,Math.PI*2);ctx.fillStyle=rgbStr(c,ba*0.35);ctx.fill();}
+      // Core
+      if(cR>0.3){ctx.beginPath();if(isAI&&n.type==='primary'){if(n.sensitive)triangle(ctx,p.x,p.y,cR);else diamond(ctx,p.x,p.y,cR);}else ctx.arc(p.x,p.y,cR,0,Math.PI*2);ctx.fillStyle=rgbStr(c,ba*0.95);ctx.fill();}
+      // Pip
+      if(cR>0.8){ctx.beginPath();if(isAI&&n.type==='primary'){if(n.sensitive)triangle(ctx,p.x,p.y,cR*0.4);else diamond(ctx,p.x,p.y,cR*0.4);}else ctx.arc(p.x,p.y,cR*0.4,0,Math.PI*2);ctx.fillStyle=rgbStr([255,255,255],ba*0.65);ctx.fill();}
+      // Flash
+      if(n.flash>0.05){const fR=cR*(3+(1-n.flash)*8);if(isAI&&n.type==='primary'&&n.sensitive)triangle(ctx,p.x,p.y,fR);else if(isAI&&n.type==='primary')diamond(ctx,p.x,p.y,fR);else{ctx.beginPath();ctx.arc(p.x,p.y,fR,0,Math.PI*2);}ctx.strokeStyle=rgbStr(c,n.flash*0.4);ctx.lineWidth=2*n.flash;ctx.stroke();}
+    }
+    ctx.restore();
+  }
+
+  // Init + prop changes + animation loop
+  React.useEffect(()=>{
+    const{onboardingAnswers,assessCompleted,entityType,tuning:t}=propsRef.current;
+    const{colorAns,posAns}=deriveAnswers(onboardingAnswers);
+    const assessState=deriveAssessState(assessCompleted);
+    const nodes=buildAllNodes(assessState,colorAns,posAns,entityType==='ai',t);
+    for(const n of nodes){n.vx=0;n.vy=0;}
+    const stars=[];for(let i=0;i<120;i++)stars.push({x:Math.random()*600,y:Math.random()*600,r:0.2+Math.random()*0.9,bright:Math.random()*0.35+0.05,phase:Math.random()*Math.PI*2,speed:0.5+Math.random()*2.5});
+    stateRef.current={nodes,stars,conns:[],lastTime:performance.now(),prevAK:'',prevAsK:'',prevET:''};
+  },[]);
+
+  React.useEffect(()=>{
+    if(!stateRef.current)return;const{nodes}=stateRef.current;
+    const{onboardingAnswers,assessCompleted,entityType,tuning:t}=propsRef.current;
+    const ak=JSON.stringify(onboardingAnswers),ask=JSON.stringify(Object.keys(assessCompleted).sort());
+    const ac=ak!==stateRef.current.prevAK,asc=ask!==stateRef.current.prevAsK,ec=entityType!==stateRef.current.prevET;
+    stateRef.current.prevAK=ak;stateRef.current.prevAsK=ask;stateRef.current.prevET=entityType;
+    if(ec)for(const n of nodes)if(n.alpha>0.05)n.flash=0.6;
+    if(asc){
+      const{colorAns,posAns}=deriveAnswers(onboardingAnswers);
+      const assessState=deriveAssessState(assessCompleted);
+      if(!t.primariesOnly){
+        nodes.length=20;
+        ASSESS_MAP.forEach((assess,ai)=>{if(!assessState[ai])return;const rng=seededRng(ai*137+42),affs=assess.affinities;
+          for(let ni=0;ni<assess.nodes;ni++){let mx=0,my=0;for(const pi of affs){mx+=nodes[pi].x;my+=nodes[pi].y;}mx/=affs.length;my/=affs.length;
+            const nd=makeNode({x:mx+(rng()-0.5)*50,y:my+(rng()-0.5)*50,r:2+rng()*2,halo:8+rng()*10,type:'assess',color:assess.color,assessIdx:ai,tier:assess.tier,parent:affs[0],affinities:affs});nd.vx=0;nd.vy=0;nodes.push(nd);}
+        });for(let i=20;i<nodes.length;i++)nodes[i].flash=0.5;
+      }
+    }
+    if(ac&&!ec){
+      const{colorAns,posAns}=deriveAnswers(onboardingAnswers);
+      const seeds=primarySeedPositions(colorAns,posAns,entityType==='ai',t);
+      for(let i=0;i<5;i++){nodes[i].flash=1;nodes[i].vx=(nodes[i].vx||0)+(seeds[i].x-nodes[i].x)*0.15;nodes[i].vy=(nodes[i].vy||0)+(seeds[i].y-nodes[i].y)*0.15;
+        if(nodes[5+i*2])nodes[5+i*2].flash=0.6;if(nodes[5+i*2+1])nodes[5+i*2+1].flash=0.5;}
+    }
+  },[onboardingAnswers,assessCompleted,entityType]);
+
+  React.useEffect(()=>{
+    const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas.getContext('2d');
+    function frame(now){
+      if(!stateRef.current){animRef.current=requestAnimationFrame(frame);return;}
+      const{nodes,stars}=stateRef.current;
+      const{onboardingAnswers,assessCompleted,entityType,size,tuning:t}=propsRef.current;
+      const scale=size/600,isAI=entityType==='ai';
+      const{colorAns,posAns}=deriveAnswers(onboardingAnswers);
+      const assessState=deriveAssessState(assessCompleted);
+      const dt=Math.min((now-stateRef.current.lastTime)/1000,0.05);stateRef.current.lastTime=now;const time=now/1000;
+      computeAppearance(nodes,isAI,colorAns,posAns,assessState,t);
+      const edges=buildEdges(nodes,isAI,colorAns,posAns,t);
+      simulateForces(nodes,edges,isAI,dt,t);
+      const conns=[];for(const e of edges)if(nodes[e.a].alpha>0.03&&nodes[e.b].alpha>0.03)conns.push([e.a,e.b]);
+      const spd=6*dt;
+      for(const n of nodes){n.x=lerp(n.x,n.tx,spd);n.y=lerp(n.y,n.ty,spd);n.r=lerp(n.r,n.tr+n.flash*5,spd);n.alpha=lerp(n.alpha,n.talpha+n.flash*0.3,spd*0.7);n.color=lerpRgb(n.color,n.tcolor,spd);n.orbitAngle+=n.orbitSpeed*(isAI?0.15:1.2);n.flash*=0.91;if(n.flash<0.01)n.flash=0;}
+      const dpr=window.devicePixelRatio||1;canvas.width=size*dpr;canvas.height=size*dpr;canvas.style.width=size+'px';canvas.style.height=size+'px';ctx.setTransform(dpr,0,0,dpr,0,0);
+      render(ctx,nodes,conns,stars,isAI,time,scale,t);
+      animRef.current=requestAnimationFrame(frame);
+    }
+    animRef.current=requestAnimationFrame(frame);
+    return()=>{if(animRef.current)cancelAnimationFrame(animRef.current);};
+  },[]);
+
+  return React.createElement('canvas',{ref:canvasRef,style:{display:'block',borderRadius:Math.round(14*(size/600))+'px',width:size+'px',height:size+'px',border:'1px solid rgba(255,255,255,0.06)'}});
+});
+
+
+// ═══════════════════════════════════════════════════════
+// 6 DRAMATICALLY DIFFERENT VARIATIONS — v3
+// ═══════════════════════════════════════════════════════
+const VARIATIONS = [
+  {
+    name: 'v12 Production',
+    desc: 'Current app. Aggregated blur clouds, all ghosts, full spread.',
+    tag: 'ref',
+    tuning: {},
+  },
+  {
+    name: 'Atmospheric Bloom',
+    desc: 'LAYERED: per-primary radials + blur wash on top. Distinct colors with atmospheric depth. The marriage of SVG warmth and production immersion.',
+    tag: 'var',
+    tuning: {
+      glowMode: 'layered',
+      glowRadius: 220,
+      glowAlpha: 0.75,
+      glowPasses: 2,
+      glowWashBlur: 45,
+      glowWashAlpha: 0.30,
+      ghostAlpha: 0.25,
+      answeredR: 13,
+      answeredHalo: 48,
+      driftMult: 1.3,
+      secondHarmonic: 0.4,
+      wobble: 5,
+      breathAmp: 0.05,
+      breathSpd: 0.22,
+      connCurve: 16,
+      connAlpha: 0.22,
+      gravity: 0.018,
+      repulsionScale: 1.2,
+      haloScale: 3.5,
+      haloInner: 0.25,
+      haloMid: 0.09,
+      stars: 40,
+    },
+  },
+  {
+    name: 'Color Pools',
+    desc: 'Per-primary glow cranked to max. Huge overlapping color pools. Where primaries cluster, colors mix into new hues.',
+    tag: 'var',
+    tuning: {
+      glowMode: 'perPrimary',
+      glowRadius: 250,
+      glowAlpha: 0.85,
+      ghostAlpha: 0.30,
+      answeredR: 14,
+      answeredHalo: 50,
+      driftMult: 1.4,
+      secondHarmonic: 0.45,
+      wobble: 6,
+      breathAmp: 0.06,
+      breathSpd: 0.2,
+      connCurve: 20,
+      connAlpha: 0.18,
+      gravity: 0.015,
+      repulsionScale: 1.3,
+      haloScale: 4,
+      haloInner: 0.30,
+      haloMid: 0.12,
+      stars: 25,
+    },
+  },
+  {
+    name: 'SVG Spirit',
+    desc: 'Canvas SVG feel. Primaries only, no force, layered glow, gentle drift. The simple beauty at low data.',
+    tag: 'var',
+    tuning: {
+      primariesOnly: true,
+      noForce: true,
+      glowMode: 'layered',
+      glowRadius: 180,
+      glowAlpha: 0.80,
+      glowPasses: 3,
+      glowWashBlur: 35,
+      glowWashAlpha: 0.20,
+      ghostAlpha: 0.15,
+      answeredR: 14,
+      answeredHalo: 50,
+      driftMult: 1.6,
+      secondHarmonic: 0.5,
+      wobble: 6,
+      breathAmp: 0.06,
+      breathSpd: 0.2,
+      noConnections: true,
+      haloScale: 4,
+      haloInner: 0.30,
+      haloMid: 0.12,
+      stars: 20,
+    },
+  },
+  {
+    name: 'Deep Nebula',
+    desc: 'Per-node glow with every node radiating. Rich, dense atmosphere. Companions and assessments add secondary color clouds.',
+    tag: 'var',
+    tuning: {
+      glowMode: 'perNode',
+      glowRadius: 130,
+      glowAlpha: 0.65,
+      ghostAlpha: 0.20,
+      companionGhostAlpha: 0.15,
+      companionAlpha: 0.7,
+      driftMult: 1.3,
+      secondHarmonic: 0.4,
+      wobble: 5,
+      breathAmp: 0.05,
+      breathSpd: 0.22,
+      connAlpha: 0.20,
+      connCurve: 18,
+      gravity: 0.02,
+      repulsionScale: 1.1,
+      haloScale: 3.5,
+      haloInner: 0.26,
+      stars: 30,
+    },
+  },
+  {
+    name: 'Warm Constellation',
+    desc: 'Balanced: layered glow + earned companions + structural connections + organic drift. SVG soul, canvas depth, for when it works.',
+    tag: 'var',
+    tuning: {
+      glowMode: 'layered',
+      glowRadius: 190,
+      glowAlpha: 0.70,
+      glowPasses: 2,
+      glowWashBlur: 30,
+      glowWashAlpha: 0.22,
+      ghostAlpha: 0.08,
+      earnedCompanions: true,
+      companionGhostAlpha: 0,
+      satThreshold: 8,
+      answeredR: 12,
+      answeredHalo: 45,
+      driftMult: 1.2,
+      secondHarmonic: 0.4,
+      wobble: 5,
+      breathAmp: 0.05,
+      breathSpd: 0.25,
+      connCurve: 16,
+      connAlpha: 0.28,
+      gravity: 0.022,
+      repulsionScale: 1.15,
+      haloScale: 3.5,
+      haloInner: 0.24,
+      haloMid: 0.09,
+      stars: 35,
+    },
+  },
+];
+
+
+// ═══════════════════════════════════════════════════════
+// HARNESS — Colored persona buttons + Entity gate toggle
+// ═══════════════════════════════════════════════════════
+
+const ALL_ASSESS_IDS = [
+  'starter-personality','starter-motivation','starter-thinking',
+  'starter-connection','starter-strategy',
+  'bigfive-E','integrity','shadow-M','adhd','attachment','risk',
+];
+
+function generateRandom(tier, forceEntity) {
+  const answers={},assessments={};
+  const entity=forceEntity||(Math.random()<0.85?'human':'ai');
+  const count=tier==='new'?(2+Math.floor(Math.random()*3)):10;
+  const qOrder=[1,2,3,4,5,6,7,8,9,10].sort(()=>Math.random()-0.5);
+  for(let i=0;i<count;i++) answers['onboard-'+qOrder[i]]=Math.random()<0.5?0:1;
+  if(tier==='regular'){
+    const n=2+Math.floor(Math.random()*3),sh=ALL_ASSESS_IDS.slice(0,5).sort(()=>Math.random()-0.5);
+    for(let i=0;i<Math.min(n,sh.length);i++) assessments[sh[i]]={score:30+Math.floor(Math.random()*60)};
+  } else if(tier==='power'){
+    const n=5+Math.floor(Math.random()*4),sh=[...ALL_ASSESS_IDS].sort(()=>Math.random()-0.5);
+    for(let i=0;i<Math.min(n,sh.length);i++) assessments[sh[i]]={score:20+Math.floor(Math.random()*70)};
+  }
+  return{answers,assessments,entity};
+}
+
+function sizeForTier(tier) {
+  return tier === 'new' ? 180 : tier === 'regular' ? 240 : 300;
+}
+
+function App() {
+  const [entityType,setEntityType]=React.useState('human');
+  const [onboardingAnswers,setOnboardingAnswers]=React.useState({});
+  const [assessCompleted,setAssessCompleted]=React.useState({});
+  const [activeTier,setActiveTier]=React.useState(null);
+  const [picked,setPicked]=React.useState(new Set());
+  const [snapshots,setSnapshots]=React.useState([]);
+  const [galleryVar,setGalleryVar]=React.useState(1); // Default to Atmospheric Bloom
+  const [vizSize,setVizSize]=React.useState(240);
+
+  function applyTier(tier) {
+    const state=generateRandom(tier, entityType);
+    setOnboardingAnswers(state.answers);
+    setAssessCompleted(state.assessments);
+    setActiveTier(tier);
+    setVizSize(sizeForTier(tier));
+    setSnapshots(prev=>[{...state,tier,size:sizeForTier(tier),entity:entityType},...prev].slice(0,6));
+  }
+
+  function toggleEntity() {
+    const next = entityType === 'human' ? 'ai' : 'human';
+    setEntityType(next);
+  }
+
+  function randomAll() {
+    const tiers=['new','regular','power'];
+    const tier=tiers[Math.floor(Math.random()*3)];
+    const state=generateRandom(tier, entityType);
+    setOnboardingAnswers(state.answers);
+    setAssessCompleted(state.assessments);
+    setActiveTier(tier);
+    setVizSize(sizeForTier(tier));
+    setSnapshots(prev=>[{...state,tier,size:sizeForTier(tier),entity:entityType},...prev].slice(0,6));
+  }
+
+  function togglePick(idx) {
+    setPicked(prev=>{const next=new Set(prev);if(next.has(idx))next.delete(idx);else next.add(idx);return next;});
+  }
+
+  const ac=Object.keys(onboardingAnswers).length;
+  const asc=Object.keys(assessCompleted).length;
+  const label=activeTier==='new'?'New User':activeTier==='regular'?'Regular':activeTier==='power'?'Power User':'—';
+
+  return React.createElement('div',{className:'page'},
+    React.createElement('div',{className:'header'},
+      React.createElement('h1',null,'Warm Canvas v3 — Layered Glow + Entity Gate'),
+      React.createElement('p',null,`${label} · ${ac}/10 answers · ${asc} assessments · ${entityType} · ${vizSize}px`),
+    ),
+
+    // Controls row 1: Entity gate + Personas + Random
+    React.createElement('div',{className:'controls'},
+      // Entity gate
+      React.createElement('div',{className:'controls-group'},
+        React.createElement('span',{className:'group-label'},'Entity'),
+        React.createElement('button',{
+          className:'entity-btn ' + (entityType==='human'?'entity-human active':'entity-human'),
+          onClick:()=>setEntityType('human'),
+          style: entityType==='human' ? {} : {opacity:0.4},
+        },'Human'),
+        React.createElement('button',{
+          className:'entity-btn ' + (entityType==='ai'?'entity-ai active':'entity-ai'),
+          onClick:()=>setEntityType('ai'),
+          style: entityType==='ai' ? {} : {opacity:0.4},
+        },'AI'),
+      ),
+
+      // Divider
+      React.createElement('div',{style:{width:'1px',height:'28px',background:'#1f2937'}}),
+
+      // Persona tier buttons
+      React.createElement('div',{className:'controls-group'},
+        React.createElement('span',{className:'group-label'},'Tier'),
+        React.createElement('button',{
+          className:'tier-btn tier-new'+(activeTier==='new'?' active':''),
+          onClick:()=>applyTier('new'),
+        },'New'),
+        React.createElement('button',{
+          className:'tier-btn tier-regular'+(activeTier==='regular'?' active':''),
+          onClick:()=>applyTier('regular'),
+        },'Regular'),
+        React.createElement('button',{
+          className:'tier-btn tier-power'+(activeTier==='power'?' active':''),
+          onClick:()=>applyTier('power'),
+        },'Power'),
+      ),
+
+      // Divider
+      React.createElement('div',{style:{width:'1px',height:'28px',background:'#1f2937'}}),
+
+      // Random
+      React.createElement('button',{className:'random-btn',onClick:randomAll},'Random'),
+    ),
+
+    picked.size>0&&React.createElement('div',{className:'pick-bar'},
+      React.createElement('span',null,`Favorites: ${[...picked].map(i=>VARIATIONS[i].name).join(', ')}`),
+    ),
+
+    React.createElement('div',{className:'grid'},
+      VARIATIONS.map((v,idx)=>
+        React.createElement('div',{key:idx,className:'cell'+(picked.has(idx)?' picked':''),onClick:()=>togglePick(idx)},
+          React.createElement('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
+            React.createElement('span',{className:'cell-label'},v.name),
+            React.createElement('span',{className:'cell-tag '+(v.tag==='ref'?'tag-ref':'tag-var')},v.tag==='ref'?'baseline':'variation'),
+          ),
+          React.createElement('div',{className:'cell-desc'},v.desc),
+          React.createElement(WarmAuraViz,{onboardingAnswers,assessCompleted,entityType,darkMode:true,size:vizSize,tuning:v.tuning}),
+        ),
+      ),
+    ),
+
+    snapshots.length>0&&React.createElement(React.Fragment,null,
+      React.createElement('div',{className:'divider'}),
+      React.createElement('div',{className:'section-label'},`Recent (${VARIATIONS[galleryVar].name})`),
+      React.createElement('div',{className:'controls',style:{marginBottom:'6px'}},
+        VARIATIONS.map((v,idx)=>
+          React.createElement('button',{key:idx,className:'ctrl-btn'+(galleryVar===idx?' active':''),onClick:()=>setGalleryVar(idx),style:{padding:'3px 8px',fontSize:'9px',border:'1px solid #374151',borderRadius:'8px',background:galleryVar===idx?'rgba(139,92,246,0.12)':'transparent',color:galleryVar===idx?'#fff':'#9ca3af',cursor:'pointer',fontFamily:'inherit'}},v.name),
+        ),
+      ),
+      React.createElement('div',{style:{display:'flex',gap:'10px',justifyContent:'center',flexWrap:'wrap'}},
+        snapshots.map((snap,i)=>
+          React.createElement('div',{key:i,style:{display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',opacity:i===0?1:0.6+i*0.05}},
+            React.createElement('div',{style:{borderRadius:'8px',overflow:'hidden',border:i===0?'2px solid rgba(139,92,246,0.4)':'1px solid rgba(255,255,255,0.06)'}},
+              React.createElement(WarmAuraViz,{onboardingAnswers:snap.answers,assessCompleted:snap.assessments,entityType:snap.entity,darkMode:true,size:snap.size*0.45,tuning:VARIATIONS[galleryVar].tuning}),
+            ),
+            React.createElement('div',{style:{fontSize:'8px',color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.08em'}},
+              `${snap.tier} · ${snap.entity} · ${Object.keys(snap.answers).length}q · ${Object.keys(snap.assessments).length}a`
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>

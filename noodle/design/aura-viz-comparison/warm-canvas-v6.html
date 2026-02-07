@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz — Warm Canvas v6</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #030712; color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh; padding: 20px;
+  }
+  .page { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .header { text-align: center; }
+  .header h1 { font-size: 15px; font-weight: 700; color: #fff; }
+  .header p { font-size: 11px; color: #6b7280; margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  .cell {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.015);
+    cursor: pointer; transition: all 0.3s;
+  }
+  .cell:hover { border-color: rgba(139,92,246,0.3); }
+  .cell.picked { border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.04); }
+  .cell-label { font-size: 11px; font-weight: 600; color: #fff; }
+  .cell-desc { font-size: 9px; color: #6b7280; text-align: center; line-height: 1.4; }
+  .cell-tag { font-size: 8px; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  .tag-ref { color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+  .tag-var { color: #8b5cf6; border: 1px solid rgba(139,92,246,0.3); }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+  .controls-group { display: flex; gap: 6px; align-items: center; }
+  .group-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: #4b5563; font-weight: 600; margin-right: 2px; }
+  .tier-btn {
+    padding: 7px 16px; border-radius: 8px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: all 0.2s; font-family: inherit;
+    border: 2px solid; background: transparent;
+  }
+  .tier-new { color: #10b981; border-color: #10b981; }
+  .tier-new.active { background: #10b981; color: #030712; }
+  .tier-regular { color: #8b5cf6; border-color: #8b5cf6; }
+  .tier-regular.active { background: #8b5cf6; color: #fff; }
+  .tier-power { color: #f59e0b; border-color: #f59e0b; }
+  .tier-power.active { background: #f59e0b; color: #030712; }
+  .entity-btn {
+    padding: 7px 16px; border-radius: 8px;
+    font-size: 11px; font-weight: 700; cursor: pointer;
+    transition: all 0.2s; font-family: inherit;
+    background: transparent; border: 2px solid;
+  }
+  .entity-human { color: #8b5cf6; border-color: #8b5cf6; }
+  .entity-human.active { background: #8b5cf6; color: #fff; }
+  .entity-ai { color: #06b6d4; border-color: #06b6d4; }
+  .entity-ai.active { background: #06b6d4; color: #030712; }
+  .random-btn {
+    padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(99,102,241,0.3);
+    background: transparent; color: #6366f1; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; font-family: inherit;
+  }
+  .random-btn:hover { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+  .divider { width: 100%; max-width: 500px; height: 1px; background: #1f2937; margin: 0 auto; }
+  .section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; font-weight: 600; text-align: center; }
+  .pick-bar {
+    display: flex; gap: 8px; justify-content: center; padding: 8px;
+    background: rgba(16,185,129,0.06); border-radius: 8px; border: 1px solid rgba(16,185,129,0.15);
+  }
+  .pick-bar span { font-size: 11px; color: #10b981; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+
+// ═══════════════════════════════════════════════════════
+// CONSTELLATION AURA VIZ v6
+// Ring-based layout (from playground), topology connections,
+// straight lines, multi-harmonic drift, concentric shapes.
+// ═══════════════════════════════════════════════════════
+
+const WarmAuraViz = React.memo(function WarmAuraViz({
+  onboardingAnswers = {},
+  assessCompleted = {},
+  entityType = 'human',
+  darkMode = true,
+  size = 240,
+  tuning = {},
+}) {
+  const canvasRef = React.useRef(null);
+  const stateRef = React.useRef(null);
+  const animRef = React.useRef(null);
+  const propsRef = React.useRef({ onboardingAnswers, assessCompleted, entityType, darkMode, size, tuning });
+  propsRef.current = { onboardingAnswers, assessCompleted, entityType, darkMode, size, tuning };
+
+  // ═══ COLORS ═══
+  const C = {
+    violet:'#8b5cf6', blue:'#3b82f6', teal:'#14b8a6', rose:'#f43f5e',
+    pink:'#d946ef', emerald:'#10b981', amber:'#f59e0b', indigo:'#6366f1', cyan:'#06b6d4',
+  };
+
+  // ═══ HELPERS ═══
+  function hexRgb(hex) { const n=parseInt(hex.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+  function lerp(a,b,t) { return a+(b-a)*t; }
+  function lerpRgb(a,b,t) { return [lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)]; }
+  function rgbStr(c,a) { return `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${Math.max(0,a).toFixed(3)})`; }
+  function seededRng(seed) { let s=seed; return()=>{s=(s*16807+0)%2147483647;return s/2147483647;}; }
+
+  // ═══ NEURON & ASSESS MAPS ═══
+  const NEURON_MAP = [
+    { colorQ:'onboard-1', posQ:'onboard-2', colors:[C.violet,C.blue] },
+    { colorQ:'onboard-4', posQ:'onboard-8', colors:[C.indigo,C.rose] },
+    { colorQ:'onboard-5', posQ:'onboard-3', colors:[C.pink,C.teal] },
+    { colorQ:'onboard-6', posQ:'onboard-9', colors:[C.emerald,C.amber] },
+    { colorQ:'onboard-7', posQ:'onboard-10', colors:[C.cyan,C.violet] },
+  ];
+  const SENSITIVE = [false,false,false,true,true];
+  const ASSESS_MAP = [
+    {ids:['starter-personality'],color:C.violet,tier:1,nodes:3,affinities:[0,2]},
+    {ids:['starter-motivation'],color:C.amber,tier:1,nodes:3,affinities:[1,3]},
+    {ids:['starter-thinking'],color:C.blue,tier:1,nodes:3,affinities:[0,4]},
+    {ids:['starter-connection'],color:C.pink,tier:1,nodes:3,affinities:[2,3]},
+    {ids:['starter-strategy'],color:C.emerald,tier:1,nodes:3,affinities:[1,4]},
+    {ids:['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'],color:C.violet,tier:2,nodes:5,affinities:[0,2,4]},
+    {ids:['integrity'],color:C.emerald,tier:2,nodes:3,affinities:[3,1]},
+    {ids:['shadow-M','shadow-N','shadow-P'],color:C.indigo,tier:2,nodes:4,affinities:[3,4]},
+    {ids:['adhd','cognitive','chronotype','reasoning'],color:C.cyan,tier:2,nodes:4,affinities:[4,0]},
+    {ids:['attachment'],color:C.rose,tier:2,nodes:3,affinities:[2,3]},
+    {ids:['risk'],color:C.amber,tier:2,nodes:3,affinities:[1,4]},
+  ];
+
+  function deriveAnswers(answers) {
+    const colorAns=new Array(5).fill(null),posAns=new Array(5).fill(null);
+    for(let i=0;i<5;i++){const nm=NEURON_MAP[i];if(nm.colorQ in answers)colorAns[i]=answers[nm.colorQ];if(nm.posQ in answers)posAns[i]=answers[nm.posQ];}
+    return{colorAns,posAns};
+  }
+  function deriveAssessState(completed){const s={};ASSESS_MAP.forEach((a,i)=>{s[i]=a.ids.some(id=>id in completed);});return s;}
+
+  // ═══ NODE FACTORY ═══
+  function makeNode(o) {
+    return {
+      x:o.x||300, y:o.y||300, tx:o.x||300, ty:o.y||300,
+      // Base position on ring (target before wander)
+      baseX:o.x||300, baseY:o.y||300,
+      color:o.color?hexRgb(o.color):[70,75,90], tcolor:o.color?hexRgb(o.color):[70,75,90],
+      r:o.r||2, tr:o.r||2, halo:o.halo||8, thalo:o.halo||8,
+      alpha:0, talpha:0,
+      // 3D multi-harmonic drift — each node traces a unique Lissajous curve
+      // Wide speed range creates parallax (fast=close, slow=far)
+      driftSpeed: 0.25 + Math.random()*0.55,  // 0.25-0.8 (gentler range)
+      driftAmp: 6 + Math.random()*9,          // 6-15px (organic, not frantic)
+      phaseX: Math.random()*Math.PI*2*3,
+      phaseY: Math.random()*Math.PI*2*3,
+      // 3rd harmonic: very slow, creates gentle "tumbling in 3D" illusion
+      slowFreq: 0.025 + Math.random()*0.045,  // 20-40 second cycles (slower)
+      slowPhaseX: Math.random()*Math.PI*2,
+      slowPhaseY: Math.random()*Math.PI*2,
+      slowAmp: 0.3 + Math.random()*0.4,       // gentler multiplier
+      orbitAngle: Math.random()*Math.PI*2,
+      orbitSpeed: (Math.random()-0.5)*0.005,
+      // Slow wander (per-primary, from v5)
+      wanderFreq1: 0.006+Math.random()*0.008,
+      wanderFreq2: 0.003+Math.random()*0.005,
+      wanderFreq3: 0.001+Math.random()*0.003,
+      wanderPhase1: Math.random()*Math.PI*2,
+      wanderPhase2: Math.random()*Math.PI*2,
+      wanderPhase3: Math.random()*Math.PI*2,
+      flash:0,
+      birthMix: 0, // 0=at center, 1=fully grown. Updated per frame.
+      birthDelay: o.birthDelay||0, // seconds before this node starts growing
+      // Ring info
+      baseAngle: o.baseAngle||0,
+      baseR: o.baseR||0,
+      // Metadata
+      type:o.type||'primary', parent:o.parent??-1, sensitive:o.sensitive||false,
+      assessIdx:o.assessIdx??null, affinities:o.affinities||null, tier:o.tier||0,
+    };
+  }
+
+  function answerHash(ca,pa){let h=0;for(let i=0;i<5;i++){h=h*31+(ca[i]!==null?ca[i]+1:0);h=h*37+(pa[i]!==null?pa[i]+1:0);}return h;}
+
+  // ═══════════════════════════════════════════════════════
+  // RING-BASED LAYOUT
+  // Inner ring: primaries (pentagon)
+  // Companion ring: 2 per primary (decagon)
+  // Satellite ring: 1 per primary (outer pentagon)
+  // Assess rings: tier 1 (~inner-mid), tier 2 (~outer)
+  // ═══════════════════════════════════════════════════════
+
+  function buildAllNodes(assessState, colorAns, posAns, isAI, t) {
+    const nodes=[], CX=300, CY=300;
+    const h = answerHash(colorAns,posAns);
+    const rng = seededRng(h+7919);
+    const baseRot = (h % 628) / 100; // unique rotation per user
+
+    const INNER_R = t.ringInner ?? 80;
+    const COMP_R = t.ringComp ?? 140;
+    const SAT_R = t.ringSat ?? 185;
+
+    // ── PRIMARIES: pentagon on inner ring ──
+    for (let i = 0; i < 5; i++) {
+      const angle = baseRot + (i/5)*Math.PI*2;
+      // Subtle answer-based nudge
+      const nudge = (posAns[i]!==null?(posAns[i]===0?-0.12:0.12):0)
+                  + (colorAns[i]!==null?(colorAns[i]===0?-0.06:0.06):0);
+      const a = angle + nudge;
+      const x = CX + Math.cos(a)*INNER_R;
+      const y = CY + Math.sin(a)*INNER_R;
+      const node = makeNode({x, y, r:5, halo:22, type:'primary', sensitive:SENSITIVE[i], baseAngle:a, baseR:INNER_R, birthDelay: i*0.2});
+      nodes.push(node);
+    }
+
+    // ── COMPANIONS: decagon on outer ring ──
+    if (!t.primariesOnly) {
+      for (let i = 0; i < 5; i++) {
+        const parentAngle = nodes[i].baseAngle;
+        for (let c = 0; c < 2; c++) {
+          const offset = c===0 ? -0.20 : 0.20;
+          const a = parentAngle + offset;
+          const r = COMP_R + (rng()-0.5)*16;
+          const x = CX + Math.cos(a)*r;
+          const y = CY + Math.sin(a)*r;
+          nodes.push(makeNode({x, y, type:'companion', parent:i, r:2.5, halo:10, baseAngle:a, baseR:r, birthDelay:1.2+c*0.2+i*0.15}));
+        }
+      }
+
+      // ── SATELLITES: outer pentagon ──
+      for (let s = 0; s < 5; s++) {
+        const a = nodes[s].baseAngle;
+        const r = SAT_R + (rng()-0.5)*12;
+        const x = CX + Math.cos(a)*r;
+        const y = CY + Math.sin(a)*r;
+        nodes.push(makeNode({x, y, type:'satellite', parent:s, r:2, halo:7, baseAngle:a, baseR:r, birthDelay:2.5+s*0.2}));
+      }
+
+      // ── ASSESS NODES: on tier rings ──
+      ASSESS_MAP.forEach((assess,ai) => {
+        if (!assessState[ai]) return;
+        const arng = seededRng(ai*137+42);
+        const affs = assess.affinities;
+        // Place on tier ring, near affinity primaries
+        let midAngle = 0;
+        for (const pi of affs) midAngle += nodes[pi].baseAngle;
+        midAngle /= affs.length;
+        const ringR = assess.tier===1 ? (INNER_R+COMP_R)/2 : (COMP_R+SAT_R)/2;
+
+        for (let ni = 0; ni < assess.nodes; ni++) {
+          const spread = (ni/assess.nodes)*0.6 - 0.3;
+          const a = midAngle + spread + (arng()-0.5)*0.15;
+          const r = ringR + (arng()-0.5)*30;
+          nodes.push(makeNode({
+            x: CX+Math.cos(a)*r, y: CY+Math.sin(a)*r,
+            r: 2+arng()*2, halo: 8+arng()*10,
+            type:'assess', color:assess.color, assessIdx:ai, tier:assess.tier,
+            parent:affs[0], affinities:affs, baseAngle:a, baseR:r,
+            birthDelay:3.0+ni*0.15,
+          }));
+        }
+      });
+    }
+
+    return nodes;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TOPOLOGY-BASED CONNECTIONS
+  // Inner shape (pentagon + star arms)
+  // Outer shape (companion ring)
+  // Bridges (primary → first companion only)
+  // Satellite ring + bridges
+  // ═══════════════════════════════════════════════════════
+
+  function buildConnections(nodes, isAI, colorAns, t) {
+    const conns = [], seen = new Set();
+    function add(a,b) {
+      if (a<0||b<0||a>=nodes.length||b>=nodes.length) return;
+      const k=Math.min(a,b)*10000+Math.max(a,b);
+      if (seen.has(k)) return; seen.add(k); conns.push([a,b]);
+    }
+
+    // ── INNER SHAPE: pentagon + star arms ──
+    // Pentagon edges
+    for (let i=0; i<5; i++) add(i, (i+1)%5);
+    // Star arms (skip-one connections)
+    if (isAI) {
+      // AI: full mesh
+      for (let i=0; i<5; i++) add(i, (i+2)%5);
+    } else {
+      // Human: two star arms for partial star
+      add(0,2); add(1,3);
+    }
+
+    if (!t.primariesOnly && nodes.length > 5) {
+      // ── BRIDGES: each primary → its first companion ──
+      for (let i=0; i<5; i++) add(i, 5+i*2);
+
+      // ── OUTER SHAPE: companion ring ──
+      // Adjacent companions form a ring (decagon)
+      for (let i=0; i<10; i++) add(5+i, 5+(i+1)%10);
+
+      // ── SATELLITE RING + BRIDGES ──
+      if (nodes.length >= 20) {
+        const answeredCount = colorAns.filter(a=>a!==null).length;
+        // Satellite bridges to parent
+        for (let s=0; s<5; s++) add(nodes[15+s].parent, 15+s);
+        // Satellite ring (outer pentagon)
+        if (answeredCount >= 8) {
+          for (let s=0; s<5; s++) add(15+s, 15+(s+1)%5);
+        }
+      }
+
+      // ── ASSESS CONNECTIONS ──
+      for (let ai=20; ai<nodes.length; ai++) {
+        const an = nodes[ai];
+        // Connect to parent primary
+        if (an.parent >= 0) add(an.parent, ai);
+        // Connect siblings (same assessment)
+        for (let aj=ai+1; aj<nodes.length; aj++) {
+          if (nodes[aj].assessIdx === an.assessIdx) add(ai, aj);
+        }
+      }
+    }
+
+    return conns;
+  }
+
+  // ═══ APPEARANCE (same logic as v5) ═══
+  function computeAppearance(nodes, isAI, colorAns, posAns, assessState, t) {
+    for (let i=0; i<5; i++) {
+      const node=nodes[i];
+      if (colorAns[i]!==null) {
+        node.tcolor=hexRgb(NEURON_MAP[i].colors[colorAns[i]]);
+        node.tr=t.answeredR??12; node.thalo=t.answeredHalo??45; node.talpha=1;
+      } else if (posAns[i]!==null) {
+        node.tcolor=lerpRgb(hexRgb(NEURON_MAP[i].colors[0]),hexRgb(NEURON_MAP[i].colors[1]),0.5);
+        node.talpha=0.6; node.tr=8; node.thalo=32;
+      } else {
+        node.tcolor=lerpRgb(hexRgb(NEURON_MAP[i].colors[0]),hexRgb(NEURON_MAP[i].colors[1]),0.5);
+        node.tr=t.ghostR??6; node.thalo=24; node.talpha=t.ghostAlpha??0;
+      }
+    }
+    if (!t.primariesOnly && nodes.length>5) {
+      const ac = colorAns.filter(a=>a!==null).length+posAns.filter(a=>a!==null).length;
+      for (let ci=0; ci<10; ci++) {
+        const node=nodes[5+ci], parent=nodes[node.parent];
+        const ans = colorAns[node.parent]!==null||posAns[node.parent]!==null;
+        if (t.earnedCompanions&&!ans) { node.talpha=0; }
+        else if (ans) { node.tcolor=parent.tcolor; node.tr=4+(ci%2)*2; node.thalo=16+(ci%2)*6; node.talpha=parent.talpha*(t.companionAlpha??0.6); }
+        else { node.tcolor=parent.tcolor; node.tr=2.5; node.thalo=10; node.talpha=t.companionGhostAlpha??0; }
+      }
+      const satT=t.satThreshold??8;
+      for (let si=0; si<5; si++) {
+        const node=nodes[15+si], parent=nodes[node.parent];
+        if (ac>=satT&&parent.talpha>0.3) { node.tcolor=parent.tcolor; node.tr=4; node.thalo=14; node.talpha=0.5*Math.min(1,(ac-satT+1)/4); }
+        else { node.talpha=0; }
+      }
+      for (let ai=20; ai<nodes.length; ai++) {
+        const node=nodes[ai];
+        if (assessState[node.assessIdx]) {
+          node.talpha=0.85; node.tr=5; node.thalo=18;
+          if (node.affinities&&node.affinities.length>=2) {
+            let ar=0,ag=0,ab=0; for (const pi of node.affinities){ar+=nodes[pi].color[0];ag+=nodes[pi].color[1];ab+=nodes[pi].color[2];}
+            const n=node.affinities.length; node.tcolor=lerpRgb(hexRgb(ASSESS_MAP[node.assessIdx].color),[ar/n,ag/n,ab/n],0.6);
+          }
+        } else { node.talpha=0; }
+      }
+    }
+  }
+
+  // ═══ TARGET UPDATE — wander + companion follow ═══
+  function updateTargets(nodes, time, t) {
+    const CX=300, CY=300;
+    const wanderAmp = (t.wanderStrength??0.4) * 25;
+
+    // Primaries: slow wander around base ring position
+    for (let i=0; i<Math.min(5,nodes.length); i++) {
+      const n = nodes[i];
+      if (n.alpha < 0.03) continue;
+      const beat = Math.sin(time*n.wanderFreq3+n.wanderPhase3);
+      const activity = Math.max(0,beat)*Math.max(0,beat);
+      const wx = Math.sin(time*n.wanderFreq1+n.wanderPhase1)*wanderAmp*activity
+               + Math.sin(time*n.wanderFreq2+n.wanderPhase2)*wanderAmp*0.6*activity;
+      const wy = Math.cos(time*n.wanderFreq1*0.73+n.wanderPhase2)*wanderAmp*activity
+               + Math.cos(time*n.wanderFreq2*0.87+n.wanderPhase1)*wanderAmp*0.6*activity;
+      n.tx = n.baseX + wx;
+      n.ty = n.baseY + wy;
+    }
+
+    // Companions: follow parent's wander direction on their ring
+    for (let ci=0; ci<10&&5+ci<nodes.length; ci++) {
+      const comp = nodes[5+ci];
+      if (comp.alpha < 0.02) continue;
+      const parent = nodes[comp.parent];
+      // How far has parent wandered from its base?
+      const pdx = parent.x - parent.baseX;
+      const pdy = parent.y - parent.baseY;
+      // Companions follow at reduced strength
+      comp.tx = comp.baseX + pdx*0.5;
+      comp.ty = comp.baseY + pdy*0.5;
+    }
+
+    // Satellites: follow parent wander at even less strength
+    for (let si=0; si<5&&15+si<nodes.length; si++) {
+      const sat = nodes[15+si];
+      if (sat.alpha < 0.02) continue;
+      const parent = nodes[sat.parent];
+      const pdx = parent.x - parent.baseX;
+      const pdy = parent.y - parent.baseY;
+      sat.tx = sat.baseX + pdx*0.3;
+      sat.ty = sat.baseY + pdy*0.3;
+    }
+
+    // Assess: follow affinity centroid shift
+    for (let ai=20; ai<nodes.length; ai++) {
+      const an = nodes[ai];
+      if (an.alpha < 0.02 || !an.affinities) continue;
+      let sx=0,sy=0;
+      for (const pi of an.affinities) { sx+=nodes[pi].x-nodes[pi].baseX; sy+=nodes[pi].y-nodes[pi].baseY; }
+      sx/=an.affinities.length; sy/=an.affinities.length;
+      an.tx = an.baseX + sx*0.4;
+      an.ty = an.baseY + sy*0.4;
+    }
+  }
+
+  // ═══ 3D MULTI-HARMONIC DRIFT ═══
+  // Each node traces a unique Lissajous curve through 3 layered harmonics.
+  // Different X/Y frequency ratios create the illusion of a 3D object
+  // slowly tumbling — some nodes move across our view, others toward/away.
+  // Returns {x, y, depth} where depth (-1 to 1) modulates glow/size.
+  // Drift is suppressed during birth (birthMix 0→1) so growth is calm, no spin.
+  function animPos(n, time, isAI, t) {
+    const bm = n.birthMix ?? 1; // 0=suppressed (birth), 1=full drift
+    // Drift ramps up VERY gradually — cubed so it's near-zero until node is nearly fully grown
+    const dm = (t.microDrift ?? 1.0) * bm * bm * bm;
+    const sp = n.driftSpeed;
+    const amp = n.driftAmp * (isAI?0.4:1.0) * dm;
+
+    // Harmonic 1: primary motion (each node's signature path)
+    const dx1 = Math.sin(time * sp + n.phaseX) * amp;
+    const dy1 = Math.cos(time * sp * 0.73 + n.phaseY) * amp;
+
+    // Harmonic 2: secondary detail (faster, smaller — adds texture)
+    const dx2 = Math.sin(time * sp * 0.4 + n.phaseX * 2.1) * amp * 0.45;
+    const dy2 = Math.cos(time * sp * 0.35 + n.phaseY * 1.7) * amp * 0.38;
+
+    // Harmonic 3: slow undulation (the "3D tumble" — large, very slow)
+    const dx3 = Math.sin(time * n.slowFreq + n.slowPhaseX) * amp * n.slowAmp;
+    const dy3 = Math.cos(time * n.slowFreq * 0.8 + n.slowPhaseY) * amp * n.slowAmp;
+
+    // Depth: simulated Z-axis. Modulates size/glow for parallax.
+    // Uses a frequency that doesn't align with X/Y for independence.
+    const depth = Math.sin(time * sp * 0.22 + n.phaseX * 0.6 + n.phaseY * 0.3);
+
+    return {
+      x: n.x + dx1 + dx2 + dx3,
+      y: n.y + dy1 + dy2 + dy3,
+      depth,  // -1 (far) to 1 (close)
+    };
+  }
+
+  // ═══ AI SHAPES ═══
+  function diamond(ctx,cx,cy,s){ctx.beginPath();ctx.moveTo(cx,cy-s);ctx.lineTo(cx+s,cy);ctx.lineTo(cx,cy+s);ctx.lineTo(cx-s,cy);ctx.closePath();}
+  function triangle(ctx,cx,cy,s){const h=s*1.15;ctx.beginPath();ctx.moveTo(cx,cy-h);ctx.lineTo(cx+s,cy+h*0.5);ctx.lineTo(cx-s,cy+h*0.5);ctx.closePath();}
+
+  // ═══════════════════════════════════════════════════════
+  // RENDER v6 — concentric constellation
+  // ═══════════════════════════════════════════════════════
+  function render(ctx, nodes, conns, stars, isAI, time, scale, t) {
+    const W=600, H=600, CX=300, CY=300;
+    const breathAmp=t.breathAmp??0.04, breathSpd=t.breathSpd??0.22;
+    const breath = 1+breathAmp*Math.sin(time*breathSpd);
+
+    ctx.save(); ctx.scale(scale,scale);
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = isAI?'#020810':'#060712'; ctx.fillRect(0,0,W,H);
+
+    // ── Stars ──
+    const starCount=t.stars??35;
+    for (let i=0; i<Math.min(starCount,stars.length); i++) {
+      const s=stars[i];
+      const tw = s.bright*(0.5+0.5*Math.sin(time*s.speed+s.phase));
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=rgbStr([180,200,255],tw); ctx.fill();
+    }
+
+    // ── AI hex grid ──
+    if (isAI&&!t.noGrid) {
+      ctx.save(); ctx.translate(CX,CY); ctx.rotate(time*0.015); ctx.translate(-CX,-CY);
+      ctx.strokeStyle='#6b7b93'; ctx.lineWidth=0.6;
+      for (let ring=1; ring<=7; ring++) {
+        ctx.globalAlpha=Math.max(0.005,0.10-ring*0.012); ctx.beginPath();
+        for (let i=0; i<=6; i++) {const a=(i/6)*Math.PI*2-Math.PI/6,r=ring*40;i===0?ctx.moveTo(CX+Math.cos(a)*r,CY+Math.sin(a)*r):ctx.lineTo(CX+Math.cos(a)*r,CY+Math.sin(a)*r);}
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // ── GLOW: per-primary atmospheric radials (depth-modulated) ──
+    const glowR = t.glowRadius ?? 150;
+    const glowAlpha = t.glowAlpha ?? 0.40;
+    const passes = t.glowPasses ?? 1;
+
+    for (let pass=0; pass<passes; pass++) {
+      const ps = 1-pass*0.15, pa = pass===0?1.0:0.6;
+      for (let i=0; i<5; i++) {
+        const n=nodes[i]; if (n.alpha<0.03) continue;
+        const p=animPos(n,time,isAI,t);
+        // Depth modulates glow: closer nodes glow bigger/brighter
+        const depthScale = 0.8 + p.depth * 0.25; // 0.55-1.05
+        const r=glowR*ps*(0.4+n.alpha*0.6)*breath*depthScale;
+        const a=n.alpha*glowAlpha*pa*(0.85+p.depth*0.2);
+        const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+        g.addColorStop(0, rgbStr(n.color, a*0.08));
+        g.addColorStop(0.2, rgbStr(n.color, a*0.20));
+        g.addColorStop(0.35, rgbStr(n.color, a*0.50));
+        g.addColorStop(0.55, rgbStr(n.color, a*0.35));
+        g.addColorStop(0.75, rgbStr(n.color, a*0.12));
+        g.addColorStop(1, rgbStr(n.color, 0));
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.fill();
+      }
+    }
+
+    // ── Optional secondary glow on companions (depth-modulated) ──
+    if (t.secondaryGlow) {
+      const secR=t.secondaryGlowRadius??50, secA=t.secondaryGlowAlpha??0.20;
+      for (let i=5; i<nodes.length; i++) {
+        const n=nodes[i]; if (n.alpha<0.08) continue;
+        const p=animPos(n,time,isAI,t);
+        const weight=n.type==='companion'?0.5:n.type==='assess'?0.6:0.3;
+        const depthMod = 0.8+p.depth*0.25;
+        const r=secR*weight*(0.5+n.alpha*0.5)*breath*depthMod;
+        if (r<4) continue;
+        const al=n.alpha*secA*weight;
+        const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+        g.addColorStop(0, rgbStr(n.color, al*0.1));
+        g.addColorStop(0.3, rgbStr(n.color, al*0.5));
+        g.addColorStop(0.6, rgbStr(n.color, al*0.2));
+        g.addColorStop(1, rgbStr(n.color, 0));
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.fill();
+      }
+    }
+
+    // ── Optional blur wash ──
+    const washBlur=t.glowWashBlur??0, washAlpha=t.glowWashAlpha??0;
+    if (washBlur>0&&washAlpha>0) {
+      ctx.save(); ctx.filter=`blur(${washBlur}px)`;
+      for (let i=0; i<5; i++) {
+        const n=nodes[i]; if (n.alpha<0.03) continue;
+        const p=animPos(n,time,isAI,t);
+        ctx.fillStyle=rgbStr(n.color,n.alpha*washAlpha*breath);
+        ctx.beginPath(); ctx.arc(p.x,p.y,50+n.alpha*40,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // ── NODES: sorted by depth (far first → close on top) for 3D layering ──
+    const nodePositions = [];
+    for (let i=0; i<nodes.length; i++) {
+      if (nodes[i].alpha<0.02) continue;
+      nodePositions.push({ idx:i, pos:animPos(nodes[i],time,isAI,t) });
+    }
+    nodePositions.sort((a,b) => a.pos.depth - b.pos.depth); // far to close
+    const haloScale=t.haloScale??3.5;
+
+    for (const {idx,pos:p} of nodePositions) {
+      const n=nodes[idx], c=n.color, ba=n.alpha;
+      // Depth modulates size: closer nodes slightly bigger
+      const depthSize = 0.88 + p.depth * 0.15; // 0.73-1.03
+      const cR=(n.r+n.flash*3)*breath*depthSize;
+
+      // Outer halo
+      if (cR>1) {
+        const outerR=cR*haloScale;
+        const g1=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,outerR);
+        g1.addColorStop(0, rgbStr(c, ba*(t.haloInner??0.24)));
+        g1.addColorStop(0.5, rgbStr(c, ba*(t.haloMid??0.09)));
+        g1.addColorStop(1, rgbStr(c, 0));
+        if (isAI&&n.type==='primary') {
+          ctx.save();
+          if(n.sensitive)triangle(ctx,p.x,p.y,outerR*1.3);else diamond(ctx,p.x,p.y,outerR*1.3);
+          ctx.clip(); ctx.fillStyle=g1; ctx.fillRect(p.x-outerR,p.y-outerR,outerR*2,outerR*2); ctx.restore();
+        } else { ctx.beginPath();ctx.arc(p.x,p.y,outerR,0,Math.PI*2);ctx.fillStyle=g1;ctx.fill(); }
+      }
+      // Mid glow
+      if (cR>0.5) {
+        ctx.beginPath();
+        if(isAI&&n.type==='primary'){if(n.sensitive)triangle(ctx,p.x,p.y,cR*1.8);else diamond(ctx,p.x,p.y,cR*1.8);}
+        else ctx.arc(p.x,p.y,cR*1.8,0,Math.PI*2);
+        ctx.fillStyle=rgbStr(c,ba*0.35); ctx.fill();
+      }
+      // Bright core
+      if (cR>0.3) {
+        ctx.beginPath();
+        if(isAI&&n.type==='primary'){if(n.sensitive)triangle(ctx,p.x,p.y,cR);else diamond(ctx,p.x,p.y,cR);}
+        else ctx.arc(p.x,p.y,cR,0,Math.PI*2);
+        ctx.fillStyle=rgbStr(c,ba*0.95); ctx.fill();
+      }
+      // White pip
+      if (cR>0.8) {
+        ctx.beginPath();
+        if(isAI&&n.type==='primary'){if(n.sensitive)triangle(ctx,p.x,p.y,cR*0.4);else diamond(ctx,p.x,p.y,cR*0.4);}
+        else ctx.arc(p.x,p.y,cR*0.4,0,Math.PI*2);
+        ctx.fillStyle=rgbStr([255,255,255],ba*0.65); ctx.fill();
+      }
+      // Flash ring
+      if (n.flash>0.05) {
+        const fR=cR*(3+(1-n.flash)*8);
+        ctx.beginPath();
+        if(isAI&&n.type==='primary'&&n.sensitive)triangle(ctx,p.x,p.y,fR);
+        else if(isAI&&n.type==='primary')diamond(ctx,p.x,p.y,fR);
+        else ctx.arc(p.x,p.y,fR,0,Math.PI*2);
+        ctx.strokeStyle=rgbStr(c,n.flash*0.4); ctx.lineWidth=2*n.flash; ctx.stroke();
+      }
+    }
+
+    // ── CONNECTIONS: straight lines, rendered LAST (always visible) ──
+    // Double-render: colored glow under + bright core on top (from playground)
+    const cAlpha = t.connAlpha??0.45;
+    for (const [a,b] of conns) {
+      const na=nodes[a], nb=nodes[b];
+      if (na.alpha<0.03||nb.alpha<0.03) continue;
+      const pa=animPos(na,time,isAI,t), pb=animPos(nb,time,isAI,t);
+      const dx=pa.x-pb.x, dy=pa.y-pb.y, dist=Math.sqrt(dx*dx+dy*dy);
+      const lineA = Math.max(0, 1-dist/350)*Math.min(na.alpha,nb.alpha)*cAlpha;
+      if (lineA<0.008) continue;
+
+      const mc = [(na.color[0]+nb.color[0])/2,(na.color[1]+nb.color[1])/2,(na.color[2]+nb.color[2])/2];
+
+      // Glow layer
+      ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
+      ctx.strokeStyle=rgbStr(mc, lineA*0.4); ctx.lineWidth=(t.connWidth??1.2)*3; ctx.lineCap='round'; ctx.stroke();
+
+      // Crisp core
+      const bright = [Math.min(255,mc[0]+160),Math.min(255,mc[1]+160),Math.min(255,mc[2]+160)];
+      ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
+      ctx.strokeStyle=rgbStr(bright, lineA*1.1); ctx.lineWidth=t.connWidth??1.2; ctx.lineCap='round'; ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  // ═══ LIFECYCLE ═══
+  React.useEffect(() => {
+    const {onboardingAnswers,assessCompleted,entityType,tuning:t} = propsRef.current;
+    const {colorAns,posAns} = deriveAnswers(onboardingAnswers);
+    const assessState = deriveAssessState(assessCompleted);
+    const nodes = buildAllNodes(assessState,colorAns,posAns,entityType==='ai',t);
+    const conns = buildConnections(nodes, entityType==='ai', colorAns, t);
+
+    // Background stars
+    const stars=[];
+    for (let i=0;i<60;i++) stars.push({
+      x:Math.random()*600, y:Math.random()*600,
+      r: 0.2+Math.random()*0.8,
+      bright: Math.random()*0.35+0.05,
+      phase: Math.random()*Math.PI*2,
+      speed: 0.5+Math.random()*2.5,
+    });
+
+    // Birth: all nodes start at center
+    for (const n of nodes) {
+      n.x=300; n.y=300; n.tx=300; n.ty=300;
+    }
+
+    stateRef.current = {
+      nodes, stars, conns,
+      lastTime: performance.now(),
+      birthStart: performance.now(),
+      prevAK: '', prevAsK: '', prevET: entityType,
+    };
+  }, []);
+
+  // Prop change handler
+  React.useEffect(() => {
+    if (!stateRef.current) return;
+    const {nodes} = stateRef.current;
+    const {onboardingAnswers,assessCompleted,entityType,tuning:t} = propsRef.current;
+    const ak=JSON.stringify(onboardingAnswers), ask=JSON.stringify(Object.keys(assessCompleted).sort());
+    const ac=ak!==stateRef.current.prevAK, asc=ask!==stateRef.current.prevAsK, ec=entityType!==stateRef.current.prevET;
+    stateRef.current.prevAK=ak; stateRef.current.prevAsK=ask; stateRef.current.prevET=entityType;
+
+    // Entity or assessment changed — full rebuild
+    if (ec||asc) {
+      const {colorAns,posAns} = deriveAnswers(onboardingAnswers);
+      const assessState = deriveAssessState(assessCompleted);
+      const isAI = entityType==='ai';
+      const newNodes = buildAllNodes(assessState,colorAns,posAns,isAI,t);
+      const newConns = buildConnections(newNodes,isAI,colorAns,t);
+      // Preserve positions from old nodes
+      for (let i=0; i<newNodes.length; i++) {
+        if (i<nodes.length&&nodes[i]) {
+          newNodes[i].x=nodes[i].x; newNodes[i].y=nodes[i].y;
+          newNodes[i].tx=nodes[i].x; newNodes[i].ty=nodes[i].y;
+        }
+        newNodes[i].flash=0.6;
+      }
+      stateRef.current.nodes=newNodes;
+      stateRef.current.conns=newConns;
+      return;
+    }
+    // Answer changed — flash + rebuild connections
+    if (ac) {
+      const {colorAns,posAns} = deriveAnswers(onboardingAnswers);
+      const isAI = entityType==='ai';
+      // Update base positions for primaries
+      const h=answerHash(colorAns,posAns), baseRot=(h%628)/100;
+      const INNER_R=t.ringInner??80;
+      for (let i=0; i<5&&i<nodes.length; i++) {
+        const angle = baseRot+(i/5)*Math.PI*2;
+        const nudge = (posAns[i]!==null?(posAns[i]===0?-0.12:0.12):0)
+                    + (colorAns[i]!==null?(colorAns[i]===0?-0.06:0.06):0);
+        const a=angle+nudge;
+        nodes[i].baseAngle=a; nodes[i].baseR=INNER_R;
+        nodes[i].baseX=300+Math.cos(a)*INNER_R;
+        nodes[i].baseY=300+Math.sin(a)*INNER_R;
+        nodes[i].flash=1;
+      }
+      stateRef.current.conns = buildConnections(nodes,isAI,colorAns,t);
+    }
+  }, [onboardingAnswers, assessCompleted, entityType]);
+
+  // Animation loop
+  React.useEffect(() => {
+    const canvas=canvasRef.current; if(!canvas) return;
+    const ctx=canvas.getContext('2d');
+
+    function frame(now) {
+      if (!stateRef.current) { animRef.current=requestAnimationFrame(frame); return; }
+      const {nodes,stars,conns} = stateRef.current;
+      const {onboardingAnswers,assessCompleted,entityType,size,tuning:t} = propsRef.current;
+      const scale=size/600, isAI=entityType==='ai';
+      const {colorAns,posAns} = deriveAnswers(onboardingAnswers);
+      const assessState = deriveAssessState(assessCompleted);
+      const dt = Math.min((now-stateRef.current.lastTime)/1000, 0.05);
+      stateRef.current.lastTime=now;
+      const time=now/1000;
+
+      // Compute visual targets
+      computeAppearance(nodes,isAI,colorAns,posAns,assessState,t);
+
+      // Birth: per-node staggered growth (zygote → expanding organism)
+      // Each node type has a birthDelay. Growth takes 1.5s per node.
+      // During growth: calm outward expansion, no spin, drift suppressed.
+      const birthElapsed = (now-stateRef.current.birthStart)/1000;
+
+      // Update wander targets (primaries wander, companions follow)
+      updateTargets(nodes, time, t);
+
+      // Smooth lerp toward targets + per-node birth
+      const spd=4*dt, cspd=6*dt;
+      for (const n of nodes) {
+        // Per-node birth progress (staggered by birthDelay)
+        const nbe = Math.max(0, birthElapsed - n.birthDelay);
+        const nbf = Math.min(1, nbe / 3.0); // 3s growth per node (slow, calm)
+        n.birthMix = nbf * nbf * (3 - 2 * nbf); // smoothstep
+
+        // During birth, pull target toward center
+        const bm = n.birthMix;
+        const targetX = 300 + (n.tx - 300) * bm;
+        const targetY = 300 + (n.ty - 300) * bm;
+
+        n.x = lerp(n.x, targetX, spd);
+        n.y = lerp(n.y, targetY, spd);
+        n.r = lerp(n.r, n.tr+n.flash*5, spd);
+        n.halo = lerp(n.halo, n.thalo+n.flash*20, spd);
+        // Alpha fades in with birth — node materializes as it grows
+        n.alpha = lerp(n.alpha, (n.talpha+n.flash*0.3)*bm, spd*0.7);
+        n.color = lerpRgb(n.color, n.tcolor, cspd);
+        n.orbitAngle += n.orbitSpeed*(isAI?0.3:1.0);
+        n.flash *= 0.91; if(n.flash<0.01) n.flash=0;
+      }
+
+      render(ctx, nodes, conns, stars, isAI, time, scale, t);
+      animRef.current = requestAnimationFrame(frame);
+    }
+    animRef.current = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(animRef.current);
+  }, []);
+
+  return React.createElement('canvas', {
+    ref: canvasRef, width: size, height: size,
+    style: { width: size, height: size, borderRadius: 8 },
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════
+// VARIATIONS & HARNESS
+// ═══════════════════════════════════════════════════════
+
+const BASE = {
+  earnedCompanions: true,
+  companionGhostAlpha: 0,
+  satThreshold: 8,
+  answeredR: 12,
+  answeredHalo: 45,
+  breathAmp: 0.04,
+  breathSpd: 0.22,
+  connAlpha: 0.45,
+  haloScale: 3.5,
+  haloInner: 0.24,
+  haloMid: 0.09,
+  stars: 35,
+  ghostAlpha: 0,
+  wanderStrength: 0.4,
+  microDrift: 0.8,
+  wobble: 3,
+  connWidth: 1.2,
+};
+
+const VARIATIONS = [
+  {
+    name: 'A — Clean Map',
+    desc: 'Visible glow but constellation-first. Clear structure, atmospheric color behind.',
+    tag: 'var',
+    tuning: {
+      ...BASE,
+      glowAlpha: 0.30,
+      glowRadius: 130,
+      glowPasses: 1,
+      connAlpha: 0.52,
+      haloInner: 0.22,
+    },
+  },
+  {
+    name: 'B — Warm Bloom',
+    desc: 'Each primary owns a distinct glow zone. Color separation with warmth.',
+    tag: 'var',
+    tuning: {
+      ...BASE,
+      glowAlpha: 0.50,
+      glowRadius: 165,
+      glowPasses: 2,
+      connAlpha: 0.48,
+    },
+  },
+  {
+    name: 'C — Bold Nodes',
+    desc: 'Bigger nodes, stronger halos. The constellation itself dominates, glow supports.',
+    tag: 'var',
+    tuning: {
+      ...BASE,
+      glowAlpha: 0.40,
+      glowRadius: 140,
+      glowPasses: 2,
+      answeredR: 15,
+      answeredHalo: 55,
+      haloScale: 4.2,
+      haloInner: 0.30,
+      connAlpha: 0.50,
+    },
+  },
+  {
+    name: 'D — Deep Bloom',
+    desc: 'Rich overlapping glow pools. Saturated, alive, dramatic 3D depth in the color.',
+    tag: 'ref',
+    tuning: {
+      ...BASE,
+      glowAlpha: 0.65,
+      glowRadius: 200,
+      glowPasses: 3,
+      answeredR: 14,
+      answeredHalo: 50,
+      breathAmp: 0.06,
+      haloScale: 4,
+      haloInner: 0.28,
+      connAlpha: 0.44,
+    },
+  },
+  {
+    name: 'E — Living Rings',
+    desc: 'Secondary glow on companions. Both rings radiate — the full constellation glows.',
+    tag: 'ref',
+    tuning: {
+      ...BASE,
+      glowAlpha: 0.50,
+      glowRadius: 170,
+      glowPasses: 2,
+      secondaryGlow: true,
+      secondaryGlowRadius: 55,
+      secondaryGlowAlpha: 0.25,
+      companionAlpha: 0.7,
+      connAlpha: 0.45,
+      breathAmp: 0.05,
+    },
+  },
+  {
+    name: 'F — Deep Rings',
+    desc: 'D + E combined. Deep primary bloom plus living secondary glow on companions.',
+    tag: 'var',
+    tuning: {
+      ...BASE,
+      glowAlpha: 0.60,
+      glowRadius: 190,
+      glowPasses: 3,
+      secondaryGlow: true,
+      secondaryGlowRadius: 55,
+      secondaryGlowAlpha: 0.22,
+      companionAlpha: 0.7,
+      answeredR: 14,
+      answeredHalo: 50,
+      breathAmp: 0.06,
+      haloScale: 4,
+      haloInner: 0.28,
+      connAlpha: 0.44,
+    },
+  },
+];
+
+
+// ═══════════════════════════════════════════════════════
+// HARNESS — tier-aware tuning overrides
+// ═══════════════════════════════════════════════════════
+
+const ALL_ASSESS_IDS = [
+  'starter-personality','starter-motivation','starter-thinking',
+  'starter-connection','starter-strategy',
+  'bigfive-E','integrity','shadow-M','adhd','attachment','risk',
+];
+
+function generateRandom(tier, forceEntity) {
+  const answers={}, assessments={};
+  const entity=forceEntity||(Math.random()<0.85?'human':'ai');
+  const count=10;
+  const qOrder=[1,2,3,4,5,6,7,8,9,10].sort(()=>Math.random()-0.5);
+  for (let i=0;i<count;i++) answers['onboard-'+qOrder[i]]=Math.random()<0.5?0:1;
+  if (tier==='regular') {
+    const n=2+Math.floor(Math.random()*3), sh=ALL_ASSESS_IDS.slice(0,5).sort(()=>Math.random()-0.5);
+    for (let i=0;i<Math.min(n,sh.length);i++) assessments[sh[i]]={score:30+Math.floor(Math.random()*60)};
+  } else if (tier==='power') {
+    const n=5+Math.floor(Math.random()*4), sh=[...ALL_ASSESS_IDS].sort(()=>Math.random()-0.5);
+    for (let i=0;i<Math.min(n,sh.length);i++) assessments[sh[i]]={score:20+Math.floor(Math.random()*70)};
+  }
+  return{answers,assessments,entity};
+}
+
+function tierOverrides(tier) {
+  if (tier === 'new') return {
+    primariesOnly: true,
+    ghostAlpha: 0,
+    wanderStrength: 0.3,
+    ringInner: 90,         // bigger ring since no outer nodes
+    // Subtle glow (match SVG reference — visible but not dominant)
+    glowAlpha: 0.30,
+    glowRadius: 120,
+    glowPasses: 1,
+    connAlpha: 0.55,
+    haloInner: 0.22,
+    haloMid: 0.08,
+  };
+  if (tier === 'regular') return {
+    ghostAlpha: 0,
+    earnedCompanions: true,
+  };
+  // Power: full complexity, constellation grows
+  return {
+    ghostAlpha: 0.06,
+    ringInner: 70,
+    ringComp: 135,
+    ringSat: 190,
+    answeredR: 15,
+    answeredHalo: 52,
+    haloScale: 4.0,
+    haloInner: 0.28,
+  };
+}
+
+function sizeForTier(tier) {
+  return tier === 'new' ? 200 : tier === 'regular' ? 260 : 360;
+}
+
+function generateInitialState() {
+  const answers = {};
+  for (let i = 1; i <= 10; i++) answers['onboard-' + i] = Math.random() < 0.5 ? 0 : 1;
+  return answers;
+}
+const INITIAL_ANSWERS = generateInitialState();
+
+function App() {
+  const [entityType,setEntityType]=React.useState('human');
+  const [onboardingAnswers,setOnboardingAnswers]=React.useState(INITIAL_ANSWERS);
+  const [assessCompleted,setAssessCompleted]=React.useState({});
+  const [activeTier,setActiveTier]=React.useState('new');
+  const [picked,setPicked]=React.useState(new Set());
+  const [snapshots,setSnapshots]=React.useState([]);
+  const [galleryVar,setGalleryVar]=React.useState(0);
+  const [vizSize,setVizSize]=React.useState(200);
+
+  function applyTier(tier) {
+    const state=generateRandom(tier, entityType);
+    setOnboardingAnswers(state.answers);
+    setAssessCompleted(state.assessments);
+    setActiveTier(tier);
+    setVizSize(sizeForTier(tier));
+    setSnapshots(prev=>[{...state,tier,size:sizeForTier(tier),entity:entityType},...prev].slice(0,6));
+  }
+
+  function randomAll() {
+    // Keep current tier, just randomize answers/assessments
+    const tier = activeTier;
+    const state=generateRandom(tier, entityType);
+    setOnboardingAnswers(state.answers);
+    setAssessCompleted(state.assessments);
+    setVizSize(sizeForTier(tier));
+    setSnapshots(prev=>[{...state,tier,size:sizeForTier(tier),entity:entityType},...prev].slice(0,6));
+  }
+
+  function togglePick(idx) {
+    setPicked(prev=>{const next=new Set(prev);if(next.has(idx))next.delete(idx);else next.add(idx);return next;});
+  }
+
+  function getTuning(variation) {
+    if (!activeTier) return variation.tuning;
+    return { ...variation.tuning, ...tierOverrides(activeTier) };
+  }
+
+  const ac=Object.keys(onboardingAnswers).length;
+  const asc=Object.keys(assessCompleted).length;
+  const label=activeTier==='new'?'New User':activeTier==='regular'?'Regular':activeTier==='power'?'Power User':'—';
+
+  return React.createElement('div',{className:'page'},
+    React.createElement('div',{className:'header'},
+      React.createElement('h1',null,'Warm Canvas v6 — Constellation Rings'),
+      React.createElement('p',null,`${label} · ${ac}/10 answers · ${asc} assessments · ${entityType} · ${vizSize}px`),
+    ),
+
+    React.createElement('div',{className:'controls'},
+      React.createElement('div',{className:'controls-group'},
+        React.createElement('span',{className:'group-label'},'Entity'),
+        React.createElement('button',{
+          className:'entity-btn entity-human'+(entityType==='human'?' active':''),
+          onClick:()=>setEntityType('human'),
+          style: entityType==='human'?{}:{opacity:0.4},
+        },'Human'),
+        React.createElement('button',{
+          className:'entity-btn entity-ai'+(entityType==='ai'?' active':''),
+          onClick:()=>setEntityType('ai'),
+          style: entityType==='ai'?{}:{opacity:0.4},
+        },'AI'),
+      ),
+      React.createElement('div',{style:{width:'1px',height:'28px',background:'#1f2937'}}),
+      React.createElement('div',{className:'controls-group'},
+        React.createElement('span',{className:'group-label'},'Tier'),
+        React.createElement('button',{className:'tier-btn tier-new'+(activeTier==='new'?' active':''),onClick:()=>applyTier('new')},'New'),
+        React.createElement('button',{className:'tier-btn tier-regular'+(activeTier==='regular'?' active':''),onClick:()=>applyTier('regular')},'Regular'),
+        React.createElement('button',{className:'tier-btn tier-power'+(activeTier==='power'?' active':''),onClick:()=>applyTier('power')},'Power'),
+      ),
+      React.createElement('div',{style:{width:'1px',height:'28px',background:'#1f2937'}}),
+      React.createElement('button',{className:'random-btn',onClick:randomAll},'Random'),
+    ),
+
+    picked.size>0&&React.createElement('div',{className:'pick-bar'},
+      React.createElement('span',null,`Favorites: ${[...picked].map(i=>VARIATIONS[i].name).join(', ')}`),
+    ),
+
+    React.createElement('div',{className:'grid'},
+      VARIATIONS.map((v,idx)=>
+        React.createElement('div',{key:idx,className:'cell'+(picked.has(idx)?' picked':''),onClick:()=>togglePick(idx)},
+          React.createElement('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
+            React.createElement('span',{className:'cell-label'},v.name),
+            React.createElement('span',{className:'cell-tag '+(v.tag==='ref'?'tag-ref':'tag-var')},v.tag==='ref'?'baseline':'variation'),
+          ),
+          React.createElement('div',{className:'cell-desc'},v.desc),
+          React.createElement(WarmAuraViz,{onboardingAnswers,assessCompleted,entityType,darkMode:true,size:vizSize,tuning:getTuning(v)}),
+        ),
+      ),
+    ),
+
+    snapshots.length>0&&React.createElement(React.Fragment,null,
+      React.createElement('div',{className:'divider'}),
+      React.createElement('div',{className:'section-label'},`Recent (${VARIATIONS[galleryVar].name})`),
+      React.createElement('div',{className:'controls',style:{marginBottom:'6px'}},
+        VARIATIONS.map((v,idx)=>
+          React.createElement('button',{key:idx,style:{padding:'3px 8px',fontSize:'9px',border:'1px solid '+(galleryVar===idx?'#8b5cf6':'#374151'),borderRadius:'8px',background:galleryVar===idx?'rgba(139,92,246,0.12)':'transparent',color:galleryVar===idx?'#fff':'#9ca3af',cursor:'pointer',fontFamily:'inherit'},onClick:()=>setGalleryVar(idx)},v.name),
+        ),
+      ),
+      React.createElement('div',{style:{display:'flex',gap:'10px',justifyContent:'center',flexWrap:'wrap'}},
+        snapshots.map((snap,i)=>
+          React.createElement('div',{key:i,style:{display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',opacity:i===0?1:0.6+i*0.05}},
+            React.createElement('div',{style:{borderRadius:'8px',overflow:'hidden',border:i===0?'2px solid rgba(139,92,246,0.4)':'1px solid rgba(255,255,255,0.06)'}},
+              React.createElement(WarmAuraViz,{onboardingAnswers:snap.answers,assessCompleted:snap.assessments,entityType:snap.entity,darkMode:true,size:snap.size*0.45,tuning:{...VARIATIONS[galleryVar].tuning,...tierOverrides(snap.tier)}}),
+            ),
+            React.createElement('div',{style:{fontSize:'8px',color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.08em'}},
+              `${snap.tier} · ${snap.entity} · ${Object.keys(snap.answers).length}q · ${Object.keys(snap.assessments).length}a`
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
