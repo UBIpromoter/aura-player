@@ -108,6 +108,44 @@ const PROGRESS_GRADIENTS = {
 | slideUp | — | ease | Bottom sheets |
 | shimmer-pulse | 3s | ease-in-out | Hover glow |
 | fill/shrink | — | linear | Progress bars |
+| aura-breathe | 6-10s | ease-in-out | Ambient breathing gradients |
+
+---
+
+## Light Mode Glow Convention
+
+The `.light-theme` class on root containers activates light-specific overrides for all glow/shine/hover-glow classes.
+
+| System | Dark Mode | Light Mode Override |
+|--------|-----------|-------------------|
+| `.glow-*` | Wide 3-layer diffuse shadows | Tighter 2-layer shadows (higher opacity) |
+| `.shine-*` | Low opacity accent vars | ~1.5x opacity for visibility on white |
+| `.hover-glow-*` | 0.08 bg, 1px inset border | 0.15 bg (~2x), 1.5px inset border |
+
+---
+
+## Ambient Gradient Sizes
+
+Breathing radial gradients use `aura-breathe` animation. Size guide:
+
+| Screen | Size | Duration | Notes |
+|--------|------|----------|-------|
+| Onboarding | 420px + 350px | 8s + 6s | Two layers, per-question colors |
+| Question | 300px | 10s | Category color, single layer |
+| Assessment | 280px | 10s | Assessment color, more subtle |
+| Category header | ellipse 80% wide | — | No animation, static wash |
+
+---
+
+## NavBar Accent Color
+
+NavBar derives `accentColor` from current screen context:
+
+| Screen | Accent Source |
+|--------|-------------|
+| assess-question | `assessCurrentTest.color` |
+| questions | Selected category color |
+| Default | violet |
 
 ---
 
@@ -157,8 +195,11 @@ Use Cmd+F with the search terms below — they don't drift when code is added.
 2. **PROGRESS_GRADIENTS** — search: `const PROGRESS_GRADIENTS` — gradient hex values
 3. **CSS .hover-glow-{color}** — search: `.hover-glow-amber` — hover effects (in `<style>`)
 4. **CSS .shine-{color}** — search: `.shine-blue` — card shine effects (in `<style>`)
-5. **ASSESS_STYLES** — search: `const ASSESS_STYLES` — gradientStyles, selectedStyles, pendingStyles
-6. **AnalysisCard colorStyles** — search: `const AnalysisCard` — colorStyles inside the component
-7. **Completion celebration glow** — search: `Completion Celebration` — COLOR_HEX[color] gradient
+5. **CSS .light-theme .glow-{color}** — search: `.light-theme .glow-amber` — light mode glow overrides
+6. **CSS .light-theme .shine-{color}** — search: `.light-theme .shine-blue` — light mode shine overrides
+7. **CSS .light-theme .hover-glow-{color}** — search: `.light-theme .hover-glow-amber` — light mode hover overrides
+8. **ASSESS_STYLES** — search: `const ASSESS_STYLES` — gradientStyles (dark AND light), selectedStyles, pendingStyles
+9. **AnalysisCard colorStyles** — search: `const AnalysisCard` — colorStyles inside the component
+10. **Completion celebration glow** — search: `Completion Celebration` — COLOR_HEX[color] gradient
 
 Miss one = broken UI somewhere.
