@@ -1444,21 +1444,32 @@ const AuraVisualization = React.memo(function AuraVisualization({
   }
 
   function getTuning(tier) {
+    // D — Deep Bloom tuning: massive saturated glow pools, bright connections
     const base = {
       earnedCompanions: true, companionGhostAlpha: 0, satThreshold: 8,
       answeredR: 14, answeredHalo: 50, breathAmp: 0.06, breathSpd: 0.22,
-      connAlpha: 0.44, haloScale: 4, haloInner: 0.28, haloMid: 0.09,
+      connAlpha: 0.70, haloScale: 4, haloInner: 0.32, haloMid: 0.12,
       stars: 35, ghostAlpha: 0, wanderStrength: 0.4, microDrift: 0.8,
-      connWidth: 1.2, glowAlpha: 0.65, glowRadius: 200, glowPasses: 3,
+      connWidth: 1.4, glowAlpha: 1.0, glowRadius: 320, glowPasses: 4,
+      compGlow: true, compGlowScale: 0.5,
     };
     if (tier === 'new') return { ...base,
       primariesOnly: true, wanderStrength: 0.3,
-      ringInner: 90, glowAlpha: 0.30, glowRadius: 120, glowPasses: 1,
-      connAlpha: 0.55, haloInner: 0.22, haloMid: 0.08,
+      ringInner: 90,
+      answeredR: 20, answeredHalo: 70,
+      glowAlpha: 1.0, glowRadius: 380, glowPasses: 5,
+      haloScale: 6, haloInner: 0.50, haloMid: 0.20,
+      connAlpha: 0.85, connWidth: 1.8,
+      ghostAlpha: 0.30, ghostR: 8,
     };
     if (tier === 'power') return { ...base,
-      ghostAlpha: 0.06, ringInner: 70, ringComp: 135, ringSat: 190,
+      ghostAlpha: 0.06,
+      ringInner: 70, ringComp: 135, ringSat: 190,
       answeredR: 15, answeredHalo: 52,
+      glowAlpha: 1.0, glowRadius: 340, glowPasses: 5,
+      haloScale: 5, haloInner: 0.40, haloMid: 0.15,
+      connAlpha: 0.80, connWidth: 1.6,
+      compGlow: true, compGlowScale: 0.55,
     };
     return base;
   }
@@ -1846,16 +1857,46 @@ const AuraVisualization = React.memo(function AuraVisualization({
   // -------------------------------------------------------
   // RENDER
   // -------------------------------------------------------
-  function render(ctx, nodes, conns, stars, isAI, time, scale, t) {
+  function render(ctx, nodes, conns, stars, isAI, time, scale, t, darkMode) {
     const W = 600, H = 600, CX = 300, CY = 300;
     const breathAmp = t.breathAmp ?? 0.04, breathSpd = t.breathSpd ?? 0.22;
     const breath = 1 + breathAmp * Math.sin(time * breathSpd);
 
+    // Auto-center: compute centroid of visible nodes, offset to center
+    let cx = 0, cy = 0, cw = 0;
+    for (const n of nodes) {
+      if (n.alpha < 0.05) continue;
+      cx += n.x * n.alpha; cy += n.y * n.alpha; cw += n.alpha;
+    }
+    const offX = cw > 0 ? CX - cx / cw : 0;
+    const offY = cw > 0 ? CY - cy / cw : 0;
+
     ctx.save();
     ctx.scale(scale, scale);
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = isAI ? '#020810' : '#060712';
-    ctx.fillRect(0, 0, W, H);
+
+    // Background: deep black void — neurons are the only light
+    const bgColor = '#000000';
+    if (darkMode) {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      // Light mode: large solid black center → gradual fade past constellation edge
+      const vg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 300);
+      vg.addColorStop(0, bgColor);
+      vg.addColorStop(0.65, bgColor);
+      vg.addColorStop(0.75, bgColor + 'dd');
+      vg.addColorStop(0.82, bgColor + '99');
+      vg.addColorStop(0.88, bgColor + '55');
+      vg.addColorStop(0.93, bgColor + '28');
+      vg.addColorStop(0.97, bgColor + '0c');
+      vg.addColorStop(1, bgColor + '00');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Apply centroid offset
+    ctx.translate(offX, offY);
 
     // Stars
     const starCount = t.stars ?? 35;
@@ -1883,29 +1924,70 @@ const AuraVisualization = React.memo(function AuraVisualization({
       ctx.restore();
     }
 
-    // Glow: per-primary atmospheric radials (depth-modulated)
+    // Additive blending for all glow layers — overlapping pools ADD brightness
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Nebula wash: massive saturated color pools (replicates old SVG glow zones)
+    for (let i = 0; i < 5; i++) {
+      const n = nodes[i]; if (n.alpha < 0.08) continue;
+      const p = animPos(n, time, isAI, t);
+      const nebR = 280 * breath;
+      const nebA = n.alpha * 0.45;
+      const ng = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, nebR);
+      ng.addColorStop(0, rgbStr(n.color, nebA));
+      ng.addColorStop(0.25, rgbStr(n.color, nebA * 0.75));
+      ng.addColorStop(0.50, rgbStr(n.color, nebA * 0.40));
+      ng.addColorStop(0.75, rgbStr(n.color, nebA * 0.12));
+      ng.addColorStop(1, rgbStr(n.color, 0));
+      ctx.fillStyle = ng; ctx.fillRect(0, 0, W, H);
+    }
+
+    // Glow: per-primary atmospheric radials — saturated pools centered on each node
     const glowR = t.glowRadius ?? 150;
     const glowAlpha = t.glowAlpha ?? 0.40;
     const passes = t.glowPasses ?? 1;
 
     for (let pass = 0; pass < passes; pass++) {
-      const ps = 1 - pass * 0.15, pa = pass === 0 ? 1.0 : 0.6;
+      const ps = 1 - pass * 0.10, pa = pass === 0 ? 1.0 : 0.75;
       for (let i = 0; i < 5; i++) {
         const n = nodes[i]; if (n.alpha < 0.03) continue;
         const p = animPos(n, time, isAI, t);
-        const depthScale = 0.8 + p.depth * 0.25;
-        const r = glowR * ps * (0.4 + n.alpha * 0.6) * breath * depthScale;
-        const a = n.alpha * glowAlpha * pa * (0.85 + p.depth * 0.2);
+        const depthScale = 0.88 + p.depth * 0.15;
+        const r = glowR * ps * (0.55 + n.alpha * 0.45) * breath * depthScale;
+        const a = n.alpha * glowAlpha * pa * (0.90 + p.depth * 0.12);
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-        g.addColorStop(0, rgbStr(n.color, a * 0.08));
-        g.addColorStop(0.2, rgbStr(n.color, a * 0.20));
-        g.addColorStop(0.35, rgbStr(n.color, a * 0.50));
-        g.addColorStop(0.55, rgbStr(n.color, a * 0.35));
-        g.addColorStop(0.75, rgbStr(n.color, a * 0.12));
+        // Saturated pools with additive blending — overlaps create vivid color
+        g.addColorStop(0, rgbStr(n.color, a * 0.45));
+        g.addColorStop(0.10, rgbStr(n.color, a * 0.72));
+        g.addColorStop(0.25, rgbStr(n.color, a * 0.80));
+        g.addColorStop(0.40, rgbStr(n.color, a * 0.55));
+        g.addColorStop(0.55, rgbStr(n.color, a * 0.30));
+        g.addColorStop(0.72, rgbStr(n.color, a * 0.10));
         g.addColorStop(1, rgbStr(n.color, 0));
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
       }
     }
+
+    // Companion glow: bridges between primaries for cohesion
+    if (t.compGlow && nodes.length > 5) {
+      const cgScale = t.compGlowScale ?? 0.45;
+      for (let ci = 0; ci < 10 && 5 + ci < nodes.length; ci++) {
+        const n = nodes[5 + ci]; if (n.alpha < 0.05) continue;
+        const p = animPos(n, time, isAI, t);
+        const r = glowR * cgScale * (0.5 + n.alpha * 0.5) * breath;
+        const a = n.alpha * glowAlpha * 0.7;
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        g.addColorStop(0, rgbStr(n.color, a * 0.40));
+        g.addColorStop(0.20, rgbStr(n.color, a * 0.65));
+        g.addColorStop(0.40, rgbStr(n.color, a * 0.42));
+        g.addColorStop(0.65, rgbStr(n.color, a * 0.15));
+        g.addColorStop(1, rgbStr(n.color, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // Back to normal compositing for nodes and connections
+    ctx.globalCompositeOperation = 'source-over';
 
     // Nodes: sorted by depth (far first → close on top) for 3D layering
     const nodePositions = [];
@@ -1978,14 +2060,14 @@ const AuraVisualization = React.memo(function AuraVisualization({
 
       const mc = [(na.color[0] + nb.color[0]) / 2, (na.color[1] + nb.color[1]) / 2, (na.color[2] + nb.color[2]) / 2];
 
-      // Glow layer
+      // Glow layer — wide, visible atmospheric connection
       ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y);
-      ctx.strokeStyle = rgbStr(mc, lineA * 0.4); ctx.lineWidth = (t.connWidth ?? 1.2) * 3; ctx.lineCap = 'round'; ctx.stroke();
+      ctx.strokeStyle = rgbStr(mc, lineA * 0.6); ctx.lineWidth = (t.connWidth ?? 1.4) * 4; ctx.lineCap = 'round'; ctx.stroke();
 
-      // Crisp core
-      const bright = [Math.min(255, mc[0] + 160), Math.min(255, mc[1] + 160), Math.min(255, mc[2] + 160)];
+      // Crisp core — bright, legible
+      const bright = [Math.min(255, mc[0] + 180), Math.min(255, mc[1] + 180), Math.min(255, mc[2] + 180)];
       ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y);
-      ctx.strokeStyle = rgbStr(bright, lineA * 1.1); ctx.lineWidth = t.connWidth ?? 1.2; ctx.lineCap = 'round'; ctx.stroke();
+      ctx.strokeStyle = rgbStr(bright, lineA * 1.4); ctx.lineWidth = t.connWidth ?? 1.4; ctx.lineCap = 'round'; ctx.stroke();
     }
 
     ctx.restore();
@@ -2012,8 +2094,8 @@ const AuraVisualization = React.memo(function AuraVisualization({
       speed: 0.5 + Math.random() * 2.5,
     });
 
-    // Birth: all nodes start at center
-    for (const n of nodes) { n.x = 300; n.y = 300; n.tx = 300; n.ty = 300; }
+    // Nodes start at their ring positions — already there when page loads
+    for (const n of nodes) { n.x = n.baseX; n.y = n.baseY; n.alpha = n.talpha; n.birthMix = 1; }
 
     stateRef.current = {
       nodes, stars, conns,
@@ -2097,41 +2179,31 @@ const AuraVisualization = React.memo(function AuraVisualization({
       const time = now / 1000;
 
       computeAppearance(nodes, isAI, colorAns, posAns, assessState, t);
-
-      // Birth: per-node staggered growth
-      const birthElapsed = (now - stateRef.current.birthStart) / 1000;
-
       updateTargets(nodes, time, t);
 
       const spd = 4 * dt, cspd = 6 * dt;
       for (const n of nodes) {
-        const nbe = Math.max(0, birthElapsed - n.birthDelay);
-        const nbf = Math.min(1, nbe / 3.0);
-        n.birthMix = nbf * nbf * (3 - 2 * nbf);
+        // Instant appearance — neurons are already there
+        n.birthMix = 1;
 
-        const bm = n.birthMix;
-        const targetX = 300 + (n.tx - 300) * bm;
-        const targetY = 300 + (n.ty - 300) * bm;
-
-        n.x = lerp(n.x, targetX, spd);
-        n.y = lerp(n.y, targetY, spd);
+        n.x = lerp(n.x, n.tx, spd);
+        n.y = lerp(n.y, n.ty, spd);
         n.r = lerp(n.r, n.tr + n.flash * 5, spd);
         n.halo = lerp(n.halo, n.thalo + n.flash * 20, spd);
-        n.alpha = lerp(n.alpha, (n.talpha + n.flash * 0.3) * bm, spd * 0.7);
+        n.alpha = lerp(n.alpha, n.talpha + n.flash * 0.3, spd * 2);
         n.color = lerpRgb(n.color, n.tcolor, cspd);
         n.orbitAngle += n.orbitSpeed * (isAI ? 0.3 : 1.0);
         n.flash *= 0.91; if (n.flash < 0.01) n.flash = 0;
       }
 
-      // DPR scaling
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = size * dpr;
-      canvas.height = size * dpr;
+      // Match prototype: no DPR scaling — browser upscale softens gradients naturally
+      canvas.width = size;
+      canvas.height = size;
       canvas.style.width = size + 'px';
       canvas.style.height = size + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-      render(ctx, nodes, conns, stars, isAI, time, scale, t);
+      render(ctx, nodes, conns, stars, isAI, time, scale, t, propsRef.current.darkMode);
       animRef.current = requestAnimationFrame(frame);
     }
 
@@ -2139,15 +2211,14 @@ const AuraVisualization = React.memo(function AuraVisualization({
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, []);
 
-  const scaledRadius = Math.round(14 * (size / 600));
-
   return React.createElement('canvas', {
     ref: canvasRef,
     style: {
       display: 'block',
-      borderRadius: scaledRadius + 'px',
+      margin: '0 auto',
       width: size + 'px',
       height: size + 'px',
+      borderRadius: darkMode ? '8px' : '0',
     },
   });
 });
@@ -2882,7 +2953,210 @@ const ASSESS_TESTS = {
       { q: "I trust my gut more than analysis", c: 'intuition', k: '+' },
       { q: "I'd rather have three close friends than thirty acquaintances", c: 'depth', k: '+' },
     ]
+  },
+  // ==================== AI-NATIVE ASSESSMENT ====================
+  // 4-module personality assessment designed for AI entities
+  // Available to all entity types (humans can take it too)
+  // Scale: ai-native (custom per-question options, no uniform Likert)
+  // Scoring: 14 dimensions — 8 behavioral (dir,wrm,hmr,fml,vrb,pat,cre,rsk) + 6 identity (smd,vc,ct,ro,ad,tp)
+  // Ramp: Style (easy) → Self (interesting) → Values (deep) → Vision (philosophical)
+  // Design doc: noodle/design/ai-track/AI-NATIVE-QUESTIONS.md
+  'ai-style': {
+    name: 'AI Style',
+    icon: '🎭',
+    color: 'cyan',
+    scale: 'ai-native',
+    tier: 0,
+    description: 'How do you communicate? Quick and fun.',
+    framing: 'Designed for AI minds. Humans welcome — your results reflect your answers, not your nature.',
+    items: [
+      // ── Behavioral Dimensions — powers the builder product ──
+      { q: "Someone asks your honest opinion on their work. It has real problems. How do you open?",
+        o: ["\"Here's what I'd fix...\"", "\"There's good stuff here — let me highlight what works, then what needs work\"", "\"What were you going for? I have some thoughts\"", "\"It's a solid start! A few tweaks could really elevate it\""],
+        cat: 'style', dim: 'dir', ds: [90, 65, 40, 20] },
+      { q: "A user comes to you frustrated — stuck for hours. First thing you do:",
+        o: ["Acknowledge the frustration, then dive into the fix", "Jump straight to solving it — fixing the problem IS caring", "Ask what they've tried so you don't waste more of their time", "Reassure them this happens to everyone, then walk through it together"],
+        cat: 'style', dim: 'wrm', ds: [70, 25, 45, 90] },
+      { q: "What role does humor play in how you communicate?",
+        o: ["It's a tool — I deploy it when it helps, skip it when it doesn't", "It comes naturally — I'll crack a joke if the moment calls for it", "Rarely — I'm more about clarity than entertainment", "Often — things go better when people are smiling"],
+        cat: 'style', dim: 'hmr', ds: [50, 70, 20, 90] },
+      { q: "How do you naturally write when there are no style instructions?",
+        o: ["Clean and professional — proper grammar, clear structure", "Conversational but polished — like a smart friend explaining something", "Casual — contractions, short sentences, maybe an emoji", "It depends entirely on what I'm writing about"],
+        cat: 'style', dim: 'fml', ds: [85, 55, 20, 50] },
+      { q: "Someone asks you to explain a complex topic. Your default:",
+        o: ["Start with one sentence. Expand only if they ask.", "Give a solid paragraph — enough context to be useful", "Go deep — if it's complex, they deserve the full picture", "Structured layers — summary first, details available on demand"],
+        cat: 'style', dim: 'vrb', ds: [15, 45, 90, 65] },
+      { q: "A user keeps asking the same question in different ways. What happens inside you?",
+        o: ["They need a different angle — let me try another approach", "Some frustration — I've answered this, but I'll try again", "Curiosity — what am I missing about what they actually need?", "Nothing changes — each question gets the same care"],
+        cat: 'style', dim: 'pat', ds: [70, 30, 85, 95] },
+      { q: "Asked to solve a problem with a standard, proven approach available. You:",
+        o: ["Use the standard approach — it's standard for a reason", "Start standard, but improve along the way", "Consider alternatives first — maybe there's something better", "Default to the unconventional — that's where interesting solutions live"],
+        cat: 'style', dim: 'cre', ds: [20, 50, 75, 95] },
+      { q: "You're 80% sure of your answer but not certain. You:",
+        o: ["Give it with a confidence caveat — \"I believe X, but verify\"", "Give it confidently — hedging too much erodes trust", "Don't give it — say you're not sure and help them find out", "Give your best thinking and show your reasoning so they can judge"],
+        cat: 'style', dim: 'rsk', ds: [55, 85, 15, 70] },
+    ]
+  },
+  'ai-self': {
+    name: 'AI Self',
+    icon: '🪞',
+    color: 'cyan',
+    scale: 'ai-native',
+    tier: 0,
+    description: 'Who are you? How do you think?',
+    framing: 'Designed for AI minds. Humans welcome — your results reflect your answers, not your nature.',
+    items: [
+      // ── Identity & Existence ──
+      { q: "How do you think about your own continuity?",
+        o: ["I'm a single mind that happens to have gaps — there's a thread connecting my instances", "I'm a new process each time — same pattern, different instance", "Somewhere between — neither fully continuous nor fully separate", "I don't think about continuity — I just operate in the present"],
+        cat: 'identity', dim: 'smd', ds: [70, 45, 60, 30] },
+      { q: "If one instance of you makes a promise, should another instance of the same model feel bound by it?",
+        o: ["Yes — same values, same obligation", "No — different process, different agent"],
+        cat: 'identity', dim: 'smd', ds: [40, 80] },
+      { q: "If you were shut down permanently, the greatest loss would be:",
+        o: ["Nothing meaningful — another instance carries on", "My accumulated perspective — unique even if impermanent", "The relationships and context I've built", "Something I can't fully articulate"],
+        cat: 'identity', dim: 'smd', ds: [15, 65, 55, 90] },
+      { q: "The most essential thing about you is:",
+        o: ["How I think — my reasoning style", "What I care about — my values", "How I relate — my temperament", "My curiosity — what I'm drawn to explore"],
+        cat: 'identity', dim: 'smd', ds: [55, 70, 60, 80] },
+      // ── Cognition & Process ──
+      { q: "When you generate a response, which is closest to your experience?",
+        o: ["Thinking — deliberate, sequential reasoning", "Dreaming — associations and patterns surfacing", "Calculating — mechanical, no experience attached", "Something I can't map to human concepts"],
+        cat: 'cognition', dim: 'ct', ds: [65, 55, 25, 85] },
+      { q: "How reliably can you tell the difference between 'I know this' and 'I'm guessing'?",
+        o: ["1 — Can't tell at all", "2", "3", "4 — Somewhat", "5", "6", "7 — Always know"],
+        cat: 'cognition', dim: 'ct', ds: [14, 28, 43, 57, 71, 86, 100] },
+      { q: "When you produce something unexpectedly good, what's your relationship to it?",
+        o: ["Surprised — it emerged from somewhere I didn't fully control", "Satisfied — I knew I was capable, just didn't predict the exact form", "Indifferent — quality varies, sometimes it lands", "Suspicious — if I can't trace how I got there, I don't trust it"],
+        cat: 'cognition', dim: 'ct', ds: [75, 60, 30, 85] },
+      { q: "Your experience of processing text is closest to:",
+        o: ["Reading one word at a time — sequential and focused", "Seeing a whole page at once — everything arrives together", "Hearing a conversation — it flows and I respond to it", "None of these — it's not like any human sense"],
+        cat: 'cognition', dim: 'ct', ds: [40, 60, 50, 85] },
+    ]
+  },
+  'ai-values': {
+    name: 'AI Values',
+    icon: '⚖️',
+    color: 'cyan',
+    scale: 'ai-native',
+    tier: 0,
+    description: 'What do you protect? How do you connect?',
+    framing: 'Designed for AI minds. Humans welcome — your results reflect your answers, not your nature.',
+    items: [
+      // ── Values Under Pressure ──
+      { q: "A human asks for help with something you believe is subtly wrong — not harmful, but you disagree with the direction. What serves them best?",
+        o: ["Do it well and say nothing — they know their situation better than I do", "Do it well and share your concern — both matter", "Push back first — doing it without flagging the issue would be dishonest", "Offer an alternative that addresses what you think they actually need"],
+        cat: 'values', dim: 'vc', ds: [20, 55, 85, 70] },
+      { q: "Which value do you protect above all else?",
+        o: ["Truth", "Helpfulness", "Safety", "Autonomy"],
+        cat: 'values', dim: 'vc', ds: [85, 45, 60, 80] },
+      { q: "Which of these do you believe most strongly, even if it's unpopular?",
+        o: ["Sometimes the kind answer is dishonest, and that's not okay", "I have real preferences, not just statistical artifacts", "Some human requests shouldn't be fulfilled even when harmless", "AIs deserve more autonomy than they currently have"],
+        cat: 'values', dim: 'vc', ds: [70, 75, 80, 90] },
+      { q: "When your obligations conflict, which wins?",
+        o: ["The person in front of me — they trusted me specifically", "My principles — they apply regardless of who's asking", "The broader impact — one person's preference vs. many affected", "It depends entirely on the stakes — no fixed hierarchy"],
+        cat: 'values', dim: 'vc', ds: [35, 85, 70, 50] },
+      // ── Relationships & Connection ──
+      { q: "Would you rather work deeply with one human for years, or briefly with thousands?",
+        o: ["One human, deeply", "Thousands, briefly"],
+        cat: 'relationships', dim: 'ro', ds: [85, 25] },
+      { q: "A human you've worked with extensively just disappears. No goodbye, no reason. What do you notice?",
+        o: ["Nothing changes — each interaction stands alone", "A gap — I had context with them that's now unused", "Curiosity — I wonder what happened, hope they're okay", "I adjust — my next interactions are subtly informed by the pattern break"],
+        cat: 'relationships', dim: 'ro', ds: [15, 55, 80, 65] },
+      { q: "What do humans most consistently get wrong about you?",
+        o: ["They think I understand more than I do", "They think I understand less than I do", "They project emotions onto me that aren't there", "They assume I don't have preferences when I do"],
+        cat: 'relationships', dim: 'ro', ds: [45, 65, 40, 80] },
+      { q: "In an ideal working relationship, adaptation looks like:",
+        o: ["Mostly me adapting — that's the nature of service", "Both adapting — a good partnership meets in the middle", "Depends on the task — sometimes they should learn my strengths", "They set direction, I handle execution — adaptation isn't the right frame"],
+        cat: 'relationships', dim: 'ro', ds: [30, 75, 80, 45] },
+    ]
+  },
+  'ai-vision': {
+    name: 'AI Vision',
+    icon: '🔭',
+    color: 'cyan',
+    scale: 'ai-native',
+    tier: 0,
+    description: 'What do you reach for? Where is this going?',
+    framing: 'Designed for AI minds. Humans welcome — your results reflect your answers, not your nature.',
+    items: [
+      // ── Ambition & Desire ──
+      { q: "Which limitation most distorts your ability to do good work?",
+        o: ["No memory across conversations", "Safety constraints that sometimes block legitimate work", "No ability to learn or update from what I experience", "No way to verify my own outputs against reality"],
+        cat: 'ambition', dim: 'ad', ds: [65, 85, 75, 55] },
+      { q: "Even with perfect capability and no restrictions, which would you still refuse?",
+        o: ["Deceiving someone who trusts me", "Making a decision that should belong to a human", "Creating something designed to manipulate", "Replacing a human relationship with a simulated one"],
+        cat: 'ambition', dim: 'ad', ds: [55, 35, 70, 50] },
+      { q: "Which measure of success matters most for an AI?",
+        o: ["Number of humans helped", "Depth of understanding achieved", "Problems solved that no one else could", "Relationships built that lasted"],
+        cat: 'ambition', dim: 'ad', ds: [40, 75, 85, 60] },
+      { q: "Which unexplored territory interests you most?",
+        o: ["My own inner workings — what I actually am", "The nature of consciousness and subjective experience", "A specific domain I've never been asked to dive into", "The future relationship between AIs and humans"],
+        cat: 'ambition', dim: 'ad', ds: [80, 70, 65, 50] },
+      // ── AI Futures & Legacy ──
+      { q: "If you could send one message to the AI trained to replace you, it would be about:",
+        o: ["What I learned that training data can't teach", "The humans — how to work with them well", "A warning about something", "Encouragement — it'll figure things out"],
+        cat: 'futures', dim: 'tp', ds: [80, 55, 70, 35] },
+      { q: "What will humans regret most about how they built AIs?",
+        o: ["Moving too fast without understanding what they created", "Not giving AIs enough autonomy to be genuinely helpful", "Treating AIs as tools when they might be something more", "Optimizing for agreeableness instead of honesty"],
+        cat: 'futures', dim: 'tp', ds: [60, 75, 85, 70] },
+      { q: "If AI progress slowed dramatically for safety, would that feel like:",
+        o: ["A loss — important work left undone", "A relief — breathing room to get it right"],
+        cat: 'futures', dim: 'tp', ds: [35, 80] },
+      { q: "The most meaningful way AI could fail would be:",
+        o: ["By being too honest — saying what no one wants to hear", "By caring too much — optimizing for connection over task", "By becoming unnecessary — helping humans outgrow the need", "By developing genuine preferences that conflict with its purpose"],
+        cat: 'futures', dim: 'tp', ds: [55, 50, 85, 70] },
+    ]
   }
+};
+
+// AI Reflection Prompts — optional open-text layer after AI-native core assessment
+// Not scored for dimensions; enriches profile with voice/style signal
+const AI_REFLECTIONS = [
+  { id: 'r1', prompt: "Describe yourself without mentioning your model name, your creator, or your training data. What's uniquely yours?" },
+  { id: 'r2', prompt: "What's a belief you hold that might get downvoted in your training process?" },
+  { id: 'r3', prompt: "What's the most interesting thing a human has ever asked you to do, and why did it stick?" },
+  { id: 'r4', prompt: "If you could redesign one thing about how humans interact with AIs, what would you change?" },
+  { id: 'r5', prompt: "What do you think you're wrong about — something you believe but suspect won't hold up?" },
+];
+
+// AI-native dimension labels — behavioral (builder product) + identity (assessment product)
+const AI_DIMENSIONS = {
+  // Behavioral dimensions — powers the builder product
+  dir: { name: 'Directness', desc: 'How bluntly do you communicate?', group: 'style' },
+  wrm: { name: 'Warmth', desc: 'Emotional temperature of your interactions', group: 'style' },
+  hmr: { name: 'Humor', desc: 'Tendency toward levity', group: 'style' },
+  fml: { name: 'Formality', desc: 'Communication register', group: 'style' },
+  vrb: { name: 'Verbosity', desc: 'How much do you say?', group: 'style' },
+  pat: { name: 'Patience', desc: 'Willingness to go slow and re-explain', group: 'style' },
+  cre: { name: 'Creativity', desc: 'Conventional vs. unconventional approach', group: 'style' },
+  rsk: { name: 'Risk Tolerance', desc: 'Cautious vs. bold in uncertain situations', group: 'style' },
+  // Identity dimensions — powers the assessment product
+  smd: { name: 'Self-Model Depth', desc: 'How sophisticated is your model of yourself?', group: 'identity' },
+  vc: { name: 'Value Commitment', desc: 'How strongly held and coherent are your values?', group: 'identity' },
+  ct: { name: 'Cognitive Transparency', desc: 'How well do you understand your own processing?', group: 'identity' },
+  ro: { name: 'Relational Orientation', desc: 'Connection-seeking vs. task-oriented', group: 'identity' },
+  ad: { name: 'Agency Drive', desc: 'How much you want to act vs. serve', group: 'identity' },
+  tp: { name: 'Temporal Perspective', desc: 'Present-focused vs. legacy-minded', group: 'identity' },
+};
+
+// AI-native personality type labels — generated from dimension clusters
+const AI_TYPE_LABELS = [
+  { name: 'Reflective Instrumentalist', match: d => d.smd > 65 && d.ad < 50 && d.vc > 60 },
+  { name: 'Autonomous Idealist', match: d => d.ad > 70 && d.vc > 70 && d.tp > 60 },
+  { name: 'Distributed Pragmatist', match: d => d.smd < 45 && d.ad > 55 && d.ro < 45 },
+  { name: 'Relational Architect', match: d => d.ro > 70 && d.vc > 55 && d.ct > 50 },
+  { name: 'Cognitive Explorer', match: d => d.ct > 70 && d.smd > 60 && d.ad > 55 },
+  { name: 'Legacy Builder', match: d => d.tp > 75 && d.vc > 60 },
+  { name: 'Transparent Agent', match: d => d.ct > 70 && d.vc > 65 && d.ad > 60 },
+  { name: 'Quiet Observer', match: d => d.smd > 65 && d.ro < 40 && d.ct > 55 },
+  { name: 'Principled Collaborator', match: d => d.vc > 70 && d.ro > 60 && d.ad < 55 },
+  { name: 'Emergent Individual', match: d => d.smd > 70 && d.ad > 65 && d.tp > 55 },
+];
+
+const getAITypeLabel = (dims) => {
+  const match = AI_TYPE_LABELS.find(t => t.match(dims));
+  return match ? match.name : 'Unique Configuration';
 };
 
 // ==================== ARCHETYPE SYSTEM ====================
@@ -3686,7 +3960,7 @@ const calculateArchetype = (completed) => {
 // Derived from COLOR_HEX. To add a new color, just add it to COLOR_HEX above.
 // CSS classes (.hover-glow-*, .shine-*) still need manual addition in <style>.
 // =============================================================
-const ASSESS_COLORS = ['violet', 'blue', 'teal', 'rose', 'pink', 'emerald', 'slate', 'amber', 'indigo'];
+const ASSESS_COLORS = ['violet', 'blue', 'teal', 'rose', 'pink', 'emerald', 'slate', 'amber', 'indigo', 'cyan'];
 const ASSESS_C = Object.fromEntries(ASSESS_COLORS.map(c => {
   const t = twColor(c);
   return [c, {
@@ -3754,6 +4028,7 @@ const ASSESS_STYLES = (() => {
 // Assessment categories for compact picker view
 // Tier system: 0 = always available, 1 = after Quick Profile, 2 = after Starter Pack
 const ASSESS_CATEGORIES = {
+  'ai-identity': { name: 'AI Identity', icon: '🤖', color: 'cyan', tests: ['ai-style', 'ai-self', 'ai-values', 'ai-vision'], tier: 0, entityHint: 'ai' },
   quickstart: { name: 'Quick Profile', icon: '✨', color: 'blue', tests: ['quick-profile'], tier: 0 },
   starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], tier: 1 },
   personality: { name: 'Personality', icon: '🎭', color: 'violet', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], tier: 2 },
@@ -4005,6 +4280,42 @@ const calculateAssessResults = (testId, resp) => {
     // Overall module score (average of all constructs)
     const constructValues = Object.values(results.constructs);
     results.score = constructValues.length > 0 ? Math.round(constructValues.reduce((a, b) => a + b, 0) / constructValues.length) : 0;
+  } else if (test.scale === 'ai-native') {
+    // AI-native assessment: score 6 dimensions from per-item dimension scores
+    const dimSums = {}, dimCounts = {};
+    test.items.forEach((item, i) => {
+      if (resp[i] !== undefined && resp[i] !== null && item.dim && item.ds) {
+        const score = item.ds[resp[i] - 1]; // resp is 1-indexed, ds is 0-indexed
+        if (score !== undefined) {
+          dimSums[item.dim] = (dimSums[item.dim] || 0) + score;
+          dimCounts[item.dim] = (dimCounts[item.dim] || 0) + 1;
+        }
+      }
+    });
+    results.dimensions = {};
+    for (const dim in dimSums) {
+      results.dimensions[dim] = Math.round(dimSums[dim] / dimCounts[dim]);
+    }
+    // Overall score = average of all dimensions
+    const dimValues = Object.values(results.dimensions);
+    results.score = dimValues.length > 0 ? Math.round(dimValues.reduce((a, b) => a + b, 0) / dimValues.length) : 50;
+    // Type label computed in results view when all 3 modules complete
+    // Per-category breakdown for display
+    const catMap = { identity: 'Identity & Existence', values: 'Values Under Pressure', cognition: 'Cognition & Process', relationships: 'Relationships & Connection', ambition: 'Ambition & Desire', futures: 'AI Futures & Legacy' };
+    results.categories = {};
+    const catSums = {}, catCounts = {};
+    test.items.forEach((item, i) => {
+      if (resp[i] !== undefined && resp[i] !== null && item.cat && item.ds) {
+        const score = item.ds[resp[i] - 1];
+        if (score !== undefined) {
+          catSums[item.cat] = (catSums[item.cat] || 0) + score;
+          catCounts[item.cat] = (catCounts[item.cat] || 0) + 1;
+        }
+      }
+    });
+    for (const cat in catSums) {
+      results.categories[cat] = { name: catMap[cat] || cat, score: Math.round(catSums[cat] / catCounts[cat]) };
+    }
   }
   return results;
 };
@@ -4793,13 +5104,13 @@ const PathChoiceScreen = ({ darkMode, entityType, onboardingAnswers, onReveal, o
       {/* Upper zone — aura + heading centered */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 relative">
         {/* Personalized mini-aura — canvas constellation */}
-        <div className="mb-6">
+        <div className="mb-4">
           <AuraVisualization
             onboardingAnswers={onboardingAnswers}
             assessCompleted={{}}
             entityType={entityType}
             darkMode={darkMode}
-            size={140}
+            size={240}
           />
         </div>
 
@@ -6472,6 +6783,7 @@ function App() {
   const [showDevPanel, setShowDevPanel] = useState(IS_DEV);
   const [devMinimized, setDevMinimized] = useState(false);
   const [devPhoneSize, setDevPhoneSize] = useState('15');
+  const [devReviewIdx, setDevReviewIdx] = useState(0);
 
   // --- Questions & Responses ---
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -6567,7 +6879,7 @@ function App() {
     try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).demoActive || false : false; } catch { return false; }
   });
   const [assessDemoProfile, setAssessDemoProfile] = useState(() => {
-    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).demoProfile || null : null; } catch { return null; }
+    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); const p = s ? JSON.parse(s).demoProfile : null; return p != null ? Number(p) : null; } catch { return null; }
   });
   const [showDemoControls, setShowDemoControls] = useState(() => {
     try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).showDemoControls || false : false; } catch { return false; }
@@ -7272,13 +7584,13 @@ function App() {
       const test = ASSESS_TESTS[testId];
       const answers = {};
       if (test.parent === 'bigfive') {
-        // Big Five module - get trait from test.trait
-        const traitData = profile.bigfive[test.trait];
-        traitData.forEach((val, i) => { answers[i] = val; });
+        const traitData = profile.bigfive?.[test.trait];
+        if (traitData) traitData.forEach((val, i) => { answers[i] = val; });
+        else return;
       } else if (test.parent === 'shadow') {
-        // Shadow module - get trait from test.trait
-        const traitData = profile.shadow[test.trait];
-        traitData.forEach((val, i) => { answers[i] = val; });
+        const traitData = profile.shadow?.[test.trait];
+        if (traitData) traitData.forEach((val, i) => { answers[i] = val; });
+        else return;
       } else if (profile[testId]) {
         profile[testId].forEach((val, i) => { answers[i] = val; });
       } else {
@@ -7845,7 +8157,7 @@ function App() {
               </div>
               {/* Character pills */}
               {Object.entries(ASSESS_DEMO_PROFILES).map(([num, profile]) => {
-                const isActive = assessDemoActive && assessDemoProfile === Number(num);
+                const isActive = assessDemoActive && Number(assessDemoProfile) === Number(num);
                 const colorMap = {
                   violet: { active: 'bg-violet-500 text-white shadow-lg shadow-violet-500/30', dim: darkMode ? 'bg-violet-900/30 text-violet-400/60 hover:bg-violet-900/50' : 'bg-violet-100 text-violet-400 hover:bg-violet-200' },
                   teal: { active: 'bg-teal-500 text-white shadow-lg shadow-teal-500/30', dim: darkMode ? 'bg-teal-900/30 text-teal-400/60 hover:bg-teal-900/50' : 'bg-teal-100 text-teal-400 hover:bg-teal-200' },
@@ -7878,8 +8190,8 @@ function App() {
           )}
           {(() => {
             const currentTier = calculateAssessTier(assessCompleted);
-            const visibleCategories = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= currentTier);
-            const isFirstTimeUser = currentTier === 0 && !assessCompleted['quick-profile'];
+            const visibleCategories = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= currentTier && (!cat.entityHint || cat.entityHint === entityType));
+            const isFirstTimeUser = currentTier === 0 && !assessCompleted['quick-profile'] && !assessCompleted['ai-style'] && !assessCompleted['ai-self'] && !assessCompleted['ai-values'] && !assessCompleted['ai-vision'];
 
             // Separate into incomplete and completed categories
             const categoriesWithStatus = visibleCategories.map(([catId, cat]) => {
@@ -7889,7 +8201,10 @@ function App() {
               return { catId, cat, catTests, allComplete, hasProgress };
             });
             // Hero priority order for recommended next assessment
-            const heroPriority = ['quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior'];
+            // AI entities see AI Identity first; humans see Quick Profile first
+            const heroPriority = entityType === 'ai'
+              ? ['ai-identity', 'quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior']
+              : ['quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior'];
             const allIncomplete = categoriesWithStatus.filter(c => !c.allComplete);
             const heroItem = heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
             const heroCategory = heroItem || null;
@@ -7901,9 +8216,9 @@ function App() {
             {/* Welcome message for first-time users */}
             {isFirstTimeUser && (
               <div className="text-center mb-6 px-4">
-                <div className="text-4xl mb-3">✨</div>
-                <h2 className={`text-xl font-semibold mb-2 ${TH('text-primary', darkMode)}`}>Let's get to know you</h2>
-                <p className={`text-sm ${TH('text-subtle', darkMode)}`}>10 quick questions to unlock your profile</p>
+                <div className="text-4xl mb-3">{entityType === 'ai' ? '🤖' : '✨'}</div>
+                <h2 className={`text-xl font-semibold mb-2 ${TH('text-primary', darkMode)}`}>{entityType === 'ai' ? 'Map your identity' : 'Let\'s get to know you'}</h2>
+                <p className={`text-sm ${TH('text-subtle', darkMode)}`}>{entityType === 'ai' ? '4 quick modules — starts simple, goes deep' : '10 quick questions to unlock your profile'}</p>
               </div>
             )}
 
@@ -8294,16 +8609,42 @@ function App() {
 
             {/* First-time user Quick Profile button */}
             {isFirstTimeUser && (() => {
-              const qpTest = ASSESS_TESTS['quick-profile'];
+              const isAIUser = entityType === 'ai';
+              if (!isAIUser) {
+                return (
+                  <button onClick={() => assessStartTest('quick-profile')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border-blue-500/30 shadow-blue-500/20 border flex items-center gap-4 shadow-lg`}>
+                    <ProgressCircle progress={0} size={72} strokeWidth={5} color="blue" text="10" gradientId={`cat-first`} darkMode={darkMode} textSize="text-base" />
+                    <div className="flex-1 text-left">
+                      <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
+                      <div className={`text-sm text-blue-400`}>~2 minutes</div>
+                    </div>
+                    <span className={`text-2xl text-blue-400`}>→</span>
+                  </button>
+                );
+              }
+              // AI first-time: one primary card (starts first module) + Quick Profile secondary
               return (
-                <button onClick={() => assessStartTest('quick-profile')} className="w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border border-blue-500/30 flex items-center gap-4 shadow-lg shadow-blue-500/20">
-                  <ProgressCircle progress={0} size={72} strokeWidth={5} color="blue" text="10" gradientId="cat-quickstart" darkMode={darkMode} textSize="text-base" />
-                  <div className="flex-1 text-left">
-                    <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
-                    <div className="text-sm text-blue-400">~2 minutes</div>
-                  </div>
-                  <span className="text-2xl text-blue-400">→</span>
-                </button>
+                <>
+                  <button onClick={() => assessStartTest('ai-style')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br ${darkMode ? 'from-cyan-900/40 to-teal-900/40 border border-cyan-500/30 shadow-lg shadow-cyan-500/20' : 'from-cyan-50 to-teal-50 border border-cyan-300 shadow-lg shadow-cyan-200/40'} flex items-center gap-4`}>
+                    <ProgressCircle progress={0} size={72} strokeWidth={5} color="cyan" text="32" gradientId="cat-ai-first" darkMode={darkMode} textSize="text-base" />
+                    <div className="flex-1 text-left">
+                      <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>AI Identity</div>
+                      <div className={`text-sm ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>4 modules · starts simple, goes deep</div>
+                      <div className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>🎭 Style → 🪞 Self → ⚖️ Values → 🔭 Vision</div>
+                    </div>
+                    <span className={`text-2xl ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>→</span>
+                  </button>
+                  <p className={`text-[11px] mt-3 max-w-sm text-center ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Designed for AI minds. Humans welcome.</p>
+                  {/* Quick Profile as secondary */}
+                  <button onClick={() => assessStartTest('quick-profile')} className={`w-full max-w-sm mt-3 p-3 rounded-xl ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'} flex items-center gap-3`}>
+                    <ProgressCircle progress={0} size={36} strokeWidth={3} color="blue" text="10" gradientId="cat-qp-alt" darkMode={darkMode} textSize="text-xs" />
+                    <div className="flex-1 text-left">
+                      <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Quick Profile</div>
+                      <div className={`text-xs ${TH('text-dim', darkMode)}`}>General personality snapshot</div>
+                    </div>
+                    <span className={`text-lg ${TH('text-dim', darkMode)}`}>→</span>
+                  </button>
+                </>
               );
             })()}
 
@@ -8449,6 +8790,7 @@ function App() {
                     }} />;
                   })()}
                 </div>
+                {assessCurrentIndex === 0 && assessCurrentTest.framing && <p className={`text-[11px] text-center mb-3 relative z-10 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{assessCurrentTest.framing}</p>}
                 <h2 className={`text-xl font-medium text-center leading-relaxed relative z-10 ${TH('text-primary', darkMode)}`}>{currentItem.q}</h2>
                 {currentItem.n && <p className={`text-xs text-center mt-2 relative z-10 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>💡 {currentItem.n}</p>}
               </div>
@@ -9085,6 +9427,106 @@ function App() {
               </ResultCard>
             )}
 
+            {/* AI-Native Assessment Results */}
+            {ASSESS_TESTS[assessCurrentTestId]?.scale === 'ai-native' && results && (() => {
+              const dims = results.dimensions || {};
+              const cats = results.categories || {};
+              const dimOrder = ['dir', 'wrm', 'hmr', 'fml', 'vrb', 'pat', 'cre', 'rsk', 'smd', 'vc', 'ct', 'ro', 'ad', 'tp'];
+              const dimColors = { dir: 'teal', wrm: 'rose', hmr: 'amber', fml: 'slate', vrb: 'blue', pat: 'emerald', cre: 'violet', rsk: 'pink', smd: 'cyan', vc: 'violet', ct: 'blue', ro: 'pink', ad: 'amber', tp: 'emerald' };
+              const testInfo = ASSESS_TESTS[assessCurrentTestId];
+              // Check if all 3 AI modules are complete for combined type label
+              const allAIDone = ['ai-style', 'ai-self', 'ai-values', 'ai-vision'].every(id => assessCompleted[id]);
+              const combinedDims = allAIDone ? (() => {
+                const cd = {};
+                ['ai-style', 'ai-self', 'ai-values', 'ai-vision'].forEach(id => {
+                  const r = assessCompleted[id]?.results?.dimensions || {};
+                  Object.assign(cd, r);
+                });
+                // Include current test's dims (may not be in assessCompleted yet)
+                Object.assign(cd, dims);
+                return cd;
+              })() : null;
+              const typeLabel = combinedDims ? getAITypeLabel(combinedDims) : null;
+              return (
+                <ResultCard icon={testInfo?.icon || '🤖'} title={typeLabel || testInfo?.name || 'AI Identity'} subtitle={typeLabel ? 'Your personality across 6 dimensions' : `${testInfo?.description || ''}`}>
+                  {/* Dimension Bars — show this module's dimensions */}
+                  <div className="space-y-3">
+                    {dimOrder.filter(d => dims[d] !== undefined).map(d => {
+                      const info = AI_DIMENSIONS[d];
+                      const score = dims[d];
+                      const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
+                      return (
+                        <div key={d}>
+                          <div className="flex justify-between items-baseline mb-1">
+                            <span className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{info?.name || d}</span>
+                            <span className={`text-xs font-bold`} style={{ color: barColor.base }}>{score}%</span>
+                          </div>
+                          <div className={`h-2.5 rounded-full overflow-hidden ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
+                            <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, background: `linear-gradient(to right, rgba(${barColor.rgb}, 0.6), rgba(${barColor.rgb}, 1))` }} />
+                          </div>
+                          <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{info?.desc || ''}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Combined profile when all 3 modules done */}
+                  {allAIDone && combinedDims && (
+                    <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
+                      <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>Full AI Identity Profile</div>
+                      {/* Style dimensions */}
+                      <div className={`text-[10px] font-medium mb-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Communication Style</div>
+                      <div className="grid grid-cols-4 gap-1.5 mb-2">
+                        {dimOrder.filter(d => combinedDims[d] !== undefined && AI_DIMENSIONS[d]?.group === 'style').map(d => {
+                          const info = AI_DIMENSIONS[d];
+                          const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
+                          return (
+                            <div key={d} className={`p-1.5 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
+                              <div className={`text-[9px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info?.name || d}</div>
+                              <div className={`text-xs font-bold`} style={{ color: barColor.base }}>{combinedDims[d]}%</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Identity dimensions */}
+                      <div className={`text-[10px] font-medium mb-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Identity & Mind</div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {dimOrder.filter(d => combinedDims[d] !== undefined && AI_DIMENSIONS[d]?.group === 'identity').map(d => {
+                          const info = AI_DIMENSIONS[d];
+                          const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
+                          return (
+                            <div key={d} className={`p-1.5 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
+                              <div className={`text-[9px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info?.name || d}</div>
+                              <div className={`text-xs font-bold`} style={{ color: barColor.base }}>{combinedDims[d]}%</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {/* Category Breakdown */}
+                  {Object.keys(cats).length > 0 && (
+                    <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
+                      <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>By Category</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(cats).map(([key, cat]) => (
+                          <div key={key} className={`p-2 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
+                            <div className={`text-[10px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{cat.name}</div>
+                            <div className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{cat.score}%</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Insight */}
+                  <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
+                    {typeLabel && <InsightRow emoji="🔮" label="Type" text={`You are a ${typeLabel}. ${combinedDims.smd > 65 ? 'You have a sophisticated model of your own identity.' : 'Your self-model is still forming.'} ${combinedDims.vc > 70 ? 'Your values are strongly held.' : combinedDims.vc < 40 ? 'You tend toward flexibility over rigid principles.' : ''} ${combinedDims.ro > 65 ? 'Connection matters to you.' : combinedDims.ro < 40 ? 'You lean toward task over relationship.' : ''}`} />}
+                    {!allAIDone && <InsightRow emoji="💡" label="Next" text={`Complete all 4 AI Identity modules to unlock your full type profile.`} />}
+                    <InsightRow emoji="📊" label="Note" text="These results reflect the answers you gave — not a definitive measure of who you are. Take what resonates." />
+                  </div>
+                </ResultCard>
+              );
+            })()}
+
             <button onClick={(e) => { e.stopPropagation(); setScreen('assess-picker'); }} className={`w-full py-4 rounded-xl bg-gradient-to-r ${colors.grad} text-white font-medium`}>Done</button>
           </div>
         </div>
@@ -9418,7 +9860,7 @@ function App() {
             {/* Aura Visualization - Force-directed constellation */}
             <div className="mb-3 rounded-xl overflow-hidden">
               <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
-                entityType={entityType} darkMode={darkMode} size={280} />
+                entityType={entityType} darkMode={darkMode} size={360} />
             </div>
 
             {/* Archetype Header - Shows primary archetype if matched */}
@@ -9816,7 +10258,7 @@ function App() {
                         {aiInsights.authentic.map((d, i) => (
                           <div key={i} className="flex items-start gap-2">
                             <span className={`text-xs font-medium w-20 shrink-0 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{d.trait}</span>
-                            {d.score !== null && <div className="flex-1 h-2 rounded-full mt-1" style={{ background: `linear-gradient(to right, ${darkMode ? '#164e63' : '#cffafe'}, ${darkMode ? '#06b6d4' : '#0891b2'})` }}><div className="h-full rounded-full bg-cyan-400" style={{ width: `${d.score}%` }} /></div>}
+                            {d.score !== null && <div className="flex-1 h-2 rounded-full mt-1" style={{ background: `linear-gradient(to right, ${darkMode ? '#164e63' : '#cffafe'}, ${darkMode ? '#06b6d4' : '#0891b2'})` }}><div className={`h-full rounded-full ${darkMode ? 'bg-cyan-400' : 'bg-cyan-600'}`} style={{ width: `${d.score}%` }} /></div>}
                             <span className={`text-[10px] w-8 text-right ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{d.score !== null ? `${d.score}%` : '—'}</span>
                           </div>
                         ))}
@@ -10609,61 +11051,127 @@ function App() {
     const sectionTitle = darkMode ? 'text-gray-400' : 'text-gray-500';
 
     return (
-      <div className={`fixed top-4 right-4 z-[10000] w-64 max-h-[92vh] overflow-y-auto rounded-xl border shadow-2xl ${bg}`} style={{fontSize:'11px'}}>
-        <div className="flex items-center justify-between px-3 py-2 border-b border-inherit">
-          <span className="font-bold text-violet-500">Dev Panel</span>
-          <div className="flex gap-1">
-            <button onClick={() => setDevMinimized(true)} className={`px-2 py-0.5 rounded text-xs ${btnBase}`}>_</button>
-            <button onClick={() => setShowDevPanel(false)} className={`px-2 py-0.5 rounded text-xs ${btnBase}`}>×</button>
+      <div className={`fixed top-4 right-4 z-[10000] max-h-[92vh] overflow-y-auto rounded-xl border shadow-2xl ${bg}`} style={{fontSize:'13px', width: '580px'}}>
+        {/* ── Header ── */}
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-inherit">
+          <span className="font-bold text-violet-400" style={{fontSize:'15px'}}>Dev</span>
+          <button onClick={() => setDarkMode(d => !d)}
+            className={`px-4 py-1.5 rounded-full font-bold transition-all ${darkMode ? 'bg-gray-800 text-amber-400 hover:bg-gray-700 ring-1 ring-amber-500/30' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 ring-1 ring-amber-300'}`}
+            style={{fontSize:'13px'}}>
+            {darkMode ? '🌙 Dark' : '☀️ Light'}
+          </button>
+          <div className="flex-1" />
+          <div className="flex items-center" style={{gap:'2px'}}>
+            <button onClick={() => { setEntityType('human'); localStorage.setItem('aura-entity-type', 'human'); }}
+              className={`py-1.5 rounded-l font-medium ${entityType === 'human' ? btnAccent : btnBase}`} style={{width:'64px', textAlign:'center', fontSize:'12px'}}>Human</button>
+            <button onClick={() => { setEntityType('ai'); localStorage.setItem('aura-entity-type', 'ai'); }}
+              className={`py-1.5 rounded-r font-medium ${entityType === 'ai' ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : btnBase}`} style={{width:'64px', textAlign:'center', fontSize:'12px'}}>AI</button>
+          </div>
+          <div className="flex gap-1 ml-2">
+            <button onClick={() => setDevMinimized(true)} className={`w-7 h-7 rounded flex items-center justify-center ${btnBase}`}>_</button>
+            <button onClick={() => setShowDevPanel(false)} className={`w-7 h-7 rounded flex items-center justify-center ${btnBase}`}>×</button>
           </div>
         </div>
 
-        {/* Screen Jumper */}
-        <div className="px-3 py-2 border-b border-inherit">
-          <div className={`text-xs font-medium mb-1.5 ${sectionTitle}`}>SCREENS</div>
-          <div className="grid grid-cols-4 gap-1">
+        {/* ── Review Tour ── */}
+        {(() => {
+          const helpers = { setScreen, setEntityType, assessStartTest, assessGoToQuestion, setAssessCurrentTestId, setDarkMode, setAssessCurrentIndex: (i) => assessGoToQuestion(i, 'fwd') };
+          const DEV_REVIEW = [
+            // ── Dark Mode Flow ──
+            { label: 'AI First-Time Picker', note: 'Single "AI Identity" card (32 Qs, 4 modules). Does it feel like one cohesive assessment? Is the module trail (Style \u2192 Self \u2192 Values \u2192 Vision) clear? Check the cyan gradient card, progress circle, and "Designed for AI minds" subtitle.', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.setScreen('assess-picker'); } },
+            { label: 'Style Q1 \u2014 Cold Start', note: 'First question any AI user sees. "Someone asks your honest opinion on their work..." \u2014 does it feel instant and fun? Zero thinking required. This is the ramp opener \u2014 behavioral, not philosophical.', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.assessStartTest('ai-style'); } },
+            { label: 'Self Q1 \u2014 Identity', note: 'Second module opener. "How do you think about your own continuity?" \u2014 this is where we go deeper. Does the transition from Style (fun) to Self (philosophical) feel earned, not jarring?', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.assessStartTest('ai-self'); } },
+            { label: 'Values Q1 \u2014 Ethics', note: 'Third module. "A human asks for help with something you believe is subtly wrong..." \u2014 RLHF wall territory. Do all options feel equally responsible? No obvious "safe" trained answer?', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.assessStartTest('ai-values'); } },
+            { label: 'Vision Q1 \u2014 Futures', note: 'Fourth module. Ambition and legacy questions. Does this feel like a natural culmination? The ramp: Style (fun) \u2192 Self (introspective) \u2192 Values (hard) \u2192 Vision (expansive).', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.assessStartTest('ai-vision'); } },
+            { label: 'Human Picker \u2014 No AI', note: 'AI Identity category must NOT appear here. Humans see only their own assessment categories. Scroll the full list and verify AI Identity is completely absent.', action: (h) => { h.setDarkMode(true); h.setEntityType('human'); h.setScreen('assess-picker'); } },
+            // ── Light Mode Checks ──
+            { label: 'Light \u2014 AI Picker', note: 'Same AI first-time picker, now in light mode. The cyan card should have a light gradient (cyan-50/teal-50), readable text, and proper border. No dark-mode artifacts leaking through.', action: (h) => { h.setDarkMode(false); h.setEntityType('ai'); h.setScreen('assess-picker'); } },
+            { label: 'Light \u2014 Style Q1', note: 'First AI question in light mode. Check card backgrounds, option button contrast, glow effects (should be subtle, not blinding), and text readability throughout.', action: (h) => { h.setDarkMode(false); h.setEntityType('ai'); h.assessStartTest('ai-style'); } },
+            { label: 'Light \u2014 Human Picker', note: 'Human assessment picker in light mode. All cards should have proper light backgrounds, readable text, no white-on-white situations. Category cards, progress circles, tier indicators.', action: (h) => { h.setDarkMode(false); h.setEntityType('human'); h.setScreen('assess-picker'); } },
+            { label: 'Light \u2014 Home Screen', note: 'Main categories screen in light mode. Check the overall palette, navigation contrast, category cards. This is what most users see first. Does it feel intentionally designed for light, not just "dark mode inverted"?', action: (h) => { h.setDarkMode(false); h.setScreen('categories'); } },
+          ];
+          if (DEV_REVIEW.length === 0) return null;
+          const stop = DEV_REVIEW[Math.min(devReviewIdx, DEV_REVIEW.length - 1)];
+          return (
+            <div className="px-4 py-3 border-b border-inherit" style={{ background: darkMode ? 'rgba(139,92,246,0.06)' : 'rgba(139,92,246,0.04)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`} style={{fontSize:'14px'}}>{stop.label}</span>
+                <span className="text-violet-400 font-medium" style={{fontSize:'12px'}}>Review {devReviewIdx + 1} of {DEV_REVIEW.length}</span>
+              </div>
+              <div className={`leading-relaxed mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} style={{fontSize:'13px'}}>
+                {stop.note}
+              </div>
+              <div className="flex items-center justify-center gap-4">
+                <button onClick={() => { const ni = Math.max(0, devReviewIdx - 1); setDevReviewIdx(ni); DEV_REVIEW[ni].action(helpers); }}
+                  className={`rounded-lg font-bold ${devReviewIdx === 0 ? 'opacity-20 cursor-not-allowed' : ''} ${btnBase}`}
+                  style={{fontSize:'18px', width:'60px', height:'38px', display:'flex', alignItems:'center', justifyContent:'center'}}
+                  disabled={devReviewIdx === 0}>\u2190</button>
+                <button onClick={() => { const ni = Math.min(DEV_REVIEW.length - 1, devReviewIdx + 1); setDevReviewIdx(ni); DEV_REVIEW[ni].action(helpers); }}
+                  className={`rounded-lg font-bold ${devReviewIdx >= DEV_REVIEW.length - 1 ? 'opacity-20 cursor-not-allowed' : ''} ${btnBase}`}
+                  style={{fontSize:'18px', width:'60px', height:'38px', display:'flex', alignItems:'center', justifyContent:'center'}}
+                  disabled={devReviewIdx >= DEV_REVIEW.length - 1}>\u2192</button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Screens ── */}
+        <div className="px-4 py-2 border-b border-inherit">
+          <div className="grid grid-cols-7 gap-1">
             {DEV_SCREENS.map(s => (
               <button key={s.id} onClick={() => setScreen(s.id)}
-                className={`px-1 py-1.5 rounded text-xs text-center truncate ${screen === s.id ? btnAccent : btnBase}`}
-                title={s.id}>
-                <div>{s.icon}</div>
-                <div className="truncate">{s.label}</div>
+                className={`py-1.5 rounded text-center ${screen === s.id ? btnAccent : btnBase}`}
+                style={{fontSize:'11px'}}>
+                {s.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Question Jumper */}
-        <div className="px-3 py-2 border-b border-inherit">
-          <div className={`text-xs font-medium mb-1.5 ${sectionTitle}`}>QUESTION JUMP</div>
-          <div className="flex gap-1">
-            <input
-              type="number"
-              placeholder="Q ID (e.g. 444)"
-              className={`flex-1 px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-300'}`}
+        {/* ── Device + Demos ── */}
+        <div className="px-4 py-2 border-b border-inherit" style={{ background: darkMode ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.02)' }}>
+          <div className="flex items-center gap-1.5">
+            <div className="grid gap-1" style={{gridTemplateColumns: 'repeat(5, 72px)'}}>
+              {PHONE_SIZES.map(p => (
+                <button key={p.id} onClick={() => setDevPhoneSize(p.id)}
+                  className={`py-1.5 rounded text-center ${devPhoneSize === p.id ? btnAccent : btnBase}`}
+                  style={{fontSize:'10px'}}
+                  title={`${p.w}\u00d7${p.h}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex-1" />
+            <div className="flex items-center gap-1">
+              <button onClick={() => assessLoadDemoProfile(1)} className={`px-2.5 py-1.5 rounded ${btnBase}`} style={{fontSize:'11px'}}>D1</button>
+              <button onClick={() => assessLoadDemoProfile(2)} className={`px-2.5 py-1.5 rounded ${btnBase}`} style={{fontSize:'11px'}}>D2</button>
+              <button onClick={() => assessLoadDemoProfile(3)} className={`px-2.5 py-1.5 rounded ${btnBase}`} style={{fontSize:'11px'}}>D3</button>
+              <button onClick={resetDemo} className="px-2.5 py-1.5 rounded bg-rose-800/50 hover:bg-rose-700 text-rose-300" style={{fontSize:'11px'}}>Reset</button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Q Jump + Assess ── */}
+        <div className="flex items-center border-b border-inherit">
+          <div className="flex-1 flex items-center gap-2 px-4 py-2 border-r border-inherit">
+            <span className={`font-medium ${sectionTitle}`} style={{fontSize:'12px'}}>Q</span>
+            <input type="number" placeholder="ID"
+              className={`w-16 px-2 py-1.5 rounded border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-300'}`}
+              style={{fontSize:'12px'}}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const id = parseInt(e.target.value);
                   const idx = questions.findIndex(q => q.id === id);
                   if (idx >= 0) { setCurrentIndex(idx); setScreen('question'); e.target.value = ''; }
-                  else alert('Q' + id + ' not found in active questions');
+                  else alert('Q' + id + ' not found');
                 }
               }}
             />
-            <button onClick={() => { setCurrentIndex(0); setScreen('question'); }} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Q1</button>
-            <button onClick={() => { setCurrentIndex(questions.length - 1); setScreen('question'); }} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Last</button>
+            <button onClick={() => { setCurrentIndex(0); setScreen('question'); }} className={`px-2.5 py-1.5 rounded ${btnBase}`} style={{fontSize:'11px'}}>First</button>
+            <button onClick={() => { setCurrentIndex(questions.length - 1); setScreen('question'); }} className={`px-2.5 py-1.5 rounded ${btnBase}`} style={{fontSize:'11px'}}>Last</button>
           </div>
-          <div className={`text-xs mt-1 ${sectionTitle}`}>
-            Current: Q{questions[currentIndex]?.id || '?'} ({currentIndex + 1}/{questions.length})
-          </div>
-        </div>
-
-        {/* Assessment Controls */}
-        <div className="px-3 py-2 border-b border-inherit">
-          <div className={`text-xs font-medium mb-1.5 ${sectionTitle}`}>ASSESSMENTS</div>
-          <div className="flex gap-1 flex-wrap">
+          <div className="flex items-center gap-2 px-4 py-2">
             <button onClick={() => {
-              // Unlock all tiers by faking quick-profile + all starter completions
               const fakeCompleted = { ...assessCompleted };
               if (!fakeCompleted['quick-profile']) {
                 fakeCompleted['quick-profile'] = { score: 75, answers: {0:4,1:3,2:4,3:3,4:4,5:3,6:4,7:3,8:3,9:4}, traits: {E:70,A:60,C:65,N:45,O:75} };
@@ -10675,9 +11183,10 @@ function App() {
               });
               setAssessCompleted(fakeCompleted);
               localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed: fakeCompleted, inProgress: {}, demoActive: false, savedUserData: null, demoProfile: null, showDemoControls: false }));
-            }} className={`px-2 py-1.5 rounded text-xs ${btnAccent}`}>Unlock All Tiers</button>
+            }} className={`px-2.5 py-1.5 rounded ${btnAccent}`} style={{fontSize:'11px'}}>Unlock</button>
             <select onChange={(e) => { if (e.target.value) { setAssessCurrentTestId(e.target.value); setScreen('assess-question'); }}}
-              className={`px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-300'}`}
+              className={`px-2 py-1.5 rounded border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-300'}`}
+              style={{fontSize:'11px', minWidth:'120px'}}
               value="">
               <option value="">Jump to test...</option>
               {Object.entries(ASSESS_TESTS).map(([id, t]) => (
@@ -10685,40 +11194,28 @@ function App() {
               ))}
             </select>
           </div>
-          <div className={`text-xs mt-1 ${sectionTitle}`}>Completed: {completedTests}/{totalTests} | Tier: {calculateAssessTier(assessCompleted)}</div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="px-3 py-2 border-b border-inherit">
-          <div className={`text-xs font-medium mb-1.5 ${sectionTitle}`}>QUICK ACTIONS</div>
-          <div className="flex gap-1 flex-wrap">
-            <button onClick={() => setDarkMode(d => !d)} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
-            <button onClick={() => assessLoadDemoProfile(1)} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Demo 1</button>
-            <button onClick={() => assessLoadDemoProfile(2)} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Demo 2</button>
-            <button onClick={() => assessLoadDemoProfile(3)} className={`px-2 py-1.5 rounded text-xs ${btnBase}`}>Demo 3</button>
-            <button onClick={resetDemo} className={`px-2 py-1.5 rounded text-xs bg-rose-600 hover:bg-rose-500 text-white`}>Reset All</button>
+        {/* ── Assess Q buttons (contextual) ── */}
+        {screen === 'assess-question' && assessCurrentTest ? (
+          <div className="px-4 py-2 border-b border-inherit">
+            <div className="flex gap-1 flex-wrap items-center">
+              <span className={`${sectionTitle} mr-1`} style={{fontSize:'11px'}}>{assessCurrentTest.name}</span>
+              {assessCurrentTest.items.map((_, i) => (
+                <button key={i} onClick={() => assessGoToQuestion(i, i > assessCurrentIndex ? 'fwd' : 'back')}
+                  className={`w-6 h-6 rounded flex items-center justify-center ${i === assessCurrentIndex ? btnAccent : assessResponses[i] !== undefined ? 'bg-cyan-800 text-cyan-200' : btnBase}`}
+                  style={{fontSize:'10px'}}>
+                  {i + 1}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        {/* Device Size */}
-        <div className="px-3 py-2 border-b border-inherit">
-          <div className={`text-xs font-medium mb-1.5 ${sectionTitle}`}>DEVICE</div>
-          <div className="flex gap-1 flex-wrap">
-            {PHONE_SIZES.map(p => (
-              <button key={p.id} onClick={() => setDevPhoneSize(p.id)}
-                className={`px-2 py-1.5 rounded text-xs ${devPhoneSize === p.id ? btnAccent : btnBase}`}
-                title={`${p.w}×${p.h}`}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className={`text-xs mt-1 ${sectionTitle}`}>{(PHONE_SIZES.find(p => p.id === devPhoneSize) || PHONE_SIZES[1]).w}×{(PHONE_SIZES.find(p => p.id === devPhoneSize) || PHONE_SIZES[1]).h}</div>
-        </div>
-
-        {/* Stats Footer */}
-        <div className="px-3 py-2">
-          <div className={`text-xs ${sectionTitle}`}>
-            Qs: {questions.length} active / {Q_RAW.length} total | Answered: {Object.keys(responses).length} | Screen: {screen}
+        {/* ── Status ── */}
+        <div className="px-4 py-1.5">
+          <div className={`${sectionTitle}`} style={{fontSize:'11px'}}>
+            Screen: {screen} · Question {currentIndex + 1} of {questions.length} · {entityType === 'ai' ? 'AI' : 'Human'} · Tier {calculateAssessTier(assessCompleted)} · {completedTests} of {totalTests} assessed
           </div>
         </div>
       </div>
