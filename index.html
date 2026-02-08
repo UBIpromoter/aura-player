@@ -4022,6 +4022,17 @@ const ASSESS_STYLES = (() => {
       return [c, `text-${t}-500/70`];
     })),
   };
+  // Shadow Self: darker midpoint gradient — honest, not skewed toward light
+  dark.gradientStyles.slate = [
+    'bg-slate-950/30 border-slate-800/40', 'bg-slate-950/60 border-slate-700/60',
+    'bg-slate-900/80 border-slate-600/70', 'bg-slate-900/50 border-slate-500/50',
+    'bg-slate-800/40 border-slate-400/40'
+  ];
+  light.gradientStyles.slate = [
+    'bg-slate-50 border-slate-200', 'bg-slate-200 border-slate-300',
+    'bg-slate-300 border-slate-400', 'bg-slate-200 border-slate-300',
+    'bg-slate-100 border-slate-200'
+  ];
   return { dark, light };
 })();
 
@@ -4031,10 +4042,10 @@ const ASSESS_CATEGORIES = {
   'ai-identity': { name: 'AI Identity', icon: '🤖', color: 'cyan', tests: ['ai-style', 'ai-self', 'ai-values', 'ai-vision'], tier: 0, entityHint: 'ai' },
   quickstart: { name: 'Quick Profile', icon: '✨', color: 'blue', tests: ['quick-profile'], tier: 0 },
   starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], tier: 1 },
-  personality: { name: 'Personality', icon: '🎭', color: 'violet', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], tier: 2 },
+  personality: { name: 'Personality', icon: '🎭', color: 'rose', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], tier: 2 },
   character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'], tier: 2 },
   shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'], tier: 2 },
-  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['adhd', 'cognitive', 'chronotype', 'reasoning', 'reasoning-2', 'reasoning-3'], tier: 2 },
+  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['reasoning', 'cognitive', 'chronotype', 'reasoning-2', 'reasoning-3', 'adhd'], tier: 2 },
   relationships: { name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'], tier: 2 },
   behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], tier: 2 },
 };
@@ -5809,7 +5820,7 @@ const AnsweredQuestionView = ({ question, response, results, darkMode, questionF
 };
 
 // Category Selection Screen - a5 mockup design
-const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCategory, onSettings, onProfile, stats, qotdData, qotdResponse, onQotdClick, onResetQotd, onAssessments, assessCompleted, isLoggedIn }) => {
+const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCategory, onSettings, onProfile, stats, qotdData, qotdResponse, onQotdClick, onResetQotd, onAssessments, onAssessSurprise, assessCompleted, isLoggedIn }) => {
   const getProgress = (categoryId) => {
     const catQuestions = categoryId === 'random' ? questions : questions.filter(q => q.category === categoryId);
     const binaryQ = catQuestions.filter(q => q.type === 'binary');
@@ -5937,7 +5948,7 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
                 <div className={`font-medium text-sm mb-2 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                   🌀 Question of the Day
                 </div>
-                <p className={`text-lg font-semibold leading-snug ${TH('text-primary', darkMode)}`}>
+                <p className={`text-lg font-semibold leading-snug ${TH('text-primary', darkMode)}`} style={{ textWrap: 'balance' }}>
                   {qotdData.text}
                 </p>
               </>
@@ -5945,8 +5956,7 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
           </button>
         )}
 
-        {/* Welcome heading */}
-        {/* Category Cards */}
+        {/* SECTION 1: World Questions */}
         <div className="space-y-3">
           {categories.map(cat => {
             const config = categoryConfig[cat.id];
@@ -5954,7 +5964,6 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
             const progress = getProgress(cat.id);
             const available = progress.binaryUnanswered + progress.mcUnanswered;
             const isFeatured = config.featured;
-            // Distinct color config per category - with light/dark variants
             const colorConfig = darkMode ? {
               amber: { shine: 'shine-amber', glow: 'glow-amber', border: 'border-amber-500/40 hover:border-amber-400/90 active:border-amber-300', text: 'text-amber-400/80', bg: '' },
               violet: { shine: 'shine-violet', glow: 'glow-violet', border: 'border-violet-500/40 hover:border-violet-400/80 active:border-violet-300', text: 'text-violet-400/80', bg: 'bg-gradient-to-r from-violet-900/30 to-violet-950/50' },
@@ -5967,18 +5976,13 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
               teal: { shine: 'shine-teal', glow: 'glow-teal', border: 'border-teal-400 hover:border-teal-500 active:border-teal-600', text: 'text-teal-600', bg: 'bg-gradient-to-r from-teal-100 to-teal-50' },
             };
             const cc = colorConfig[cat.color] || colorConfig.teal;
-            const shineClass = cc.shine;
-            const glowClass = cc.glow;
-            const borderColor = cc.border;
-            const bgGradient = cc.bg;
-            const textColor = cc.text;
 
             return (
               <button
                 key={cat.id}
                 onClick={() => handleCategoryClick(cat.id)}
                 disabled={available === 0}
-                className={`w-full ${isFeatured ? 'py-4 px-5' : 'py-3.5 px-5'} rounded-2xl text-left transition-colors shine-card ${shineClass} ${glowClass} border ${borderColor} ${isFeatured ? (darkMode ? 'starry-bg overflow-hidden' : 'bg-gradient-to-r from-amber-100 to-yellow-50 overflow-hidden') : bgGradient} ${available === 0 ? 'opacity-40' : ''}`}
+                className={`w-full ${isFeatured ? 'py-4 px-5' : 'py-3.5 px-5'} rounded-2xl text-left transition-colors shine-card ${cc.shine} ${cc.glow} border ${cc.border} ${isFeatured ? (darkMode ? 'starry-bg overflow-hidden' : 'bg-gradient-to-r from-amber-100 to-yellow-50 overflow-hidden') : cc.bg} ${available === 0 ? 'opacity-40' : ''}`}
               >
                 <div className={`flex items-center gap-4 ${isFeatured ? 'relative z-10' : ''}`}>
                   <span className={isFeatured ? 'text-2xl' : 'text-xl'}>{config.icon}</span>
@@ -6009,19 +6013,44 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
               </button>
             );
           })()}
+        </div>
 
+        {/* DIVIDER — World ↔ Self */}
+        <div className="flex items-center gap-3 my-5">
+          <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
+          <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Self</span>
+          <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
+        </div>
+
+        {/* SECTION 2: Self Assessments */}
+        <div className="space-y-3">
           {/* Reveal Card - cyan/sky accent for self-discovery */}
           <button
             onClick={onAssessments}
             className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-blue glow-blue border ${
               darkMode
-                ? 'border-sky-500/40 hover:border-sky-400/80 active:border-sky-300 bg-gradient-to-r from-sky-900/30 to-cyan-950/50'
-                : 'border-sky-300 hover:border-sky-400 bg-gradient-to-r from-sky-50 to-cyan-50'
+                ? 'border-blue-500/40 hover:border-blue-400/80 active:border-blue-300 bg-gradient-to-r from-blue-900/30 to-blue-950/50'
+                : 'border-blue-300 hover:border-blue-400 bg-gradient-to-r from-blue-50 to-blue-50'
             }`}
           >
             <div className="flex items-center gap-4">
               <span className="text-xl">🪞</span>
               <div className={`flex-1 text-base font-semibold ${TH('text-primary', darkMode)}`}>Reveal</div>
+            </div>
+          </button>
+
+          {/* Assessment Surprise Me — random test, no picking */}
+          <button
+            onClick={onAssessSurprise}
+            className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-violet glow-violet border ${
+              darkMode
+                ? 'border-violet-500/40 hover:border-violet-400/80 active:border-violet-300 bg-gradient-to-r from-violet-900/30 to-violet-950/50'
+                : 'border-violet-400 hover:border-violet-500 active:border-violet-600 bg-gradient-to-r from-violet-100 to-violet-50'
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <span className="text-xl">🎲</span>
+              <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Surprise me</div>
             </div>
           </button>
 
@@ -6226,15 +6255,26 @@ const QuestionCard = ({ question, darkMode, evidenceExpanded, onToggleEvidence }
 };
 
 // Binary Answer Buttons - FIXED POSITION, no transforms
-const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentResponse, onTap, onRightClick, pendingSubmit, requireConfirmation, onSubmit, onClear }) => {
-  // Color shades for gradient (light to dark by confidence)
-  const yesShades = {
+const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentResponse, onTap, onRightClick, pendingSubmit, requireConfirmation, onSubmit, onClear, category }) => {
+  // Judgment questions use blue/teal (opinion), not green/red (factual yes/no)
+  const isOpinionBinary = category === 'judgment';
+  const yesShades = isOpinionBinary ? {
+    1: darkMode ? ['#164e63', '#0891b2'] : ['#cffafe', '#a5f3fc'],
+    2: darkMode ? ['#155e75', '#06b6d4'] : ['#a5f3fc', '#67e8f9'],
+    3: darkMode ? ['#0e7490', '#22d3ee'] : ['#67e8f9', '#06b6d4'],
+    4: darkMode ? ['#0891b2', '#67e8f9'] : ['#06b6d4', '#0891b2'],
+  } : {
     1: darkMode ? ['#065f46', '#059669'] : ['#a7f3d0', '#6ee7b7'],
     2: darkMode ? ['#047857', '#10b981'] : ['#6ee7b7', '#34d399'],
     3: darkMode ? ['#059669', '#34d399'] : ['#34d399', '#10b981'],
     4: darkMode ? ['#10b981', '#6ee7b7'] : ['#10b981', '#059669'],
   };
-  const noShades = {
+  const noShades = isOpinionBinary ? {
+    1: darkMode ? ['#4a1d96', '#7c3aed'] : ['#ede9fe', '#ddd6fe'],
+    2: darkMode ? ['#5b21b6', '#8b5cf6'] : ['#ddd6fe', '#c4b5fd'],
+    3: darkMode ? ['#6d28d9', '#a78bfa'] : ['#c4b5fd', '#8b5cf6'],
+    4: darkMode ? ['#7c3aed', '#c4b5fd'] : ['#8b5cf6', '#7c3aed'],
+  } : {
     1: darkMode ? ['#9f1239', '#e11d48'] : ['#fecdd3', '#fda4af'],
     2: darkMode ? ['#be123c', '#f43f5e'] : ['#fda4af', '#fb7185'],
     3: darkMode ? ['#e11d48', '#fb7185'] : ['#fb7185', '#f43f5e'],
@@ -6255,41 +6295,52 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
     }
     if (isSelected) {
       const s = shades[Math.min(tapCount, 4)];
-      return { background: `linear-gradient(135deg, ${s[0]} 0%, ${s[1]} 100%)`, boxShadow: `0 0 ${tapCount * 8}px rgba(${answer === 0 ? '16,185,129' : '244,63,94'}, ${0.2 + tapCount * 0.15})`, color: 'white' };
+      const glowRgb = isOpinionBinary
+        ? (answer === 0 ? '6,182,212' : '124,58,237')
+        : (answer === 0 ? '16,185,129' : '244,63,94');
+      return { background: `linear-gradient(135deg, ${s[0]} 0%, ${s[1]} 100%)`, boxShadow: `0 0 ${tapCount * 8}px rgba(${glowRgb}, ${0.2 + tapCount * 0.15})`, color: 'white' };
     }
     if (isAnswered) {
       return { background: darkMode ? 'rgb(31,41,55)' : 'rgb(243,244,246)', boxShadow: 'none', color: darkMode ? 'rgb(107,114,128)' : 'rgb(156,163,175)' };
     }
+    const defaultColors = isOpinionBinary
+      ? { yesColor: 'rgb(8,145,178)', noColor: 'rgb(109,40,217)', yesBorder: 'rgb(165,243,252)', noBorder: 'rgb(196,181,253)' }
+      : { yesColor: 'rgb(5,150,105)', noColor: 'rgb(225,29,72)', yesBorder: 'rgb(167,243,208)', noBorder: 'rgb(254,205,211)' };
     return {
       background: darkMode ? 'rgb(31,41,55)' : 'rgb(255,255,255)',
       boxShadow: 'none',
-      color: darkMode ? 'rgb(209,213,219)' : (answer === 0 ? 'rgb(5,150,105)' : 'rgb(225,29,72)'),
-      border: darkMode ? 'none' : `2px solid ${answer === 0 ? 'rgb(167,243,208)' : 'rgb(254,205,211)'}`,
+      color: darkMode ? 'rgb(209,213,219)' : (answer === 0 ? defaultColors.yesColor : defaultColors.noColor),
+      border: darkMode ? 'none' : `2px solid ${answer === 0 ? defaultColors.yesBorder : defaultColors.noBorder}`,
     };
   };
 
   const showSubmit = tappedAnswer !== null && requireConfirmation && !isAnswered && !pendingSubmit;
+  const yesAccent = isOpinionBinary ? 'cyan' : 'emerald';
+  const noAccent = isOpinionBinary ? 'violet' : 'rose';
 
   // Full width buttons when auto-submit (no checkmark slots needed)
   if (!requireConfirmation) {
     return (
       <div className="grid grid-cols-2 gap-2">
-        {[0, 1].map(answer => (
+        {[0, 1].map(answer => {
+          const accent = answer === 0 ? yesAccent : noAccent;
+          return (
           <button
             key={answer}
             onClick={() => !isAnswered && !pendingSubmit && onTap(answer)}
             onContextMenu={(e) => onRightClick && onRightClick(e, answer)}
             disabled={isAnswered || pendingSubmit}
-            className={`relative h-[57px] rounded-xl font-bold overflow-hidden select-none btn-feedback ${tappedAnswer === answer ? (answer === 0 ? 'ring-2 ring-emerald-400 shine-card shine-emerald' : 'ring-2 ring-rose-400 shine-card shine-rose') : ''}`}
+            className={`relative h-[57px] rounded-xl font-bold overflow-hidden select-none btn-feedback ${tappedAnswer === answer ? `ring-2 ring-${accent}-400 shine-card shine-${accent}` : ''}`}
             style={getButtonStyle(answer)}
           >
-            <ConfidenceSegments level={tapCount} color={answer === 0 ? 'emerald' : 'rose'} active={tappedAnswer === answer} darkMode={darkMode} />
+            <ConfidenceSegments level={tapCount} color={accent} active={tappedAnswer === answer} darkMode={darkMode} />
             <div className="relative z-10 flex items-center justify-center h-full gap-1.5">
               <span className="text-2xl font-bold">{answer === 0 ? 'YES' : 'NO'}</span>
               {tappedAnswer === answer && <span className="text-sm font-medium opacity-70">{getStars(tapCount)}</span>}
             </div>
           </button>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -6302,28 +6353,28 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
         onClick={() => !isAnswered && !pendingSubmit && onTap(0)}
         onContextMenu={(e) => onRightClick && onRightClick(e, 0)}
         disabled={isAnswered || pendingSubmit}
-        className={`flex-1 relative h-[57px] rounded-xl font-bold overflow-hidden select-none btn-feedback ${tappedAnswer === 0 ? 'ring-2 ring-emerald-400 shine-card shine-emerald' : ''}`}
+        className={`flex-1 relative h-[57px] rounded-xl font-bold overflow-hidden select-none btn-feedback ${tappedAnswer === 0 ? `ring-2 ring-${yesAccent}-400 shine-card shine-${yesAccent}` : ''}`}
         style={getButtonStyle(0)}
       >
-        <ConfidenceSegments level={tapCount} color="emerald" active={tappedAnswer === 0} darkMode={darkMode} />
+        <ConfidenceSegments level={tapCount} color={yesAccent} active={tappedAnswer === 0} darkMode={darkMode} />
         <div className="relative z-10 flex items-center justify-center h-full gap-1.5">
           <span className="text-2xl font-bold">YES</span>
           {tappedAnswer === 0 && <span className="text-sm font-medium opacity-70">{getStars(tapCount)}</span>}
         </div>
       </button>
       {/* Centered submit/clear buttons - FIXED height container to prevent any shift */}
-      <div className="w-11 h-[57px] flex-shrink-0 flex flex-col items-center justify-center">
+      <div className="w-14 h-[57px] flex-shrink-0 flex flex-col items-center justify-center">
         {showSubmit && (
           <>
             <button
               onClick={() => onClear && onClear()}
-              className={`w-6 h-6 rounded-full btn-feedback flex items-center justify-center text-xs ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}
+              className={`w-8 h-8 rounded-full btn-feedback flex items-center justify-center text-sm ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}
             >
               ✕
             </button>
             <button
               onClick={() => onSubmit && onSubmit(tappedAnswer, tapCount)}
-              className={`w-10 h-10 rounded-full text-white shadow-lg btn-feedback flex items-center justify-center text-lg ${tappedAnswer === 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+              className={`w-11 h-11 rounded-full text-white shadow-lg btn-feedback flex items-center justify-center text-xl ${tappedAnswer === 0 ? `bg-${yesAccent}-500` : `bg-${noAccent}-500`}`}
             >
               ✓
             </button>
@@ -6335,10 +6386,10 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
         onClick={() => !isAnswered && !pendingSubmit && onTap(1)}
         onContextMenu={(e) => onRightClick && onRightClick(e, 1)}
         disabled={isAnswered || pendingSubmit}
-        className={`flex-1 relative h-[57px] rounded-xl font-bold overflow-hidden select-none btn-feedback ${tappedAnswer === 1 ? 'ring-2 ring-rose-400 shine-card shine-rose' : ''}`}
+        className={`flex-1 relative h-[57px] rounded-xl font-bold overflow-hidden select-none btn-feedback ${tappedAnswer === 1 ? `ring-2 ring-${noAccent}-400 shine-card shine-${noAccent}` : ''}`}
         style={getButtonStyle(1)}
       >
-        <ConfidenceSegments level={tapCount} color="rose" active={tappedAnswer === 1} darkMode={darkMode} />
+        <ConfidenceSegments level={tapCount} color={noAccent} active={tappedAnswer === 1} darkMode={darkMode} />
         <div className="relative z-10 flex items-center justify-center h-full gap-1.5">
           <span className="text-2xl font-bold">NO</span>
           {tappedAnswer === 1 && <span className="text-sm font-medium opacity-70">{getStars(tapCount)}</span>}
@@ -6421,18 +6472,18 @@ const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, curr
             </button>
             {/* Clear/Submit slot - FIXED height to prevent shift */}
             {requireConfirmation && (
-              <div className="w-9 h-[40px] flex-shrink-0 flex flex-col items-center justify-center">
+              <div className="w-11 h-[40px] flex-shrink-0 flex flex-col items-center justify-center">
                 {isSelected && showSubmit && (
                   <>
                     <button
                       onClick={() => onClear && onClear()}
-                      className={`w-4 h-4 rounded-full btn-feedback flex items-center justify-center text-[10px] ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}
+                      className={`w-7 h-7 rounded-full btn-feedback flex items-center justify-center text-xs ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}
                     >
                       ✕
                     </button>
                     <button
                       onClick={() => onSubmit && onSubmit(tappedAnswer, tapCount)}
-                      className="w-8 h-8 rounded-full text-white shadow-lg btn-feedback flex items-center justify-center text-base"
+                      className="w-10 h-10 rounded-full text-white shadow-lg btn-feedback flex items-center justify-center text-lg"
                       style={{ backgroundColor: selectedColor?.hex || '#8b5cf6' }}
                     >
                       ✓
@@ -6814,6 +6865,7 @@ function App() {
   const [showExplanationModal, setShowExplanationModal] = useState(null); // questionId or null
   const [savedQuestions, setSavedQuestions] = useState(new Set()); // Questions saved for later
   const [skippedQuestions, setSkippedQuestions] = useState(new Set()); // Questions skipped
+  const [showSavedToast, setShowSavedToast] = useState(false); // "Saved for later" feedback
 
   // --- Entity Type ---
   const [entityType, setEntityType] = useState(() => demoStorage.get().entityType || 'human');
@@ -7012,6 +7064,8 @@ function App() {
     }
     setTappedAnswer(null);
     setTapCount(0);
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 1200);
     goToNext();
   }, [currentQuestion, goToNext]);
 
@@ -7831,15 +7885,46 @@ function App() {
               </div>
             </div>
 
-            {/* Quick Action */}
-            <button
-              onClick={() => setScreen('assess-picker')}
-              className={`w-full rounded-2xl px-4 py-3 flex items-center gap-3 ${darkMode ? 'bg-emerald-950/30 border border-emerald-800/30 hover:border-emerald-500/50' : 'bg-emerald-50 border border-emerald-200 hover:border-emerald-300'}`}
-            >
-              <span className="text-xl">🧩</span>
-              <span className={`text-sm font-medium ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>Assessments</span>
-              <span className={`ml-auto text-sm ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>→</span>
-            </button>
+            {/* Assessments — available vs completed */}
+            {(() => {
+              const tier = calculateAssessTier(assessCompleted);
+              const visible = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= tier && (!cat.entityHint || cat.entityHint === entityType));
+              const available = visible.filter(([_, cat]) => !cat.tests.every(id => assessCompleted[id]));
+              const completed = visible.filter(([_, cat]) => cat.tests.every(id => assessCompleted[id]));
+              return (
+                <div className="space-y-2">
+                  {available.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Available</div>
+                      {available.map(([catId, cat]) => {
+                        const t = twColor(cat.color);
+                        return (
+                          <button key={catId} onClick={() => setScreen('assess-picker')}
+                            className={`w-full rounded-xl px-3 py-2.5 flex items-center gap-3 ${darkMode ? `bg-${t}-950/30 border border-${t}-800/30 hover:border-${t}-500/50` : `bg-${t}-50 border border-${t}-200 hover:border-${t}-300`}`}>
+                            <span className="text-lg">{cat.icon}</span>
+                            <span className={`text-sm font-medium flex-1 text-left ${darkMode ? `text-${t}-400` : `text-${t}-700`}`}>{cat.name}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? `bg-${t}-500/20 text-${t}-400` : `bg-${t}-100 text-${t}-600`}`}>Start →</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {completed.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Completed</div>
+                      {completed.map(([catId, cat]) => (
+                        <button key={catId} onClick={() => { setAssessCurrentTestId(cat.tests[0]); setScreen('assess-results'); }}
+                          className={`w-full rounded-xl px-3 py-2 flex items-center gap-3 opacity-50 ${darkMode ? 'bg-gray-900/30' : 'bg-gray-100'}`}>
+                          <span className="text-base">{cat.icon}</span>
+                          <span className={`text-sm flex-1 text-left ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{cat.name}</span>
+                          <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>✓</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       );
@@ -10050,7 +10135,7 @@ function App() {
               // Define category groups
               const categoryGroups = [
                 { id: 'starter', name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], minTier: 1 },
-                { id: 'personality', name: 'Personality', icon: '🎭', color: 'violet', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], minTier: 2 },
+                { id: 'personality', name: 'Personality', icon: '🎭', color: 'rose', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], minTier: 2 },
                 { id: 'shadow', name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'], minTier: 2 },
                 { id: 'mind', name: 'Mind', icon: '🧠', color: 'blue', tests: ['adhd', 'cognitive', 'chronotype', 'reasoning', 'reasoning-2', 'reasoning-3'], minTier: 2 },
                 { id: 'relationships', name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'], minTier: 2 },
@@ -10337,6 +10422,18 @@ function App() {
         onQotdClick={() => setScreen('qotd')}
         onResetQotd={resetDemo}
         onAssessments={() => setScreen('assess-picker')}
+        onAssessSurprise={() => {
+          const tier = calculateAssessTier(assessCompleted);
+          const allTests = Object.entries(ASSESS_CATEGORIES)
+            .filter(([_, cat]) => (cat.tier || 0) <= tier && (!cat.entityHint || cat.entityHint === entityType))
+            .flatMap(([_, cat]) => cat.tests);
+          const available = allTests.filter(id => !assessCompleted[id] && ASSESS_TESTS[id]);
+          if (available.length > 0) {
+            assessStartTest(available[Math.floor(Math.random() * available.length)]);
+          } else {
+            setScreen('assess-picker');
+          }
+        }}
         assessCompleted={assessCompleted}
         isLoggedIn={!!getCurrentEmail()}
       />
@@ -10387,16 +10484,68 @@ function App() {
             </div>
           );
         })()}
-        {/* Full-screen undo overlay - uses portal to escape stacking context (mobile only, desktop has its own) */}
-        {pendingSubmit && displayMode !== 'desktop' && ReactDOM.createPortal(
-          <div
-            className="fixed inset-0 z-[9999]"
-            onClick={handleUndo}
-            onTouchEnd={(e) => { e.preventDefault(); handleUndo(); }}
-            style={{ cursor: 'pointer' }}
-          />,
-          document.body
+        {/* Saved for later — mid-screen pop-up */}
+        {showSavedToast && (
+          <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+            <div className={`px-6 py-4 rounded-2xl flex flex-col items-center gap-1 ${darkMode ? 'bg-gray-800/90' : 'bg-white/90'} shadow-xl`}
+              style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', animation: 'fadeSlideIn 0.3s ease forwards' }}>
+              <span className="text-3xl">✓</span>
+              <span className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Saved for later</span>
+            </div>
+          </div>
         )}
+        {/* Undo toast — top-positioned, doesn't move buttons */}
+        {pendingSubmit && (() => {
+          const undoColor = isBinary
+            ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+            : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
+          const answerLabel = isBinary
+            ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
+            : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
+          return (
+            <div className="absolute top-1 left-3 right-3 z-30">
+              <div
+                onClick={handleUndo}
+                className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-lg"
+                style={{
+                  background: darkMode
+                    ? `rgba(${undoColor.rgb}, 0.15)`
+                    : `rgba(${undoColor.rgb}, 0.12)`,
+                  border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                }}
+              >
+                {/* Countdown ring */}
+                <div className="flex-shrink-0 w-7 h-7 relative">
+                  <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                    <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                    <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                      strokeDasharray="75.4"
+                      strokeDashoffset="0"
+                      style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Answered: {answerLabel}
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleUndo(); }}
+                  className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                  style={{
+                    background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
+                    color: undoColor.hex,
+                  }}
+                >
+                  Undo
+                </button>
+              </div>
+            </div>
+          );
+        })()}
         {/* Circle Track Selector - remaining counts by type */}
         <div className={`h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10 ${darkMode ? 'bg-gray-900/50' : 'bg-white/90'}`}
           style={{
@@ -10442,7 +10591,7 @@ function App() {
                   style={{ cursor: 'pointer' }}
                 >
                   <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
-                    {ynCount > 0 ? ynCount : '✓'}
+                    {ynCount > 0 ? 'Y/N' : '✓'}
                   </div>
                 </div>
                 {/* MC circle - 5 colors */}
@@ -10452,7 +10601,7 @@ function App() {
                   style={{ cursor: 'pointer' }}
                 >
                   <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
-                    {mcCount > 0 ? mcCount : '✓'}
+                    {mcCount > 0 ? 'ABC' : '✓'}
                   </div>
                 </div>
                 {/* All/Combined circle - white/silver */}
@@ -10513,6 +10662,12 @@ function App() {
                 evidenceExpanded={evidenceExpanded}
                 onToggleEvidence={() => setEvidenceExpanded(!evidenceExpanded)}
               />
+              {/* Onboarding hint for early questions */}
+              {answeredCount < 3 && !isAnswered && (
+                <div className={`text-center mt-3 text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+                  {answeredCount === 0 ? "we'll start easy — just tap what feels right" : 'tap more for higher confidence'}
+                </div>
+              )}
             </div>
 
             {/* FIXED BOTTOM AREA - answer zones */}
@@ -10551,43 +10706,10 @@ function App() {
                 </div>
               )}
 
-              {/* Answer zone wrapper - UndoBar overlays this area */}
+              {/* Answer zone wrapper */}
               <div className="relative">
-                {/* Y/N UndoBar - positioned at wrapper level, covers answer buttons + action row */}
-                {pendingSubmit && isBinary && (
-                  <div className="absolute inset-0 z-20">
-                    <UndoBar
-                      darkMode={darkMode}
-                      undoDelay={undoDelay}
-                      onUndo={handleUndo}
-                      answer={pendingSubmit.answer}
-                      confidence={pendingSubmit.confidence}
-                      isBinary={true}
-                      options={null}
-                      fullHeight={true}
-                      requireConfirmation={requireConfirmation}
-                    />
-                  </div>
-                )}
-
                 {/* ZONE 1: Answer Buttons */}
                 <div className={`relative px-4 ${justUndone ? 'pt-0' : (showTips && showGestureHint && !isAnswered && !pendingSubmit ? 'pt-0' : 'pt-3')}`}>
-                  {/* MC UndoBar - covers just the MC buttons area */}
-                  {pendingSubmit && !isBinary && (
-                    <div className="absolute -left-4 -right-4 top-0 bottom-0 z-20">
-                      <UndoBar
-                        darkMode={darkMode}
-                        undoDelay={undoDelay}
-                        onUndo={handleUndo}
-                        answer={pendingSubmit.answer}
-                        confidence={pendingSubmit.confidence}
-                        isBinary={false}
-                        options={currentQuestion.options}
-                        fullHeight={true}
-                        requireConfirmation={requireConfirmation}
-                      />
-                    </div>
-                  )}
                   <div className={pendingSubmit ? 'opacity-60 pointer-events-none' : ''}>
                     {isBinary ? (
                       <BinaryButtons
@@ -10602,6 +10724,7 @@ function App() {
                         requireConfirmation={requireConfirmation}
                         onSubmit={submitAnswer}
                         onClear={() => { setTappedAnswer(null); setTapCount(0); }}
+                        category={currentQuestion?.category}
                       />
                     ) : (
                       <MCButtons
@@ -10622,70 +10745,19 @@ function App() {
                   </div>
                 </div>
 
-                {/* Action buttons row */}
-                <div className={`relative ${pendingSubmit ? 'min-h-[48px]' : 'h-[36px]'} px-4 mt-2 flex items-center justify-center`}>
-                  {pendingSubmit ? (
-                    /* Prominent undo notification bar */
-                    (() => {
-                      const undoColor = isBinary
-                        ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
-                        : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
-                      const answerLabel = isBinary
-                        ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
-                        : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
-                      return (
-                        <div
-                          onClick={handleUndo}
-                          className="cursor-pointer w-full rounded-xl px-4 py-2.5 flex items-center gap-3 transition-all"
-                          style={{
-                            background: darkMode
-                              ? `rgba(${undoColor.rgb}, 0.12)`
-                              : `rgba(${undoColor.rgb}, 0.10)`,
-                            border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.4)` : `rgba(${undoColor.rgb}, 0.3)`}`,
-                          }}
-                        >
-                          {/* Countdown ring */}
-                          <div className="flex-shrink-0 w-7 h-7 relative">
-                            <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
-                              <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
-                              <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
-                                strokeDasharray="75.4"
-                                strokeDashoffset="0"
-                                style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
-                              />
-                            </svg>
-                          </div>
-                          {/* Text */}
-                          <div className="flex-1 min-w-0">
-                            <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                              Answered: {answerLabel}
-                            </div>
-                          </div>
-                          {/* Undo button */}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleUndo(); }}
-                            className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
-                            style={{
-                              background: darkMode ? `rgba(${undoColor.rgb}, 0.25)` : `rgba(${undoColor.rgb}, 0.15)`,
-                              color: undoColor.hex,
-                            }}
-                          >
-                            Undo
-                          </button>
-                        </div>
-                      );
-                    })()
-                  ) : !isAnswered ? (
-                    <div className="flex gap-1.5">
+                {/* Action buttons row — stays fixed, undo toast is at top */}
+                <div className={`relative h-[44px] px-4 mt-2 flex items-center justify-center`}>
+                  {!isAnswered && !pendingSubmit ? (
+                    <div className="flex gap-2 w-full">
                       <button
                         onClick={() => isBinary ? setShowCantAnswerModal(currentQuestion?.id) : setShowNoneOptionModal(true)}
-                        className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${TH('btn-secondary', darkMode)}`}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${TH('btn-secondary', darkMode)}`}
                       >
                         {isBinary ? "Can't" : "None"}
                       </button>
                       <button
                         onClick={() => setShowExplanationModal(currentQuestion?.id)}
-                        className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                           answerExplanations[currentQuestion?.id]
                             ? 'bg-amber-900/30 text-amber-400'
                             : darkMode ? 'bg-white/[0.06] text-gray-500 hover:bg-white/[0.10]' : 'bg-gray-200 text-gray-500'
@@ -10695,13 +10767,13 @@ function App() {
                       </button>
                       <button
                         onClick={skipQuestion}
-                        className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${TH('btn-secondary', darkMode)}`}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${TH('btn-secondary', darkMode)}`}
                       >
                         Skip
                       </button>
                       <button
                         onClick={saveForLater}
-                        className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                           savedQuestions.has(currentQuestion?.id)
                             ? 'bg-violet-900/30 text-violet-400'
                             : darkMode ? 'bg-white/[0.06] text-gray-500 hover:bg-white/[0.10]' : 'bg-gray-200 text-gray-500'
@@ -10717,14 +10789,14 @@ function App() {
               {/* ZONE 3: Community Browse */}
               <div className="px-4 pb-3 pt-1">
                 {(() => {
-                  // Only show community results after user has answered at least one question this session
-                  const hasAnsweredThisSession = sessionAnsweredCategories.size > 0;
+                  // Only show community results after user has answered the current question
+                  const currentIsAnswered = currentQuestion && responses[currentQuestion.id];
 
                   // Get list of answered questions with results, sorted by answer time (most recent first)
                   const answeredList = questions
                     .filter(q => responses[q.id] && communityResults[q.id])
                     .sort((a, b) => (responses[b.id]?.timestamp || 0) - (responses[a.id]?.timestamp || 0));
-                  if (answeredList.length === 0 || !hasAnsweredThisSession) {
+                  if (answeredList.length === 0 || !currentIsAnswered) {
                     return (
                       <div className={`h-full flex items-center justify-center text-sm ${TH('text-faint', darkMode)}`}>
                         Swipe for next →
@@ -10800,7 +10872,6 @@ function App() {
                           setCommunityExpanded(true);
                         }}
                       >
-                        <span className={`text-sm font-black uppercase tracking-wide ${TH('text-sky', darkMode)}`}>LAST:</span>
                         <span className={`text-base truncate flex-1 font-medium ${TH('text-bright', darkMode)}`}>{browseQ.text}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); if (pendingSubmit) { handleUndo(); return; } setCommunityDisplayMode('hidden'); }}
@@ -11105,11 +11176,11 @@ function App() {
                 <button onClick={() => { const ni = Math.max(0, devReviewIdx - 1); setDevReviewIdx(ni); DEV_REVIEW[ni].action(helpers); }}
                   className={`rounded-lg font-bold ${devReviewIdx === 0 ? 'opacity-20 cursor-not-allowed' : ''} ${btnBase}`}
                   style={{fontSize:'18px', width:'60px', height:'38px', display:'flex', alignItems:'center', justifyContent:'center'}}
-                  disabled={devReviewIdx === 0}>\u2190</button>
+                  disabled={devReviewIdx === 0}>{'\u2190'}</button>
                 <button onClick={() => { const ni = Math.min(DEV_REVIEW.length - 1, devReviewIdx + 1); setDevReviewIdx(ni); DEV_REVIEW[ni].action(helpers); }}
                   className={`rounded-lg font-bold ${devReviewIdx >= DEV_REVIEW.length - 1 ? 'opacity-20 cursor-not-allowed' : ''} ${btnBase}`}
                   style={{fontSize:'18px', width:'60px', height:'38px', display:'flex', alignItems:'center', justifyContent:'center'}}
-                  disabled={devReviewIdx >= DEV_REVIEW.length - 1}>\u2192</button>
+                  disabled={devReviewIdx >= DEV_REVIEW.length - 1}>{'\u2192'}</button>
               </div>
             </div>
           );
