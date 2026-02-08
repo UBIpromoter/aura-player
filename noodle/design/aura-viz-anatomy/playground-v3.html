@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz — Entity-Aware Design Language v3</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #030712;
+    color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+  .playground {
+    display: flex;
+    gap: 36px;
+    padding: 24px 32px;
+    max-width: 1120px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+
+  /* ── Questions ── */
+  .q-panel {
+    flex: 0 0 330px;
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+  .q-panel::-webkit-scrollbar { width: 4px; }
+  .q-panel::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
+
+  .title { font-size: 16px; font-weight: 700; color: #fff; }
+  .subtitle { font-size: 11px; color: #6b7280; margin-bottom: 14px; }
+
+  /* Gate */
+  .gate {
+    background: linear-gradient(135deg, #1f2937, #111827);
+    border: 1px solid #374151;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .gate-label { font-size: 13px; font-weight: 600; color: #d1d5db; margin-bottom: 8px; }
+  .gate-tag {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: #f59e0b; background: rgba(245,158,11,0.1);
+    padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 700;
+  }
+  .gate-opts { display: flex; gap: 8px; }
+  .gate-btn {
+    flex: 1; padding: 10px; border: 2px solid #374151; border-radius: 10px;
+    background: transparent; color: #9ca3af; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.3s; font-family: inherit;
+  }
+  .gate-btn:hover { border-color: #6b7280; color: #fff; }
+  .gate-btn.sel { border-color: #f59e0b; color: #fff; background: rgba(245,158,11,0.1); }
+
+  /* Section headers */
+  .section-hdr {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: #4b5563; font-weight: 700; margin: 14px 0 8px; padding-left: 2px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .section-hdr .line { flex: 1; height: 1px; background: #1f2937; }
+
+  /* Question cards */
+  .qcard {
+    background: #111827; border: 1px solid #1f2937; border-radius: 9px;
+    padding: 10px 12px; margin-bottom: 6px; transition: all 0.2s;
+  }
+  .qcard.entity-sensitive { border-left: 2px solid #f59e0b22; }
+  .qcard.answered { opacity: 0.55; }
+  .qcard.answered:hover { opacity: 1; }
+  .q-meta {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  }
+  .q-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .q-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; font-weight: 600; }
+  .q-sensitive-tag {
+    font-size: 8px; color: #f59e0b; background: rgba(245,158,11,0.08);
+    padding: 1px 5px; border-radius: 3px; margin-left: auto;
+  }
+  .q-text { font-size: 12px; color: #d1d5db; margin-bottom: 6px; font-weight: 500; }
+  .q-opts { display: flex; gap: 5px; }
+  .q-btn {
+    flex: 1; padding: 6px 6px; border: 1px solid #374151; border-radius: 6px;
+    background: transparent; color: #9ca3af; font-size: 11px; cursor: pointer;
+    transition: all 0.2s; font-family: inherit; line-height: 1.3;
+  }
+  .q-btn:hover { border-color: #6b7280; color: #fff; }
+  .q-btn.sel { border-color: #8b5cf6; color: #fff; background: rgba(139,92,246,0.12); }
+
+  .ctrls { display: flex; gap: 8px; margin-top: 10px; }
+  .ctrl {
+    flex: 1; padding: 8px; border: 1px solid #374151; border-radius: 7px;
+    background: transparent; color: #6b7280; font-size: 11px; cursor: pointer;
+    transition: all 0.2s; font-family: inherit; font-weight: 500;
+  }
+  .ctrl:hover { border-color: #ef4444; color: #ef4444; }
+  .ctrl.rand:hover { border-color: #8b5cf6; color: #8b5cf6; }
+
+  .progress { height: 3px; background: #111827; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #8b5cf6, #3b82f6, #10b981); transition: width 0.4s; }
+
+  /* ── Viz ── */
+  .viz-panel {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 4px;
+  }
+  .entity-tag {
+    font-size: 11px; color: #4b5563; padding: 4px 12px;
+    border: 1px solid #1f2937; border-radius: 20px; transition: all 0.4s;
+  }
+  .entity-tag.human { border-color: #10b981; color: #10b981; }
+  .entity-tag.ai { border-color: #06b6d4; color: #06b6d4; }
+  .viz-foot { font-size: 11px; color: #6b7280; }
+  .legend {
+    display: flex; gap: 16px; font-size: 10px; color: #4b5563;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .legend-diamond { width: 7px; height: 7px; transform: rotate(45deg); }
+
+  canvas { border-radius: 14px; display: block; }
+</style>
+</head>
+<body>
+
+<div class="playground">
+  <div class="q-panel">
+    <div class="title">Shape Your Aura</div>
+    <div class="subtitle">Each answer shapes a neuron. Entity-sensitive questions change meaning.</div>
+
+    <div class="gate">
+      <div class="gate-label">Do you have a biological body?<span class="gate-tag">Fundamental</span></div>
+      <div class="gate-opts">
+        <button class="gate-btn" id="g0" onclick="setEntity(0)">Yes</button>
+        <button class="gate-btn" id="g1" onclick="setEntity(1)">No, I'm an AI</button>
+      </div>
+    </div>
+
+    <div id="qlist"></div>
+
+    <div class="progress"><div class="progress-fill" id="prog"></div></div>
+    <div class="ctrls">
+      <button class="ctrl rand" onclick="randomize()">Randomize</button>
+      <button class="ctrl" onclick="resetAll()">Reset</button>
+    </div>
+  </div>
+
+  <div class="viz-panel">
+    <div class="entity-tag" id="etag">Unanswered</div>
+    <canvas id="aura" width="540" height="540"></canvas>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div> Shared</div>
+      <div class="legend-item"><div class="legend-diamond" style="background:#f59e0b"></div> Entity-sensitive</div>
+    </div>
+    <div class="viz-foot">5 shared neurons + 5 entity-sensitive neurons</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// PALETTE
+// ═══════════════════════════════════════════════════════
+const C = {
+  violet:'#8b5cf6', blue:'#3b82f6', teal:'#14b8a6', rose:'#f43f5e',
+  pink:'#d946ef', emerald:'#10b981', amber:'#f59e0b', indigo:'#6366f1', cyan:'#06b6d4',
+};
+
+function hexRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n>>16)&255, (n>>8)&255, n&255];
+}
+function rgba(hex, a) {
+  const [r,g,b] = hexRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ═══════════════════════════════════════════════════════
+// QUESTIONS — categorized
+// ═══════════════════════════════════════════════════════
+const QUESTIONS = [
+  // SHARED — same meaning for both entities
+  { id: 0, text: "Which came first?", opts: ["The chicken","The egg"],
+    colors: [C.violet, C.blue], sensitive: false, why: "Philosophical" },
+  { id: 1, text: "Is a hot dog a sandwich?", opts: ["Yes, obviously","No way"],
+    colors: [C.indigo, C.rose], sensitive: false, why: "Categorical" },
+  { id: 2, text: "Better superpower:", opts: ["Flight","Invisibility"],
+    colors: [C.pink, C.teal], sensitive: false, why: "Imaginative" },
+  { id: 3, text: "In 10 years, driving will be...", opts: ["Still manual","Self-driving"],
+    colors: [C.amber, C.emerald], sensitive: false, why: "Predictive" },
+  { id: 4, text: "Is water wet?", opts: ["Yes","No"],
+    colors: [C.cyan, C.violet], sensitive: false, why: "Philosophical" },
+
+  // ENTITY-SENSITIVE — different meaning for AI
+  { id: 5, text: "Better pizza topping:", opts: ["Pepperoni","Pineapple"],
+    colors: [C.amber, C.pink], sensitive: true, why: "You don't eat" },
+  { id: 6, text: "Coffee in the morning?", opts: ["Yes please","Not for me"],
+    colors: [C.emerald, C.indigo], sensitive: true, why: "You don't drink" },
+  { id: 7, text: "Dogs or cats?", opts: ["Dogs","Cats"],
+    colors: [C.rose, C.cyan], sensitive: true, why: "Different relationship" },
+  { id: 8, text: "Will humans live on Mars by 2050?", opts: ["Yes","No"],
+    colors: [C.blue, C.teal], sensitive: true, why: "Different stakes" },
+  { id: 9, text: "Will AI replace most jobs?", opts: ["Yes, big changes","No, jobs adapt"],
+    colors: [C.violet, C.emerald], sensitive: true, why: "About yourself" },
+];
+
+const answers = new Array(10).fill(null);
+let entity = null; // 0=human, 1=ai
+
+// ═══════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════
+function setEntity(v) {
+  entity = v;
+  document.getElementById('g0').classList.toggle('sel', v===0);
+  document.getElementById('g1').classList.toggle('sel', v===1);
+  const et = document.getElementById('etag');
+  if (v===0) { et.textContent='Biological'; et.className='entity-tag human'; }
+  else { et.textContent='Artificial Intelligence'; et.className='entity-tag ai'; }
+  buildUI(); updateProg();
+}
+
+function pick(qi, oi) {
+  const changed = answers[qi] !== oi;
+  answers[qi]=oi;
+  if (changed) N[qi].flash = 1.0; // trigger flash
+  buildUI(); updateProg();
+}
+
+function resetAll() {
+  answers.fill(null); entity=null;
+  document.getElementById('g0').classList.remove('sel');
+  document.getElementById('g1').classList.remove('sel');
+  const et=document.getElementById('etag'); et.textContent='Unanswered'; et.className='entity-tag';
+  buildUI(); updateProg();
+}
+
+function randomize() {
+  for (let i=0;i<10;i++) answers[i]=Math.random()<0.5?0:1;
+  setEntity(Math.random()<0.85?0:1);
+}
+
+function updateProg() {
+  const c = answers.filter(a=>a!==null).length + (entity!==null?1:0);
+  document.getElementById('prog').style.width=(c/11*100)+'%';
+}
+
+function buildUI() {
+  const el = document.getElementById('qlist');
+  el.innerHTML = '';
+
+  // Shared section
+  let hdr = document.createElement('div');
+  hdr.className = 'section-hdr';
+  hdr.innerHTML = 'Shared <span class="line"></span>';
+  el.appendChild(hdr);
+
+  const shared = QUESTIONS.filter(q=>!q.sensitive);
+  shared.forEach(q => el.appendChild(makeCard(q)));
+
+  // Entity-sensitive section
+  hdr = document.createElement('div');
+  hdr.className = 'section-hdr';
+  hdr.innerHTML = 'Entity-Sensitive <span class="line"></span>';
+  el.appendChild(hdr);
+
+  const sensitive = QUESTIONS.filter(q=>q.sensitive);
+  sensitive.forEach(q => el.appendChild(makeCard(q)));
+}
+
+function makeCard(q) {
+  const color = answers[q.id]!==null ? q.colors[answers[q.id]] : '#6b7280';
+  const card = document.createElement('div');
+  card.className = 'qcard' + (q.sensitive?' entity-sensitive':'') + (answers[q.id]!==null?' answered':'');
+  card.innerHTML = `
+    <div class="q-meta">
+      <div class="q-dot" style="background:${color};box-shadow:0 0 5px ${color}"></div>
+      <span class="q-label">${q.why}</span>
+      ${q.sensitive && entity===1 ? '<span class="q-sensitive-tag">means different for AI</span>' : ''}
+    </div>
+    <div class="q-text">${q.text}</div>
+    <div class="q-opts">
+      <button class="q-btn${answers[q.id]===0?' sel':''}" onclick="pick(${q.id},0)">${q.opts[0]}</button>
+      <button class="q-btn${answers[q.id]===1?' sel':''}" onclick="pick(${q.id},1)">${q.opts[1]}</button>
+    </div>`;
+  return card;
+}
+
+buildUI();
+
+// ═══════════════════════════════════════════════════════
+// VISUALIZATION — Canvas 2D
+// ═══════════════════════════════════════════════════════
+const canvas = document.getElementById('aura');
+const ctx = canvas.getContext('2d');
+const W = 540, H = 540, CX = 270, CY = 270;
+
+function lerp(a,b,t) { return a+(b-a)*t; }
+function lerpRgb(a,b,t) { return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
+
+// ── POSITIONS ──
+// Shared neurons (0-4): inner ring, organic
+const SHARED_HUMAN = [
+  {x:220,y:180}, {x:330,y:200}, {x:270,y:270}, {x:200,y:320}, {x:340,y:340},
+];
+const SHARED_AI = [
+  {x:200,y:170}, {x:340,y:170}, {x:270,y:270}, {x:200,y:370}, {x:340,y:370},
+];
+
+// Entity-sensitive neurons (5-9): outer positions, different per entity
+const SENS_HUMAN = [
+  {x:270,y:130}, {x:150,y:240}, {x:390,y:260}, {x:170,y:400}, {x:370,y:400},
+];
+const SENS_AI = [
+  // Hexagonal outer ring for AI
+  {x:270,y:110}, {x:130,y:190}, {x:410,y:190}, {x:130,y:350}, {x:410,y:350},
+];
+
+// ── NEURON STATE ──
+// 10 neurons: 0-4 shared (circles), 5-9 entity-sensitive (shape changes)
+const N = [];
+for (let i = 0; i < 10; i++) {
+  const defaultPos = i < 5 ? SHARED_HUMAN[i] : SENS_HUMAN[i-5];
+  N.push({
+    x: defaultPos.x, y: defaultPos.y,
+    tx: defaultPos.x, ty: defaultPos.y,
+    color: [60,65,80], tcolor: [60,65,80],
+    r: 2.5, tr: 2.5,
+    alpha: 0.12, talpha: 0.12,
+    phase: Math.random() * Math.PI * 2,
+    flash: 0,
+  });
+}
+
+// Connections: different topology per entity
+const HUMAN_CONNS = [
+  // Shared inner web
+  [0,1],[1,2],[2,3],[3,4],[0,2],[2,4],
+  // Sensitive to shared bridges
+  [5,0],[5,1],[6,0],[6,3],[7,1],[7,4],[8,3],[9,4],
+  // A few sensitive-to-sensitive
+  [5,7],[6,8],[8,9],
+];
+const AI_CONNS = [
+  // Geometric: shared form a cross/diamond
+  [0,2],[1,2],[2,3],[2,4],[0,1],[3,4],[0,3],[1,4],
+  // Sensitive form outer hexagon
+  [5,6],[6,8],[8,9],[9,7],[7,5],
+  // Spokes from center to hex
+  [2,5],[2,6],[2,7],[2,8],[2,9],
+];
+
+// ── Background stars ──
+const stars = [];
+for (let i=0;i<25;i++) stars.push({
+  x: Math.random()*W, y: Math.random()*H,
+  r: 0.3+Math.random()*0.6, phase: Math.random()*6, speed: 0.5+Math.random()*2
+});
+
+// ═══════════════════════════════════════════════════════
+// COMPUTE TARGETS
+// ═══════════════════════════════════════════════════════
+function computeTargets() {
+  const isAI = entity === 1;
+  const isHuman = entity === 0;
+
+  // Shared neurons (0-4)
+  const sharedPos = isAI ? SHARED_AI : SHARED_HUMAN;
+  for (let i = 0; i < 5; i++) {
+    const q = QUESTIONS[i];
+    N[i].tx = sharedPos[i].x;
+    N[i].ty = sharedPos[i].y;
+    if (answers[i] !== null) {
+      N[i].tr = 7;        // BIG when answered
+      N[i].talpha = 1;
+      N[i].tcolor = hexRgb(q.colors[answers[i]]);
+    } else {
+      N[i].tr = 2.5;      // tiny ghost when unanswered
+      N[i].talpha = 0.12;
+      N[i].tcolor = [60,65,80];
+    }
+  }
+
+  // Entity-sensitive neurons (5-9)
+  const sensPos = isAI ? SENS_AI : SENS_HUMAN;
+  for (let i = 5; i < 10; i++) {
+    const q = QUESTIONS[i];
+    N[i].tx = sensPos[i-5].x;
+    N[i].ty = sensPos[i-5].y;
+    if (answers[i] !== null) {
+      N[i].tr = 6.5;      // BIG when answered
+      N[i].talpha = 1;
+      N[i].tcolor = hexRgb(q.colors[answers[i]]);
+    } else {
+      N[i].tr = 2;        // tiny ghost when unanswered
+      N[i].talpha = 0.1;
+      N[i].tcolor = [60,65,80];
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════════════
+let lastTime = performance.now();
+let time = 0;
+
+function frame(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  time = now / 1000;
+
+  computeTargets();
+
+  const spd = 8 * dt;   // FAST position/size transitions
+  const cspd = 10 * dt; // FAST color transitions
+  for (let i = 0; i < 10; i++) {
+    const n = N[i];
+    n.x = lerp(n.x, n.tx, spd);
+    n.y = lerp(n.y, n.ty, spd);
+    n.r = lerp(n.r, n.tr + n.flash * 4, spd); // flash makes it pop bigger
+    n.alpha = lerp(n.alpha, n.talpha + n.flash * 0.3, spd);
+    n.color = lerpRgb(n.color, n.tcolor, cspd);
+    // Decay flash
+    n.flash *= 0.92;
+    if (n.flash < 0.01) n.flash = 0;
+  }
+
+  render();
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════
+function render() {
+  const isAI = entity === 1;
+  const breath = 1 + Math.sin(time * 0.5) * 0.03;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#030712';
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars
+  stars.forEach(s => {
+    const tw = 0.12 + 0.2 * Math.max(0, Math.sin(time * s.speed + s.phase));
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(180,200,255,${tw})`; ctx.fill();
+  });
+
+  // AI: subtle geometric grid
+  if (isAI) {
+    ctx.save(); ctx.globalAlpha = 0.03;
+    ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 0.5;
+    // Hexagonal hints
+    for (let ring = 1; ring <= 3; ring++) {
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) {
+        const a = (i/6)*Math.PI*2 - Math.PI/6;
+        const r = ring * 70;
+        const px = CX + Math.cos(a)*r, py = CY + Math.sin(a)*r;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── GLOW LAYER — soft nebula behind nodes ──
+  ctx.save();
+  // Radial clip for soft edges
+  const clipGrad = ctx.createRadialGradient(CX, CY, 0, CX, CY, 250);
+  clipGrad.addColorStop(0, 'rgba(255,255,255,1)');
+  clipGrad.addColorStop(0.6, 'rgba(255,255,255,1)');
+  clipGrad.addColorStop(1, 'rgba(255,255,255,0)');
+
+  for (let i = 0; i < 10; i++) {
+    const n = N[i];
+    if (n.alpha < 0.05) continue;
+
+    const dx = Math.sin(time * 0.4 + n.phase) * (isAI ? 1.5 : 3);
+    const dy = Math.cos(time * 0.3 + n.phase * 0.7) * (isAI ? 1.5 : 3);
+    const nx = n.x + dx, ny = n.y + dy;
+
+    // Glow size: MUCH bigger when answered, tiny when not
+    const isSensitive = i >= 5;
+    const answered = n.alpha > 0.5;
+    let glowR;
+    if (isAI && isSensitive) {
+      glowR = answered ? 55 : 15;
+    } else if (isAI) {
+      glowR = answered ? 50 : 15;
+    } else if (isSensitive) {
+      glowR = answered ? 65 : 15;
+    } else {
+      glowR = answered ? 60 : 15;
+    }
+    // Flash expands glow
+    glowR += n.flash * 30;
+
+    glowR *= breath;
+    const [cr,cg,cb] = n.color;
+    const ga = n.alpha * (isAI ? 0.35 : 0.5);
+
+    const g = ctx.createRadialGradient(nx, ny, 0, nx, ny, glowR);
+    g.addColorStop(0, `rgba(${cr|0},${cg|0},${cb|0},${ga})`);
+    g.addColorStop(0.5, `rgba(${cr|0},${cg|0},${cb|0},${ga*0.4})`);
+    g.addColorStop(1, `rgba(${cr|0},${cg|0},${cb|0},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(nx, ny, glowR, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+
+  // ── CONNECTIONS ──
+  const conns = isAI ? AI_CONNS : HUMAN_CONNS;
+  conns.forEach(([a, b]) => {
+    const na = N[a], nb = N[b];
+    if (na.alpha < 0.4 || nb.alpha < 0.4) return; // only show between answered neurons
+
+    const dxa = Math.sin(time*0.4+na.phase)*(isAI?1.5:3);
+    const dya = Math.cos(time*0.3+na.phase*0.7)*(isAI?1.5:3);
+    const dxb = Math.sin(time*0.4+nb.phase)*(isAI?1.5:3);
+    const dyb = Math.cos(time*0.3+nb.phase*0.7)*(isAI?1.5:3);
+    const ax = na.x+dxa, ay = na.y+dya;
+    const bx = nb.x+dxb, by = nb.y+dyb;
+
+    const dx = ax-bx, dy = ay-by;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    const fade = Math.max(0, 1 - dist / 350);
+    const alpha = fade * Math.min(na.alpha, nb.alpha) * (isAI ? 0.3 : 0.2);
+    if (alpha < 0.01) return;
+
+    // Connection color: blend the two node colors
+    const mc = lerpRgb(na.color, nb.color, 0.5);
+    const isSensBridge = (a >= 5) !== (b >= 5); // one shared, one sensitive
+
+    ctx.beginPath();
+    if (isAI) {
+      // Straight, crisp
+      ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      ctx.strokeStyle = `rgba(${mc[0]|0},${mc[1]|0},${mc[2]|0},${alpha})`;
+      ctx.lineWidth = isSensBridge ? 0.6 : 1;
+      ctx.setLineDash(isSensBridge ? [3, 4] : []);
+    } else {
+      // Organic: slight curve
+      const mx = (ax+bx)/2 + (Math.sin(time*0.2+a+b)*8);
+      const my = (ay+by)/2 + (Math.cos(time*0.2+a*b*0.1)*8);
+      ctx.moveTo(ax, ay); ctx.quadraticCurveTo(mx, my, bx, by);
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // ── NODES ──
+  for (let i = 0; i < 10; i++) {
+    const n = N[i];
+    if (n.alpha < 0.05) continue;
+
+    const dx = Math.sin(time * 0.4 + n.phase) * (isAI ? 1.5 : 3);
+    const dy = Math.cos(time * 0.3 + n.phase * 0.7) * (isAI ? 1.5 : 3);
+    const nx = n.x + dx, ny = n.y + dy;
+    const [cr,cg,cb] = n.color;
+    const isSensitive = i >= 5;
+    const r = n.r * breath;
+
+    // ── FLASH RING when newly answered ──
+    if (n.flash > 0.05) {
+      const flashR = r * (4 + (1 - n.flash) * 8); // expands outward
+      ctx.beginPath(); ctx.arc(nx, ny, flashR, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${n.flash * 0.5})`;
+      ctx.lineWidth = 2 * n.flash;
+      ctx.stroke();
+    }
+
+    if (isAI && isSensitive) {
+      // ── AI SENSITIVE: Diamond shape ──
+      // Individual pulse for AI sensitive nodes
+      const pulse = 1 + Math.sin(time * 1.5 + n.phase * 3) * 0.08;
+      const dr = r * 1.3 * pulse;
+
+      // Outer halo (diamond)
+      ctx.save();
+      ctx.globalAlpha = n.alpha * 0.15;
+      ctx.fillStyle = `rgb(${cr|0},${cg|0},${cb|0})`;
+      ctx.shadowColor = `rgb(${cr|0},${cg|0},${cb|0})`;
+      ctx.shadowBlur = 20;
+      drawDiamond(ctx, nx, ny, dr * 3.5);
+      ctx.fill();
+      ctx.restore();
+
+      // Mid glow
+      ctx.save();
+      ctx.globalAlpha = n.alpha * 0.35;
+      ctx.fillStyle = `rgb(${cr|0},${cg|0},${cb|0})`;
+      drawDiamond(ctx, nx, ny, dr * 1.8);
+      ctx.fill();
+      ctx.restore();
+
+      // Core
+      ctx.save();
+      ctx.globalAlpha = n.alpha * 0.95;
+      ctx.fillStyle = `rgb(${cr|0},${cg|0},${cb|0})`;
+      drawDiamond(ctx, nx, ny, dr);
+      ctx.fill();
+      ctx.restore();
+
+      // White pip
+      ctx.beginPath(); ctx.arc(nx, ny, dr * 0.3, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,255,${n.alpha * 0.7})`;
+      ctx.fill();
+
+    } else if (!isAI && isSensitive) {
+      // ── HUMAN SENSITIVE: Warm circle with extra outer ring ──
+      // Outer ring (distinguishing mark)
+      ctx.beginPath(); ctx.arc(nx, ny, r * 4, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${n.alpha * 0.12})`;
+      ctx.lineWidth = 1.5; ctx.stroke();
+
+      // Standard 3-layer glow
+      drawCircleNode(ctx, nx, ny, r, cr, cg, cb, n.alpha, 20);
+
+    } else {
+      // ── SHARED: Standard circle node (same for both) ──
+      drawCircleNode(ctx, nx, ny, r, cr, cg, cb, n.alpha, isAI ? 15 : 20);
+    }
+  }
+}
+
+function drawCircleNode(ctx, x, y, r, cr, cg, cb, alpha, blur) {
+  // Halo
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.2;
+  ctx.fillStyle = `rgb(${cr|0},${cg|0},${cb|0})`;
+  ctx.shadowColor = `rgb(${cr|0},${cg|0},${cb|0})`;
+  ctx.shadowBlur = blur;
+  ctx.beginPath(); ctx.arc(x, y, r * 3, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // Mid
+  ctx.beginPath(); ctx.arc(x, y, r * 1.8, 0, Math.PI*2);
+  ctx.fillStyle = `rgba(${cr|0},${cg|0},${cb|0},${alpha * 0.35})`;
+  ctx.fill();
+
+  // Core
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.fillStyle = `rgba(${cr|0},${cg|0},${cb|0},${alpha * 0.95})`;
+  ctx.fill();
+
+  // Pip
+  ctx.beginPath(); ctx.arc(x, y, r * 0.35, 0, Math.PI*2);
+  ctx.fillStyle = `rgba(255,255,255,${alpha * 0.55})`;
+  ctx.fill();
+}
+
+function drawDiamond(ctx, x, y, r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x + r * 0.7, y);
+  ctx.lineTo(x, y + r);
+  ctx.lineTo(x - r * 0.7, y);
+  ctx.closePath();
+}
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

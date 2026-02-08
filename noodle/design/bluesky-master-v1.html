@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Master — v1</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+    transition: background 0.6s ease, color 0.6s ease;
+  }
+
+  body.dark { background: #030712; color: #f9fafb; }
+  body.light { background: #f9fafb; color: #030712; }
+
+  /* ================================================================
+     ORB CONTAINER — 550px canvas, orb fills ~500px visible
+     ================================================================ */
+
+  .orb-stage {
+    position: relative;
+    width: 550px;
+    height: 550px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 600px) {
+    .orb-stage {
+      width: 100vw;
+      height: 100vw;
+      max-width: 550px;
+      max-height: 550px;
+    }
+  }
+
+  /* ================================================================
+     AMBIENT GLOW — large soft halo behind everything
+     ================================================================ */
+
+  .orb-ambient {
+    position: absolute;
+    width: 300%;
+    height: 300%;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    animation: ambient-breathe 14s ease-in-out infinite;
+    transition: background 1.2s ease;
+  }
+
+  @keyframes ambient-breathe {
+    0%, 100% { transform: scale(0.85); opacity: 0.6; }
+    50% { transform: scale(1.1); opacity: 1; }
+  }
+
+  /* ================================================================
+     CORE GLOW — the main orb body
+     ================================================================ */
+
+  .orb-core {
+    position: absolute;
+    width: 480px;
+    height: 480px;
+    border-radius: 50%;
+    z-index: 5;
+    animation: core-breathe 10s ease-in-out infinite;
+    transition: background 1.2s ease, filter 1.2s ease;
+  }
+
+  @keyframes core-breathe {
+    0%, 100% { transform: scale(0.95); filter: blur(30px); }
+    50% { transform: scale(1.05); filter: blur(35px); }
+  }
+
+  @media (max-width: 600px) {
+    .orb-core { width: 87vw; height: 87vw; max-width: 480px; max-height: 480px; }
+  }
+
+  /* ================================================================
+     INNER GLOW — trait-colored blobs (gaussian blur ellipses)
+     ================================================================ */
+
+  .orb-inner-glow {
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    z-index: 8;
+    overflow: hidden;
+    animation: inner-breathe 10s ease-in-out infinite;
+  }
+
+  @keyframes inner-breathe {
+    0%, 100% { transform: scale(0.96); }
+    50% { transform: scale(1.04); }
+  }
+
+  .glow-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(50px);
+    pointer-events: none;
+    transition: all 1.2s ease;
+  }
+
+  @media (max-width: 600px) {
+    .orb-inner-glow { width: 73vw; height: 73vw; max-width: 400px; max-height: 400px; }
+  }
+
+  /* ================================================================
+     CENTER BRIGHT POINT
+     ================================================================ */
+
+  .orb-center {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    z-index: 12;
+    animation: center-pulse 10s ease-in-out infinite;
+    transition: background 1.2s ease, box-shadow 1.2s ease;
+  }
+
+  @keyframes center-pulse {
+    0%, 100% { transform: scale(0.92); opacity: 0.85; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+
+  /* ================================================================
+     NEURAL NODE CANVAS (SVG sits inside the orb)
+     ================================================================ */
+
+  .node-canvas {
+    position: absolute;
+    width: 380px;
+    height: 380px;
+    z-index: 15;
+    pointer-events: none;
+  }
+
+  @media (max-width: 600px) {
+    .node-canvas { width: 69vw; height: 69vw; max-width: 380px; max-height: 380px; }
+  }
+
+  /* ================================================================
+     ENERGY WAVES — directional, trait-colored
+     ================================================================ */
+
+  .energy-wave {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 3;
+  }
+
+  @keyframes wave-radiate {
+    0% { transform: translate(var(--tx-start), var(--ty-start)) scale(0.5); opacity: 0; }
+    10% { opacity: var(--wave-peak, 0.35); }
+    60% { opacity: calc(var(--wave-peak, 0.35) * 0.3); }
+    100% { transform: translate(var(--tx-end), var(--ty-end)) scale(var(--wave-scale, 1.6)); opacity: 0; }
+  }
+
+  /* ================================================================
+     TRAIT SPECTRUM BARS
+     ================================================================ */
+
+  .spectrum-bar {
+    position: relative;
+    height: 4px;
+    border-radius: 2px;
+    overflow: visible;
+  }
+
+  .spectrum-fill {
+    height: 100%;
+    border-radius: 2px;
+    position: relative;
+    transition: width 0.8s ease;
+  }
+
+  .spectrum-dot {
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid;
+    transition: left 0.8s ease, background 0.8s ease;
+    z-index: 2;
+  }
+
+  /* ================================================================
+     CONTROLS
+     ================================================================ */
+
+  .ctrl-btn {
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    letter-spacing: 0.01em;
+  }
+
+  .ctrl-btn:active { transform: scale(0.96); }
+
+  .ctrl-primary {
+    background: #8b5cf6;
+    color: white;
+  }
+  .ctrl-primary:hover { background: #7c3aed; transform: translateY(-1px); }
+
+  .dark .ctrl-secondary {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .dark .ctrl-secondary:hover { background: rgba(255,255,255,0.1); color: white; }
+
+  .light .ctrl-secondary {
+    background: rgba(0,0,0,0.04);
+    color: rgba(0,0,0,0.6);
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .light .ctrl-secondary:hover { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.9); }
+
+  /* ================================================================
+     SUMMARY TEXT GRADIENT
+     ================================================================ */
+
+  .summary-gradient {
+    background: linear-gradient(135deg, #8b5cf6, #d946ef, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .light .summary-gradient {
+    background: linear-gradient(135deg, #7c3aed, #c026d3, #0891b2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ================================================================
+     SMOOTH TRANSITIONS FOR THEME
+     ================================================================ */
+
+  .theme-transition {
+    transition: background 0.6s ease, color 0.6s ease, border-color 0.6s ease, opacity 0.6s ease;
+  }
+</style>
+</head>
+<body class="dark min-h-screen flex flex-col items-center justify-start">
+
+  <!-- LAYOUT WRAPPER -->
+  <div class="w-full max-w-[550px] flex flex-col items-center px-4 py-6 gap-2">
+
+    <!-- ORB VISUALIZATION -->
+    <div class="orb-stage" id="orb-stage">
+      <!-- Ambient halo -->
+      <div class="orb-ambient" id="orb-ambient"></div>
+
+      <!-- Core glow body -->
+      <div class="orb-core" id="orb-core"></div>
+
+      <!-- Inner trait-colored blobs -->
+      <div class="orb-inner-glow" id="orb-inner-glow"></div>
+
+      <!-- Bright center -->
+      <div class="orb-center" id="orb-center"></div>
+
+      <!-- Neural nodes (SVG) -->
+      <svg class="node-canvas" id="node-canvas" viewBox="0 0 380 380"></svg>
+
+      <!-- Energy waves injected here by JS -->
+    </div>
+
+    <!-- BELOW-ORB CONTENT -->
+    <div class="w-full max-w-[375px] flex flex-col gap-4 mt-[-16px]" id="below-orb">
+
+      <!-- Summary line -->
+      <p class="text-center text-sm font-medium summary-gradient" id="summary-text">
+        Your aura blends curiosity, empathy, and drive
+      </p>
+
+      <!-- Trait spectrums -->
+      <div class="flex flex-col gap-3" id="trait-spectrums"></div>
+
+      <!-- Controls -->
+      <div class="flex gap-3 justify-center mt-2 mb-4">
+        <button onclick="shuffleProfile()" class="ctrl-btn ctrl-primary">Shuffle Profile</button>
+        <button onclick="toggleTheme()" class="ctrl-btn ctrl-secondary" id="theme-btn">Light Mode</button>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+// =====================================================================
+// AURA MASTER v1 — Production Candidate
+// =====================================================================
+
+// -- Color tokens (from TOKENS.md) ------------------------------------
+const COLORS = {
+  violet:  '#8b5cf6',
+  blue:    '#3b82f6',
+  emerald: '#10b981',
+  pink:    '#d946ef',
+  cyan:    '#06b6d4',
+  teal:    '#14b8a6',
+  amber:   '#f59e0b',
+  rose:    '#f43f5e',
+};
+
+// -- Trait data --------------------------------------------------------
+let traits = {
+  openness:  { score: 78, color: COLORS.violet,  lowLabel: 'Practical',  highLabel: 'Curious',   direction: { angle: 300, label: 'Curious' } },
+  warmth:    { score: 85, color: COLORS.emerald,  lowLabel: 'Direct',     highLabel: 'Empathetic', direction: { angle: 135, label: 'Empathetic' } },
+  energy:    { score: 65, color: COLORS.pink,     lowLabel: 'Reserved',   highLabel: 'Outgoing',   direction: { angle: 45,  label: 'Social' } },
+  stability: { score: 42, color: COLORS.blue,     lowLabel: 'Sensitive',  highLabel: 'Steady',     direction: { angle: 180, label: 'Sensitive' } },
+  drive:     { score: 71, color: COLORS.cyan,     lowLabel: 'Flexible',   highLabel: 'Organized',  direction: { angle: 225, label: 'Organized' } },
+};
+
+let isDark = true;
+
+// -- Helpers -----------------------------------------------------------
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { r, g, b };
+}
+
+function rgba(hex, alpha) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// -- Sorted traits by score (descending) ------------------------------
+function topTraits() {
+  return Object.entries(traits)
+    .sort((a, b) => b[1].score - a[1].score)
+    .map(([key, val]) => ({ key, ...val }));
+}
+
+// =====================================================================
+// ORB RENDERING
+// =====================================================================
+
+function renderOrb() {
+  const sorted = topTraits();
+  const top3 = sorted.slice(0, 3);
+  const darkMul = isDark ? 1 : 0.55;
+
+  // -- Ambient halo: blend of top 2 colors --
+  const amb = document.getElementById('orb-ambient');
+  amb.style.background = `radial-gradient(circle,
+    ${rgba(top3[0].color, 0.12 * darkMul)} 0%,
+    ${rgba(top3[1].color, 0.06 * darkMul)} 30%,
+    ${rgba(top3[0].color, 0.02 * darkMul)} 50%,
+    transparent 65%
+  )`;
+
+  // -- Core glow body --
+  const core = document.getElementById('orb-core');
+  const coreOpacity = isDark ? 0.55 : 0.35;
+  const coreEdge = isDark ? 0.08 : 0.04;
+  core.style.background = `radial-gradient(circle,
+    ${rgba(top3[0].color, coreOpacity)} 0%,
+    ${rgba(top3[1].color, coreOpacity * 0.7)} 30%,
+    ${rgba(top3[2].color, coreOpacity * 0.4)} 55%,
+    ${rgba(top3[0].color, coreEdge)} 80%,
+    transparent 95%
+  )`;
+
+  // -- Inner glow blobs (gaussian blur ellipses like aura-themed) --
+  const innerGlow = document.getElementById('orb-inner-glow');
+  innerGlow.innerHTML = '';
+
+  sorted.forEach((t, i) => {
+    const blob = document.createElement('div');
+    blob.className = 'glow-blob';
+
+    // Position blobs in different zones based on trait direction
+    const angle = t.direction.angle * (Math.PI / 180);
+    const dist = 60 + (i * 20);
+    const cx = 200 + Math.cos(angle) * dist - 80;
+    const cy = 200 + Math.sin(angle) * dist - 60;
+
+    // Size proportional to score
+    const size = 100 + (t.score / 100) * 80;
+    const blobOpacity = isDark
+      ? 0.3 + (t.score / 100) * 0.4
+      : 0.2 + (t.score / 100) * 0.25;
+
+    blob.style.cssText = `
+      left: ${cx}px; top: ${cy}px;
+      width: ${size}px; height: ${size * 0.8}px;
+      background: ${t.color};
+      opacity: ${blobOpacity};
+      animation: blobDrift${i} ${12 + i * 2}s ease-in-out infinite;
+    `;
+
+    innerGlow.appendChild(blob);
+  });
+
+  // -- Center bright point --
+  const center = document.getElementById('orb-center');
+  if (isDark) {
+    center.style.background = `radial-gradient(circle,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.6) 25%,
+      ${rgba(top3[0].color, 0.4)} 55%,
+      ${rgba(top3[1].color, 0.15)} 80%,
+      transparent 100%
+    )`;
+    center.style.boxShadow = `
+      0 0 40px rgba(255,255,255,0.4),
+      0 0 80px ${rgba(top3[0].color, 0.5)},
+      0 0 140px ${rgba(top3[1].color, 0.3)}
+    `;
+  } else {
+    center.style.background = `radial-gradient(circle,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.85) 30%,
+      ${rgba(top3[0].color, 0.25)} 60%,
+      ${rgba(top3[1].color, 0.1)} 80%,
+      transparent 100%
+    )`;
+    center.style.boxShadow = `
+      0 0 30px rgba(255,255,255,0.5),
+      0 0 60px ${rgba(top3[0].color, 0.25)},
+      0 0 100px ${rgba(top3[1].color, 0.15)}
+    `;
+  }
+}
+
+// =====================================================================
+// NEURAL NODES
+// =====================================================================
+
+let nodeState = [];
+let animFrame = null;
+
+function initNodes() {
+  const canvas = document.getElementById('node-canvas');
+  const cx = 190, cy = 190;
+  nodeState = [];
+
+  Object.entries(traits).forEach(([key, t]) => {
+    // Number of nodes proportional to score (2-4 nodes per trait)
+    const count = Math.max(2, Math.round((t.score / 100) * 4));
+    const baseAngle = t.direction.angle;
+
+    for (let i = 0; i < count; i++) {
+      // Spread nodes around trait direction with some scatter
+      const angleOffset = (i - count / 2) * 25 + (Math.random() - 0.5) * 30;
+      const angle = (baseAngle + angleOffset) * (Math.PI / 180);
+      const dist = 55 + Math.random() * 80;
+
+      const x = cx + Math.cos(angle) * dist;
+      const y = cy + Math.sin(angle) * dist;
+
+      // Node size: bigger = stronger signal
+      const baseR = 2.5 + (t.score / 100) * 4;
+      const r = baseR + Math.random() * 1.5;
+
+      nodeState.push({
+        trait: key,
+        color: t.color,
+        x, y,
+        baseX: x, baseY: y,
+        r,
+        // Wiggle parameters (organic, not mechanical)
+        phaseX: Math.random() * Math.PI * 2,
+        phaseY: Math.random() * Math.PI * 2,
+        speedX: 0.3 + Math.random() * 0.4,
+        speedY: 0.25 + Math.random() * 0.35,
+        ampX: 1.5 + Math.random() * 2.5,
+        ampY: 1.2 + Math.random() * 2.5,
+      });
+    }
+  });
+}
+
+function renderNodes(time) {
+  const svg = document.getElementById('node-canvas');
+  const lineColor = isDark ? 'rgba(255,255,255,' : 'rgba(0,0,0,';
+  const lineOpacity = isDark ? 0.12 : 0.08;
+
+  // Animate positions
+  nodeState.forEach(n => {
+    n.x = n.baseX + Math.sin(time * n.speedX + n.phaseX) * n.ampX;
+    n.y = n.baseY + Math.cos(time * n.speedY + n.phaseY) * n.ampY;
+  });
+
+  // Build SVG
+  let html = '';
+
+  // Connection lines between nearby nodes
+  for (let i = 0; i < nodeState.length; i++) {
+    for (let j = i + 1; j < nodeState.length; j++) {
+      const a = nodeState[i];
+      const b = nodeState[j];
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Connect if within 80px — fade by distance
+      if (dist < 80) {
+        const opacity = (1 - dist / 80) * lineOpacity;
+        // Line color blends between the two node colors
+        html += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"
+          stroke="${lineColor}${opacity})" stroke-width="1" stroke-linecap="round"/>`;
+      }
+    }
+  }
+
+  // Nodes with glow
+  nodeState.forEach(n => {
+    const glowOp = isDark ? 0.25 : 0.15;
+    html += `<circle cx="${n.x}" cy="${n.y}" r="${n.r * 2.5}" fill="${rgba(n.color, glowOp)}" />`;
+    html += `<circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${n.color}" opacity="${isDark ? 0.9 : 0.75}" />`;
+  });
+
+  svg.innerHTML = html;
+}
+
+// Animation loop
+function animate(timestamp) {
+  const time = timestamp * 0.001; // seconds
+  renderNodes(time);
+  animFrame = requestAnimationFrame(animate);
+}
+
+// =====================================================================
+// DIRECTIONAL ENERGY WAVES
+// =====================================================================
+
+const stage = document.getElementById('orb-stage');
+let waveInterval = null;
+
+function spawnWaveSet() {
+  const sorted = topTraits();
+  // Only emit waves for traits with score > 40
+  const active = sorted.filter(t => t.score > 40);
+
+  active.forEach((t, i) => {
+    setTimeout(() => {
+      createDirectionalWave(t);
+    }, i * 600);
+  });
+}
+
+function createDirectionalWave(t) {
+  const wave = document.createElement('div');
+  wave.className = 'energy-wave';
+
+  const size = 350;
+  wave.style.width = `${size}px`;
+  wave.style.height = `${size}px`;
+
+  // Direction: each trait "owns" a direction
+  const angle = t.direction.angle * (Math.PI / 180);
+  const startDist = 0;
+  const endDist = 80 + (t.score / 100) * 60;
+
+  const txStart = Math.cos(angle) * startDist;
+  const tyStart = Math.sin(angle) * startDist;
+  const txEnd = Math.cos(angle) * endDist;
+  const tyEnd = Math.sin(angle) * endDist;
+
+  const peakOpacity = isDark
+    ? 0.15 + (t.score / 100) * 0.2
+    : 0.08 + (t.score / 100) * 0.12;
+
+  const scaleMax = 1.2 + (t.score / 100) * 0.6;
+  const duration = 8 + Math.random() * 4;
+
+  wave.style.setProperty('--tx-start', `${txStart}px`);
+  wave.style.setProperty('--ty-start', `${tyStart}px`);
+  wave.style.setProperty('--tx-end', `${txEnd}px`);
+  wave.style.setProperty('--ty-end', `${tyEnd}px`);
+  wave.style.setProperty('--wave-peak', peakOpacity);
+  wave.style.setProperty('--wave-scale', scaleMax);
+
+  // Soft ring glow in trait color
+  const thickness = 2 + (t.score / 100) * 3;
+  const blur = 6 + (t.score / 100) * 10;
+
+  wave.style.boxShadow = `
+    inset 0 0 0 ${thickness}px ${rgba(t.color, 0.5)},
+    inset 0 0 ${blur * 2}px ${thickness * 2}px ${rgba(t.color, 0.15)},
+    0 0 ${blur}px ${thickness}px ${rgba(t.color, 0.1)}
+  `;
+  wave.style.filter = `blur(${blur / 3}px)`;
+  wave.style.animation = `wave-radiate ${duration}s ease-out forwards`;
+
+  stage.appendChild(wave);
+
+  setTimeout(() => wave.remove(), duration * 1000 + 200);
+}
+
+function startWaves() {
+  spawnWaveSet();
+  waveInterval = setInterval(spawnWaveSet, 6000);
+}
+
+function stopWaves() {
+  if (waveInterval) clearInterval(waveInterval);
+  stage.querySelectorAll('.energy-wave').forEach(w => w.remove());
+}
+
+// =====================================================================
+// TRAIT SPECTRUM BARS
+// =====================================================================
+
+function renderSpectrums() {
+  const container = document.getElementById('trait-spectrums');
+  const sorted = topTraits().slice(0, 5);
+
+  const darkBg = 'rgba(255,255,255,0.06)';
+  const lightBg = 'rgba(0,0,0,0.06)';
+  const trackBg = isDark ? darkBg : lightBg;
+
+  let html = '';
+
+  sorted.forEach(t => {
+    const labelColor = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
+    const activeLabel = isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)';
+    const isHigh = t.score >= 50;
+    const dotBorder = isDark ? '#030712' : '#f9fafb';
+
+    html += `
+      <div class="flex items-center gap-3">
+        <span class="text-[11px] w-[70px] text-right font-medium flex-shrink-0 tracking-tight"
+              style="color: ${isHigh ? labelColor : activeLabel}">
+          ${t.lowLabel}
+        </span>
+        <div class="flex-1 relative">
+          <div class="spectrum-bar" style="background: ${trackBg};">
+            <div class="spectrum-fill" style="
+              width: 100%;
+              background: linear-gradient(90deg, ${rgba(t.color, isDark ? 0.15 : 0.1)}, ${rgba(t.color, isDark ? 0.4 : 0.3)});
+            "></div>
+            <div class="spectrum-dot" style="
+              left: ${t.score}%;
+              background: ${t.color};
+              border-color: ${dotBorder};
+              box-shadow: 0 0 8px ${rgba(t.color, 0.5)};
+            "></div>
+          </div>
+        </div>
+        <span class="text-[11px] w-[70px] font-medium flex-shrink-0 tracking-tight"
+              style="color: ${isHigh ? activeLabel : labelColor}">
+          ${t.highLabel}
+        </span>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+// =====================================================================
+// SUMMARY TEXT
+// =====================================================================
+
+function updateSummary() {
+  const sorted = topTraits();
+  const top3 = sorted.slice(0, 3);
+  const labels = top3.map(t => {
+    return t.score >= 50 ? t.highLabel.toLowerCase() : t.lowLabel.toLowerCase();
+  });
+
+  document.getElementById('summary-text').textContent =
+    `Your aura blends ${labels[0]}, ${labels[1]}, and ${labels[2]}`;
+}
+
+// =====================================================================
+// THEME TOGGLE
+// =====================================================================
+
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.className = isDark ? 'dark min-h-screen flex flex-col items-center justify-start'
+                                    : 'light min-h-screen flex flex-col items-center justify-start';
+  document.getElementById('theme-btn').textContent = isDark ? 'Light Mode' : 'Dark Mode';
+
+  renderAll();
+}
+
+// =====================================================================
+// SHUFFLE PROFILE
+// =====================================================================
+
+function shuffleProfile() {
+  const rand = () => {
+    const r = Math.random();
+    if (r < 0.3) return 15 + Math.random() * 30;
+    if (r > 0.7) return 60 + Math.random() * 38;
+    return 30 + Math.random() * 40;
+  };
+
+  Object.keys(traits).forEach(key => {
+    traits[key].score = Math.round(rand());
+  });
+
+  // Restart everything with new data
+  stopWaves();
+  if (animFrame) cancelAnimationFrame(animFrame);
+
+  initNodes();
+  renderAll();
+  animFrame = requestAnimationFrame(animate);
+  startWaves();
+}
+
+// =====================================================================
+// MASTER RENDER
+// =====================================================================
+
+function renderAll() {
+  renderOrb();
+  renderSpectrums();
+  updateSummary();
+}
+
+// =====================================================================
+// INITIALIZATION
+// =====================================================================
+
+initNodes();
+renderAll();
+animFrame = requestAnimationFrame(animate);
+startWaves();
+
+// Pause/resume on visibility change
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (animFrame) cancelAnimationFrame(animFrame);
+    stopWaves();
+  } else {
+    animFrame = requestAnimationFrame(animate);
+    startWaves();
+  }
+});
+
+</script>
+</body>
+</html>
+

@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Constellation — Design Iteration</title>
+<style>
+  /* ============================================================
+     RESET & BASE
+     ============================================================ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  .header {
+    height: 50px;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: #0e0e16;
+    border-bottom: 1px solid #1e1e2e;
+    z-index: 10;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #6a6a80;
+    white-space: nowrap;
+  }
+
+  .header-left .label {
+    font-weight: 500;
+    color: #8b8ba0;
+  }
+
+  .header-left .subject {
+    color: #e0e0e8;
+    font-weight: 600;
+  }
+
+  .header-center {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .mode-btn {
+    padding: 5px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border: 1px solid #2a2a3e;
+    background: transparent;
+    color: #6a6a80;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .mode-btn:first-child {
+    border-radius: 6px 0 0 6px;
+    border-right: none;
+  }
+
+  .mode-btn:last-child {
+    border-radius: 0 6px 6px 0;
+  }
+
+  .mode-btn.active {
+    background: #1e1e2e;
+    color: #e0e0e8;
+    border-color: #3a3a52;
+  }
+
+  .mode-btn:hover:not(.active) {
+    background: #16161e;
+    color: #9a9ab0;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .round-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6a6a80;
+    padding: 3px 10px;
+    border: 1px solid #1e1e2e;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .feedback-btn {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid #2a2a3e;
+    background: transparent;
+    color: #8b8ba0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .feedback-btn:hover {
+    background: #1e1e2e;
+    color: #e0e0e8;
+  }
+
+  .feedback-btn.has-ratings {
+    border-color: #c89b3c44;
+    color: #c89b3c;
+  }
+
+  /* ============================================================
+     GRID
+     ============================================================ */
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 6px;
+    padding: 6px 10px;
+    min-height: 0;
+  }
+
+  /* ============================================================
+     CARD
+     ============================================================ */
+  .card {
+    display: flex;
+    flex-direction: column;
+    background: #12121a;
+    border: 1px solid #1e1e2e;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    transition: border-color 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+    min-height: 0;
+  }
+
+  .card.is-current {
+    border-left: 2px solid #c89b3c;
+  }
+
+  .card.is-current.is-reference {
+    border-left-color: #6a6a80;
+    opacity: 0.5;
+  }
+
+  .card.state-kept {
+    box-shadow: inset 0 0 20px rgba(46, 204, 113, 0.12), 0 0 15px rgba(46, 204, 113, 0.08);
+    border-color: rgba(46, 204, 113, 0.3);
+  }
+
+  .card.state-remix {
+    box-shadow: inset 0 0 20px rgba(200, 155, 60, 0.12), 0 0 15px rgba(200, 155, 60, 0.08);
+    border-color: rgba(200, 155, 60, 0.3);
+  }
+
+  .card.state-killed {
+    opacity: 0.2;
+  }
+
+  .card.state-killed .card-canvas-wrap {
+    filter: grayscale(0.8);
+  }
+
+  /* Canvas area */
+  .card-canvas-wrap {
+    flex: 1;
+    position: relative;
+    background: #000000;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .card-canvas-wrap canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Card bottom strip */
+  .card-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    background: #0e0e16;
+    border-top: 1px solid #1a1a28;
+    min-height: 30px;
+  }
+
+  .card-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    background: #1e1e2e;
+    color: #8b8ba0;
+    flex-shrink: 0;
+  }
+
+  .card.is-current .card-badge {
+    background: #c89b3c22;
+    color: #c89b3c;
+  }
+
+  .card-desc {
+    flex: 1;
+    font-size: 11px;
+    color: #6a6a80;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-desc .name {
+    color: #9a9ab0;
+    font-weight: 600;
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .action-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    border: 1px solid #2a2a3e;
+    background: transparent;
+    color: #6a6a80;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    line-height: 1;
+  }
+
+  .action-btn:hover {
+    background: #1e1e2e;
+    color: #e0e0e8;
+  }
+
+  .action-btn.keep:hover, .action-btn.keep.active {
+    background: rgba(46, 204, 113, 0.15);
+    border-color: rgba(46, 204, 113, 0.4);
+    color: #2ecc71;
+  }
+
+  .action-btn.remix:hover, .action-btn.remix.active {
+    background: rgba(200, 155, 60, 0.15);
+    border-color: rgba(200, 155, 60, 0.4);
+    color: #c89b3c;
+  }
+
+  .action-btn.kill:hover, .action-btn.kill.active {
+    background: rgba(231, 76, 60, 0.15);
+    border-color: rgba(231, 76, 60, 0.4);
+    color: #e74c3c;
+  }
+
+  .action-btn.undo {
+    display: none;
+    font-size: 11px;
+    width: auto;
+    padding: 0 8px;
+    color: #8b8ba0;
+  }
+
+  .card.state-killed .action-btn:not(.undo) { display: none; }
+  .card.state-killed .action-btn.undo { display: flex; }
+
+  /* Note input */
+  .card-note-row {
+    padding: 0 10px 4px;
+    background: #0e0e16;
+  }
+
+  .card-note {
+    width: 100%;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid #1a1a28;
+    background: #0a0a12;
+    color: #9a9ab0;
+    outline: none;
+    transition: border-color 0.2s ease;
+  }
+
+  .card-note::placeholder {
+    color: #3a3a52;
+  }
+
+  .card-note:focus {
+    border-color: #3a3a52;
+  }
+
+  /* ============================================================
+     FEEDBACK PANEL
+     ============================================================ */
+  .feedback-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+  }
+
+  .feedback-overlay.open {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .feedback-backdrop {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+  }
+
+  .feedback-panel {
+    background: #0e0e16;
+    border-top: 1px solid #2a2a3e;
+    padding: 20px 24px 24px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .feedback-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .feedback-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e0e0e8;
+  }
+
+  .feedback-close {
+    background: transparent;
+    border: none;
+    color: #6a6a80;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+
+  .feedback-close:hover { color: #e0e0e8; }
+
+  .feedback-columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .feedback-col h3 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid;
+  }
+
+  .feedback-col.col-keep h3 {
+    color: #2ecc71;
+    border-color: #2ecc7144;
+  }
+
+  .feedback-col.col-remix h3 {
+    color: #c89b3c;
+    border-color: #c89b3c44;
+  }
+
+  .feedback-col.col-kill h3 {
+    color: #e74c3c;
+    border-color: #e74c3c44;
+  }
+
+  .feedback-item {
+    font-size: 12px;
+    color: #9a9ab0;
+    padding: 4px 0;
+  }
+
+  .feedback-item .item-name {
+    font-weight: 600;
+    color: #e0e0e8;
+  }
+
+  .feedback-item .item-note {
+    font-style: italic;
+    color: #6a6a80;
+    margin-left: 4px;
+  }
+
+  .feedback-empty {
+    font-size: 12px;
+    color: #3a3a52;
+    font-style: italic;
+  }
+
+  .send-btn {
+    padding: 8px 20px;
+    border-radius: 6px;
+    border: 1px solid #c89b3c55;
+    background: #c89b3c18;
+    color: #c89b3c;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .send-btn:hover {
+    background: #c89b3c28;
+    border-color: #c89b3c88;
+  }
+
+  .send-btn.copied {
+    background: #2ecc7118;
+    border-color: #2ecc7155;
+    color: #2ecc71;
+  }
+
+  /* ============================================================
+     UTILITY
+     ============================================================ */
+  ::selection {
+    background: #c89b3c44;
+    color: #e0e0e8;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a3e; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ================================================================
+     HEADER
+     ================================================================ -->
+<div class="header">
+  <div class="header-left">
+    <span class="label" id="headerLabel">Refining:</span>
+    <span class="subject">Aura Constellation</span>
+  </div>
+  <div class="header-center">
+    <button class="mode-btn active" id="btnMicro" onclick="setMode('micro')">Micro</button>
+    <button class="mode-btn" id="btnMacro" onclick="setMode('macro')">Macro</button>
+  </div>
+  <div class="header-right">
+    <span class="round-badge">Round 1</span>
+    <button class="feedback-btn" id="feedbackBtn" onclick="toggleFeedback()">Feedback (0)</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     GRID
+     ================================================================ -->
+<div class="grid" id="grid">
+  <!-- Cards injected by JS -->
+</div>
+
+<!-- ================================================================
+     FEEDBACK OVERLAY
+     ================================================================ -->
+<div class="feedback-overlay" id="feedbackOverlay">
+  <div class="feedback-backdrop" onclick="toggleFeedback()"></div>
+  <div class="feedback-panel">
+    <div class="feedback-header">
+      <span class="feedback-title">Iteration Feedback</span>
+      <button class="feedback-close" onclick="toggleFeedback()">&times;</button>
+    </div>
+    <div class="feedback-columns" id="feedbackColumns">
+      <div class="feedback-col col-keep">
+        <h3>Keep</h3>
+        <div id="feedKeep"></div>
+      </div>
+      <div class="feedback-col col-remix">
+        <h3>Remix</h3>
+        <div id="feedRemix"></div>
+      </div>
+      <div class="feedback-col col-kill">
+        <h3>Kill</h3>
+        <div id="feedKill"></div>
+      </div>
+    </div>
+    <button class="send-btn" id="sendBtn" onclick="sendToJude()">Send to Jude</button>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// AURA CONSTELLATION VISUALIZATION ENGINE
+// Extracted from production: index.html lines 1421-2220
+// ================================================================
+
+// -- Palette --
+const C = {
+  violet:'#8b5cf6', blue:'#3b82f6', teal:'#14b8a6', rose:'#f43f5e',
+  pink:'#d946ef', emerald:'#10b981', amber:'#f59e0b', indigo:'#6366f1', cyan:'#06b6d4',
+};
+
+// -- Helpers --
+function hexRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n>>16)&255, (n>>8)&255, n&255]; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpRgb(a, b, t) { return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
+function rgbStr(c, a) { return `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${Math.max(0, a).toFixed(3)})`; }
+function seededRng(seed) { let s = seed; return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; }; }
+
+// -- Neuron Mapping --
+const NEURON_MAP = [
+  { colorQ: 'onboard-1',  posQ: 'onboard-2',  colors: [C.violet, C.blue] },
+  { colorQ: 'onboard-4',  posQ: 'onboard-8',  colors: [C.indigo, C.rose] },
+  { colorQ: 'onboard-5',  posQ: 'onboard-3',  colors: [C.pink, C.teal] },
+  { colorQ: 'onboard-6',  posQ: 'onboard-9',  colors: [C.emerald, C.amber] },
+  { colorQ: 'onboard-7',  posQ: 'onboard-10', colors: [C.cyan, C.violet] },
+];
+
+const SENSITIVE = [false, false, false, true, true];
+
+// -- Assessment Map --
+const ASSESS_MAP = [
+  { ids: ['starter-personality'], name: 'Personality', color: C.violet, tier: 1, nodes: 3, affinities: [0, 2] },
+  { ids: ['starter-motivation'], name: 'Motivation', color: C.amber, tier: 1, nodes: 3, affinities: [1, 3] },
+  { ids: ['starter-thinking'], name: 'Thinking', color: C.blue, tier: 1, nodes: 3, affinities: [0, 4] },
+  { ids: ['starter-connection'], name: 'Connection', color: C.pink, tier: 1, nodes: 3, affinities: [2, 3] },
+  { ids: ['starter-strategy'], name: 'Strategy', color: C.emerald, tier: 1, nodes: 3, affinities: [1, 4] },
+  { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: C.violet, tier: 2, nodes: 5, affinities: [0, 2, 4] },
+  { ids: ['integrity'], name: 'Character', color: C.emerald, tier: 2, nodes: 3, affinities: [3, 1] },
+  { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: C.indigo, tier: 2, nodes: 4, affinities: [3, 4] },
+  { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: C.cyan, tier: 2, nodes: 4, affinities: [4, 0] },
+  { ids: ['attachment'], name: 'Relationships', color: C.rose, tier: 2, nodes: 3, affinities: [2, 3] },
+  { ids: ['risk'], name: 'Behavior', color: C.amber, tier: 2, nodes: 3, affinities: [1, 4] },
+];
+
+// -- Tier Detection & Tuning --
+function detectTier(completed) {
+  const count = Object.keys(completed || {}).length;
+  if (count >= 4) return 'power';
+  if (count >= 1) return 'regular';
+  return 'new';
+}
+
+function getTuning(tier) {
+  const base = {
+    earnedCompanions: true, companionGhostAlpha: 0, satThreshold: 8,
+    answeredR: 14, answeredHalo: 50, breathAmp: 0.06, breathSpd: 0.22,
+    connAlpha: 0.70, haloScale: 4, haloInner: 0.32, haloMid: 0.12,
+    stars: 35, ghostAlpha: 0, wanderStrength: 0.4, microDrift: 0.8,
+    connWidth: 1.4, glowAlpha: 1.0, glowRadius: 320, glowPasses: 4,
+    compGlow: true, compGlowScale: 0.5,
+  };
+  if (tier === 'new') return { ...base,
+    primariesOnly: true, wanderStrength: 0.3,
+    ringInner: 90,
+    answeredR: 20, answeredHalo: 70,
+    glowAlpha: 1.0, glowRadius: 380, glowPasses: 5,
+    haloScale: 6, haloInner: 0.50, haloMid: 0.20,
+    connAlpha: 0.85, connWidth: 1.8,
+    ghostAlpha: 0.30, ghostR: 8,
+  };
+  if (tier === 'power') return { ...base,
+    ghostAlpha: 0.06,
+    ringInner: 70, ringComp: 135, ringSat: 190,
+    answeredR: 15, answeredHalo: 52,
+    glowAlpha: 1.0, glowRadius: 340, glowPasses: 5,
+    haloScale: 5, haloInner: 0.40, haloMid: 0.15,
+    connAlpha: 0.80, connWidth: 1.6,
+    compGlow: true, compGlowScale: 0.55,
+  };
+  return base;
+}
+
+// -- Derive Answers --
+function deriveAnswers(answers) {
+  const colorAns = new Array(5).fill(null);
+  const posAns = new Array(5).fill(null);
+  for (let i = 0; i < 5; i++) {
+    const nm = NEURON_MAP[i];
+    if (nm.colorQ in answers) colorAns[i] = answers[nm.colorQ];
+    if (nm.posQ in answers) posAns[i] = answers[nm.posQ];
+  }
+  return { colorAns, posAns };
+}
+
+function deriveAssessState(completed) {
+  const state = {};
+  ASSESS_MAP.forEach((assess, idx) => {
+    state[idx] = assess.ids.some(id => id in completed);
+  });
+  return state;
+}
+
+// -- Node Factory --
+function makeNode(o) {
+  return {
+    x: o.x || 300, y: o.y || 300, tx: o.x || 300, ty: o.y || 300,
+    baseX: o.x || 300, baseY: o.y || 300,
+    color: o.color ? hexRgb(o.color) : [70, 75, 90],
+    tcolor: o.color ? hexRgb(o.color) : [70, 75, 90],
+    r: o.r || 2, tr: o.r || 2, halo: o.halo || 8, thalo: o.halo || 8,
+    alpha: 0, talpha: 0,
+    driftSpeed: 0.25 + Math.random() * 0.55,
+    driftAmp: 6 + Math.random() * 9,
+    phaseX: Math.random() * Math.PI * 2 * 3,
+    phaseY: Math.random() * Math.PI * 2 * 3,
+    slowFreq: 0.025 + Math.random() * 0.045,
+    slowPhaseX: Math.random() * Math.PI * 2,
+    slowPhaseY: Math.random() * Math.PI * 2,
+    slowAmp: 0.3 + Math.random() * 0.4,
+    orbitAngle: Math.random() * Math.PI * 2,
+    orbitSpeed: (Math.random() - 0.5) * 0.005,
+    wanderFreq1: 0.006 + Math.random() * 0.008,
+    wanderFreq2: 0.003 + Math.random() * 0.005,
+    wanderFreq3: 0.001 + Math.random() * 0.003,
+    wanderPhase1: Math.random() * Math.PI * 2,
+    wanderPhase2: Math.random() * Math.PI * 2,
+    wanderPhase3: Math.random() * Math.PI * 2,
+    flash: 0,
+    birthMix: 0,
+    birthDelay: o.birthDelay || 0,
+    baseAngle: o.baseAngle || 0,
+    baseR: o.baseR || 0,
+    type: o.type || 'primary',
+    parent: o.parent ?? -1,
+    sensitive: o.sensitive || false,
+    assessIdx: o.assessIdx ?? null,
+    affinities: o.affinities || null,
+    tier: o.tier || 0,
+  };
+}
+
+function answerHash(ca, pa) {
+  let h = 0;
+  for (let i = 0; i < 5; i++) {
+    h = h * 31 + (ca[i] !== null ? ca[i] + 1 : 0);
+    h = h * 37 + (pa[i] !== null ? pa[i] + 1 : 0);
+  }
+  return h;
+}
+
+// -- Ring-Based Layout --
+function buildAllNodes(assessState, colorAns, posAns, isAI, t) {
+  const nodes = [], CX = 300, CY = 300;
+  const h = answerHash(colorAns, posAns);
+  const rng = seededRng(h + 7919);
+  const baseRot = (h % 628) / 100;
+
+  const INNER_R = t.ringInner ?? 80;
+  const COMP_R = t.ringComp ?? 140;
+  const SAT_R = t.ringSat ?? 185;
+
+  // Primaries: pentagon on inner ring
+  for (let i = 0; i < 5; i++) {
+    const angle = baseRot + (i / 5) * Math.PI * 2;
+    const nudge = (posAns[i] !== null ? (posAns[i] === 0 ? -0.12 : 0.12) : 0)
+                + (colorAns[i] !== null ? (colorAns[i] === 0 ? -0.06 : 0.06) : 0);
+    const a = angle + nudge;
+    const x = CX + Math.cos(a) * INNER_R;
+    const y = CY + Math.sin(a) * INNER_R;
+    nodes.push(makeNode({ x, y, r: 5, halo: 22, type: 'primary', sensitive: SENSITIVE[i], baseAngle: a, baseR: INNER_R, birthDelay: i * 0.2 }));
+  }
+
+  // Companions + satellites + assess (only if not primaries-only)
+  if (!t.primariesOnly) {
+    // Companions: decagon on outer ring
+    for (let i = 0; i < 5; i++) {
+      const parentAngle = nodes[i].baseAngle;
+      for (let c = 0; c < 2; c++) {
+        const offset = c === 0 ? -0.20 : 0.20;
+        const a = parentAngle + offset;
+        const r = COMP_R + (rng() - 0.5) * 16;
+        const x = CX + Math.cos(a) * r;
+        const y = CY + Math.sin(a) * r;
+        nodes.push(makeNode({ x, y, type: 'companion', parent: i, r: 2.5, halo: 10, baseAngle: a, baseR: r, birthDelay: 1.2 + c * 0.2 + i * 0.15 }));
+      }
+    }
+
+    // Satellites: outer pentagon
+    for (let s = 0; s < 5; s++) {
+      const a = nodes[s].baseAngle;
+      const r = SAT_R + (rng() - 0.5) * 12;
+      const x = CX + Math.cos(a) * r;
+      const y = CY + Math.sin(a) * r;
+      nodes.push(makeNode({ x, y, type: 'satellite', parent: s, r: 2, halo: 7, baseAngle: a, baseR: r, birthDelay: 2.5 + s * 0.2 }));
+    }
+
+    // Assess nodes on tier rings
+    ASSESS_MAP.forEach((assess, ai) => {
+      if (!assessState[ai]) return;
+      const arng = seededRng(ai * 137 + 42);
+      const affs = assess.affinities;
+      let midAngle = 0;
+      for (const pi of affs) midAngle += nodes[pi].baseAngle;
+      midAngle /= affs.length;
+      const ringR = assess.tier === 1 ? (INNER_R + COMP_R) / 2 : (COMP_R + SAT_R) / 2;
+
+      for (let ni = 0; ni < assess.nodes; ni++) {
+        const spread = (ni / assess.nodes) * 0.6 - 0.3;
+        const a = midAngle + spread + (arng() - 0.5) * 0.15;
+        const r = ringR + (arng() - 0.5) * 30;
+        nodes.push(makeNode({
+          x: CX + Math.cos(a) * r, y: CY + Math.sin(a) * r,
+          r: 2 + arng() * 2, halo: 8 + arng() * 10,
+          type: 'assess', color: assess.color, assessIdx: ai, tier: assess.tier,
+          parent: affs[0], affinities: affs, baseAngle: a, baseR: r,
+          birthDelay: 3.0 + ni * 0.15,
+        }));
+      }
+    });
+  }
+
+  return nodes;
+}
+
+// -- Topology-Based Connections --
+function buildConnections(nodes, isAI, colorAns, t) {
+  const conns = [], seen = new Set();
+  function add(a, b) {
+    if (a < 0 || b < 0 || a >= nodes.length || b >= nodes.length) return;
+    const k = Math.min(a, b) * 10000 + Math.max(a, b);
+    if (seen.has(k)) return;
+    seen.add(k);
+    conns.push([a, b]);
+  }
+
+  // Inner shape: pentagon edges
+  for (let i = 0; i < 5; i++) add(i, (i + 1) % 5);
+  // Star arms
+  if (isAI) {
+    for (let i = 0; i < 5; i++) add(i, (i + 2) % 5);
+  } else {
+    add(0, 2); add(1, 3);
+  }
+
+  if (!t.primariesOnly && nodes.length > 5) {
+    // Bridges: each primary to its first companion
+    for (let i = 0; i < 5; i++) add(i, 5 + i * 2);
+
+    // Outer shape: companion ring (decagon)
+    for (let i = 0; i < 10; i++) add(5 + i, 5 + (i + 1) % 10);
+
+    // Satellite ring + bridges
+    if (nodes.length >= 20) {
+      const answeredCount = colorAns.filter(a => a !== null).length;
+      for (let s = 0; s < 5; s++) add(nodes[15 + s].parent, 15 + s);
+      if (answeredCount >= 8) {
+        for (let s = 0; s < 5; s++) add(15 + s, 15 + (s + 1) % 5);
+      }
+    }
+
+    // Assess connections
+    for (let ai = 20; ai < nodes.length; ai++) {
+      const an = nodes[ai];
+      if (an.parent >= 0) add(an.parent, ai);
+      for (let aj = ai + 1; aj < nodes.length; aj++) {
+        if (nodes[aj].assessIdx === an.assessIdx) add(ai, aj);
+      }
+    }
+  }
+
+  return conns;
+}
+
+// -- Appearance --
+function computeAppearance(nodes, isAI, colorAns, posAns, assessState, t) {
+  for (let i = 0; i < 5; i++) {
+    const node = nodes[i];
+    if (colorAns[i] !== null) {
+      node.tcolor = hexRgb(NEURON_MAP[i].colors[colorAns[i]]);
+      node.tr = t.answeredR ?? 12; node.thalo = t.answeredHalo ?? 45; node.talpha = 1;
+    } else if (posAns[i] !== null) {
+      node.tcolor = lerpRgb(hexRgb(NEURON_MAP[i].colors[0]), hexRgb(NEURON_MAP[i].colors[1]), 0.5);
+      node.talpha = 0.6; node.tr = 8; node.thalo = 32;
+    } else {
+      node.tcolor = lerpRgb(hexRgb(NEURON_MAP[i].colors[0]), hexRgb(NEURON_MAP[i].colors[1]), 0.5);
+      node.tr = t.ghostR ?? 6; node.thalo = 24; node.talpha = t.ghostAlpha ?? 0;
+    }
+  }
+  if (!t.primariesOnly && nodes.length > 5) {
+    const ac = colorAns.filter(a => a !== null).length + posAns.filter(a => a !== null).length;
+    for (let ci = 0; ci < 10; ci++) {
+      const node = nodes[5 + ci], parent = nodes[node.parent];
+      const ans = colorAns[node.parent] !== null || posAns[node.parent] !== null;
+      if (t.earnedCompanions && !ans) { node.talpha = 0; }
+      else if (ans) { node.tcolor = parent.tcolor; node.tr = 4 + (ci % 2) * 2; node.thalo = 16 + (ci % 2) * 6; node.talpha = parent.talpha * (t.companionAlpha ?? 0.6); }
+      else { node.tcolor = parent.tcolor; node.tr = 2.5; node.thalo = 10; node.talpha = t.companionGhostAlpha ?? 0; }
+    }
+    const satT = t.satThreshold ?? 8;
+    for (let si = 0; si < 5; si++) {
+      const node = nodes[15 + si], parent = nodes[node.parent];
+      if (ac >= satT && parent.talpha > 0.3) { node.tcolor = parent.tcolor; node.tr = 4; node.thalo = 14; node.talpha = 0.5 * Math.min(1, (ac - satT + 1) / 4); }
+      else { node.talpha = 0; }
+    }
+    for (let ai = 20; ai < nodes.length; ai++) {
+      const node = nodes[ai];
+      if (assessState[node.assessIdx]) {
+        node.talpha = 0.85; node.tr = 5; node.thalo = 18;
+        if (node.affinities && node.affinities.length >= 2) {
+          let ar = 0, ag = 0, ab = 0;
+          for (const pi of node.affinities) { ar += nodes[pi].color[0]; ag += nodes[pi].color[1]; ab += nodes[pi].color[2]; }
+          const n = node.affinities.length;
+          node.tcolor = lerpRgb(hexRgb(ASSESS_MAP[node.assessIdx].color), [ar / n, ag / n, ab / n], 0.6);
+        }
+      } else { node.talpha = 0; }
+    }
+  }
+}
+
+// -- Target Update: wander + companion follow --
+function updateTargets(nodes, time, t) {
+  const wanderAmp = (t.wanderStrength ?? 0.4) * 25;
+
+  // Primaries: slow wander around base ring position
+  for (let i = 0; i < Math.min(5, nodes.length); i++) {
+    const n = nodes[i];
+    if (n.alpha < 0.03) continue;
+    const beat = Math.sin(time * n.wanderFreq3 + n.wanderPhase3);
+    const activity = Math.max(0, beat) * Math.max(0, beat);
+    const wx = Math.sin(time * n.wanderFreq1 + n.wanderPhase1) * wanderAmp * activity
+             + Math.sin(time * n.wanderFreq2 + n.wanderPhase2) * wanderAmp * 0.6 * activity;
+    const wy = Math.cos(time * n.wanderFreq1 * 0.73 + n.wanderPhase2) * wanderAmp * activity
+             + Math.cos(time * n.wanderFreq2 * 0.87 + n.wanderPhase1) * wanderAmp * 0.6 * activity;
+    n.tx = n.baseX + wx;
+    n.ty = n.baseY + wy;
+  }
+
+  // Companions: follow parent's wander at reduced strength
+  for (let ci = 0; ci < 10 && 5 + ci < nodes.length; ci++) {
+    const comp = nodes[5 + ci];
+    if (comp.alpha < 0.02) continue;
+    const parent = nodes[comp.parent];
+    const pdx = parent.x - parent.baseX;
+    const pdy = parent.y - parent.baseY;
+    comp.tx = comp.baseX + pdx * 0.5;
+    comp.ty = comp.baseY + pdy * 0.5;
+  }
+
+  // Satellites: follow parent at even less strength
+  for (let si = 0; si < 5 && 15 + si < nodes.length; si++) {
+    const sat = nodes[15 + si];
+    if (sat.alpha < 0.02) continue;
+    const parent = nodes[sat.parent];
+    const pdx = parent.x - parent.baseX;
+    const pdy = parent.y - parent.baseY;
+    sat.tx = sat.baseX + pdx * 0.3;
+    sat.ty = sat.baseY + pdy * 0.3;
+  }
+
+  // Assess: follow affinity centroid shift
+  for (let ai = 20; ai < nodes.length; ai++) {
+    const an = nodes[ai];
+    if (an.alpha < 0.02 || !an.affinities) continue;
+    let sx = 0, sy = 0;
+    for (const pi of an.affinities) { sx += nodes[pi].x - nodes[pi].baseX; sy += nodes[pi].y - nodes[pi].baseY; }
+    sx /= an.affinities.length; sy /= an.affinities.length;
+    an.tx = an.baseX + sx * 0.4;
+    an.ty = an.baseY + sy * 0.4;
+  }
+}
+
+// -- 3D Multi-Harmonic Drift --
+function animPos(n, time, isAI, t) {
+  const bm = n.birthMix ?? 1;
+  const dm = (t.microDrift ?? 1.0) * bm * bm * bm;
+  const sp = n.driftSpeed;
+  const amp = n.driftAmp * (isAI ? 0.4 : 1.0) * dm;
+
+  const dx1 = Math.sin(time * sp + n.phaseX) * amp;
+  const dy1 = Math.cos(time * sp * 0.73 + n.phaseY) * amp;
+  const dx2 = Math.sin(time * sp * 0.4 + n.phaseX * 2.1) * amp * 0.45;
+  const dy2 = Math.cos(time * sp * 0.35 + n.phaseY * 1.7) * amp * 0.38;
+  const dx3 = Math.sin(time * n.slowFreq + n.slowPhaseX) * amp * n.slowAmp;
+  const dy3 = Math.cos(time * n.slowFreq * 0.8 + n.slowPhaseY) * amp * n.slowAmp;
+  const depth = Math.sin(time * sp * 0.22 + n.phaseX * 0.6 + n.phaseY * 0.3);
+
+  return { x: n.x + dx1 + dx2 + dx3, y: n.y + dy1 + dy2 + dy3, depth };
+}
+
+// -- Shape Helpers --
+function diamond(ctx, cx, cy, s) { ctx.beginPath(); ctx.moveTo(cx, cy - s); ctx.lineTo(cx + s, cy); ctx.lineTo(cx, cy + s); ctx.lineTo(cx - s, cy); ctx.closePath(); }
+function triangle(ctx, cx, cy, s) { const h = s * 1.15; ctx.beginPath(); ctx.moveTo(cx, cy - h); ctx.lineTo(cx + s, cy + h * 0.5); ctx.lineTo(cx - s, cy + h * 0.5); ctx.closePath(); }
+
+// -- Render --
+function renderViz(ctx, nodes, conns, stars, isAI, time, scale, t, darkMode) {
+  const W = 600, H = 600, CX = 300, CY = 300;
+  const breathAmp = t.breathAmp ?? 0.04, breathSpd = t.breathSpd ?? 0.22;
+  const breath = 1 + breathAmp * Math.sin(time * breathSpd);
+
+  // Auto-center: compute centroid of visible nodes, offset to center
+  let cx = 0, cy = 0, cw = 0;
+  for (const n of nodes) {
+    if (n.alpha < 0.05) continue;
+    cx += n.x * n.alpha; cy += n.y * n.alpha; cw += n.alpha;
+  }
+  const offX = cw > 0 ? CX - cx / cw : 0;
+  const offY = cw > 0 ? CY - cy / cw : 0;
+
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.clearRect(0, 0, W, H);
+
+  // Background: deep black void
+  const bgColor = '#000000';
+  if (darkMode) {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const vg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 300);
+    vg.addColorStop(0, bgColor);
+    vg.addColorStop(0.65, bgColor);
+    vg.addColorStop(0.75, bgColor + 'dd');
+    vg.addColorStop(0.82, bgColor + '99');
+    vg.addColorStop(0.88, bgColor + '55');
+    vg.addColorStop(0.93, bgColor + '28');
+    vg.addColorStop(0.97, bgColor + '0c');
+    vg.addColorStop(1, bgColor + '00');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Apply centroid offset
+  ctx.translate(offX, offY);
+
+  // Stars
+  const starCount = t.stars ?? 35;
+  for (let i = 0; i < Math.min(starCount, stars.length); i++) {
+    const s = stars[i];
+    const tw = s.bright * (0.5 + 0.5 * Math.sin(time * s.speed + s.phase));
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = rgbStr([180, 200, 255], tw); ctx.fill();
+  }
+
+  // AI hex grid
+  if (isAI) {
+    ctx.save(); ctx.translate(CX, CY); ctx.rotate(time * 0.015); ctx.translate(-CX, -CY);
+    ctx.strokeStyle = '#6b7b93'; ctx.lineWidth = 0.6;
+    for (let ring = 1; ring <= 7; ring++) {
+      ctx.globalAlpha = Math.max(0.005, 0.10 - ring * 0.012);
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) {
+        const a = (i / 6) * Math.PI * 2 - Math.PI / 6, r = ring * 40;
+        i === 0 ? ctx.moveTo(CX + Math.cos(a) * r, CY + Math.sin(a) * r)
+                : ctx.lineTo(CX + Math.cos(a) * r, CY + Math.sin(a) * r);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Additive blending for all glow layers
+  ctx.globalCompositeOperation = 'lighter';
+
+  // Nebula wash: massive saturated color pools
+  for (let i = 0; i < 5; i++) {
+    const n = nodes[i]; if (n.alpha < 0.08) continue;
+    const p = animPos(n, time, isAI, t);
+    const nebR = 280 * breath;
+    const nebA = n.alpha * 0.45;
+    const ng = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, nebR);
+    ng.addColorStop(0, rgbStr(n.color, nebA));
+    ng.addColorStop(0.25, rgbStr(n.color, nebA * 0.75));
+    ng.addColorStop(0.50, rgbStr(n.color, nebA * 0.40));
+    ng.addColorStop(0.75, rgbStr(n.color, nebA * 0.12));
+    ng.addColorStop(1, rgbStr(n.color, 0));
+    ctx.fillStyle = ng; ctx.fillRect(0, 0, W, H);
+  }
+
+  // Glow: per-primary atmospheric radials
+  const glowR = t.glowRadius ?? 150;
+  const glowAlpha = t.glowAlpha ?? 0.40;
+  const passes = t.glowPasses ?? 1;
+
+  for (let pass = 0; pass < passes; pass++) {
+    const ps = 1 - pass * 0.10, pa = pass === 0 ? 1.0 : 0.75;
+    for (let i = 0; i < 5; i++) {
+      const n = nodes[i]; if (n.alpha < 0.03) continue;
+      const p = animPos(n, time, isAI, t);
+      const depthScale = 0.88 + p.depth * 0.15;
+      const r = glowR * ps * (0.55 + n.alpha * 0.45) * breath * depthScale;
+      const a = n.alpha * glowAlpha * pa * (0.90 + p.depth * 0.12);
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      g.addColorStop(0, rgbStr(n.color, a * 0.45));
+      g.addColorStop(0.10, rgbStr(n.color, a * 0.72));
+      g.addColorStop(0.25, rgbStr(n.color, a * 0.80));
+      g.addColorStop(0.40, rgbStr(n.color, a * 0.55));
+      g.addColorStop(0.55, rgbStr(n.color, a * 0.30));
+      g.addColorStop(0.72, rgbStr(n.color, a * 0.10));
+      g.addColorStop(1, rgbStr(n.color, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Companion glow
+  if (t.compGlow && nodes.length > 5) {
+    const cgScale = t.compGlowScale ?? 0.45;
+    for (let ci = 0; ci < 10 && 5 + ci < nodes.length; ci++) {
+      const n = nodes[5 + ci]; if (n.alpha < 0.05) continue;
+      const p = animPos(n, time, isAI, t);
+      const r = glowR * cgScale * (0.5 + n.alpha * 0.5) * breath;
+      const a = n.alpha * glowAlpha * 0.7;
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      g.addColorStop(0, rgbStr(n.color, a * 0.40));
+      g.addColorStop(0.20, rgbStr(n.color, a * 0.65));
+      g.addColorStop(0.40, rgbStr(n.color, a * 0.42));
+      g.addColorStop(0.65, rgbStr(n.color, a * 0.15));
+      g.addColorStop(1, rgbStr(n.color, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Back to normal compositing for nodes and connections
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Nodes: sorted by depth (far first, close on top) for 3D layering
+  const nodePositions = [];
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].alpha < 0.02) continue;
+    nodePositions.push({ idx: i, pos: animPos(nodes[i], time, isAI, t) });
+  }
+  nodePositions.sort((a, b) => a.pos.depth - b.pos.depth);
+  const haloScale = t.haloScale ?? 3.5;
+
+  for (const { idx, pos: p } of nodePositions) {
+    const n = nodes[idx], c = n.color, ba = n.alpha;
+    const depthSize = 0.88 + p.depth * 0.15;
+    const cR = (n.r + n.flash * 3) * breath * depthSize;
+
+    // Outer halo
+    if (cR > 1) {
+      const outerR = cR * haloScale;
+      const g1 = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, outerR);
+      g1.addColorStop(0, rgbStr(c, ba * (t.haloInner ?? 0.24)));
+      g1.addColorStop(0.5, rgbStr(c, ba * (t.haloMid ?? 0.09)));
+      g1.addColorStop(1, rgbStr(c, 0));
+      if (isAI && n.type === 'primary') {
+        ctx.save();
+        if (n.sensitive) triangle(ctx, p.x, p.y, outerR * 1.3); else diamond(ctx, p.x, p.y, outerR * 1.3);
+        ctx.clip(); ctx.fillStyle = g1; ctx.fillRect(p.x - outerR, p.y - outerR, outerR * 2, outerR * 2); ctx.restore();
+      } else { ctx.beginPath(); ctx.arc(p.x, p.y, outerR, 0, Math.PI * 2); ctx.fillStyle = g1; ctx.fill(); }
+    }
+    // Mid glow
+    if (cR > 0.5) {
+      ctx.beginPath();
+      if (isAI && n.type === 'primary') { if (n.sensitive) triangle(ctx, p.x, p.y, cR * 1.8); else diamond(ctx, p.x, p.y, cR * 1.8); }
+      else ctx.arc(p.x, p.y, cR * 1.8, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr(c, ba * 0.35); ctx.fill();
+    }
+    // Bright core
+    if (cR > 0.3) {
+      ctx.beginPath();
+      if (isAI && n.type === 'primary') { if (n.sensitive) triangle(ctx, p.x, p.y, cR); else diamond(ctx, p.x, p.y, cR); }
+      else ctx.arc(p.x, p.y, cR, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr(c, ba * 0.95); ctx.fill();
+    }
+    // White pip
+    if (cR > 0.8) {
+      ctx.beginPath();
+      if (isAI && n.type === 'primary') { if (n.sensitive) triangle(ctx, p.x, p.y, cR * 0.4); else diamond(ctx, p.x, p.y, cR * 0.4); }
+      else ctx.arc(p.x, p.y, cR * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr([255, 255, 255], ba * 0.65); ctx.fill();
+    }
+    // Flash ring
+    if (n.flash > 0.05) {
+      const fR = cR * (3 + (1 - n.flash) * 8);
+      ctx.beginPath();
+      if (isAI && n.type === 'primary' && n.sensitive) triangle(ctx, p.x, p.y, fR);
+      else if (isAI && n.type === 'primary') diamond(ctx, p.x, p.y, fR);
+      else ctx.arc(p.x, p.y, fR, 0, Math.PI * 2);
+      ctx.strokeStyle = rgbStr(c, n.flash * 0.4); ctx.lineWidth = 2 * n.flash; ctx.stroke();
+    }
+  }
+
+  // Connections: straight lines, rendered LAST (always visible)
+  const cAlpha = t.connAlpha ?? 0.45;
+  for (const [a, b] of conns) {
+    const na = nodes[a], nb = nodes[b];
+    if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+    const pa = animPos(na, time, isAI, t), pb = animPos(nb, time, isAI, t);
+    const dx = pa.x - pb.x, dy = pa.y - pb.y, dist = Math.sqrt(dx * dx + dy * dy);
+    const lineA = Math.max(0, 1 - dist / 350) * Math.min(na.alpha, nb.alpha) * cAlpha;
+    if (lineA < 0.008) continue;
+
+    const mc = [(na.color[0] + nb.color[0]) / 2, (na.color[1] + nb.color[1]) / 2, (na.color[2] + nb.color[2]) / 2];
+
+    // Glow layer
+    ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y);
+    ctx.strokeStyle = rgbStr(mc, lineA * 0.6); ctx.lineWidth = (t.connWidth ?? 1.4) * 4; ctx.lineCap = 'round'; ctx.stroke();
+
+    // Crisp core
+    const bright = [Math.min(255, mc[0] + 180), Math.min(255, mc[1] + 180), Math.min(255, mc[2] + 180)];
+    ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y);
+    ctx.strokeStyle = rgbStr(bright, lineA * 1.4); ctx.lineWidth = t.connWidth ?? 1.4; ctx.lineCap = 'round'; ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+
+// ================================================================
+// SAMPLE DATA
+// ================================================================
+const sampleAnswers = {
+  'onboard-1': 0, 'onboard-2': 1, 'onboard-3': 0,
+  'onboard-4': 1, 'onboard-5': 0, 'onboard-6': 1,
+  'onboard-7': 0, 'onboard-8': 1, 'onboard-9': 0, 'onboard-10': 1,
+};
+
+const sampleCompleted = {
+  'starter-personality': true,
+  'starter-motivation': true,
+  'starter-thinking': true,
+};
+
+
+// ================================================================
+// CARD DEFINITIONS
+// ================================================================
+const CARDS = [
+  {
+    id: 'current',
+    badge: '\u2605',
+    name: 'Current',
+    desc: 'Production tuning',
+    macroDesc: 'Reference baseline',
+    overrides: {},
+    isCurrent: true,
+  },
+  {
+    id: 'a',
+    badge: 'A',
+    name: 'Compact',
+    desc: 'Tighter constellation, more intimate',
+    macroDesc: 'Tighter constellation, more intimate',
+    overrides: { ringInner: 55, ringComp: 100, ringSat: 140 },
+  },
+  {
+    id: 'b',
+    badge: 'B',
+    name: 'Softer Glow',
+    desc: 'Less saturated, more subtle',
+    macroDesc: 'Less saturated, more subtle',
+    overrides: { glowRadius: 180, glowPasses: 2, glowAlpha: 0.6 },
+  },
+  {
+    id: 'c',
+    badge: 'C',
+    name: 'Bold Connections',
+    desc: 'Structural web more prominent',
+    macroDesc: 'Structural web more prominent',
+    overrides: { connAlpha: 1.0, connWidth: 2.8 },
+  },
+  {
+    id: 'd',
+    badge: 'D',
+    name: 'Expanded',
+    desc: 'Spread out, more spacious',
+    macroDesc: 'Spread out, more spacious',
+    overrides: { ringInner: 100, ringComp: 170, ringSat: 230 },
+  },
+  {
+    id: 'e',
+    badge: 'E',
+    name: 'Deeper Motion',
+    desc: 'More alive, more movement',
+    macroDesc: 'More alive, more movement',
+    overrides: { wanderStrength: 0.9, microDrift: 1.8, breathAmp: 0.10 },
+  },
+];
+
+
+// ================================================================
+// INIT VIZ — standalone canvas + animation loop
+// ================================================================
+function initViz(canvas, tuningOverrides) {
+  const isAI = false;
+  const darkMode = true;
+  const tier = detectTier(sampleCompleted);
+  const baseTuning = getTuning(tier);
+  const t = { ...baseTuning, ...tuningOverrides };
+
+  const { colorAns, posAns } = deriveAnswers(sampleAnswers);
+  const assessState = deriveAssessState(sampleCompleted);
+  const nodes = buildAllNodes(assessState, colorAns, posAns, isAI, t);
+  const conns = buildConnections(nodes, isAI, colorAns, t);
+
+  const stars = [];
+  for (let i = 0; i < 60; i++) stars.push({
+    x: Math.random() * 600, y: Math.random() * 600,
+    r: 0.2 + Math.random() * 0.8,
+    bright: Math.random() * 0.35 + 0.05,
+    phase: Math.random() * Math.PI * 2,
+    speed: 0.5 + Math.random() * 2.5,
+  });
+
+  // Nodes start at their ring positions — already present
+  for (const n of nodes) {
+    n.x = n.baseX; n.y = n.baseY;
+    n.alpha = n.talpha; n.birthMix = 1;
+  }
+
+  const state = {
+    nodes, stars, conns, t, isAI, darkMode,
+    colorAns, posAns, assessState,
+    lastTime: performance.now(),
+    animId: null,
+  };
+
+  const ctx = canvas.getContext('2d');
+
+  function frame(now) {
+    const dt = Math.min((now - state.lastTime) / 1000, 0.05);
+    state.lastTime = now;
+    const time = now / 1000;
+
+    computeAppearance(state.nodes, state.isAI, state.colorAns, state.posAns, state.assessState, state.t);
+    updateTargets(state.nodes, time, state.t);
+
+    const spd = 4 * dt, cspd = 6 * dt;
+    for (const n of state.nodes) {
+      n.birthMix = 1;
+      n.x = lerp(n.x, n.tx, spd);
+      n.y = lerp(n.y, n.ty, spd);
+      n.r = lerp(n.r, n.tr + n.flash * 5, spd);
+      n.halo = lerp(n.halo, n.thalo + n.flash * 20, spd);
+      n.alpha = lerp(n.alpha, n.talpha + n.flash * 0.3, spd * 2);
+      n.color = lerpRgb(n.color, n.tcolor, cspd);
+      n.orbitAngle += n.orbitSpeed;
+      n.flash *= 0.91; if (n.flash < 0.01) n.flash = 0;
+    }
+
+    // Size canvas to fill its container
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const w = Math.round(rect.width);
+    const h = Math.round(rect.height);
+    if (w > 0 && h > 0) {
+      // Use the smaller dimension so the 600x600 viz fits, then scale
+      const fitSize = Math.min(w, h);
+      const scale = fitSize / 600;
+
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+
+      // Center the viz in the canvas
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, w, h);
+
+      // Offset to center the 600*scale region
+      const ox = (w - 600 * scale) / 2;
+      const oy = (h - 600 * scale) / 2;
+      ctx.translate(ox, oy);
+
+      renderViz(ctx, state.nodes, state.conns, state.stars, state.isAI, time, scale, state.t, state.darkMode);
+    }
+
+    state.animId = requestAnimationFrame(frame);
+  }
+
+  state.animId = requestAnimationFrame(frame);
+  return state;
+}
+
+
+// ================================================================
+// UI STATE
+// ================================================================
+let currentMode = 'micro'; // 'micro' | 'macro'
+const cardStates = {}; // { cardId: 'neutral' | 'kept' | 'remix' | 'killed' }
+const cardNotes = {};  // { cardId: string }
+const vizInstances = {};
+
+CARDS.forEach(c => {
+  cardStates[c.id] = 'neutral';
+  cardNotes[c.id] = '';
+});
+
+
+// ================================================================
+// BUILD DOM
+// ================================================================
+function buildCards() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  CARDS.forEach(card => {
+    const el = document.createElement('div');
+    el.className = 'card' + (card.isCurrent ? ' is-current' : '');
+    el.id = 'card-' + card.id;
+    el.dataset.cardId = card.id;
+
+    el.innerHTML = `
+      <div class="card-canvas-wrap">
+        <canvas id="canvas-${card.id}"></canvas>
+      </div>
+      <div class="card-strip">
+        <div class="card-badge">${card.badge}</div>
+        <div class="card-desc">
+          <span class="name">${card.name}</span>
+          <span class="sep"> &mdash; </span>
+          <span class="desc-text">${card.desc}</span>
+        </div>
+        <div class="card-actions">
+          <button class="action-btn keep" title="Keep" onclick="rateCard('${card.id}', 'kept')">+</button>
+          <button class="action-btn remix" title="Remix" onclick="rateCard('${card.id}', 'remix')">\u21BB</button>
+          <button class="action-btn kill" title="Kill" onclick="rateCard('${card.id}', 'killed')">\u00D7</button>
+          <button class="action-btn undo" title="Undo" onclick="rateCard('${card.id}', 'neutral')">undo</button>
+        </div>
+      </div>
+      <div class="card-note-row">
+        <input class="card-note" type="text" placeholder="Note..." id="note-${card.id}" oninput="cardNotes['${card.id}'] = this.value" />
+      </div>
+    `;
+
+    grid.appendChild(el);
+  });
+}
+
+function initAllViz() {
+  CARDS.forEach(card => {
+    const canvas = document.getElementById('canvas-' + card.id);
+    if (canvas) {
+      vizInstances[card.id] = initViz(canvas, card.overrides);
+    }
+  });
+}
+
+
+// ================================================================
+// INTERACTIONS
+// ================================================================
+function rateCard(cardId, state) {
+  // Toggle: clicking same state returns to neutral
+  if (cardStates[cardId] === state && state !== 'neutral') {
+    cardStates[cardId] = 'neutral';
+  } else {
+    cardStates[cardId] = state;
+  }
+  updateCardUI(cardId);
+  updateFeedbackCount();
+}
+
+function updateCardUI(cardId) {
+  const el = document.getElementById('card-' + cardId);
+  if (!el) return;
+  const state = cardStates[cardId];
+
+  // Remove all state classes
+  el.classList.remove('state-kept', 'state-remix', 'state-killed');
+
+  // Add current state class
+  if (state !== 'neutral') {
+    el.classList.add('state-' + state);
+  }
+
+  // Update action button highlighting
+  const keepBtn = el.querySelector('.action-btn.keep');
+  const remixBtn = el.querySelector('.action-btn.remix');
+  const killBtn = el.querySelector('.action-btn.kill');
+
+  keepBtn.classList.toggle('active', state === 'kept');
+  remixBtn.classList.toggle('active', state === 'remix');
+  killBtn.classList.toggle('active', state === 'killed');
+}
+
+function updateFeedbackCount() {
+  const count = Object.values(cardStates).filter(s => s !== 'neutral').length;
+  const btn = document.getElementById('feedbackBtn');
+  btn.textContent = `Feedback (${count})`;
+  btn.classList.toggle('has-ratings', count > 0);
+}
+
+
+// ================================================================
+// MODE TOGGLE
+// ================================================================
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('btnMicro').classList.toggle('active', mode === 'micro');
+  document.getElementById('btnMacro').classList.toggle('active', mode === 'macro');
+  document.getElementById('headerLabel').textContent = mode === 'micro' ? 'Refining:' : 'Exploring:';
+
+  // Update current card appearance
+  const currentCard = document.getElementById('card-current');
+  if (currentCard) {
+    currentCard.classList.toggle('is-reference', mode === 'macro');
+    const badge = currentCard.querySelector('.card-badge');
+    if (badge) badge.textContent = mode === 'macro' ? 'REF' : '\u2605';
+  }
+
+  // Update descriptions
+  CARDS.forEach(card => {
+    const el = document.getElementById('card-' + card.id);
+    if (!el) return;
+    const descEl = el.querySelector('.desc-text');
+    if (descEl) {
+      descEl.textContent = mode === 'macro' ? card.macroDesc : card.desc;
+    }
+  });
+}
+
+
+// ================================================================
+// FEEDBACK PANEL
+// ================================================================
+function toggleFeedback() {
+  const overlay = document.getElementById('feedbackOverlay');
+  const isOpen = overlay.classList.contains('open');
+  if (isOpen) {
+    overlay.classList.remove('open');
+  } else {
+    renderFeedbackPanel();
+    overlay.classList.add('open');
+  }
+}
+
+function renderFeedbackPanel() {
+  const keepEl = document.getElementById('feedKeep');
+  const remixEl = document.getElementById('feedRemix');
+  const killEl = document.getElementById('feedKill');
+
+  const kept = [], remixed = [], killed = [];
+
+  CARDS.forEach(card => {
+    const state = cardStates[card.id];
+    const note = cardNotes[card.id];
+    const item = { card, note };
+    if (state === 'kept') kept.push(item);
+    else if (state === 'remix') remixed.push(item);
+    else if (state === 'killed') killed.push(item);
+  });
+
+  keepEl.innerHTML = kept.length
+    ? kept.map(i => `<div class="feedback-item"><span class="item-name">${i.card.badge === '\u2605' ? 'Current' : i.card.badge} &mdash; "${i.card.name}"</span>${i.note ? `<span class="item-note">&mdash; "${i.note}"</span>` : ''}</div>`).join('')
+    : '<div class="feedback-empty">No keeps yet</div>';
+
+  remixEl.innerHTML = remixed.length
+    ? remixed.map(i => `<div class="feedback-item"><span class="item-name">${i.card.badge === '\u2605' ? 'Current' : i.card.badge} &mdash; "${i.card.name}"</span>${i.note ? `<span class="item-note">&mdash; "${i.note}"</span>` : ''}</div>`).join('')
+    : '<div class="feedback-empty">No remixes yet</div>';
+
+  killEl.innerHTML = killed.length
+    ? killed.map(i => `<div class="feedback-item"><span class="item-name">${i.card.badge === '\u2605' ? 'Current' : i.card.badge} &mdash; "${i.card.name}"</span></div>`).join('')
+    : '<div class="feedback-empty">No kills yet</div>';
+}
+
+function sendToJude() {
+  const kept = [], remixed = [], killed = [];
+
+  CARDS.forEach(card => {
+    const state = cardStates[card.id];
+    const note = cardNotes[card.id];
+    const label = card.badge === '\u2605' ? 'Current' : `${card.badge} \u2014 "${card.name}"`;
+
+    if (state === 'kept') kept.push(label);
+    else if (state === 'remix') {
+      remixed.push(note ? `${label} \u2014 "${note}"` : label);
+    }
+    else if (state === 'killed') killed.push(card.badge === '\u2605' ? 'Current' : card.badge);
+  });
+
+  const lines = [`${currentMode} \u2014 Aura Constellation`];
+  if (kept.length) lines.push(`KEEP: ${kept.join(', ')}`);
+  if (remixed.length) lines.push(`REMIX: ${remixed.join(', ')}`);
+  if (killed.length) lines.push(`KILL: ${killed.join(', ')}`);
+
+  const text = lines.join('\n');
+
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('sendBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Send to Jude';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    // Fallback: select text approach
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const btn = document.getElementById('sendBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Send to Jude';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+
+// ================================================================
+// KEYBOARD SHORTCUTS
+// ================================================================
+document.addEventListener('keydown', (e) => {
+  // Escape closes feedback panel
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('feedbackOverlay');
+    if (overlay.classList.contains('open')) {
+      toggleFeedback();
+    }
+  }
+  // Tab toggles micro/macro
+  if (e.key === 'Tab' && !e.target.closest('input')) {
+    e.preventDefault();
+    setMode(currentMode === 'micro' ? 'macro' : 'micro');
+  }
+});
+
+
+// ================================================================
+// BOOT
+// ================================================================
+buildCards();
+initAllViz();
+</script>
+</body>
+</html>

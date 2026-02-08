@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breath Pattern V3 — The Teaching Champion</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #06060a;
+    overflow-x: hidden;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     BREATH VISUALIZATION CORE
+     ══════════════════════════════════════════════════════════════ */
+
+  .breath-container {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .breath-container.small {
+    width: 100px;
+    height: 100px;
+  }
+
+  .breath-blob svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .breath-glow {
+    position: absolute;
+    width: 140%;
+    height: 140%;
+    filter: blur(40px);
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .breath-core {
+    position: absolute;
+    width: 40%;
+    height: 40%;
+    border-radius: 50%;
+    filter: blur(15px);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     INTERACTIVE HOVER ZONES — Teach on demand
+     ══════════════════════════════════════════════════════════════ */
+
+  .hover-zone {
+    position: absolute;
+    cursor: pointer;
+    z-index: 20;
+    border-radius: 8px;
+    transition: all 0.25s ease;
+  }
+
+  .hover-zone:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .hover-zone:hover .zone-tooltip {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .zone-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    padding: 14px 18px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+    transition: all 0.25s ease;
+    z-index: 100;
+    min-width: 200px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .zone-tooltip .tooltip-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .zone-tooltip .tooltip-icon {
+    font-size: 18px;
+  }
+
+  .zone-tooltip .tooltip-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+  }
+
+  .zone-tooltip .tooltip-percent {
+    font-size: 20px;
+    font-weight: 700;
+    margin-left: auto;
+  }
+
+  .zone-tooltip .tooltip-desc {
+    font-size: 11px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .zone-tooltip .tooltip-mapping {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Edge zone - right side (speed indicator) */
+  .zone-edge {
+    right: -30px;
+    top: 20%;
+    width: 50px;
+    height: 60%;
+  }
+
+  .zone-edge .zone-tooltip {
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%) scale(0.97);
+  }
+
+  .zone-edge:hover .zone-tooltip {
+    transform: translateY(-50%) scale(1);
+  }
+
+  /* Size zone - bottom (expansion) */
+  .zone-size {
+    bottom: -25px;
+    left: 15%;
+    width: 70%;
+    height: 40px;
+  }
+
+  .zone-size .zone-tooltip {
+    top: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px) scale(0.97);
+  }
+
+  .zone-size:hover .zone-tooltip {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+
+  /* Flow zone - center-ish */
+  .zone-flow {
+    top: 10%;
+    left: 10%;
+    width: 80%;
+    height: 50%;
+  }
+
+  .zone-flow .zone-tooltip {
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-4px) scale(0.97);
+  }
+
+  .zone-flow:hover .zone-tooltip {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     COMPARISON OVERLAY — Ghost breath
+     ══════════════════════════════════════════════════════════════ */
+
+  .ghost-breath {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+
+  .ghost-breath.visible {
+    opacity: 1;
+  }
+
+  .ghost-breath svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     MODE SELECTOR TABS
+     ══════════════════════════════════════════════════════════════ */
+
+  .mode-tabs {
+    display: flex;
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 2px;
+  }
+
+  .mode-tab {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.5);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .mode-tab:hover {
+    color: rgba(255,255,255,0.7);
+    background: rgba(255,255,255,0.05);
+  }
+
+  .mode-tab.active {
+    background: rgba(255,255,255,0.1);
+    color: white;
+  }
+
+  .mode-tab.active[data-mode="energy"] { background: rgba(244,114,182,0.2); color: #f472b6; }
+  .mode-tab.active[data-mode="openness"] { background: rgba(96,165,250,0.2); color: #60a5fa; }
+  .mode-tab.active[data-mode="feeling"] { background: rgba(167,139,250,0.2); color: #a78bfa; }
+
+  /* ══════════════════════════════════════════════════════════════
+     TRAIT LEGEND — The Teaching Engine
+     ══════════════════════════════════════════════════════════════ */
+
+  .legend-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    transition: opacity 0.3s ease;
+  }
+
+  .legend-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .legend-item:first-child {
+    padding-top: 0;
+  }
+
+  .legend-item.dimmed {
+    opacity: 0.3;
+  }
+
+  .legend-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 20px;
+    transition: transform 0.3s ease;
+  }
+
+  .legend-item:not(.dimmed) .legend-icon {
+    animation: iconPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes iconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+
+  .legend-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .legend-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+  }
+
+  .legend-trait-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .legend-percent {
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend-descriptor {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 6px;
+  }
+
+  .legend-bar {
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .legend-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+
+  .legend-bar-average {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    left: 50%;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 1px;
+  }
+
+  .legend-mapping {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.35);
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     HOW TO READ GUIDE — Collapsible
+     ══════════════════════════════════════════════════════════════ */
+
+  .guide-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(59, 130, 246, 0.08);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+  }
+
+  .guide-toggle:hover {
+    background: rgba(59, 130, 246, 0.12);
+    color: white;
+  }
+
+  .guide-arrow {
+    transition: transform 0.3s ease;
+  }
+
+  .guide-arrow.open {
+    transform: rotate(180deg);
+  }
+
+  .guide-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
+    opacity: 0;
+  }
+
+  .guide-panel.expanded {
+    max-height: 500px;
+    opacity: 1;
+  }
+
+  .guide-content {
+    padding: 16px 0 0;
+  }
+
+  .guide-section {
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(59, 130, 246, 0.05);
+    margin-bottom: 10px;
+  }
+
+  .guide-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .guide-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #60a5fa;
+    margin-bottom: 8px;
+  }
+
+  .guide-section-content {
+    font-size: 10px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .guide-mapping {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .guide-mapping-item {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    text-align: center;
+  }
+
+  .guide-mapping-visual {
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+
+  .guide-mapping-label {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     COMPARISON TOGGLE
+     ══════════════════════════════════════════════════════════════ */
+
+  .compare-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .compare-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .compare-toggle.active {
+    background: rgba(96, 165, 250, 0.15);
+    color: #60a5fa;
+    border-color: rgba(96, 165, 250, 0.3);
+  }
+
+  .compare-toggle .toggle-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.4;
+    transition: opacity 0.2s ease;
+  }
+
+  .compare-toggle.active .toggle-dot {
+    opacity: 1;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     PERSONALITY INSIGHT — Poetic Summary
+     ══════════════════════════════════════════════════════════════ */
+
+  .personality-insight {
+    text-align: center;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .insight-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 8px;
+  }
+
+  .insight-text {
+    font-size: 13px;
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.75);
+    font-style: italic;
+  }
+
+  .insight-text strong {
+    color: white;
+    font-style: normal;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     PULSE ANIMATION
+     ══════════════════════════════════════════════════════════════ */
+
+  @keyframes pulse-ring {
+    0%, 100% { transform: scale(1); opacity: 0.25; }
+    50% { transform: scale(1.3); opacity: 0; }
+  }
+
+  .pulse-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    animation: pulse-ring 3s ease-out infinite;
+    pointer-events: none;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     TEACHING CALLOUT — Context-aware
+     ══════════════════════════════════════════════════════════════ */
+
+  .teaching-callout {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(167, 139, 250, 0.05));
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .teaching-callout .callout-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .teaching-callout .callout-content {
+    flex: 1;
+  }
+
+  .teaching-callout .callout-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 4px;
+  }
+
+  .teaching-callout .callout-desc {
+    font-size: 11px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .teaching-callout .highlight {
+    color: #60a5fa;
+    font-weight: 500;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLS
+     ══════════════════════════════════════════════════════════════ */
+
+  .control-btn {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+  }
+
+  .control-btn.primary {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .control-btn.primary:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+  }
+
+  .control-btn.secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .control-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  .control-btn:active {
+    transform: scale(0.97);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     SECTION STYLING
+     ══════════════════════════════════════════════════════════════ */
+
+  .section-header {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start p-6 gap-5">
+
+  <!-- Header -->
+  <div class="text-center">
+    <div class="text-xl font-semibold mb-1 text-white">Your Breath Pattern</div>
+    <div class="text-xs text-gray-500 uppercase tracking-widest">V3 — The Teaching Champion</div>
+  </div>
+
+  <!-- Mode Selector -->
+  <div class="mode-tabs" id="mode-tabs">
+    <div class="mode-tab active" data-mode="all" onclick="setViewMode('all')">All</div>
+    <div class="mode-tab" data-mode="energy" onclick="setViewMode('energy')">Energy</div>
+    <div class="mode-tab" data-mode="openness" onclick="setViewMode('openness')">Openness</div>
+    <div class="mode-tab" data-mode="feeling" onclick="setViewMode('feeling')">Feeling</div>
+  </div>
+
+  <!-- Main Visualization -->
+  <div class="relative">
+    <div class="breath-container" id="breath-container">
+      <!-- Glow -->
+      <div class="breath-glow" id="breath-glow"></div>
+
+      <!-- Pulse rings -->
+      <div class="pulse-ring" id="pulse-ring" style="color: #3b82f6;"></div>
+
+      <!-- Ghost breath (comparison) -->
+      <div class="ghost-breath" id="ghost-breath">
+        <svg viewBox="0 0 200 200">
+          <defs>
+            <radialGradient id="ghost-gradient" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stop-color="rgba(148, 163, 184, 0.3)" />
+              <stop offset="100%" stop-color="rgba(148, 163, 184, 0.05)" />
+            </radialGradient>
+          </defs>
+          <path id="ghost-path" fill="url(#ghost-gradient)" stroke="rgba(148, 163, 184, 0.3)" stroke-width="1" stroke-dasharray="4,4" />
+        </svg>
+        <div style="position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 9px; color: rgba(148, 163, 184, 0.5); white-space: nowrap;">Average breath</div>
+      </div>
+
+      <!-- Main Blob -->
+      <div class="breath-blob" style="position: absolute; width: 100%; height: 100%;">
+        <svg viewBox="0 0 200 200" id="breath-svg">
+          <defs>
+            <radialGradient id="blob-gradient" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" id="grad-inner" stop-color="#93c5fd" />
+              <stop offset="40%" id="grad-mid" stop-color="#3b82f6" />
+              <stop offset="100%" id="grad-outer" stop-color="#1e3a8a" stop-opacity="0.9" />
+            </radialGradient>
+            <filter id="blob-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <path id="blob-path" fill="url(#blob-gradient)" filter="url(#blob-glow)" />
+        </svg>
+      </div>
+
+      <!-- Core -->
+      <div class="breath-core" id="breath-core"></div>
+
+      <!-- INTERACTIVE HOVER ZONES -->
+      <!-- Energy zone (right edge - speed) -->
+      <div class="hover-zone zone-edge" id="zone-energy">
+        <div class="zone-tooltip">
+          <div class="tooltip-header">
+            <span class="tooltip-icon">&#9889;</span>
+            <span class="tooltip-title">Energy</span>
+            <span class="tooltip-percent" id="tooltip-energy-pct" style="color: #f472b6;">72%</span>
+          </div>
+          <div class="tooltip-desc" id="tooltip-energy-desc">Your pulse runs quick and vibrant. You bring momentum to everything you touch.</div>
+          <div class="tooltip-mapping">Speed = Energy. Fast pulse = high energy. Slow pulse = calm presence.</div>
+        </div>
+      </div>
+
+      <!-- Openness zone (bottom - size) -->
+      <div class="hover-zone zone-size" id="zone-openness">
+        <div class="zone-tooltip">
+          <div class="tooltip-header">
+            <span class="tooltip-icon">&#127759;</span>
+            <span class="tooltip-title">Openness</span>
+            <span class="tooltip-percent" id="tooltip-openness-pct" style="color: #60a5fa;">85%</span>
+          </div>
+          <div class="tooltip-desc" id="tooltip-openness-desc">You reach toward possibility. Your curiosity expands to embrace new experiences.</div>
+          <div class="tooltip-mapping">Size = Openness. Big expansion = outward-reaching. Small = focused depth.</div>
+        </div>
+      </div>
+
+      <!-- Feeling zone (center - flow) -->
+      <div class="hover-zone zone-flow" id="zone-feeling">
+        <div class="zone-tooltip">
+          <div class="tooltip-header">
+            <span class="tooltip-icon">&#128156;</span>
+            <span class="tooltip-title">Feeling</span>
+            <span class="tooltip-percent" id="tooltip-feeling-pct" style="color: #a78bfa;">65%</span>
+          </div>
+          <div class="tooltip-desc" id="tooltip-feeling-desc">Your movement flows with warmth. You navigate the world through emotional intelligence.</div>
+          <div class="tooltip-mapping">Flow = Feeling. Smooth motion = empathetic. Angular = analytical.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compare Toggle -->
+  <button class="compare-toggle" id="compare-toggle" onclick="toggleComparison()">
+    <span class="toggle-dot"></span>
+    <span id="compare-label">Show Average</span>
+  </button>
+
+  <!-- Teaching Callout -->
+  <div class="teaching-callout w-full max-w-sm" id="teaching-callout">
+    <div class="callout-icon" id="callout-icon">&#128161;</div>
+    <div class="callout-content">
+      <div class="callout-title" id="callout-title">Three Traits, One Breath</div>
+      <div class="callout-desc" id="callout-desc">
+        Your breath encodes <span class="highlight">speed</span> (energy), <span class="highlight">size</span> (openness), and <span class="highlight">flow</span> (feeling).
+        <strong>Hover over any area</strong> to learn what it reveals about you.
+      </div>
+    </div>
+  </div>
+
+  <!-- Trait Legend -->
+  <div class="w-full max-w-sm">
+    <div class="section-header">Your Trait Profile</div>
+    <div class="legend-card">
+      <!-- Energy -->
+      <div class="legend-item" id="legend-energy">
+        <div class="legend-icon" style="background: rgba(244, 114, 182, 0.15);">&#9889;</div>
+        <div class="legend-content">
+          <div class="legend-header">
+            <span class="legend-trait-name" style="color: #f472b6;">Energy</span>
+            <span class="legend-percent" id="legend-energy-pct" style="color: #f472b6;">72%</span>
+          </div>
+          <div class="legend-descriptor" id="legend-energy-desc">Energetic</div>
+          <div class="legend-bar">
+            <div class="legend-bar-average"></div>
+            <div class="legend-bar-fill" id="legend-energy-bar" style="background: #f472b6; width: 72%;"></div>
+          </div>
+          <div class="legend-mapping">Shown as: pulse speed. Fast = high energy, slow = calm presence.</div>
+        </div>
+      </div>
+
+      <!-- Openness -->
+      <div class="legend-item" id="legend-openness">
+        <div class="legend-icon" style="background: rgba(96, 165, 250, 0.15);">&#127759;</div>
+        <div class="legend-content">
+          <div class="legend-header">
+            <span class="legend-trait-name" style="color: #60a5fa;">Openness</span>
+            <span class="legend-percent" id="legend-openness-pct" style="color: #60a5fa;">85%</span>
+          </div>
+          <div class="legend-descriptor" id="legend-openness-desc">Curious</div>
+          <div class="legend-bar">
+            <div class="legend-bar-average"></div>
+            <div class="legend-bar-fill" id="legend-openness-bar" style="background: #60a5fa; width: 85%;"></div>
+          </div>
+          <div class="legend-mapping">Shown as: expansion size. Big reach = outward-focused, small = inward depth.</div>
+        </div>
+      </div>
+
+      <!-- Feeling -->
+      <div class="legend-item" id="legend-feeling">
+        <div class="legend-icon" style="background: rgba(167, 139, 250, 0.15);">&#128156;</div>
+        <div class="legend-content">
+          <div class="legend-header">
+            <span class="legend-trait-name" style="color: #a78bfa;">Feeling</span>
+            <span class="legend-percent" id="legend-feeling-pct" style="color: #a78bfa;">65%</span>
+          </div>
+          <div class="legend-descriptor" id="legend-feeling-desc">Empathetic</div>
+          <div class="legend-bar">
+            <div class="legend-bar-average"></div>
+            <div class="legend-bar-fill" id="legend-feeling-bar" style="background: #a78bfa; width: 65%;"></div>
+          </div>
+          <div class="legend-mapping">Shown as: flow smoothness. Organic = heart-led, angular = mind-led.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How to Read Guide -->
+  <div class="w-full max-w-sm">
+    <button class="guide-toggle" onclick="toggleGuide()">
+      <span>How to Read Your Breath</span>
+      <span class="guide-arrow" id="guide-arrow">▼</span>
+    </button>
+    <div class="guide-panel" id="guide-panel">
+      <div class="guide-content">
+        <div class="guide-section">
+          <div class="guide-section-title">The Three Dimensions</div>
+          <div class="guide-section-content">
+            Your breath pattern encodes three personality traits simultaneously. Each visual property maps to one trait — learn them once, read anyone's breath forever.
+          </div>
+          <div class="guide-mapping">
+            <div class="guide-mapping-item">
+              <div class="guide-mapping-visual" style="color: #f472b6;">⚡</div>
+              <div class="guide-mapping-label">Speed → Energy</div>
+            </div>
+            <div class="guide-mapping-item">
+              <div class="guide-mapping-visual" style="color: #60a5fa;">↔️</div>
+              <div class="guide-mapping-label">Size → Openness</div>
+            </div>
+            <div class="guide-mapping-item">
+              <div class="guide-mapping-visual" style="color: #a78bfa;">〰️</div>
+              <div class="guide-mapping-label">Flow → Feeling</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <div class="guide-section-title">Compare to Average</div>
+          <div class="guide-section-content">
+            Toggle "Show Average" to see how your breath differs from the population midpoint. The dashed outline shows a perfectly neutral breath (all traits at 50%).
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <div class="guide-section-title">Isolate Single Traits</div>
+          <div class="guide-section-content">
+            Use the tabs above to focus on one trait at a time. When isolating, other traits lock to neutral so you can study each dimension independently.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Personality Insight -->
+  <div class="personality-insight w-full max-w-sm" id="personality-insight">
+    <div class="insight-label">What Your Breath Says</div>
+    <p class="insight-text" id="insight-text">
+      You move with <strong>vibrant energy</strong>, reaching <strong>outward toward possibility</strong>, guided by <strong>warmth and intuition</strong>.
+    </p>
+  </div>
+
+  <!-- Controls -->
+  <div class="flex gap-3">
+    <button onclick="shuffle()" class="control-btn primary">Shuffle Profile</button>
+    <button onclick="resetToDefault()" class="control-btn secondary">Reset</button>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// TEAM BREATH V3 — "The Teaching Champion"
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Core state
+let traits = {
+  energy: 72,
+  openness: 85,
+  feeling: 65,
+};
+
+// Average traits for comparison
+const AVERAGE_TRAITS = {
+  energy: 50,
+  openness: 50,
+  feeling: 50,
+};
+
+let viewMode = 'all';
+let showComparison = false;
+let guideExpanded = false;
+let time = 0;
+let animationFrame;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DESCRIPTORS — Words that describe trait levels
+// ═══════════════════════════════════════════════════════════════════════════
+
+const descriptors = {
+  energy: {
+    high: { label: 'Energetic', desc: 'Your pulse runs quick and vibrant. You bring momentum to everything you touch.' },
+    mid: { label: 'Balanced', desc: 'Your energy flows steadily. You can accelerate or calm as needed.' },
+    low: { label: 'Calm', desc: 'Your pulse runs deep and slow. You bring grounding presence to chaos.' }
+  },
+  openness: {
+    high: { label: 'Curious', desc: 'You reach toward possibility. Your curiosity expands to embrace new experiences.' },
+    mid: { label: 'Selective', desc: 'You balance exploration with depth. You choose your expansions carefully.' },
+    low: { label: 'Focused', desc: 'You cultivate depth over breadth. Your attention goes deep, not wide.' }
+  },
+  feeling: {
+    high: { label: 'Empathetic', desc: 'Your movement flows with warmth. You navigate the world through emotional intelligence.' },
+    mid: { label: 'Balanced', desc: 'You blend heart and mind. Neither dominates — both inform your path.' },
+    low: { label: 'Analytical', desc: 'Your movement is precise and clear. You lead with logic and structure.' }
+  }
+};
+
+function getDescriptor(trait, value) {
+  if (value > 65) return descriptors[trait].high;
+  if (value > 35) return descriptors[trait].mid;
+  return descriptors[trait].low;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BREATH PARAMETERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getBreathParams(traitsObj, isolate = null) {
+  const e = isolate === null || isolate === 'energy' ? traitsObj.energy : 50;
+  const o = isolate === null || isolate === 'openness' ? traitsObj.openness : 50;
+  const f = isolate === null || isolate === 'feeling' ? traitsObj.feeling : 50;
+
+  return {
+    speed: 0.3 + (e / 100) * 1.2,
+    amplitude: 0.5 + (o / 100) * 0.5,
+    smoothness: 0.3 + (f / 100) * 0.7,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BLOB GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function generateBlobPath(t, params, scale = 1) {
+  const { speed, amplitude, smoothness } = params;
+  const cx = 100, cy = 100;
+
+  const breathPhase = (Math.sin(t * speed) + 1) / 2;
+  const baseRadius = (45 + breathPhase * 35 * amplitude) * scale;
+
+  const numPoints = 8;
+  const points = [];
+
+  for (let i = 0; i < numPoints; i++) {
+    const angle = (i / numPoints) * Math.PI * 2 - Math.PI / 2;
+
+    const variation = smoothness > 0.5
+      ? Math.sin(t * speed * 0.7 + i * 1.2) * 8 * (1 - smoothness * 0.5)
+      : Math.sin(t * speed * 1.5 + i * 2.1) * 12 * (1 - smoothness);
+
+    const r = baseRadius + variation;
+
+    points.push({
+      x: cx + Math.cos(angle) * r,
+      y: cy + Math.sin(angle) * r
+    });
+  }
+
+  return createSmoothPath(points, smoothness);
+}
+
+function createSmoothPath(points, smoothness) {
+  if (points.length < 3) return '';
+
+  const n = points.length;
+  let path = `M ${points[0].x} ${points[0].y}`;
+
+  const tension = 0.2 + smoothness * 0.25;
+
+  for (let i = 0; i < n; i++) {
+    const p0 = points[(i - 1 + n) % n];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % n];
+    const p3 = points[(i + 2) % n];
+
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+
+  return path + ' Z';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════════════════════════════════
+
+function animate() {
+  time += 0.016;
+
+  const isolate = viewMode === 'all' ? null : viewMode;
+  const params = getBreathParams(traits, isolate);
+
+  // Update main blob
+  const path = generateBlobPath(time, params);
+  document.getElementById('blob-path').setAttribute('d', path);
+
+  // Update ghost blob (comparison)
+  if (showComparison) {
+    const avgParams = getBreathParams(AVERAGE_TRAITS, isolate);
+    const ghostPath = generateBlobPath(time, avgParams);
+    document.getElementById('ghost-path').setAttribute('d', ghostPath);
+  }
+
+  // Update glow
+  const breathPhase = (Math.sin(time * params.speed) + 1) / 2;
+  const glow = document.getElementById('breath-glow');
+  glow.style.background = 'radial-gradient(circle, #3b82f670 0%, transparent 65%)';
+  glow.style.transform = `scale(${0.8 + breathPhase * 0.3})`;
+  glow.style.opacity = 0.4 + breathPhase * 0.3;
+
+  // Update core
+  const core = document.getElementById('breath-core');
+  core.style.background = 'radial-gradient(circle, #dbeafe 0%, #3b82f660 100%)';
+  core.style.transform = `scale(${0.9 + breathPhase * 0.2})`;
+  core.style.opacity = 0.5 + breathPhase * 0.3;
+
+  // Update pulse ring speed
+  const pulseRing = document.getElementById('pulse-ring');
+  const pulseDuration = 4 - (params.speed - 0.3) * 1.5;
+  pulseRing.style.animationDuration = `${Math.max(1.5, pulseDuration)}s`;
+
+  animationFrame = requestAnimationFrame(animate);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIEW MODE
+// ═══════════════════════════════════════════════════════════════════════════
+
+function setViewMode(mode) {
+  viewMode = mode;
+
+  // Update tabs
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.mode === mode);
+  });
+
+  // Dim non-active legend items
+  ['energy', 'openness', 'feeling'].forEach(trait => {
+    const item = document.getElementById(`legend-${trait}`);
+    if (mode === 'all' || mode === trait) {
+      item.classList.remove('dimmed');
+    } else {
+      item.classList.add('dimmed');
+    }
+  });
+
+  // Update teaching callout
+  updateTeachingCallout(mode);
+}
+
+function updateTeachingCallout(mode) {
+  const icon = document.getElementById('callout-icon');
+  const title = document.getElementById('callout-title');
+  const desc = document.getElementById('callout-desc');
+
+  const callouts = {
+    all: {
+      icon: '&#128161;',
+      title: 'Three Traits, One Breath',
+      desc: 'Your breath encodes <span class="highlight">speed</span> (energy), <span class="highlight">size</span> (openness), and <span class="highlight">flow</span> (feeling). <strong>Hover over any area</strong> to learn what it reveals about you.'
+    },
+    energy: {
+      icon: '&#9889;',
+      title: 'Isolating: Energy',
+      desc: 'Watch the <span class="highlight">pulse speed</span>. Your energy is <span class="highlight">' + traits.energy + '%</span> — ' + (traits.energy > 65 ? 'faster than most.' : traits.energy > 35 ? 'balanced and adaptive.' : 'calm and grounding.') + ' Other traits are locked to neutral for comparison.'
+    },
+    openness: {
+      icon: '&#127759;',
+      title: 'Isolating: Openness',
+      desc: 'Watch the <span class="highlight">expansion size</span>. Your openness is <span class="highlight">' + traits.openness + '%</span> — ' + (traits.openness > 65 ? 'reaching wide.' : traits.openness > 35 ? 'selective and intentional.' : 'focused inward.') + ' Other traits are locked to neutral.'
+    },
+    feeling: {
+      icon: '&#128156;',
+      title: 'Isolating: Feeling',
+      desc: 'Watch the <span class="highlight">flow smoothness</span>. Your feeling is <span class="highlight">' + traits.feeling + '%</span> — ' + (traits.feeling > 65 ? 'warm and organic.' : traits.feeling > 35 ? 'a blend of heart and mind.' : 'precise and angular.') + ' Other traits are locked to neutral.'
+    },
+  };
+
+  const c = callouts[mode];
+  icon.innerHTML = c.icon;
+  title.textContent = c.title;
+  desc.innerHTML = c.desc;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPARISON TOGGLE
+// ═══════════════════════════════════════════════════════════════════════════
+
+function toggleComparison() {
+  showComparison = !showComparison;
+
+  const toggle = document.getElementById('compare-toggle');
+  const label = document.getElementById('compare-label');
+  const ghost = document.getElementById('ghost-breath');
+
+  toggle.classList.toggle('active', showComparison);
+  label.textContent = showComparison ? 'Hide Average' : 'Show Average';
+  ghost.classList.toggle('visible', showComparison);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GUIDE TOGGLE
+// ═══════════════════════════════════════════════════════════════════════════
+
+function toggleGuide() {
+  guideExpanded = !guideExpanded;
+
+  const panel = document.getElementById('guide-panel');
+  const arrow = document.getElementById('guide-arrow');
+
+  panel.classList.toggle('expanded', guideExpanded);
+  arrow.classList.toggle('open', guideExpanded);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER UI
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderUI() {
+  // Update legend
+  ['energy', 'openness', 'feeling'].forEach(trait => {
+    const val = traits[trait];
+    const desc = getDescriptor(trait, val);
+
+    document.getElementById(`legend-${trait}-pct`).textContent = val + '%';
+    document.getElementById(`legend-${trait}-desc`).textContent = desc.label;
+    document.getElementById(`legend-${trait}-bar`).style.width = val + '%';
+  });
+
+  // Update hover tooltips
+  ['energy', 'openness', 'feeling'].forEach(trait => {
+    const val = traits[trait];
+    const desc = getDescriptor(trait, val);
+
+    document.getElementById(`tooltip-${trait}-pct`).textContent = val + '%';
+    document.getElementById(`tooltip-${trait}-desc`).textContent = desc.desc;
+  });
+
+  // Update personality insight
+  const e = traits.energy;
+  const o = traits.openness;
+  const f = traits.feeling;
+
+  const energyPhrase = e > 70 ? 'vibrant energy'
+    : e > 50 ? 'steady momentum'
+    : e > 30 ? 'calm presence'
+    : 'grounding stillness';
+
+  const openPhrase = o > 70 ? 'reaching outward toward possibility'
+    : o > 50 ? 'balancing exploration and depth'
+    : o > 30 ? 'cultivating selective depth'
+    : 'anchored in focused attention';
+
+  const feelPhrase = f > 70 ? 'warmth and intuition'
+    : f > 50 ? 'a blend of heart and mind'
+    : f > 30 ? 'thoughtful consideration'
+    : 'clear analytical precision';
+
+  document.getElementById('insight-text').innerHTML =
+    `You move with <strong>${energyPhrase}</strong>, <strong>${openPhrase}</strong>, guided by <strong>${feelPhrase}</strong>.`;
+
+  // Update teaching callout
+  updateTeachingCallout(viewMode);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function shuffle() {
+  const randomTrait = () => {
+    const r = Math.random();
+    if (r < 0.35) return 15 + Math.random() * 25;
+    if (r > 0.65) return 60 + Math.random() * 35;
+    return 35 + Math.random() * 30;
+  };
+
+  traits = {
+    energy: Math.round(randomTrait()),
+    openness: Math.round(randomTrait()),
+    feeling: Math.round(randomTrait()),
+  };
+
+  renderUI();
+}
+
+function resetToDefault() {
+  traits = { energy: 72, openness: 85, feeling: 65 };
+  renderUI();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+renderUI();
+setViewMode('all');
+animate();
+
+// Performance: pause when hidden
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    cancelAnimationFrame(animationFrame);
+  } else {
+    animate();
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura — Screen Atlas (Editorial)</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --sat: 0px; --sar: 0px; --sab: 0px; --sal: 0px; }
+    html, body, #root { margin: 0; padding: 0; height: 100%; width: 100%; }
+    html { scroll-behavior: smooth; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .question-text { font-size: clamp(18px, 5vw, 26px); line-height: 1.35; text-wrap: balance; }
+    @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes shimmer-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+    @keyframes celebrateGlow { 0% { transform: scale(0.8); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+    .celebrate-glow { animation: celebrateGlow 0.6s ease-out forwards; }
+    .shine-card { position: relative; }
+    .shine-card::before {
+      content: ''; position: absolute; inset: -1px; border-radius: inherit;
+      background: linear-gradient(180deg, var(--accent-bright, rgba(255,255,255,0.5)) 0%, var(--accent-color, rgba(255,255,255,0.2)) 5%, transparent 15%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude;
+      padding: 2px; pointer-events: none; z-index: 20; opacity: 0; transition: opacity 0.3s ease;
+    }
+    .shine-card:hover::before { opacity: 1; animation: shimmer-pulse 3s ease-in-out infinite; }
+    .shine-violet { --accent-color: rgba(139, 92, 246, 0.25); --accent-bright: rgba(196, 181, 253, 0.55); }
+    .shine-blue { --accent-color: rgba(59, 130, 246, 0.3); --accent-bright: rgba(147, 197, 253, 0.6); }
+    .shine-amber { --accent-color: rgba(251, 191, 36, 0.2); --accent-bright: rgba(253, 224, 71, 0.45); }
+    .shine-teal { --accent-color: rgba(45, 212, 191, 0.2); --accent-bright: rgba(153, 246, 228, 0.5); }
+    .shine-emerald { --accent-color: rgba(16, 185, 129, 0.25); --accent-bright: rgba(110, 231, 183, 0.55); }
+    .shine-rose { --accent-color: rgba(244, 63, 94, 0.25); --accent-bright: rgba(251, 113, 133, 0.55); }
+    .shine-gray { --accent-color: rgba(156, 163, 175, 0.2); --accent-bright: rgba(209, 213, 219, 0.45); }
+    .glow-amber { box-shadow: 0 0 15px rgba(251, 191, 36, 0.12), 0 0 35px rgba(251, 191, 36, 0.08); }
+    .glow-violet { box-shadow: 0 0 18px rgba(139, 92, 246, 0.2), 0 0 40px rgba(139, 92, 246, 0.12); }
+    .glow-teal { box-shadow: 0 0 18px rgba(45, 212, 191, 0.16), 0 0 40px rgba(45, 212, 191, 0.1); }
+    .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2), 0 0 45px rgba(59, 130, 246, 0.12); }
+    .glow-emerald { box-shadow: 0 0 18px rgba(16, 185, 129, 0.16), 0 0 40px rgba(16, 185, 129, 0.1); }
+    .glow-rose { box-shadow: 0 0 18px rgba(244, 63, 94, 0.16), 0 0 40px rgba(244, 63, 94, 0.1); }
+    .starry-bg { background: linear-gradient(135deg, rgba(30, 20, 10, 0.9) 0%, rgba(50, 30, 15, 0.8) 100%); position: relative; }
+    .starry-bg::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: radial-gradient(1px 1px at 20px 30px, white, transparent),
+        radial-gradient(1px 1px at 40px 70px, rgba(255,255,255,0.8), transparent),
+        radial-gradient(1px 1px at 90px 40px, rgba(255,255,255,0.7), transparent),
+        radial-gradient(1px 1px at 130px 55px, white, transparent);
+      opacity: 0.7; border-radius: inherit;
+    }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .scroll-mt-24 { scroll-margin-top: 6rem; }
+    ::selection { background: rgba(139, 92, 246, 0.3); }
+    .atlas-card { cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .atlas-card:hover { transform: translateY(-4px); }
+    .device-frame { background: #1a1a1c; padding: 12px; border-radius: 55px; filter: drop-shadow(0 25px 50px rgba(0,0,0,0.4)); }
+    .device-frame .side-btn-1 { position: absolute; left: -3px; top: 100px; width: 3px; height: 28px; background: #2a2a2c; border-radius: 2px 0 0 2px; }
+    .device-frame .side-btn-2 { position: absolute; left: -3px; top: 145px; width: 3px; height: 50px; background: #2a2a2c; border-radius: 2px 0 0 2px; }
+    .device-frame .side-btn-3 { position: absolute; left: -3px; top: 205px; width: 3px; height: 50px; background: #2a2a2c; border-radius: 2px 0 0 2px; }
+    .device-frame .side-btn-4 { position: absolute; right: -3px; top: 160px; width: 3px; height: 65px; background: #2a2a2c; border-radius: 0 2px 2px 0; }
+    /* Light mode warm paper palette */
+    .light-paper { background: #faf8f5; }
+    .light-card { background: #fff; border: 1px solid #e8e2d9; }
+    .light-card-hover:hover { border-color: #d4cdc3; box-shadow: 0 8px 32px rgba(120, 100, 70, 0.08); }
+  </style>
+</head>
+<body class="bg-gray-950">
+  <div id="root"></div>
+  <script>
+const _warn = console.warn;
+console.warn = (...args) => { if (typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return; _warn.apply(console, args); };
+  </script>
+  <script type="text/babel">
+const { useState, useCallback, useEffect, useRef } = React;
+
+// ==================== TOKENS ====================
+const PROGRESS_GRADIENTS = {
+  violet:  { from: '#8b5cf6', to: '#a78bfa' },
+  blue:    { from: '#3b82f6', to: '#60a5fa' },
+  teal:    { from: '#14b8a6', to: '#2dd4bf' },
+  rose:    { from: '#f43f5e', to: '#fb7185' },
+  emerald: { from: '#10b981', to: '#34d399' },
+  amber:   { from: '#f59e0b', to: '#fbbf24' },
+  indigo:  { from: '#6366f1', to: '#818cf8' },
+  gray:    { from: '#6b7280', to: '#9ca3af' },
+  cyan:    { from: '#06b6d4', to: '#67e8f9' },
+};
+
+// Theme helper — light mode uses warm paper tones
+const TH = (token, dark) => ({
+  'text-primary':   dark ? 'text-white' : 'text-stone-900',
+  'text-secondary':  dark ? 'text-gray-300' : 'text-stone-700',
+  'text-muted':     dark ? 'text-gray-400' : 'text-stone-500',
+  'text-subtle':    dark ? 'text-gray-500' : 'text-stone-400',
+  'text-faint':     dark ? 'text-gray-600' : 'text-stone-400',
+  'bg-main':        dark ? 'bg-gray-950' : 'bg-[#faf8f5]',
+  'bg-card':        dark ? 'bg-gray-900 border border-gray-800' : 'bg-white border border-stone-200',
+  'bg-surface':     dark ? 'bg-gray-900' : 'bg-white',
+  'border-base':    dark ? 'border-gray-800' : 'border-stone-200',
+  'text-violet':    dark ? 'text-violet-400' : 'text-violet-600',
+  'text-dim':       dark ? 'text-gray-400' : 'text-stone-500',
+  'text-bright':    dark ? 'text-gray-100' : 'text-stone-900',
+  'chip-violet':    dark ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700',
+}[token] || '');
+
+// ==================== SVG STATUS BAR ICONS ====================
+const StatusBarIcons = ({ dark, scale = 1 }) => {
+  const c = dark ? '#fff' : '#1c1917';
+  const s = 15 * scale;
+  return (
+    <div style={{ display: 'flex', gap: 5 * scale, alignItems: 'center' }}>
+      {/* Signal bars */}
+      <svg width={s} height={s} viewBox="0 0 18 18" fill="none">
+        <rect x="1" y="13" width="3" height="4" rx="0.5" fill={c}/>
+        <rect x="5.5" y="10" width="3" height="7" rx="0.5" fill={c}/>
+        <rect x="10" y="6" width="3" height="11" rx="0.5" fill={c}/>
+        <rect x="14.5" y="1" width="3" height="16" rx="0.5" fill={c} opacity="0.35"/>
+      </svg>
+      {/* WiFi */}
+      <svg width={s} height={s} viewBox="0 0 18 18" fill="none">
+        <path d="M9 14.5a1.2 1.2 0 100-2.4 1.2 1.2 0 000 2.4z" fill={c}/>
+        <path d="M5.8 10.8a4.5 4.5 0 016.4 0" stroke={c} strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M3 7.8a8 8 0 0112 0" stroke={c} strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+      {/* Battery */}
+      <svg width={Math.round(s * 1.6)} height={s} viewBox="0 0 28 18" fill="none">
+        <rect x="1" y="3.5" width="22" height="11" rx="2.5" stroke={c} strokeWidth="1.2"/>
+        <rect x="3" y="5.5" width="17" height="7" rx="1" fill={c}/>
+        <path d="M24.5 7.5v3a1.5 1.5 0 000-3z" fill={c} opacity="0.4"/>
+      </svg>
+    </div>
+  );
+};
+
+// ==================== PHONE FRAME (Dynamic Island) ====================
+const PhoneFrame = ({ children, darkMode, scale = 1, screenBg }) => {
+  const w = Math.round(393 * scale);
+  const h = Math.round(852 * scale);
+  const br = Math.round(44 * scale);
+  const diW = Math.round(126 * scale);
+  const diH = Math.round(37 * scale);
+  const diTop = Math.round(12 * scale);
+  const sbH = Math.round(54 * scale);
+  const hiW = Math.round(134 * scale);
+  // Dynamic Island area bg matches screen bg, not black
+  const diBg = screenBg || (darkMode ? '#030712' : '#faf8f5');
+  return (
+    <div style={{ width: w, height: h, borderRadius: br, overflow: 'hidden', position: 'relative', flexShrink: 0, background: '#000' }}>
+      {/* Screen bg fill behind Dynamic Island area */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: sbH + 4 * scale, background: diBg, zIndex: 1 }} />
+      {/* Dynamic Island pill */}
+      <div style={{ position: 'absolute', top: diTop, left: '50%', transform: 'translateX(-50%)',
+                     width: diW, height: diH, background: '#000', borderRadius: 9999, zIndex: 35 }} />
+      {/* Status bar */}
+      <div style={{ height: sbH, padding: `0 ${Math.round(28 * scale)}px ${Math.round(6 * scale)}px`,
+                     display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+                     fontSize: Math.round(14 * scale), fontWeight: 600, position: 'relative', zIndex: 20,
+                     color: darkMode ? '#fff' : '#1c1917' }}>
+        <span>9:41</span>
+        <StatusBarIcons dark={darkMode} scale={scale} />
+      </div>
+      {/* Content */}
+      <div style={{ height: h - sbH, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+        {children}
+      </div>
+      {/* Home indicator */}
+      <div style={{ position: 'absolute', bottom: Math.round(8 * scale), left: '50%', transform: 'translateX(-50%)',
+                     width: hiW, height: Math.round(5 * scale), borderRadius: 9999, zIndex: 20, opacity: 0.5,
+                     background: darkMode ? '#fff' : '#1c1917' }} />
+    </div>
+  );
+};
+
+// ==================== SCREEN COMPONENTS ====================
+const ScreenWelcome = ({ darkMode }) => (
+  <div className="flex-1 flex flex-col items-center justify-center p-6" style={{ backgroundColor: darkMode ? '#030712' : '#faf8f5' }}>
+    <div className="text-5xl mb-5">&#x1F300;</div>
+    <h1 className="text-2xl font-bold mb-2" style={{ color: darkMode ? '#fff' : '#1c1917' }}>Aura</h1>
+    <p className="text-sm mb-10 text-center" style={{ color: darkMode ? '#9ca3af' : '#78716c' }}>Discover yourself, one question at a time</p>
+    <div className="w-full max-w-[260px] space-y-3">
+      <div className={`w-full py-3.5 rounded-xl font-semibold text-base text-center ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'}`}>Let's Go</div>
+    </div>
+    <div className="mt-6 text-xs" style={{ color: darkMode ? '#6b7280' : '#a8a29e' }}>Sign In</div>
+  </div>
+);
+
+const ScreenSignIn = ({ darkMode }) => (
+  <div className="flex-1 flex flex-col items-center justify-center p-6" style={{ backgroundColor: darkMode ? '#030712' : '#faf8f5' }}>
+    <div className="text-4xl mb-3">&#x1F511;</div>
+    <h1 className="text-xl font-bold mb-5" style={{ color: darkMode ? '#fff' : '#1c1917' }}>Sign In</h1>
+    <div className="w-full max-w-[260px] space-y-2.5">
+      <div className={`w-full px-3.5 py-2.5 rounded-xl text-sm ${darkMode ? 'bg-gray-800 text-gray-500' : 'bg-stone-100 text-stone-400'}`}>Email</div>
+      <div className={`w-full px-3.5 py-2.5 rounded-xl text-sm ${darkMode ? 'bg-gray-800 text-gray-500' : 'bg-stone-100 text-stone-400'}`}>PIN (4+ digits)</div>
+      <div className={`w-full py-2.5 rounded-xl font-medium text-sm text-center ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'}`}>Sign In</div>
+      <div className={`text-xs text-center pt-1 ${darkMode ? 'text-gray-600' : 'text-stone-400'}`}>
+        Don't have an account? <span className={darkMode ? 'text-violet-400' : 'text-violet-500'}>Create one</span>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenOnboarding = ({ darkMode }) => {
+  const vs = darkMode ? ['#5b21b6', '#7c3aed'] : ['#ddd6fe', '#c4b5fd'];
+  return (
+    <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-[#faf8f5]'}`}>
+      <div className="flex items-center justify-between px-4 pt-3 pb-1">
+        <span className="text-xl">&#x1F300;</span>
+        <span className={`text-lg ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>&#9776;</span>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-5">
+        <div className={`text-xs font-medium mb-4 ${darkMode ? 'text-gray-400' : 'text-stone-500'}`}>3 of 10</div>
+        <h2 className={`question-text text-center font-medium mb-6 ${TH('text-primary', darkMode)}`}>Is a hot dog a sandwich?</h2>
+        <div className="w-full max-w-[240px] space-y-2.5">
+          <div className="rounded-xl py-3.5 text-center font-bold text-white text-base"
+               style={{ background: `linear-gradient(135deg, ${vs[0]}, ${vs[1]})` }}>Yes, obviously</div>
+          <div className={`rounded-xl py-3.5 text-center font-bold text-base ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-stone-600 border-2 border-stone-200'}`}>No way</div>
+        </div>
+        <div className="flex gap-1 mt-6">
+          {[...Array(10)].map((_, i) => (
+            <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < 3 ? 'bg-violet-500' : i === 3 ? 'bg-violet-400' : darkMode ? 'bg-gray-700' : 'bg-stone-300'}`} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenPathChoice = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-[#faf8f5]'}`}>
+    <div className="flex items-center justify-between px-4 pt-3 pb-1">
+      <span className="text-xl">&#x1F300;</span>
+      <span className={`text-lg ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>&#9776;</span>
+    </div>
+    <div className="flex-1 flex flex-col items-center justify-center px-5">
+      <div className="text-center mb-6">
+        <div className="text-4xl mb-3">&#127881;</div>
+        <h1 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-stone-900'}`}>Nice! 10 down</h1>
+        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-stone-500'}`}>You're on a roll. What next?</p>
+      </div>
+      <div className="w-full max-w-[280px] space-y-3">
+        <div className={`w-full p-4 rounded-2xl shine-card shine-violet glow-violet border ${
+          darkMode ? 'border-violet-500/40 bg-gradient-to-r from-violet-900/40 to-violet-950/60' : 'border-violet-300 bg-gradient-to-r from-violet-100 to-violet-50'}`}>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">&#x1FA9E;</span>
+            <div className="flex-1 min-w-0">
+              <div className={`text-base font-semibold truncate ${darkMode ? 'text-white' : 'text-stone-900'}`}>Learn About Yourself</div>
+              <div className={`text-xs truncate ${darkMode ? 'text-violet-400/80' : 'text-violet-600'}`}>Take a quick personality quiz</div>
+            </div>
+            <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>&rarr;</span>
+          </div>
+        </div>
+        <div className={`w-full p-4 rounded-2xl shine-card shine-teal glow-teal border ${
+          darkMode ? 'border-teal-500/40 bg-gradient-to-r from-teal-900/40 to-teal-950/60' : 'border-teal-300 bg-gradient-to-r from-teal-100 to-teal-50'}`}>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">&#x1F9ED;</span>
+            <div className="flex-1 min-w-0">
+              <div className={`text-base font-semibold truncate ${darkMode ? 'text-white' : 'text-stone-900'}`}>Explore Topics</div>
+              <div className={`text-xs truncate ${darkMode ? 'text-teal-400/80' : 'text-teal-600'}`}>Answer questions about things you care about</div>
+            </div>
+            <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>&rarr;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenCategories = ({ darkMode }) => {
+  const cats = [
+    { icon: '\u2600\uFE0F', name: 'Predict', sub: 'What will happen?', cls: 'shine-amber glow-amber', dark: 'starry-bg border-amber-500/40', light: 'bg-gradient-to-r from-amber-100 to-yellow-50 border-amber-400', accent: darkMode ? 'text-amber-400/80' : 'text-amber-600', featured: true },
+    { icon: '\uD83E\uDDE0', name: 'Think', sub: 'Logic & analysis', cls: 'shine-violet glow-violet', dark: 'border-violet-500/40 bg-gradient-to-r from-violet-900/30 to-violet-950/50', light: 'border-violet-400 bg-gradient-to-r from-violet-100 to-violet-50', accent: darkMode ? 'text-violet-400/80' : 'text-violet-600' },
+    { icon: '\u2696\uFE0F', name: 'Judge', sub: 'Ethics & opinions', cls: 'shine-emerald glow-emerald', dark: 'border-emerald-500/40 bg-gradient-to-r from-emerald-900/30 to-emerald-950/50', light: 'border-emerald-400 bg-gradient-to-r from-emerald-100 to-emerald-50', accent: darkMode ? 'text-emerald-400/80' : 'text-emerald-600' },
+    { icon: '\u2728', name: 'Surprise me', sub: 'Something unexpected', cls: 'shine-rose glow-rose', dark: 'border-rose-500/40 bg-gradient-to-r from-rose-900/30 to-rose-950/50', light: 'border-rose-400 bg-gradient-to-r from-rose-100 to-rose-50', accent: darkMode ? 'text-rose-400/80' : 'text-rose-500' },
+  ];
+  return (
+    <div className={`flex-1 flex flex-col relative ${TH('bg-main', darkMode)}`}>
+      <div className="flex items-center justify-between px-4 pt-3 pb-1">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">&#x1F300;</span>
+          <span className={`text-xs font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Lv.3</span>
+          <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>145 XP</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-orange-400 font-medium">&#x1F525;5</span>
+          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-white/15 to-white/5 flex items-center justify-center text-xs"
+            style={{ border: '1.5px solid rgba(255,255,255,0.3)' }}>&#x1F464;</div>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 pt-1 pb-6 space-y-3 hide-scrollbar">
+        <div className={`w-full rounded-xl p-3 text-center shine-card shine-blue glow-blue ${
+          darkMode ? 'bg-gradient-to-br from-blue-900/60 to-blue-950/80 border border-blue-500/40' : 'bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-200'}`}>
+          <div className={`font-medium text-xs mb-1 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>&#x1F300; Question of the Day</div>
+          <p className={`text-sm font-semibold leading-snug ${TH('text-primary', darkMode)}`}>Should AI systems be required to identify themselves?</p>
+        </div>
+        <h1 className={`text-2xl font-bold text-center ${TH('text-primary', darkMode)}`}>What's on your mind?</h1>
+        <div className="space-y-2.5">
+          {cats.map((cat, i) => (
+            <div key={i} className={`w-full ${cat.featured ? 'py-4' : 'py-3'} px-4 rounded-2xl text-left shine-card ${cat.cls} border overflow-hidden ${darkMode ? cat.dark : cat.light}`}>
+              <div className="flex items-center gap-3 relative z-10">
+                <span className={cat.featured ? 'text-2xl' : 'text-xl'}>{cat.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <div className={`${cat.featured ? 'text-lg' : 'text-base'} font-semibold truncate ${TH('text-primary', darkMode)}`}>{cat.name}</div>
+                  <div className={`text-xs truncate ${cat.accent}`}>{cat.sub}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenBinaryQuestion = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+    <div className={`flex items-center justify-between px-3 py-1.5 ${darkMode ? 'border-b border-white/5' : 'border-b border-stone-200/50'}`}>
+      <span className="text-lg">&#x1F300;</span>
+      <span className={`text-xs ${TH('text-muted', darkMode)}`}>42 answered</span>
+      <span className={`text-lg ${TH('text-muted', darkMode)}`}>&#9776;</span>
+    </div>
+    <div className="flex-1 flex flex-col justify-center px-4 space-y-3">
+      <div className="space-y-1.5 glow-amber p-3 rounded-2xl">
+        <div className="flex justify-center">
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${darkMode ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>\u2600\uFE0F Predictions</span>
+        </div>
+        <h2 className={`question-text text-center font-medium ${TH('text-primary', darkMode)}`}>Will humans live on Mars by 2050?</h2>
+      </div>
+      <div className="flex items-center gap-2 px-3">
+        <div className="flex-1 h-[50px] rounded-xl font-bold flex items-center justify-center"
+             style={{ background: 'linear-gradient(135deg, #047857, #10b981)', boxShadow: '0 0 16px rgba(16,185,129,0.35)', color: 'white' }}>
+          <span className="text-xl font-bold">YES</span><span className="text-xs ml-1 opacity-70">&#9733;&#9733;</span>
+        </div>
+        <div className="w-9 flex-shrink-0 flex flex-col items-center gap-0.5">
+          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-stone-200 text-stone-500'}`}>&#10005;</div>
+          <div className="w-8 h-8 rounded-full bg-emerald-500 text-white shadow flex items-center justify-center text-sm">&#10003;</div>
+        </div>
+        <div className={`flex-1 h-[50px] rounded-xl font-bold flex items-center justify-center ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-rose-600 border-2 border-rose-200'}`}>
+          <span className="text-xl font-bold">NO</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenMCQuestion = ({ darkMode }) => {
+  const colors = [
+    { hex: '#3b82f6', sh: ['#93c5fd','#60a5fa','#3b82f6','#2563eb'], rgb: '59,130,246' },
+    { hex: '#8b5cf6', sh: ['#c4b5fd','#a78bfa','#8b5cf6','#7c3aed'], rgb: '139,92,246' },
+    { hex: '#14b8a6', sh: ['#5eead4','#2dd4bf','#14b8a6','#0d9488'], rgb: '20,184,166' },
+    { hex: '#06b6d4', sh: ['#67e8f9','#22d3ee','#06b6d4','#0891b2'], rgb: '6,182,212' },
+  ];
+  const opts = ['Utilitarianism vs duty', 'Action vs inaction', 'Individual vs collective', 'Moral intuition vs logic'];
+  const sel = 1; const tc = 2;
+  return (
+    <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 ${darkMode ? 'border-b border-white/5' : 'border-b border-stone-200/50'}`}>
+        <span className="text-lg">&#x1F300;</span>
+        <span className={`text-xs ${TH('text-muted', darkMode)}`}>42 answered</span>
+        <span className={`text-lg ${TH('text-muted', darkMode)}`}>&#9776;</span>
+      </div>
+      <div className="flex-1 flex flex-col justify-center px-4 space-y-3">
+        <div className="glow-violet p-3 rounded-2xl">
+          <div className="flex justify-center mb-1">
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700'}`}>&#x1F9E0; Reasoning</span>
+          </div>
+          <h2 className={`question-text text-center font-medium ${TH('text-primary', darkMode)}`}>The trolley problem is fundamentally about...</h2>
+        </div>
+        <div className="px-2 space-y-1">
+          {opts.map((opt, i) => {
+            const c = colors[i]; const isSel = i === sel;
+            const st = isSel
+              ? { background: `linear-gradient(135deg, ${c.sh[tc-1]}, ${c.sh[Math.min(tc,3)]})`, boxShadow: `0 0 ${tc*6}px rgba(${c.rgb},${0.2+tc*0.12})`, color: 'white', border: `2px solid ${c.hex}` }
+              : { background: darkMode ? 'rgb(31,41,55)' : '#fff', color: darkMode ? '#d1d5db' : '#44403c', border: darkMode ? '2px solid transparent' : '2px solid #e7e5e4' };
+            return (
+              <div key={i} className="flex items-center gap-1">
+                <div className="flex-1 h-[36px] px-2.5 rounded-lg text-sm flex items-center min-w-0" style={st}>
+                  <span className="font-medium mr-1 opacity-60 flex-shrink-0">{String.fromCharCode(65+i)}.</span>
+                  <span className="truncate">{opt}</span>
+                  {isSel && <span className="ml-auto flex-shrink-0 text-xs font-bold bg-white/30 w-4 h-4 rounded-full flex items-center justify-center">{tc}</span>}
+                </div>
+                <div className="w-8 h-[36px] flex-shrink-0 flex flex-col items-center justify-center">
+                  {isSel && <>
+                    <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-stone-200 text-stone-500'}`}>&#10005;</div>
+                    <div className="w-6 h-6 rounded-full text-white shadow flex items-center justify-center text-xs" style={{ backgroundColor: c.hex }}>&#10003;</div>
+                  </>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenResults = ({ darkMode }) => {
+  const rows = [
+    { label: 'Yes', pct: '69%', widths: [38,28,18,8], colors: ['#10b981','#34d399','#6ee7b7','#a7f3d0'], isUser: true },
+    { label: 'No', pct: '31%', widths: [15,12,8,5], colors: ['#f43f5e','#fb7185','#fda4af','#fecaca'], isUser: false },
+  ];
+  const mx = 38;
+  const Bar = ({ row, tall }) => {
+    const segs = row.widths.map((w,i) => ({ w: (w/mx)*100, c: row.colors[i] })).filter(s => s.w > 0);
+    const tw = segs.reduce((a,s) => a + s.w, 0);
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className={`text-xs w-7 font-semibold ${row.isUser ? 'font-bold' : ''}`} style={{ color: row.colors[0] }}>{row.label}</span>
+        <span className="text-xs w-6" style={{ color: row.colors[0] }}>{row.pct}</span>
+        <div className={`flex-1 ${tall ? 'h-4' : 'h-2'} rounded-full overflow-hidden ${darkMode ? 'bg-black' : 'bg-stone-200'}`}>
+          <div className="h-full flex">
+            {segs.map((s,i) => <div key={i} className={`h-full ${i===0 ? 'rounded-l-full' : ''} ${i===segs.length-1 && tw >= 100 ? 'rounded-r-full' : ''}`} style={{ width: `${s.w}%`, backgroundColor: s.c }} />)}
+            {tw < 100 && <div className="h-full rounded-r-full" style={{ width: `${100-tw}%`, border: `1px solid ${row.colors[3]}`, borderLeft: 'none' }} />}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  return (
+    <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 ${darkMode ? 'border-b border-white/5' : 'border-b border-stone-200/50'}`}>
+        <span className="text-lg">&#x1F300;</span>
+        <span className={`text-xs ${TH('text-muted', darkMode)}`}>43 answered</span>
+        <span className={`text-lg ${TH('text-muted', darkMode)}`}>&#9776;</span>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+        <div className={`px-3 py-2 rounded-lg ${darkMode ? 'bg-gray-900/80' : 'bg-white border border-stone-200'}`}>
+          <div className={`text-xs font-medium mb-1 truncate ${TH('text-secondary', darkMode)}`}>Will humans live on Mars by 2050?</div>
+          <div className="space-y-1">{rows.map((r,i) => <Bar key={i} row={r} tall={false} />)}</div>
+          <div className={`text-[10px] text-right mt-1 ${TH('text-faint', darkMode)}`}>1,847 responses &rarr;</div>
+        </div>
+        <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-900' : 'bg-white border border-stone-200'}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`text-xs font-black uppercase tracking-wide ${darkMode ? 'text-sky-300' : 'text-sky-500'}`}>LAST:</span>
+            <span className={`text-[10px] ${TH('text-subtle', darkMode)}`}>1,847 responses</span>
+          </div>
+          <p className={`text-xs font-medium mb-2 truncate ${TH('text-bright', darkMode)}`}>Will humans live on Mars by 2050?</p>
+          <div className="space-y-1">{rows.map((r,i) => <Bar key={i} row={r} tall={true} />)}</div>
+          <div className={`text-[10px] text-center mt-1.5 ${TH('text-faint', darkMode)}`}>1,847 responses &middot; Demo data</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenSettings = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col overflow-hidden ${TH('bg-main', darkMode)}`}>
+    <div className={`flex items-center justify-between px-3 py-2 border-b ${TH('border-base', darkMode)}`}>
+      <span className={`text-xs ${TH('text-violet', darkMode)}`}>&larr; Back</span>
+      <h1 className={`font-semibold text-sm ${TH('text-primary', darkMode)}`}>Settings</h1>
+      <div className="w-10" />
+    </div>
+    <div className="flex-1 overflow-y-auto p-3 space-y-2 hide-scrollbar">
+      <div className={`rounded-lg p-2.5 ${darkMode ? 'bg-gray-900' : 'bg-white border border-stone-200'}`}>
+        <div className="flex items-center justify-between">
+          <div className={`text-xs font-medium ${TH('text-primary', darkMode)}`}>Theme</div>
+          <div className={`relative w-10 h-5 rounded-full ${darkMode ? 'bg-violet-600' : 'bg-stone-200'}`}>
+            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow text-[10px] flex items-center justify-center ${darkMode ? 'translate-x-5' : 'translate-x-0.5'}`}>{darkMode ? '\uD83C\uDF19' : '\u2600\uFE0F'}</div>
+          </div>
+        </div>
+      </div>
+      {[{ l: 'Require Submit', s: 'Off = auto-submit', on: true },{ l: 'Show Tips', s: 'Gesture hints', on: true },{ l: 'Streak Counter', s: 'Show during play', on: true },{ l: 'Demo Profiles', s: 'Sample data', on: false }].map((it, i) => (
+        <div key={i} className={`rounded-lg p-2.5 ${darkMode ? 'bg-gray-900' : 'bg-white border border-stone-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1 mr-2">
+              <div className={`text-xs font-medium truncate ${TH('text-primary', darkMode)}`}>{it.l}</div>
+              <div className={`text-[10px] truncate ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>{it.s}</div>
+            </div>
+            <div className={`relative w-10 h-5 rounded-full flex-shrink-0 ${it.on ? 'bg-violet-600' : darkMode ? 'bg-gray-600' : 'bg-stone-200'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow ${it.on ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className={`rounded-lg p-2.5 ${darkMode ? 'bg-gray-900/50 border border-gray-800' : 'bg-white border border-stone-200'}`}>
+        <div className={`text-xs font-medium mb-1.5 ${TH('text-dim', darkMode)}`}>Shortcuts</div>
+        <div className={`text-[10px] space-y-0.5 ${darkMode ? 'text-gray-500' : 'text-stone-500'}`}>
+          <div className="flex justify-between"><span>Yes / A</span><span className="font-mono">Y / 1</span></div>
+          <div className="flex justify-between"><span>No / B-E</span><span className="font-mono">N / 2-5</span></div>
+          <div className="flex justify-between"><span>Next</span><span className="font-mono">&rarr; / Space</span></div>
+        </div>
+      </div>
+      <div className={`rounded-lg p-2.5 ${darkMode ? 'bg-gray-900' : 'bg-white border border-stone-200'}`}>
+        <div className={`text-xs font-medium mb-1.5 ${TH('text-primary', darkMode)}`}>Your Data</div>
+        <div className="flex gap-1.5">
+          <div className={`flex-1 py-1.5 rounded text-[10px] font-medium text-center ${darkMode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>Export</div>
+          <div className={`flex-1 py-1.5 rounded text-[10px] font-medium text-center ${darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>Import</div>
+        </div>
+      </div>
+      <div className={`text-[10px] text-center ${TH('text-faint', darkMode)}`}>Aura Player vR-Data</div>
+    </div>
+  </div>
+);
+
+// Shared ProgressCircle
+const Circle = ({ progress, size, sw, color, children, id, darkMode = true }) => {
+  const r = (size - sw) / 2;
+  const circ = 2 * Math.PI * r;
+  const grad = PROGRESS_GRADIENTS[color] || PROGRESS_GRADIENTS.violet;
+  const gId = id || `c-${size}-${color}-${progress}`;
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="absolute">
+        <defs><linearGradient id={gId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={progress > 0 ? grad.from : (darkMode ? '#374151' : '#d6d3d1')} />
+          <stop offset="100%" stopColor={progress > 0 ? grad.to : (darkMode ? '#4b5563' : '#a8a29e')} />
+        </linearGradient></defs>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={darkMode ? '#1f2937' : '#e7e5e4'} strokeWidth={sw} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={`url(#${gId})`} strokeWidth={sw} strokeLinecap="round"
+          strokeDasharray={circ} strokeDashoffset={circ * (1 - progress / 100)}
+          transform={`rotate(-90 ${size/2} ${size/2})`} />
+      </svg>
+      <span className="relative z-10">{children}</span>
+    </div>
+  );
+};
+
+const ScreenAssessments = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+    <div className={`h-[40px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+      <span className={darkMode ? 'text-gray-400' : 'text-stone-500'}>&larr;</span>
+      <span className="text-lg">&#x1FA9E;</span>
+      <span className={`font-semibold text-sm flex-1 truncate ${TH('text-primary', darkMode)}`}>Reveal</span>
+      <span className="px-2 py-1 rounded-full text-[10px] font-medium bg-violet-600 text-white">Analysis</span>
+    </div>
+    <div className="flex-1 overflow-auto p-3 pb-20 hide-scrollbar space-y-2.5">
+      <div className={`w-full p-3 rounded-xl ${TH('bg-card', darkMode)} flex items-center gap-3`}>
+        <Circle progress={40} size={44} sw={3} color="blue" id="pk-qp" darkMode={darkMode}>
+          <span className="text-xs font-medium" style={{ color: PROGRESS_GRADIENTS.blue.to }}>10</span>
+        </Circle>
+        <div className="flex-1 min-w-0">
+          <div className={`font-semibold text-sm truncate ${TH('text-primary', darkMode)}`}>Quick Profile</div>
+          <div className={`text-[10px] ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>40% done</div>
+        </div>
+        <span className={`text-[10px] font-medium px-2 py-1 rounded-full ${darkMode ? 'bg-blue-600/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>Continue</span>
+      </div>
+      <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)}`}>
+        <div className="w-full p-3 flex items-center gap-2">
+          <Circle progress={33} size={40} sw={3} color="indigo" id="pk-st" darkMode={darkMode}>
+            <span className="text-[10px] font-medium" style={{ color: PROGRESS_GRADIENTS.indigo.to }}>2</span>
+          </Circle>
+          <div className="flex-1 min-w-0">
+            <div className={`font-semibold text-sm truncate ${TH('text-primary', darkMode)}`}>Starter Pack</div>
+            <div className={`text-[10px] ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>2 left</div>
+          </div>
+          <div className="flex gap-0.5">
+            {[['\uD83C\uDFAD',100],['\uD83D\uDD25',62],['\uD83D\uDCA1',0]].map(([ic,p],j) => (
+              <Circle key={j} progress={p} size={22} sw={2} color="indigo" id={`mr-${j}`} darkMode={darkMode}>
+                <span className="text-[8px]">{ic}</span>
+              </Circle>
+            ))}
+          </div>
+        </div>
+        <div className={`divide-y ${darkMode ? 'divide-gray-800/50' : 'divide-stone-200'} border-t ${darkMode ? 'border-gray-800/50' : 'border-stone-200'}`}>
+          <div className="px-3 py-1.5 flex items-center gap-2">
+            <span className="text-xs">&#x1F3AD;</span>
+            <span className={`text-[10px] truncate flex-1 ${TH('text-secondary', darkMode)}`}>Personality</span>
+            <div className="w-16 h-1.5 rounded-full" style={{ background: `linear-gradient(to right, ${PROGRESS_GRADIENTS.indigo.from}, ${PROGRESS_GRADIENTS.indigo.to})` }}>
+              <div className="relative"><div className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white" style={{ left: '65%', marginLeft: -4, boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }} /></div>
+            </div>
+          </div>
+          <div className="px-3 py-1.5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs">&#x1F525;</span>
+              <span className={`text-[10px] truncate flex-1 ${TH('text-primary', darkMode)}`}>Motivation</span>
+              <span className={`text-[9px] ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>5/8</span>
+            </div>
+            <div className="h-1.5 rounded-full relative" style={{ background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}>
+              <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: '62.5%', background: `linear-gradient(to right, ${PROGRESS_GRADIENTS.indigo.from}, ${PROGRESS_GRADIENTS.indigo.to})` }} />
+            </div>
+          </div>
+          <div className="px-3 py-1.5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs">&#x1F4A1;</span>
+              <span className={`text-[10px] truncate flex-1 ${TH('text-primary', darkMode)}`}>Thinking Style</span>
+              <span className={`text-[9px] ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>0/8</span>
+            </div>
+            <div className="h-1.5 rounded-full" style={{ background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }} />
+          </div>
+        </div>
+      </div>
+      <div className={`w-full p-3 rounded-xl ${TH('bg-card', darkMode)} flex items-center gap-3 opacity-60`}>
+        <Circle progress={0} size={44} sw={3} color="violet" id="pk-dp" darkMode={darkMode}>
+          <span className="text-xs font-medium" style={{ color: darkMode ? '#6b7280' : '#a8a29e' }}>40</span>
+        </Circle>
+        <div className="flex-1 min-w-0">
+          <div className={`font-semibold text-sm truncate ${TH('text-primary', darkMode)}`}>Personality Deep</div>
+          <div className={`text-[10px] ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>40 questions</div>
+        </div>
+        <span className={`text-[10px] font-medium px-2 py-1 rounded-full ${darkMode ? 'bg-violet-600/20 text-violet-400' : 'bg-violet-100 text-violet-600'}`}>Start</span>
+      </div>
+      <div className={`text-[9px] font-medium uppercase tracking-wide px-1 ${TH('text-dim', darkMode)}`}>Completed</div>
+      <div className={`rounded-xl ${TH('bg-card', darkMode)} px-3 py-2 flex items-center gap-2`}>
+        <Circle progress={100} size={28} sw={2} color="emerald" id="pk-ch" darkMode={darkMode}>
+          <span className="text-[9px]">&#x1F6E1;</span>
+        </Circle>
+        <span className={`flex-1 text-xs font-medium truncate ${TH('text-primary', darkMode)}`}>Character</span>
+        <span className={`text-[10px] ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>View &rarr;</span>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenAssessmentTaking = ({ darkMode }) => {
+  const labels = ['Not like me','A little unlike me','Neutral','A little like me','Very like me'];
+  const selV = 4;
+  const segs = Array.from({length:10},(_,i) => i < 3 ? 'done' : i === 3 ? 'cur' : 'todo');
+  return (
+    <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+      <div className={`h-[40px] flex-shrink-0 flex items-center gap-1.5 px-2.5 border-b ${TH('border-base', darkMode)}`}>
+        <span className={`text-[10px] font-semibold ${darkMode ? 'text-gray-300' : 'text-stone-600'}`}>Save</span>
+        <span className={`text-lg w-6 h-6 flex items-center justify-center ${darkMode ? 'text-gray-300' : 'text-stone-600'}`}>&#9664;</span>
+        <div className="flex-1 text-center">
+          <div className={`text-[9px] ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Quick Profile</div>
+          <div className={`text-xs font-medium ${TH('text-primary', darkMode)}`}>4 / 10</div>
+        </div>
+        <span className={`text-lg w-6 h-6 flex items-center justify-center ${darkMode ? 'text-gray-300' : 'text-stone-600'}`}>&#9654;</span>
+        <span className={`text-[10px] font-semibold ${darkMode ? 'text-gray-300' : 'text-stone-600'}`}>Exit</span>
+      </div>
+      <div className={`flex h-2 gap-px px-1 py-0.5 ${darkMode ? 'bg-gray-900' : 'bg-stone-100'}`}>
+        {segs.map((s,i) => <div key={i} className={`flex-1 rounded-sm ${s==='done' ? 'bg-blue-500' : s==='cur' ? (darkMode ? 'bg-white' : 'bg-stone-900') : (darkMode ? 'bg-gray-800' : 'bg-stone-300')}`} />)}
+      </div>
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex items-center justify-center px-3">
+          <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-900 border border-gray-800' : 'bg-white border border-stone-200'}`}>
+            <h2 className={`text-lg font-medium text-center leading-relaxed ${TH('text-primary', darkMode)}`}>I enjoy being the center of attention</h2>
+          </div>
+        </div>
+        <div className="flex-shrink-0 px-3 pb-3 space-y-1.5">
+          {labels.map((l, i) => {
+            const v = i + 1; const isSel = v === selV;
+            return (
+              <div key={v} className={`w-full py-2.5 px-3 rounded-xl flex items-center justify-between border text-sm ${
+                isSel ? `bg-blue-600 border-blue-400 text-white ring-2 ring-blue-400 ring-offset-1 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-[#faf8f5]'}`
+                : `${darkMode ? 'bg-gray-800/50 border-gray-700 text-gray-200' : 'bg-stone-50 border-stone-200 text-stone-700'}`
+              }`}>
+                <span className="truncate">{l}</span>
+                <span className={`text-xs flex-shrink-0 ml-2 ${isSel ? 'text-white/70' : (darkMode ? 'text-blue-400/50' : 'text-blue-500/50')}`}>{v}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenAssessmentResults = ({ darkMode }) => {
+  const grad = PROGRESS_GRADIENTS.violet;
+  const traits = [
+    { name: 'Extraversion', low: 'Reserved', high: 'Outgoing', score: 35 },
+    { name: 'Agreeableness', low: 'Analytical', high: 'Empathetic', score: 72 },
+    { name: 'Conscientiousness', low: 'Flexible', high: 'Organized', score: 58 },
+    { name: 'Neuroticism', low: 'Calm', high: 'Sensitive', score: 45 },
+    { name: 'Openness', low: 'Practical', high: 'Curious', score: 81 },
+  ];
+  return (
+    <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+      <div className={`h-[40px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+        <span className={darkMode ? 'text-gray-400' : 'text-stone-500'}>&larr;</span>
+        <span className={`font-semibold text-sm flex-1 text-center truncate ${TH('text-primary', darkMode)}`}>Quick Profile</span>
+        <div className="w-4" />
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 hide-scrollbar">
+        <div className={`rounded-xl overflow-hidden ${darkMode ? 'bg-gray-900/80 border border-gray-800' : 'bg-white border border-stone-200'}`}>
+          <div className="p-4 bg-gradient-to-br from-violet-600 to-violet-400 text-center">
+            <span className="text-3xl">&#9889;</span>
+            <h2 className="text-white text-lg font-bold mt-1">Quick Profile Complete</h2>
+            <p className="text-white/70 text-[10px] mt-0.5">Based on 10 responses</p>
+          </div>
+          <div className="p-3 space-y-3">
+            <div className="text-center">
+              <div className="relative w-20 h-20 mx-auto">
+                <svg className="w-20 h-20 transform -rotate-90">
+                  <circle cx="40" cy="40" r="32" stroke={darkMode ? '#374151' : '#e7e5e4'} strokeWidth="7" fill="none" />
+                  <circle cx="40" cy="40" r="32" stroke="url(#sGr)" strokeWidth="7" fill="none" strokeLinecap="round"
+                    strokeDasharray={`${(65/100)*201} 201`} />
+                  <defs><linearGradient id="sGr" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#8b5cf6"/><stop offset="100%" stopColor="#a78bfa"/>
+                  </linearGradient></defs>
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={`text-xl font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>65%</span>
+                </div>
+              </div>
+            </div>
+            {traits.map((t,i) => (
+              <div key={i} className="py-0.5">
+                <div className={`text-[10px] font-medium mb-0.5 ${darkMode ? 'text-gray-300' : 'text-stone-700'}`}>{t.name}</div>
+                <div className="flex justify-between text-[9px] mb-0.5">
+                  <span className={darkMode ? 'text-gray-500' : 'text-stone-500'}>{t.low}</span>
+                  <span className={darkMode ? 'text-gray-500' : 'text-stone-500'}>{t.high}</span>
+                </div>
+                <div className="h-2.5 rounded-full relative" style={{ background: `linear-gradient(to right, ${grad.from}, ${grad.to})` }}>
+                  <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white"
+                    style={{ left: `${Math.max(5,Math.min(95,t.score))}%`, marginLeft: -6, boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }} />
+                </div>
+              </div>
+            ))}
+            {[['&#x1F4AA;','Strength','Deep thinker who recharges through reflection'],['&#x1F311;','Shadow','Networking and small talk can feel draining'],['&#x1F4A1;','Growth','Prepare conversation starters before events']].map(([em,lab,txt],i) => (
+              <div key={i} className="flex gap-2">
+                <span className="text-sm" dangerouslySetInnerHTML={{__html:em}} />
+                <div className="flex-1 min-w-0">
+                  <div className={`text-[9px] font-medium uppercase tracking-wide ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{lab}</div>
+                  <p className={`text-[10px] mt-0.5 truncate ${darkMode ? 'text-gray-300' : 'text-stone-600'}`}>{txt}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenSaveModal = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+    <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: darkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.1)' }}>
+      <div className={`w-full max-w-[260px] rounded-2xl p-5 ${darkMode ? 'bg-gray-900' : 'bg-white shadow-2xl'}`}>
+        <div className="text-3xl text-center mb-2">&#127881;</div>
+        <h2 className={`text-lg font-bold text-center mb-1 ${darkMode ? 'text-white' : 'text-stone-900'}`}>20 responses!</h2>
+        <p className={`text-xs text-center mb-4 ${darkMode ? 'text-gray-400' : 'text-stone-500'}`}>Save your progress?<br/>Sync across devices.</p>
+        <div className="space-y-1.5">
+          <div className={`w-full py-2.5 rounded-xl font-medium text-sm text-center ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'}`}>Create Account</div>
+          <div className={`w-full py-2.5 rounded-xl font-medium text-sm text-center ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-stone-100 text-stone-600'}`}>Later</div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenLevelUp = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+    <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: darkMode ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.1)' }}>
+      <div className={`w-full max-w-[260px] rounded-2xl p-6 text-center ${darkMode ? 'bg-gray-900' : 'bg-white shadow-2xl'}`}>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center justify-center"><div className="w-28 h-28 rounded-full bg-gradient-to-br from-violet-500/20 to-amber-500/20 animate-pulse" /></div>
+          <div className="relative z-10 text-5xl mb-3 celebrate-glow">&#127881;</div>
+        </div>
+        <h2 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-stone-900'}`}>Level Up!</h2>
+        <div className={`text-4xl font-bold mb-1 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>5</div>
+        <p className={`text-base font-medium mb-4 ${darkMode ? 'text-violet-300' : 'text-violet-500'}`}>Thinker</p>
+        <div className={`w-full py-2.5 rounded-xl font-medium text-sm ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'}`}>Continue</div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenProfile = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col overflow-hidden ${darkMode ? 'text-white bg-gray-950' : 'text-stone-900 bg-[#faf8f5]'}`}>
+    <div className={`h-[40px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+      <span className={darkMode ? 'text-gray-400' : 'text-stone-500'}>&larr;</span>
+      <span className="font-medium text-sm flex-1">Profile</span>
+    </div>
+    <div className="flex-1 p-3 overflow-y-auto space-y-3 hide-scrollbar">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center font-bold text-sm text-white"
+          style={{ boxShadow: '0 0 20px 6px rgba(139,92,246,0.3)', border: '2px solid rgba(139,92,246,0.5)' }}>P</div>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold text-sm truncate">philip@aura.app</h2>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={`text-[10px] ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Lv.3</span>
+            <span className="text-[10px] text-orange-400">&#x1F525;5</span>
+            <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>145 XP</span>
+          </div>
+        </div>
+      </div>
+      <div className={`w-full rounded-xl overflow-hidden ${darkMode ? 'bg-gradient-to-br from-violet-950/50 to-indigo-950/60 border border-violet-700/40' : 'bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200'}`}>
+        <div className="flex items-stretch min-h-[80px]">
+          <div className={`w-[80px] flex-shrink-0 flex items-center justify-center ${darkMode ? 'bg-gray-950/40' : 'bg-white/50'}`}>
+            <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.4), transparent)', boxShadow: '0 0 30px rgba(139,92,246,0.3)' }}>
+              <span className="text-2xl">&#x1F300;</span>
+            </div>
+          </div>
+          <div className="flex-1 py-2 px-3 flex flex-col justify-center min-w-0">
+            <div className={`font-semibold text-xs truncate ${darkMode ? 'text-white' : 'text-stone-900'}`}>The Quiet Strategist</div>
+            <p className={`text-[10px] truncate ${darkMode ? 'text-gray-400' : 'text-stone-600'}`}>Thoughtful planner, big picture</p>
+            <div className="flex items-center gap-1 mt-1">
+              {[1,2,3,4].map(s => <div key={s} className={`w-1.5 h-1.5 rounded-full ${s <= 2 ? (darkMode ? 'bg-violet-400' : 'bg-violet-500') : (darkMode ? 'bg-gray-700' : 'bg-stone-300')}`} />)}
+              <span className={`text-[9px] ml-0.5 ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>Stage 2</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className={`rounded-xl p-3 ${darkMode ? 'bg-gray-900/40 border border-gray-800/40' : 'bg-white border border-stone-200'}`}>
+        <div className={`text-[9px] font-semibold uppercase tracking-wide mb-2 ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>Activity</div>
+        <div className="grid grid-cols-3 gap-3">
+          {[['42','Answered'],['2.8','Avg Conf'],['3','Assess.']].map(([v,l],i) => (
+            <div key={i} className="text-center">
+              <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-stone-900'}`}>{v}</div>
+              <div className={`text-[9px] ${darkMode ? 'text-gray-500' : 'text-stone-500'}`}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className={`rounded-xl p-3 text-center ${darkMode ? 'bg-emerald-950/30 border border-emerald-800/30' : 'bg-emerald-50 border border-emerald-200'}`}>
+          <span className="text-xl">&#x1F9E9;</span>
+          <div className={`text-[10px] font-medium mt-0.5 ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>Assessments</div>
+        </div>
+        <div className={`rounded-xl p-3 text-center opacity-50 ${darkMode ? 'bg-gray-900/30 border border-gray-800/30' : 'bg-stone-100 border border-stone-200'}`}>
+          <span className="text-xl grayscale">&#x1F4CA;</span>
+          <div className={`text-[10px] font-medium mt-0.5 ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>History</div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenQotD = ({ darkMode }) => (
+  <div className="flex-1 flex flex-col overflow-hidden relative" style={{
+    background: darkMode
+      ? 'radial-gradient(ellipse at center top, rgba(59,130,246,0.25) 0%, transparent 60%), #030712'
+      : 'radial-gradient(ellipse at center top, rgba(59,130,246,0.15) 0%, transparent 60%), #faf8f5'
+  }}>
+    <div className={`h-[32px] flex-shrink-0 flex items-center gap-2 px-3 ${darkMode ? 'bg-gray-900/50' : 'bg-white/80 border-b border-stone-200'}`}>
+      <span className={`text-lg w-6 text-center ${darkMode ? 'text-gray-300' : 'text-stone-600'}`}>&#9664;</span>
+      <div className={`flex-1 h-1.5 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-stone-300'}`} />
+      <span className={`text-lg w-6 text-center ${darkMode ? 'text-gray-300' : 'text-stone-600'}`}>&#9654;</span>
+    </div>
+    <div className={`h-[24px] flex items-center justify-center gap-1.5 ${darkMode ? 'bg-blue-900/20' : 'bg-blue-50'}`}>
+      <span className="text-[10px]">\u2600\uFE0F</span>
+      <span className={`text-[10px] font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Question of the Day</span>
+      <span className={`text-[9px] ${darkMode ? 'text-gray-500' : 'text-stone-500'}`}>Day 12</span>
+      <span className="text-amber-500 text-[10px] font-medium">+25</span>
+    </div>
+    <div className="flex-1 flex flex-col justify-center px-4 pb-2">
+      <div className="glow-blue p-3 rounded-2xl">
+        <h2 className={`question-text text-center font-medium ${TH('text-primary', darkMode)}`}>Should AI systems be required to identify themselves?</h2>
+      </div>
+    </div>
+    <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-800 bg-gray-950/80' : 'border-stone-200 bg-white/80'}`}>
+      <div className="px-3 pt-2 pb-1">
+        <div className="flex items-center gap-2">
+          <div className={`flex-1 h-[48px] rounded-xl font-bold flex items-center justify-center ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-emerald-600 border-2 border-emerald-200'}`}>
+            <span className="text-lg font-bold">YES</span>
+          </div>
+          <div className="w-9" />
+          <div className={`flex-1 h-[48px] rounded-xl font-bold flex items-center justify-center ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-rose-600 border-2 border-rose-200'}`}>
+            <span className="text-lg font-bold">NO</span>
+          </div>
+        </div>
+      </div>
+      <div className="h-[34px]" />
+    </div>
+  </div>
+);
+
+// ==================== SCREEN REGISTRY ====================
+const SCREENS = [
+  { id: 'welcome', name: 'Welcome', section: 'Auth', component: ScreenWelcome, hero: false, order: 1, screenBg: null,
+    caption: 'First impression. Brand mark + single CTA. Zero friction entry point.',
+    components: ['Logo', 'CTA Button', 'Text Link'] },
+  { id: 'signin', name: 'Sign In', section: 'Auth', component: ScreenSignIn, hero: false, order: 2, screenBg: null,
+    caption: 'Minimal auth form. Email + PIN keeps it lightweight.',
+    components: ['Input Field x2', 'CTA Button', 'Text Link'] },
+  { id: 'onboarding', name: 'Calibration', section: 'Onboarding', component: ScreenOnboarding, hero: false, order: 1,
+    caption: 'Binary questions calibrate thinking style. Progress dots build momentum.',
+    components: ['Progress Counter', 'Question Text', 'Binary Buttons', 'Progress Dots'] },
+  { id: 'path-choice', name: 'Path Choice', section: 'Onboarding', component: ScreenPathChoice, hero: true, order: 2,
+    caption: 'The fork in the road. Personality assessment vs. topic exploration.',
+    components: ['Celebration Header', 'ShineCard x2', 'Glow Effects'] },
+  { id: 'categories', name: 'Categories', section: 'Main', component: ScreenCategories, hero: true, order: 1,
+    caption: 'Home screen. QOTD banner + category cards with color identities.',
+    components: ['Header Bar', 'QOTD Banner', 'Category Cards x4', 'XP Badge', 'Streak'] },
+  { id: 'profile', name: 'Profile', section: 'Main', component: ScreenProfile, hero: false, order: 2,
+    caption: 'Player identity. Aura glow avatar, personality card, activity stats.',
+    components: ['Aura Avatar', 'Personality Card', 'Stats Grid', 'Quick Actions'] },
+  { id: 'qotd', name: 'Question of the Day', section: 'Main', component: ScreenQotD, hero: false, order: 3,
+    caption: 'Time-limited daily question with blue radial glow and bonus XP.',
+    components: ['Progress Bar', 'QotD Badge', 'Question Text', 'Binary Buttons'] },
+  { id: 'binary-question', name: 'Binary Question', section: 'Questions', component: ScreenBinaryQuestion, hero: true, order: 1,
+    caption: 'Core loop. YES/NO with confidence taps. Inline confirm/cancel.',
+    components: ['NavBar', 'Category Chip', 'Question Text', 'Binary Buttons', 'Confirm/Cancel'] },
+  { id: 'mc-question', name: 'Multiple Choice', section: 'Questions', component: ScreenMCQuestion, hero: false, order: 2,
+    caption: 'Four color-coded options. Tap count shows conviction level.',
+    components: ['NavBar', 'Category Chip', 'MC Buttons x4', 'Tap Counter'] },
+  { id: 'results', name: 'Results Panel', section: 'Questions', component: ScreenResults, hero: false, order: 3,
+    caption: 'Confidence-segmented result bars. Compact + expanded views.',
+    components: ['NavBar', 'Mini Results', 'Full Panel', 'Segmented Bars'] },
+  { id: 'settings', name: 'Settings', section: 'Settings', component: ScreenSettings, hero: false, order: 1,
+    caption: 'Dense settings. Theme toggle, feature toggles, shortcuts, data mgmt.',
+    components: ['Toggle x5', 'Shortcuts', 'Action Buttons'] },
+  { id: 'assessments', name: 'Assessment Hub', section: 'Assessments', component: ScreenAssessments, hero: true, order: 1,
+    caption: 'Assessment picker with progress rings and expandable multi-test packs.',
+    components: ['Progress Circles', 'Expandable Cards', 'Spectrum Bars', 'Mini Rings'] },
+  { id: 'assess-taking', name: 'Taking Assessment', section: 'Assessments', component: ScreenAssessmentTaking, hero: false, order: 2,
+    caption: 'Likert scale (1-5) with segmented progress bar. Save/Exit nav.',
+    components: ['Assessment Nav', 'Segmented Progress', 'Likert Scale x5'] },
+  { id: 'assess-results', name: 'Assessment Results', section: 'Assessments', component: ScreenAssessmentResults, hero: false, order: 3,
+    caption: 'Score gauge, Big Five spectrums, insight cards with emoji labels.',
+    components: ['Score Gauge', 'Trait Spectrum x5', 'Insight Rows x3'] },
+  { id: 'save-modal', name: 'Save Progress', section: 'Modals', component: ScreenSaveModal, hero: false, order: 1,
+    caption: 'Triggered at 20 responses. Account creation nudge.',
+    components: ['Overlay', 'Modal Card', 'CTA Button', 'Dismiss'] },
+  { id: 'level-up', name: 'Level Up', section: 'Modals', component: ScreenLevelUp, hero: false, order: 2,
+    caption: 'Reward moment. Pulsing glow ring, level number, title reveal.',
+    components: ['Overlay', 'Glow Ring', 'Level Number', 'Pulse Animation'] },
+];
+
+const SECTION_META = {
+  Auth:        { color: 'violet', accent: '#8b5cf6', accentLight: '#a78bfa', accentDim: 'rgba(139,92,246,0.15)', borderAccent: 'rgba(139,92,246,0.3)', icon: '\uD83D\uDD10', title: 'Authentication', subtitle: 'First Contact', blurb: 'The gateway. Two screens handle the entire auth flow with a PIN-based system that prioritizes speed over ceremony.' },
+  Onboarding:  { color: 'teal', accent: '#14b8a6', accentLight: '#2dd4bf', accentDim: 'rgba(20,184,166,0.15)', borderAccent: 'rgba(20,184,166,0.3)', icon: '\uD83E\uDDED', title: 'Onboarding', subtitle: 'Calibration Phase', blurb: 'Ten quick binary questions calibrate the user\'s thinking style. The path choice is the first real decision point.' },
+  Main:        { color: 'blue', accent: '#3b82f6', accentLight: '#60a5fa', accentDim: 'rgba(59,130,246,0.15)', borderAccent: 'rgba(59,130,246,0.3)', icon: '\uD83C\uDFE0', title: 'Main Experience', subtitle: 'The Living Room', blurb: 'Where users spend most time. Categories hub, profile, and daily questions. Five topic verticals with distinct color identities.' },
+  Questions:   { color: 'amber', accent: '#f59e0b', accentLight: '#fbbf24', accentDim: 'rgba(245,158,11,0.15)', borderAccent: 'rgba(245,158,11,0.3)', icon: '\uD83D\uDCAC', title: 'Question Flow', subtitle: 'The Core Loop', blurb: 'Binary and multiple-choice questions with a confidence mechanic. Results show community opinion through segmented bars.' },
+  Settings:    { color: 'gray', accent: '#6b7280', accentLight: '#9ca3af', accentDim: 'rgba(107,114,128,0.15)', borderAccent: 'rgba(107,114,128,0.3)', icon: '\u2699\uFE0F', title: 'Settings', subtitle: 'Under the Hood', blurb: 'Power user territory. Theme toggle, undo delay, feature flags, keyboard shortcuts, and data management.' },
+  Assessments: { color: 'emerald', accent: '#10b981', accentLight: '#34d399', accentDim: 'rgba(16,185,129,0.15)', borderAccent: 'rgba(16,185,129,0.3)', icon: '\uD83E\uDE9E', title: 'Assessments', subtitle: 'Self-Discovery', blurb: 'Structured personality tests with progress tracking. Hub shows tests with rings; taking mode uses Likert scale; results display Big Five spectrums.' },
+  Modals:      { color: 'rose', accent: '#f43f5e', accentLight: '#fb7185', accentDim: 'rgba(244,63,94,0.15)', borderAccent: 'rgba(244,63,94,0.3)', icon: '\uD83C\uDF89', title: 'Modals & Moments', subtitle: 'Reward Beats', blurb: 'Interruption moments done right. Save progress nudge at 20 responses, level-up celebration with animated glow.' },
+};
+const SECTIONS_ORDERED = ['Auth', 'Onboarding', 'Main', 'Questions', 'Assessments', 'Settings', 'Modals'];
+
+// ==================== PHONE PREVIEW (Thumbnail) ====================
+const PhonePreview = ({ screen, darkMode, scale = 0.55, onClick }) => {
+  const ScreenComp = screen.component;
+  const screenBg = darkMode ? '#030712' : '#faf8f5';
+  return (
+    <div className="atlas-card" onClick={onClick} style={{ display: 'inline-block' }}>
+      <PhoneFrame darkMode={darkMode} scale={scale} screenBg={screenBg}>
+        <ScreenComp darkMode={darkMode} />
+      </PhoneFrame>
+    </div>
+  );
+};
+
+// ==================== EXPANDED VIEW ====================
+const ExpandedView = ({ screen, darkMode, onClose, onNav }) => {
+  const meta = SECTION_META[screen.section];
+  const sScreens = SCREENS.filter(s => s.section === screen.section).sort((a,b) => a.order - b.order);
+  const ci = sScreens.findIndex(s => s.id === screen.id);
+  useEffect(() => {
+    const h = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && ci > 0) onNav(sScreens[ci - 1]);
+      if (e.key === 'ArrowRight' && ci < sScreens.length - 1) onNav(sScreens[ci + 1]);
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [screen.id]);
+  const screenBg = darkMode ? '#030712' : '#faf8f5';
+  const NavBtn = ({ dir, enabled, onClick: oc }) => (
+    <button onClick={oc} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-colors ${enabled ? (darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-stone-200 text-stone-600 hover:bg-stone-300') : 'opacity-20 cursor-default'}`}>
+      {dir === 'l' ? '\u2190' : '\u2192'}
+    </button>
+  );
+  return (
+    <div className="fixed inset-0 z-[200] flex" onClick={onClose}>
+      <div className={`absolute inset-0 ${darkMode ? 'bg-black/80' : 'bg-black/40'} backdrop-blur-sm`} />
+      <div className="relative z-10 flex w-full h-full items-center justify-center p-6" onClick={e => e.stopPropagation()}>
+        <div className={`flex gap-8 max-w-[1100px] w-full max-h-[90vh] ${darkMode ? 'text-white' : 'text-stone-900'}`}>
+          <div className="flex flex-col items-center flex-shrink-0">
+            <div className="flex items-center gap-4 mb-3">
+              <NavBtn dir="l" enabled={ci > 0} onClick={() => ci > 0 && onNav(sScreens[ci-1])} />
+              <span className="text-sm font-mono" style={{ color: meta.accent }}>{screen.order} / {sScreens.length}</span>
+              <NavBtn dir="r" enabled={ci < sScreens.length-1} onClick={() => ci < sScreens.length-1 && onNav(sScreens[ci+1])} />
+            </div>
+            <div className="device-frame relative" style={{ width: 417, borderRadius: 55 }}>
+              <div className="side-btn-1" /><div className="side-btn-2" /><div className="side-btn-3" /><div className="side-btn-4" />
+              <PhoneFrame darkMode={darkMode} scale={1} screenBg={screenBg}>
+                {React.createElement(screen.component, { darkMode })}
+              </PhoneFrame>
+            </div>
+            <div className="text-[10px] mt-2 opacity-40 font-mono">&larr; &rarr; navigate &middot; ESC close</div>
+          </div>
+          <div className={`flex-1 overflow-y-auto rounded-2xl p-6 hide-scrollbar ${darkMode ? 'bg-gray-900/90 border border-gray-800' : 'bg-[#faf8f5]/95 border border-stone-200'}`}>
+            <button onClick={onClose} className={`absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-xl z-20 ${darkMode ? 'bg-gray-800 text-gray-400 hover:text-white' : 'bg-stone-200 text-stone-500 hover:bg-stone-300'}`}>&#10005;</button>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-lg">{meta.icon}</span>
+              <span className="text-xs font-bold uppercase tracking-widest" style={{ color: meta.accent }}>{screen.section}</span>
+            </div>
+            <h2 className="text-3xl font-bold mb-3" style={{ fontFamily: "'Georgia', serif" }}>{screen.name}</h2>
+            <p className={`text-base leading-relaxed mb-6 ${darkMode ? 'text-gray-400' : 'text-stone-600'}`}>{screen.caption}</p>
+            <div className="h-px mb-6" style={{ background: `linear-gradient(to right, ${meta.accent}, transparent)` }} />
+            <div className="mb-6">
+              <h3 className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>Components Used</h3>
+              <div className="flex flex-wrap gap-2">
+                {screen.components.map((c, i) => (
+                  <span key={i} className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                    style={{ background: meta.accentDim, color: meta.accentLight, border: `1px solid ${meta.borderAccent}` }}>{c}</span>
+                ))}
+              </div>
+            </div>
+            <div className="mb-6">
+              <h3 className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>Flow Position</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                {sScreens.map((s, i) => (
+                  <React.Fragment key={s.id}>
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer ${
+                      s.id === screen.id ? 'ring-2 ring-offset-2 ' + (darkMode ? 'ring-offset-gray-900' : 'ring-offset-[#faf8f5]') : 'opacity-50 hover:opacity-80'
+                    }`} style={{ background: s.id === screen.id ? meta.accentDim : (darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
+                      color: s.id === screen.id ? meta.accentLight : (darkMode ? '#9ca3af' : '#78716c'), ringColor: meta.accent }}
+                      onClick={() => onNav(s)}>
+                      <span className="font-bold">{i+1}</span><span className="hidden sm:inline">{s.name}</span>
+                    </div>
+                    {i < sScreens.length - 1 && <svg width="20" height="8" className="opacity-30 flex-shrink-0"><path d="M0 4 L16 4 M12 1 L16 4 L12 7" fill="none" stroke={meta.accent} strokeWidth="1.5" /></svg>}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+            <div className={`grid grid-cols-2 gap-3 p-4 rounded-xl ${darkMode ? 'bg-gray-950/60 border border-gray-800/50' : 'bg-white border border-stone-200'}`}>
+              {[['Section', meta.title, meta.accent], ['Layout', screen.hero ? 'Hero (2x)' : 'Standard'], ['Components', screen.components.length], ['ID', screen.id]].map(([l,v,c],i) => (
+                <div key={i}>
+                  <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>{l}</div>
+                  <div className={`text-sm font-medium ${c ? '' : (darkMode ? 'text-gray-300' : 'text-stone-700')}`} style={c ? { color: c } : {}}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== SECTION BLOCK ====================
+const SectionBlock = ({ sectionKey, darkMode, onExpand }) => {
+  const meta = SECTION_META[sectionKey];
+  const screens = SCREENS.filter(s => s.section === sectionKey).sort((a, b) => a.order - b.order);
+  return (
+    <section id={`section-${sectionKey}`} className="mb-20 scroll-mt-24">
+      <div className="flex items-start gap-4 mb-6">
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+          style={{ background: meta.accentDim, border: `1px solid ${meta.borderAccent}` }}>{meta.icon}</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+            <h2 className="text-2xl font-bold" style={{ fontFamily: "'Georgia', serif" }}>{meta.title}</h2>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+              style={{ background: meta.accentDim, color: meta.accentLight, border: `1px solid ${meta.borderAccent}` }}>{meta.subtitle}</span>
+          </div>
+          <p className={`text-sm leading-relaxed max-w-2xl ${darkMode ? 'text-gray-400' : 'text-stone-600'}`}>{meta.blurb}</p>
+        </div>
+        <div className={`text-xs font-mono self-center flex-shrink-0 ${darkMode ? 'text-gray-600' : 'text-stone-400'}`}>{screens.length} screen{screens.length !== 1 ? 's' : ''}</div>
+      </div>
+      <div className="flex items-center gap-2 mb-5 ml-1 flex-wrap">
+        {screens.map((s, i) => (
+          <React.Fragment key={s.id}>
+            <div className="flex items-center gap-1">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                style={{ background: meta.accentDim, color: meta.accentLight, border: `1px solid ${meta.borderAccent}` }}>{i+1}</span>
+              <span className={`text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-stone-600'}`}>{s.name}</span>
+            </div>
+            {i < screens.length - 1 && <svg width="28" height="8" className="flex-shrink-0"><path d="M0 4 L24 4 M20 1 L24 4 L20 7" fill="none" stroke={meta.accent} strokeWidth="1" opacity="0.4" /></svg>}
+          </React.Fragment>
+        ))}
+      </div>
+      <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
+        {screens.map((screen, idx) => {
+          const isHero = screen.hero;
+          return (
+            <div key={screen.id} className={isHero ? 'col-span-2' : ''} style={isHero ? { gridColumn: 'span 2' } : {}}>
+              <div className={`rounded-2xl overflow-hidden transition-all duration-300 ${
+                darkMode ? 'bg-gray-900/40 border border-gray-800/60 hover:border-gray-700' : 'bg-white border border-stone-200 hover:border-stone-300 hover:shadow-lg'
+              }`} style={{ borderLeftWidth: 3, borderLeftColor: meta.accent }}>
+                <div className={`flex ${isHero ? 'flex-row' : 'flex-col'} items-center`}>
+                  <div className={`${isHero ? 'p-4' : 'p-3 pb-1'} flex justify-center`}>
+                    <PhonePreview screen={screen} darkMode={darkMode} scale={isHero ? 0.58 : 0.48} onClick={() => onExpand(screen)} />
+                  </div>
+                  <div className={`${isHero ? 'flex-1 pr-4 py-4' : 'px-3 pb-3 w-full'} min-w-0`}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                        style={{ background: meta.accentDim, color: meta.accentLight }}>{idx+1}</span>
+                      <h3 className={`font-bold text-xs truncate ${darkMode ? 'text-white' : 'text-stone-900'}`}>{screen.name}</h3>
+                      {isHero && <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded flex-shrink-0"
+                        style={{ background: meta.accentDim, color: meta.accentLight }}>Hero</span>}
+                    </div>
+                    <p className={`text-[10px] leading-relaxed mb-1.5 ${darkMode ? 'text-gray-500' : 'text-stone-500'}`}
+                       style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {screen.caption}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {screen.components.slice(0, isHero ? 5 : 3).map((c, i) => (
+                        <span key={i} className="px-1.5 py-0.5 rounded text-[9px] font-medium"
+                          style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', color: darkMode ? '#6b7280' : '#a8a29e' }}>{c}</span>
+                      ))}
+                      {screen.components.length > (isHero ? 5 : 3) && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-medium" style={{ color: meta.accent }}>+{screen.components.length - (isHero ? 5 : 3)}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+// ==================== TOC SIDEBAR ====================
+const TOCSidebar = ({ activeSection, darkMode, onNavigate }) => (
+  <nav className="w-52 flex-shrink-0 sticky top-[80px] self-start hidden xl:block h-[calc(100vh-110px)] overflow-y-auto hide-scrollbar">
+    <div className={`text-[10px] font-bold uppercase tracking-[0.2em] mb-3 ${darkMode ? 'text-gray-600' : 'text-stone-400'}`}>Table of Contents</div>
+    <div className="space-y-0.5">
+      {SECTIONS_ORDERED.map(key => {
+        const meta = SECTION_META[key];
+        const isActive = activeSection === key;
+        const ct = SCREENS.filter(s => s.section === key).length;
+        return (
+          <button key={key} onClick={() => onNavigate(key)}
+            className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-2 ${
+              isActive ? (darkMode ? 'bg-gray-800/80' : 'bg-stone-100') : (darkMode ? 'hover:bg-gray-900/50' : 'hover:bg-stone-50')}`}>
+            <div className="w-0.5 h-5 rounded-full transition-all" style={{ background: isActive ? meta.accent : 'transparent' }} />
+            <span className="text-sm">{meta.icon}</span>
+            <div className="flex-1 min-w-0">
+              <div className={`text-xs font-medium truncate ${isActive ? (darkMode ? 'text-white' : 'text-stone-900') : (darkMode ? 'text-gray-400' : 'text-stone-600')}`}>{meta.title}</div>
+              <div className={`text-[9px] ${darkMode ? 'text-gray-600' : 'text-stone-400'}`}>{ct} screens</div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+    <div className={`mt-6 pt-3 border-t ${darkMode ? 'border-gray-800/50' : 'border-stone-200'}`}>
+      <div className={`text-[9px] font-bold uppercase tracking-[0.2em] mb-2 ${darkMode ? 'text-gray-600' : 'text-stone-400'}`}>Overview</div>
+      <div className="space-y-1.5">
+        {[['Total Screens', SCREENS.length], ['Sections', SECTIONS_ORDERED.length], ['Hero Screens', SCREENS.filter(s => s.hero).length]].map(([l,v],i) => (
+          <div key={i} className="flex justify-between items-center">
+            <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-stone-400'}`}>{l}</span>
+            <span className={`text-xs font-bold ${darkMode ? 'text-white' : 'text-stone-900'}`}>{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </nav>
+);
+
+// ==================== APP ====================
+const App = () => {
+  const [darkMode, setDarkMode] = useState(true);
+  const [expandedScreen, setExpandedScreen] = useState(null);
+  const [activeSection, setActiveSection] = useState('Auth');
+
+  useEffect(() => {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) setActiveSection(e.target.id.replace('section-', '')); });
+    }, { threshold: 0.2, rootMargin: '-80px 0px -60% 0px' });
+    SECTIONS_ORDERED.forEach(k => { const el = document.getElementById(`section-${k}`); if (el) obs.observe(el); });
+    return () => obs.disconnect();
+  }, []);
+
+  const scrollTo = (k) => { const el = document.getElementById(`section-${k}`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+
+  // Light mode uses warm paper bg
+  const pageBg = darkMode ? '#0a0a0f' : '#f5f0ea';
+  const headerBg = darkMode ? 'rgba(10,10,15,0.9)' : 'rgba(245,240,234,0.92)';
+  const headerBorder = darkMode ? 'rgba(55,65,81,0.5)' : '#e0d8ce';
+
+  return (
+    <div className={`min-h-screen ${darkMode ? 'text-white' : 'text-stone-900'}`} style={{ background: pageBg }}>
+      {/* MASTHEAD */}
+      <div className="sticky top-0 z-50 backdrop-blur-xl" style={{ background: headerBg, borderBottom: `1px solid ${headerBorder}` }}>
+        <div className="max-w-[1400px] mx-auto px-6 h-[64px] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">&#x1F300;</span>
+            <div>
+              <h1 className="text-base font-bold tracking-tight" style={{ fontFamily: "'Georgia', serif" }}>Aura Screen Atlas</h1>
+              <div className={`text-[9px] font-medium uppercase tracking-[0.15em] ${darkMode ? 'text-gray-500' : 'text-stone-500'}`}>
+                Editorial Edition &middot; {SCREENS.length} Screens &middot; {SECTIONS_ORDERED.length} Sections
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`text-xs font-mono ${darkMode ? 'text-gray-600' : 'text-stone-400'}`}>v3.0</span>
+            <div className={`h-4 w-px ${darkMode ? 'bg-gray-700' : 'bg-stone-300'}`} />
+            <button onClick={() => setDarkMode(!darkMode)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${darkMode ? 'bg-violet-600' : 'bg-stone-300'}`}>
+              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform flex items-center justify-center text-xs ${darkMode ? 'translate-x-5' : 'translate-x-0.5'}`}>
+                {darkMode ? '\uD83C\uDF19' : '\u2600\uFE0F'}
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* HERO BANNER */}
+      <div className="relative overflow-hidden" style={{ background: darkMode
+        ? 'radial-gradient(ellipse at 30% 0%, rgba(139,92,246,0.12) 0%, transparent 50%), radial-gradient(ellipse at 70% 0%, rgba(59,130,246,0.08) 0%, transparent 50%), #0a0a0f'
+        : 'radial-gradient(ellipse at 30% 0%, rgba(139,92,246,0.06) 0%, transparent 50%), radial-gradient(ellipse at 70% 0%, rgba(59,130,246,0.05) 0%, transparent 50%), #f5f0ea'
+      }}>
+        <div className="max-w-[1400px] mx-auto px-6 py-16">
+          <div className="max-w-2xl">
+            <div className={`text-xs font-bold uppercase tracking-[0.2em] mb-3 ${darkMode ? 'text-violet-400/60' : 'text-violet-600/50'}`}>Design Case Study</div>
+            <h1 className="text-4xl font-bold leading-[1.1] mb-4" style={{ fontFamily: "'Georgia', serif" }}>
+              Every screen in Aura,<br/><span style={{ color: '#8b5cf6' }}>annotated.</span>
+            </h1>
+            <p className={`text-base leading-relaxed max-w-lg ${darkMode ? 'text-gray-400' : 'text-stone-600'}`}>
+              A living design document mapping all {SCREENS.length} screens across {SECTIONS_ORDERED.length} sections &mdash;
+              from first launch through personality assessment results.
+            </p>
+          </div>
+          <div className="flex gap-8 mt-8">
+            {[['Screens', SCREENS.length], ['Sections', SECTIONS_ORDERED.length], ['Components', '40+'], ['Hero', SCREENS.filter(s => s.hero).length]].map(([l,v],i) => (
+              <div key={i}>
+                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-stone-900'}`}>{v}</div>
+                <div className={`text-[10px] uppercase tracking-wider ${darkMode ? 'text-gray-500' : 'text-stone-500'}`}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="h-px" style={{ background: darkMode
+          ? 'linear-gradient(to right, transparent, rgba(139,92,246,0.3) 30%, rgba(59,130,246,0.3) 70%, transparent)'
+          : 'linear-gradient(to right, transparent, rgba(139,92,246,0.15) 30%, rgba(59,130,246,0.15) 70%, transparent)'
+        }} />
+      </div>
+
+      {/* MAIN CONTENT */}
+      <div className="max-w-[1400px] mx-auto px-6 py-14 flex gap-10">
+        <TOCSidebar activeSection={activeSection} darkMode={darkMode} onNavigate={scrollTo} />
+        <main className="flex-1 min-w-0">
+          {SECTIONS_ORDERED.map(key => (
+            <SectionBlock key={key} sectionKey={key} darkMode={darkMode} onExpand={setExpandedScreen} />
+          ))}
+        </main>
+      </div>
+
+      {expandedScreen && (
+        <ExpandedView screen={expandedScreen} darkMode={darkMode}
+          onClose={() => setExpandedScreen(null)} onNav={s => setExpandedScreen(s)} />
+      )}
+
+      {/* FOOTER */}
+      <div style={{ borderTop: `1px solid ${headerBorder}` }}>
+        <div className="max-w-[1400px] mx-auto px-6 py-10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-lg">&#x1F300;</span>
+            <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-stone-500'}`} style={{ fontFamily: "'Georgia', serif" }}>
+              Aura Screen Atlas &middot; Editorial Edition
+            </span>
+          </div>
+          <div className={`text-xs font-mono ${darkMode ? 'text-gray-700' : 'text-stone-400'}`}>
+            {SCREENS.length} screens &middot; {SECTIONS_ORDERED.length} sections
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

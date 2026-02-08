@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Breath V10 — Trait-Colored Energy</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #030712;
+    overflow-x: hidden;
+    color: white;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     AURA BREATH V10 — Trait-Colored Directional Energy
+     Orb: 580px container, ~550px visible breathing area
+     Energy waves colored by dominant traits
+     ══════════════════════════════════════════════════════════════ */
+
+  .aura-stage {
+    position: relative;
+    width: 600px;
+    height: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* Canvas sits behind everything for the colored energy waves */
+  #energy-canvas {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  /* Deep ambient background glow — fills the page */
+  .aura-ambient {
+    position: absolute;
+    width: 500%;
+    height: 500%;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    animation: ambient-breathe 14s ease-in-out infinite;
+  }
+
+  @keyframes ambient-breathe {
+    0%, 100% {
+      transform: scale(0.85);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+  }
+
+  /* Outer core glow — ~540px, soft blurred edge */
+  .aura-core {
+    position: absolute;
+    width: 540px;
+    height: 540px;
+    border-radius: 50%;
+    filter: blur(30px);
+    z-index: 10;
+    animation: core-breathe 11s ease-in-out infinite;
+  }
+
+  @keyframes core-breathe {
+    0%, 100% {
+      transform: scale(0.82);
+      opacity: 0.75;
+      filter: blur(35px);
+    }
+    50% {
+      transform: scale(1.18);
+      opacity: 1;
+      filter: blur(40px);
+    }
+  }
+
+  /* Inner purple glow — ~400px visible area */
+  .aura-core-inner {
+    position: absolute;
+    width: 420px;
+    height: 420px;
+    border-radius: 50%;
+    filter: blur(16px);
+    z-index: 15;
+    animation: core-inner-breathe 11s ease-in-out infinite;
+  }
+
+  @keyframes core-inner-breathe {
+    0%, 100% {
+      transform: scale(0.88);
+      opacity: 0.85;
+    }
+    50% {
+      transform: scale(1.12);
+      opacity: 1;
+    }
+  }
+
+  /* Bright glowing center — ~350px */
+  .aura-center {
+    position: absolute;
+    width: 350px;
+    height: 350px;
+    border-radius: 50%;
+    z-index: 25;
+    animation: center-glow 11s ease-in-out infinite;
+  }
+
+  @keyframes center-glow {
+    0%, 100% {
+      transform: scale(0.94);
+    }
+    50% {
+      transform: scale(1.06);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     TRAIT LEGEND — compact, below the orb
+     ══════════════════════════════════════════════════════════════ */
+
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    width: 100%;
+    max-width: 520px;
+  }
+
+  .legend-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 6px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.5s ease;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  .legend-name {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+  }
+
+  .legend-bar-track {
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+  }
+
+  .legend-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .legend-pct {
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.5s ease;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLS
+     ══════════════════════════════════════════════════════════════ */
+
+  .control-btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .control-btn.primary {
+    background: #8b5cf6;
+    color: white;
+  }
+
+  .control-btn.primary:hover {
+    background: #7c3aed;
+    transform: translateY(-1px);
+  }
+
+  .control-btn.secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .control-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  .control-btn:active {
+    transform: scale(0.97);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     INSIGHT
+     ══════════════════════════════════════════════════════════════ */
+
+  .insight-card {
+    text-align: center;
+    padding: 14px 20px;
+    border-radius: 14px;
+    border: 1px solid rgba(139, 92, 246, 0.1);
+    background: rgba(139, 92, 246, 0.04);
+  }
+
+  .insight-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.35);
+    margin-bottom: 6px;
+  }
+
+  .insight-text {
+    font-size: 12px;
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .insight-text strong {
+    font-weight: 500;
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start pt-6 pb-12 gap-5">
+
+  <!-- Header -->
+  <div class="text-center">
+    <div class="text-xl font-semibold mb-1 text-white tracking-tight">Your Aura Breath</div>
+    <div class="text-xs text-gray-600 uppercase tracking-widest">V10 — Trait-Colored Energy</div>
+  </div>
+
+  <!-- Main Visualization -->
+  <div class="aura-stage" id="aura-stage">
+    <!-- Deep ambient glow -->
+    <div class="aura-ambient" id="aura-ambient"></div>
+
+    <!-- Energy waves rendered on canvas (behind the orb layers) -->
+    <canvas id="energy-canvas" width="900" height="900"></canvas>
+
+    <!-- Large core glow -->
+    <div class="aura-core" id="aura-core"></div>
+
+    <!-- Inner core -->
+    <div class="aura-core-inner" id="aura-core-inner"></div>
+
+    <!-- Bright center -->
+    <div class="aura-center" id="aura-center"></div>
+  </div>
+
+  <!-- Trait Legend -->
+  <div class="legend-grid" id="legend-grid"></div>
+
+  <!-- Insight -->
+  <div class="insight-card w-full max-w-md" id="insight-card">
+    <div class="insight-label">Aura Signature</div>
+    <p class="insight-text" id="insight-text"></p>
+  </div>
+
+  <!-- Controls -->
+  <div class="flex gap-3">
+    <button onclick="shuffleProfile()" class="control-btn primary">Shuffle Profile</button>
+    <button onclick="resetProfile()" class="control-btn secondary">Reset</button>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AURA BREATH V10
+// Trait-colored directional energy waves
+// Bigger orb (550px+ visible), energy color reflects internal composition
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Token Colors ──────────────────────────────────────────────────────────
+const TRAIT_DEFS = [
+  { id: 'intuition',  name: 'Intuition',  hex: '#8b5cf6', rgb: [139, 92, 246] },  // violet
+  { id: 'empathy',    name: 'Empathy',    hex: '#d946ef', rgb: [217, 70, 239] },   // pink/fuchsia
+  { id: 'clarity',    name: 'Clarity',    hex: '#3b82f6', rgb: [59, 130, 246] },   // blue
+  { id: 'growth',     name: 'Growth',     hex: '#10b981', rgb: [16, 185, 129] },   // emerald
+  { id: 'flow',       name: 'Flow',       hex: '#06b6d4', rgb: [6, 182, 212] },    // cyan
+];
+
+// ── Trait strengths (0-100) ──────────────────────────────────────────────
+let traits = {
+  intuition: 80,
+  empathy: 60,
+  clarity: 45,
+  growth: 70,
+  flow: 35,
+};
+
+// ── Canvas setup ─────────────────────────────────────────────────────────
+const canvas = document.getElementById('energy-canvas');
+const ctx = canvas.getContext('2d');
+const CW = canvas.width;
+const CH = canvas.height;
+const CX = CW / 2;
+const CY = CH / 2;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENERGY WAVE SYSTEM — Canvas-based directional colored waves
+// Each trait sends waves in a unique direction, strength = brightness/frequency
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Each trait has a preferred angular direction (radians)
+// Spread across the circle so colors fan outward in distinct arcs
+const TRAIT_ANGLES = {
+  intuition: -Math.PI / 2,          // up (12 o'clock)
+  empathy:   -Math.PI / 2 + 1.26,   // upper-right (~2 o'clock)
+  clarity:    Math.PI / 2 + 1.26,    // lower-right (~4 o'clock)
+  growth:     Math.PI / 2,           // down (6 o'clock)
+  flow:      -Math.PI / 2 - 1.26,   // upper-left (~10 o'clock)
+};
+
+// Active wave particles
+let waves = [];
+let animFrame;
+let lastSpawn = 0;
+
+// Wave object: ring that expands outward from center in a direction
+function spawnWaveSet() {
+  const totalStrength = Object.values(traits).reduce((a, b) => a + b, 0);
+
+  TRAIT_DEFS.forEach(def => {
+    const strength = traits[def.id];
+    // Higher strength = more likely to spawn a wave this cycle
+    // Even low-strength traits spawn sometimes for variety
+    const spawnChance = 0.15 + (strength / 100) * 0.65;
+    if (Math.random() > spawnChance) return;
+
+    const baseAngle = TRAIT_ANGLES[def.id];
+    // Spread: stronger traits have tighter directional focus, weaker ones scatter more
+    const spread = (1.2 - (strength / 100) * 0.7);
+    const angle = baseAngle + (Math.random() - 0.5) * spread;
+
+    // Higher strength = brighter, slightly larger
+    const alpha = 0.15 + (strength / 100) * 0.45;
+    const maxRadius = 280 + (strength / 100) * 120;
+
+    // Slight random offset for organic feel
+    const offsetMag = 10 + Math.random() * 20;
+
+    waves.push({
+      r: 140 + Math.random() * 20, // start from orb edge
+      maxR: maxRadius + Math.random() * 40,
+      angle: angle,
+      offsetX: Math.cos(angle) * offsetMag,
+      offsetY: Math.sin(angle) * offsetMag,
+      alpha: alpha,
+      color: def.rgb,
+      thickness: 2 + (strength / 100) * 4,
+      blur: 6 + (strength / 100) * 10,
+      speed: 0.25 + Math.random() * 0.35, // px per frame
+      arcWidth: 0.6 + (strength / 100) * 0.8, // radians of arc
+      born: performance.now(),
+      life: 6000 + Math.random() * 4000, // ms
+    });
+  });
+}
+
+// ── Draw loop ────────────────────────────────────────────────────────────
+function drawWaves(now) {
+  ctx.clearRect(0, 0, CW, CH);
+
+  // Spawn new waves periodically
+  const spawnInterval = 1800; // ms between spawn sets
+  if (now - lastSpawn > spawnInterval) {
+    spawnWaveSet();
+    lastSpawn = now;
+  }
+
+  // Draw each wave
+  waves.forEach(w => {
+    const age = now - w.born;
+    const progress = age / w.life;
+    if (progress > 1) return;
+
+    // Expand outward
+    w.r += w.speed;
+
+    // Fade envelope: fade in quickly, sustain, fade out slowly
+    let alpha;
+    if (progress < 0.08) {
+      alpha = w.alpha * (progress / 0.08);
+    } else if (progress < 0.5) {
+      alpha = w.alpha;
+    } else {
+      alpha = w.alpha * (1 - (progress - 0.5) / 0.5);
+    }
+
+    if (alpha <= 0.001) return;
+
+    // Draw an arc (directional wave, not full ring)
+    const halfArc = w.arcWidth / 2;
+    const startAngle = w.angle - halfArc;
+    const endAngle = w.angle + halfArc;
+
+    ctx.save();
+    ctx.translate(CX + w.offsetX * progress, CY + w.offsetY * progress);
+
+    // Soft glow layer (wider, dimmer)
+    ctx.beginPath();
+    ctx.arc(0, 0, w.r, startAngle, endAngle);
+    ctx.strokeStyle = `rgba(${w.color[0]}, ${w.color[1]}, ${w.color[2]}, ${alpha * 0.3})`;
+    ctx.lineWidth = w.thickness * 4;
+    ctx.lineCap = 'round';
+    ctx.filter = `blur(${w.blur}px)`;
+    ctx.stroke();
+
+    // Core line (brighter, thinner)
+    ctx.beginPath();
+    ctx.arc(0, 0, w.r, startAngle, endAngle);
+    ctx.strokeStyle = `rgba(${w.color[0]}, ${w.color[1]}, ${w.color[2]}, ${alpha * 0.7})`;
+    ctx.lineWidth = w.thickness * 1.5;
+    ctx.filter = `blur(${w.blur * 0.4}px)`;
+    ctx.stroke();
+
+    // Bright center of the arc
+    ctx.beginPath();
+    ctx.arc(0, 0, w.r, startAngle, endAngle);
+    ctx.strokeStyle = `rgba(${Math.min(255, w.color[0] + 60)}, ${Math.min(255, w.color[1] + 60)}, ${Math.min(255, w.color[2] + 60)}, ${alpha * 0.5})`;
+    ctx.lineWidth = w.thickness * 0.6;
+    ctx.filter = `blur(${w.blur * 0.2}px)`;
+    ctx.stroke();
+
+    ctx.restore();
+  });
+
+  // Prune dead waves
+  waves = waves.filter(w => {
+    const age = now - w.born;
+    return age / w.life <= 1 && w.r < w.maxR;
+  });
+
+  animFrame = requestAnimationFrame(drawWaves);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CORE ORB — Blended color based on trait composition
+// The orb's glow color is a weighted average of all trait colors
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getBlendedColor(brighten = 0) {
+  const totalStrength = Object.values(traits).reduce((a, b) => a + b, 0) || 1;
+  let r = 0, g = 0, b = 0;
+
+  TRAIT_DEFS.forEach(def => {
+    const weight = traits[def.id] / totalStrength;
+    r += def.rgb[0] * weight;
+    g += def.rgb[1] * weight;
+    b += def.rgb[2] * weight;
+  });
+
+  r = Math.min(255, Math.round(r) + brighten);
+  g = Math.min(255, Math.round(g) + brighten);
+  b = Math.min(255, Math.round(b) + brighten);
+
+  return [r, g, b];
+}
+
+function getDominantTrait() {
+  let maxId = TRAIT_DEFS[0].id;
+  let maxVal = 0;
+  TRAIT_DEFS.forEach(def => {
+    if (traits[def.id] > maxVal) {
+      maxVal = traits[def.id];
+      maxId = def.id;
+    }
+  });
+  return TRAIT_DEFS.find(d => d.id === maxId);
+}
+
+function updateCoreGlow() {
+  const core = document.getElementById('aura-core');
+  const coreInner = document.getElementById('aura-core-inner');
+  const center = document.getElementById('aura-center');
+  const ambient = document.getElementById('aura-ambient');
+
+  // Blended colors
+  const [cr, cg, cb] = getBlendedColor(0);
+  const [lr, lg, lb] = getBlendedColor(50);  // lighter variant
+  const [br, bg, bb] = getBlendedColor(80);  // bright center
+
+  // Average feeling intensity (overall trait strength drives glow)
+  const avgStrength = Object.values(traits).reduce((a, b) => a + b, 0) / TRAIT_DEFS.length / 100;
+  const intensity = 0.5 + avgStrength * 0.5;
+
+  // Core glow — large, blurred, blended color
+  core.style.background = `radial-gradient(circle,
+    rgba(${lr}, ${lg}, ${lb}, ${intensity * 0.8}) 0%,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.6}) 25%,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.3}) 50%,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.1}) 70%,
+    transparent 90%
+  )`;
+
+  // Inner core — lighter center
+  coreInner.style.background = `radial-gradient(circle,
+    rgba(${br}, ${bg}, ${bb}, ${intensity * 0.95}) 0%,
+    rgba(${lr}, ${lg}, ${lb}, ${intensity * 0.75}) 30%,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.4}) 60%,
+    transparent 85%
+  )`;
+
+  // Bright center — white to blended
+  center.style.background = `radial-gradient(circle,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(255, 255, 255, 0.95) 15%,
+    rgba(${br}, ${bg}, ${bb}, 0.85) 35%,
+    rgba(${lr}, ${lg}, ${lb}, 0.65) 55%,
+    rgba(${cr}, ${cg}, ${cb}, 0.35) 75%,
+    transparent 100%
+  )`;
+
+  const gi = intensity * 1.2;
+  center.style.boxShadow = `
+    0 0 ${50 * gi}px rgba(255, 255, 255, ${gi * 0.4}),
+    0 0 ${100 * gi}px rgba(${br}, ${bg}, ${bb}, ${gi * 0.6}),
+    0 0 ${180 * gi}px rgba(${lr}, ${lg}, ${lb}, ${gi * 0.4}),
+    0 0 ${280 * gi}px rgba(${cr}, ${cg}, ${cb}, ${gi * 0.2})
+  `;
+
+  // Ambient glow — very soft, blended color
+  ambient.style.background = `radial-gradient(circle,
+    rgba(${cr}, ${cg}, ${cb}, 0.12) 0%,
+    rgba(${cr}, ${cg}, ${cb}, 0.06) 20%,
+    rgba(${cr}, ${cg}, ${cb}, 0.02) 40%,
+    transparent 60%
+  )`;
+
+  // Breath speed — average trait strength (higher = slightly faster)
+  const breathDuration = 9 + (1 - avgStrength) * 5; // 9-14s
+  core.style.animationDuration = `${breathDuration}s`;
+  coreInner.style.animationDuration = `${breathDuration}s`;
+  center.style.animationDuration = `${breathDuration}s`;
+  ambient.style.animationDuration = `${breathDuration * 1.3}s`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LEGEND — 5 trait chips with color dots and strength bars
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildLegend() {
+  const grid = document.getElementById('legend-grid');
+  grid.innerHTML = '';
+
+  TRAIT_DEFS.forEach(def => {
+    const strength = traits[def.id];
+    const chip = document.createElement('div');
+    chip.className = 'legend-chip';
+    chip.id = `chip-${def.id}`;
+    chip.innerHTML = `
+      <div class="legend-dot" style="color: ${def.hex}; background: ${def.hex};"></div>
+      <div class="legend-name" style="color: ${def.hex};">${def.name}</div>
+      <div class="legend-bar-track">
+        <div class="legend-bar-fill" id="bar-${def.id}" style="width: ${strength}%; background: ${def.hex};"></div>
+      </div>
+      <div class="legend-pct" id="pct-${def.id}" style="color: ${def.hex};">${strength}%</div>
+    `;
+    grid.appendChild(chip);
+  });
+}
+
+function updateLegend() {
+  TRAIT_DEFS.forEach(def => {
+    const strength = traits[def.id];
+    const bar = document.getElementById(`bar-${def.id}`);
+    const pct = document.getElementById(`pct-${def.id}`);
+    if (bar) bar.style.width = `${strength}%`;
+    if (pct) pct.textContent = `${strength}%`;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INSIGHT TEXT — describes the aura based on dominant traits
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateInsight() {
+  // Sort traits by strength
+  const sorted = TRAIT_DEFS.map(d => ({ ...d, val: traits[d.id] }))
+    .sort((a, b) => b.val - a.val);
+
+  const top = sorted[0];
+  const second = sorted[1];
+
+  const phrases = {
+    intuition: { high: 'deep intuitive knowing', low: 'grounded pragmatism' },
+    empathy:   { high: 'radiant emotional warmth', low: 'analytical detachment' },
+    clarity:   { high: 'sharp mental clarity', low: 'soft impressionistic thinking' },
+    growth:    { high: 'restless growth energy', low: 'quiet contentment' },
+    flow:      { high: 'effortless creative flow', low: 'deliberate intention' },
+  };
+
+  const topPhrase = top.val > 50 ? phrases[top.id].high : phrases[top.id].low;
+  const secPhrase = second.val > 50 ? phrases[second.id].high : phrases[second.id].low;
+
+  const topColor = top.hex;
+  const secColor = second.hex;
+
+  document.getElementById('insight-text').innerHTML =
+    `Your aura leads with <strong style="color:${topColor}">${topPhrase}</strong>, ` +
+    `blended with <strong style="color:${secColor}">${secPhrase}</strong>. ` +
+    `The energy radiates ${top.val > 70 ? 'powerfully' : 'gently'} outward.`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function shuffleProfile() {
+  TRAIT_DEFS.forEach(def => {
+    // Generate interesting distributions — some high, some low
+    const r = Math.random();
+    if (r < 0.3) traits[def.id] = Math.round(15 + Math.random() * 25);       // low
+    else if (r > 0.7) traits[def.id] = Math.round(65 + Math.random() * 30);  // high
+    else traits[def.id] = Math.round(30 + Math.random() * 40);               // mid
+  });
+
+  // Ensure at least one trait is notably strong for visual interest
+  const ids = TRAIT_DEFS.map(d => d.id);
+  const boostIdx = Math.floor(Math.random() * ids.length);
+  traits[ids[boostIdx]] = Math.round(75 + Math.random() * 20);
+
+  applyUpdate();
+}
+
+function resetProfile() {
+  traits = {
+    intuition: 80,
+    empathy: 60,
+    clarity: 45,
+    growth: 70,
+    flow: 35,
+  };
+  applyUpdate();
+}
+
+function applyUpdate() {
+  // Clear existing waves so new colors take over
+  waves = [];
+  updateLegend();
+  updateCoreGlow();
+  updateInsight();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+buildLegend();
+updateCoreGlow();
+updateInsight();
+
+// Start wave animation
+lastSpawn = performance.now() - 2000; // spawn immediately
+animFrame = requestAnimationFrame(drawWaves);
+
+// Pause when hidden for performance
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (animFrame) cancelAnimationFrame(animFrame);
+  } else {
+    waves = [];
+    lastSpawn = performance.now() - 2000;
+    animFrame = requestAnimationFrame(drawWaves);
+  }
+});
+</script>
+</body>
+</html>
+

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick Profile — Soft Spectrum Preview</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  body { font-family: 'Inter', sans-serif; transition: background 0.3s ease; }
+  .phone { transition: background 0.3s ease, border-color 0.3s ease; }
+  .card { transition: background 0.3s ease, border-color 0.3s ease; }
+  .glow-dot { transition: all 0.4s ease; }
+  * { transition: color 0.3s ease; }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-8 gap-6" style="background: #0f0f14;">
+
+  <!-- Controls -->
+  <div class="flex gap-3 items-center">
+    <button onclick="setMode('dark')" id="btn-dark" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-indigo-500">Dark</button>
+    <button onclick="setMode('light')" id="btn-light" class="px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 border-gray-300">Light</button>
+    <div class="w-px h-6 bg-gray-600"></div>
+    <button onclick="randomize()" class="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white">Shuffle Scores</button>
+  </div>
+
+  <!-- Single phone -->
+  <div id="phone" class="phone w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl" style="background: #111827; border: 2px solid #1f2937;">
+    <div class="p-6 pt-10 pb-8">
+      <!-- ResultCard -->
+      <div id="card" class="card rounded-2xl overflow-hidden" style="background: rgba(30, 30, 50, 0.6); border: 1px solid rgba(99, 102, 241, 0.15);">
+        <!-- Header -->
+        <div class="p-4 pb-2 text-center">
+          <div class="text-2xl mb-1">✨</div>
+          <div id="title" class="text-base font-semibold text-white">Quick Profile</div>
+          <div id="subtitle" class="text-xs text-gray-500">Your personality snapshot</div>
+        </div>
+
+        <!-- Soft Spectrum Bars -->
+        <div id="bars" class="px-5 py-3 space-y-4"></div>
+
+        <!-- Summary line -->
+        <div class="px-5 pb-2">
+          <p id="summary" class="text-sm text-center text-gray-400"></p>
+        </div>
+
+        <!-- CTA -->
+        <div class="px-4 pb-4 pt-1">
+          <div id="cta" class="p-3 rounded-xl text-center" style="background: rgba(67, 56, 202, 0.12);">
+            <div id="cta-sub" class="text-xs text-gray-500">Based on 10 questions</div>
+            <div id="cta-main" class="text-sm font-medium mt-1 text-indigo-300">Starter Pack sharpens the picture with 40 more →</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Before/after label -->
+      <div class="mt-6 text-center">
+        <div id="replaces-label" class="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Currently shows</div>
+        <div id="replaces-box" class="rounded-xl p-4" style="background: rgba(30, 30, 50, 0.4); border: 1px solid rgba(255,255,255,0.05);">
+          <p id="replaces-text" class="text-sm text-gray-500 italic leading-relaxed">"You're outgoing and energized by people, organized and follow-through strong, and drawn to the unconventional."</p>
+          <div id="replaces-note" class="text-[10px] text-gray-600 mt-2">↑ Text-only paragraph, no visualization</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const spectrumColors = {
+  E: { left: '#6366f1', right: '#f59e0b', leftLabel: 'Reserved', rightLabel: 'Outgoing' },
+  A: { left: '#3b82f6', right: '#ec4899', leftLabel: 'Direct', rightLabel: 'Empathetic' },
+  C: { left: '#8b5cf6', right: '#10b981', leftLabel: 'Flexible', rightLabel: 'Organized' },
+  N: { left: '#06b6d4', right: '#f97316', leftLabel: 'Steady', rightLabel: 'Sensitive' },
+  O: { left: '#14b8a6', right: '#a855f7', leftLabel: 'Practical', rightLabel: 'Curious' },
+};
+
+let scores = { E: 78, C: 72, A: 65, N: 42, O: 85 };
+let isDark = true;
+
+function getTop3(scores) {
+  return Object.entries(spectrumColors)
+    .map(([trait, spec]) => ({
+      trait, score: scores[trait],
+      distance: Math.abs(scores[trait] - 50),
+      ...spec
+    }))
+    .sort((a, b) => b.distance - a.distance)
+    .slice(0, 3);
+}
+
+function lerpColor(c1, c2, t) {
+  const r1 = parseInt(c1.slice(1,3),16), g1 = parseInt(c1.slice(3,5),16), b1 = parseInt(c1.slice(5,7),16);
+  const r2 = parseInt(c2.slice(1,3),16), g2 = parseInt(c2.slice(3,5),16), b2 = parseInt(c2.slice(5,7),16);
+  return `rgb(${Math.round(r1+(r2-r1)*t)}, ${Math.round(g1+(g2-g1)*t)}, ${Math.round(b1+(b2-b1)*t)})`;
+}
+
+function render() {
+  const ranked = getTop3(scores);
+  const container = document.getElementById('bars');
+  container.innerHTML = '';
+
+  ranked.forEach(({ score, left, right, leftLabel, rightLabel }) => {
+    const pct = score / 100;
+    const dotColor = lerpColor(left, right, pct);
+    const gradientOpacity = isDark ? 0.5 : 0.75;
+    const labelStyle = isDark ? 'opacity: 1; filter: brightness(1.3)' : 'opacity: 1; filter: saturate(1.3) brightness(0.75)';
+    const dotStyle = isDark
+      ? `background: ${dotColor}; box-shadow: 0 0 10px ${dotColor}, 0 0 20px ${dotColor}80, 0 0 30px ${dotColor}40;`
+      : `background: white; border: 2px solid ${dotColor}; box-shadow: 0 1px 4px rgba(0,0,0,0.15), 0 0 10px ${dotColor}25;`;
+
+    container.innerHTML += `
+      <div class="px-1">
+        <div class="flex justify-between text-[10px] mb-1.5">
+          <span style="color: ${left}; ${labelStyle}">${leftLabel}</span>
+          <span style="color: ${right}; ${labelStyle}">${rightLabel}</span>
+        </div>
+        <div class="h-3 rounded-full relative" style="background: linear-gradient(to right, ${left}, ${right}); opacity: ${gradientOpacity};">
+          <div class="glow-dot absolute rounded-full" style="
+            width: 18px; height: 18px; top: 50%; transform: translateY(-50%);
+            left: ${Math.max(8, Math.min(92, score))}%; margin-left: -9px; ${dotStyle}
+          "></div>
+        </div>
+      </div>`;
+  });
+
+  // Summary
+  const words = ranked.map(r => r.score > 50 ? r.rightLabel.toLowerCase() : r.leftLabel.toLowerCase());
+  const summary = words.length === 3 ? `${words[0]}, ${words[1]}, and ${words[2]}` : words.join(' and ');
+  document.getElementById('summary').innerHTML = `Leaning <em>${summary}</em>`;
+  document.getElementById('summary').className = `text-sm text-center font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`;
+
+  // Theme the shell
+  const phone = document.getElementById('phone');
+  const card = document.getElementById('card');
+  const title = document.getElementById('title');
+  const subtitle = document.getElementById('subtitle');
+  const cta = document.getElementById('cta');
+  const ctaSub = document.getElementById('cta-sub');
+  const ctaMain = document.getElementById('cta-main');
+  const replacesBox = document.getElementById('replaces-box');
+  const replacesLabel = document.getElementById('replaces-label');
+  const replacesText = document.getElementById('replaces-text');
+  const replacesNote = document.getElementById('replaces-note');
+
+  if (isDark) {
+    document.body.style.background = '#08080c';
+    phone.style.background = '#0a0a12';
+    phone.style.borderColor = '#151520';
+    card.style.background = 'rgba(12, 12, 22, 0.85)';
+    card.style.borderColor = 'rgba(99, 102, 241, 0.2)';
+    title.className = 'text-base font-semibold text-white';
+    subtitle.className = 'text-xs text-gray-400';
+    cta.style.background = 'rgba(67, 56, 202, 0.15)';
+    ctaSub.className = 'text-xs text-gray-400';
+    ctaMain.className = 'text-sm font-medium mt-1 text-indigo-300';
+    replacesBox.style.background = 'rgba(12, 12, 22, 0.6)';
+    replacesBox.style.borderColor = 'rgba(255,255,255,0.06)';
+    replacesLabel.className = 'text-[10px] text-gray-500 uppercase tracking-widest mb-2';
+    replacesText.className = 'text-sm text-gray-400 italic leading-relaxed';
+    replacesNote.className = 'text-[10px] text-gray-500 mt-2';
+  } else {
+    document.body.style.background = '#f3f4f6';
+    phone.style.background = '#ffffff';
+    phone.style.borderColor = '#e5e7eb';
+    card.style.background = 'rgba(248, 248, 252, 1)';
+    card.style.borderColor = 'rgba(99, 102, 241, 0.12)';
+    title.className = 'text-base font-semibold text-gray-900';
+    subtitle.className = 'text-xs text-gray-500';
+    cta.style.background = '#eef2ff';
+    ctaSub.className = 'text-xs text-gray-500';
+    ctaMain.className = 'text-sm font-semibold mt-1 text-indigo-600';
+    replacesBox.style.background = 'rgba(0,0,0,0.03)';
+    replacesBox.style.borderColor = 'rgba(0,0,0,0.06)';
+    replacesLabel.className = 'text-[10px] text-gray-500 uppercase tracking-widest mb-2';
+    replacesText.className = 'text-sm text-gray-500 italic leading-relaxed';
+    replacesNote.className = 'text-[10px] text-gray-500 mt-2';
+  }
+}
+
+function setMode(mode) {
+  isDark = mode === 'dark';
+  document.getElementById('btn-dark').className = `px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 ${isDark ? 'border-indigo-500' : 'border-gray-600'}`;
+  document.getElementById('btn-light').className = `px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 ${!isDark ? 'border-indigo-500' : 'border-gray-300'}`;
+  render();
+}
+
+function randomize() {
+  Object.keys(scores).forEach(k => {
+    const r = Math.random();
+    scores[k] = r < 0.3 ? Math.round(15 + Math.random() * 25) :
+                r > 0.7 ? Math.round(60 + Math.random() * 35) :
+                Math.round(35 + Math.random() * 30);
+  });
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

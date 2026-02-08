@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura — Team Nebula</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #030712;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .container {
+    display: flex;
+    gap: 40px;
+    max-width: 960px;
+    width: 100%;
+    padding: 32px;
+    align-items: flex-start;
+  }
+
+  @media (max-width: 780px) {
+    .container {
+      flex-direction: column;
+      align-items: center;
+    }
+  }
+
+  /* --- LEFT PANEL: QUESTIONS --- */
+  .questions-panel {
+    flex: 1;
+    min-width: 280px;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .panel-header {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #9ca3af;
+    margin-bottom: 4px;
+  }
+
+  .question-card {
+    background: #1f2937;
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: background 0.2s;
+  }
+
+  .question-card.answered {
+    background: #1f2937cc;
+  }
+
+  .question-text {
+    font-size: 14px;
+    color: #d1d5db;
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  .question-number {
+    color: #6b7280;
+    font-size: 12px;
+    margin-right: 4px;
+  }
+
+  .options {
+    display: flex;
+    gap: 8px;
+  }
+
+  .option-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: inherit;
+  }
+
+  .option-btn:hover {
+    border-color: #6b7280;
+    color: #fff;
+    background: #374151;
+  }
+
+  .option-btn.selected {
+    border-color: #8b5cf6;
+    color: #fff;
+    background: #8b5cf620;
+    box-shadow: 0 0 12px #8b5cf620;
+  }
+
+  .reset-btn {
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    background: transparent;
+    color: #6b7280;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: inherit;
+  }
+
+  .reset-btn:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+
+  /* --- RIGHT PANEL: VIZ --- */
+  .viz-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  canvas {
+    border-radius: 16px;
+    display: block;
+  }
+
+  .viz-label {
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #6b7280;
+  }
+
+  .progress-bar {
+    width: 400px;
+    height: 3px;
+    background: #1f2937;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+    width: 0%;
+    transition: width 0.4s ease;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Left panel -->
+  <div class="questions-panel">
+    <div class="panel-header">Shape Your Aura</div>
+    <div id="questions"></div>
+    <button class="reset-btn" onclick="resetAll()">Reset All</button>
+  </div>
+
+  <!-- Right panel -->
+  <div class="viz-panel">
+    <canvas id="aura" width="400" height="400"></canvas>
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+    <div class="viz-label">Team Nebula &mdash; Organic Cloud</div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// DATA
+// =====================================================================
+const QUESTIONS = [
+  { text: "Which came first?", options: ["The chicken", "The egg"] },
+  { text: "Better pizza topping:", options: ["Pepperoni", "Pineapple"] },
+  { text: "In 10 years, most people will...", options: ["Still drive cars themselves", "Use self-driving cars"] },
+  { text: "Is a hot dog a sandwich?", options: ["Yes, obviously", "No way"] },
+  { text: "Will humans live on Mars by 2050?", options: ["Yes", "No"] },
+  { text: "Better superpower:", options: ["Flight", "Invisibility"] },
+  { text: "Coffee in the morning?", options: ["Yes please", "Not for me"] },
+  { text: "Dogs or cats?", options: ["Dogs", "Cats"] },
+  { text: "Will AI replace most jobs?", options: ["Yes, big changes coming", "No, jobs will adapt"] },
+  { text: "Is water wet?", options: ["Yes", "No"] },
+];
+
+// answers[i] = 0 | 1 | null
+const answers = new Array(10).fill(null);
+
+// =====================================================================
+// RENDER QUESTIONS
+// =====================================================================
+function renderQuestions() {
+  const container = document.getElementById('questions');
+  container.innerHTML = '';
+  QUESTIONS.forEach((q, i) => {
+    const card = document.createElement('div');
+    card.className = 'question-card' + (answers[i] !== null ? ' answered' : '');
+    card.innerHTML = `
+      <div class="question-text"><span class="question-number">${i + 1}.</span> ${q.text}</div>
+      <div class="options">
+        <button class="option-btn${answers[i] === 0 ? ' selected' : ''}" onclick="pick(${i},0)">${q.options[0]}</button>
+        <button class="option-btn${answers[i] === 1 ? ' selected' : ''}" onclick="pick(${i},1)">${q.options[1]}</button>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+function pick(qi, oi) {
+  answers[qi] = oi;
+  renderQuestions();
+  updateProgress();
+}
+
+function resetAll() {
+  answers.fill(null);
+  renderQuestions();
+  updateProgress();
+}
+
+function updateProgress() {
+  const answered = answers.filter(a => a !== null).length;
+  document.getElementById('progress').style.width = (answered / 10 * 100) + '%';
+}
+
+renderQuestions();
+
+// =====================================================================
+// COLOR UTILITIES
+// =====================================================================
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToStr([r, g, b], a = 1) {
+  return `rgba(${r|0},${g|0},${b|0},${a})`;
+}
+
+function lerpColor(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+// palette
+const VIOLET = hexToRgb('#8b5cf6');
+const BLUE   = hexToRgb('#3b82f6');
+const EMERALD= hexToRgb('#10b981');
+const PINK   = hexToRgb('#d946ef');
+const CYAN   = hexToRgb('#06b6d4');
+const INDIGO = hexToRgb('#6366f1');
+const AMBER  = hexToRgb('#f59e0b');
+const BG     = hexToRgb('#030712');
+
+// =====================================================================
+// ANIMATED STATE — smoothly lerped toward targets
+// =====================================================================
+const state = {
+  // Q1: dominant hue
+  hue:      { current: [...VIOLET], target: [...VIOLET] },      // blended color
+  // Q2: radius
+  radius:   { current: 120, target: 120 },
+  // Q3: breath period
+  breathPeriod: { current: 8, target: 8 },
+  // Q4: layer count (1-4)
+  layers:   { current: 2, target: 2 },
+  // Q5: outer glow
+  outerGlow: { current: 0.4, target: 0.4 },
+  // Q6: opacity
+  opacity:  { current: 0.65, target: 0.65 },
+  // Q7: secondary accent
+  accent:   { current: [...EMERALD], target: [...EMERALD] },
+  // Q8: tertiary zone color
+  tertiary: { current: [...PINK], target: [...PINK] },
+  tertiaryStrength: { current: 0, target: 0 },
+  // Q9: turbulence
+  turbulence: { current: 0.4, target: 0.4 },
+  // Q10: sparkle vs dust
+  sparkle:  { current: 0, target: 0 },  // 1 = sparkle, -1 = dust
+};
+
+// =====================================================================
+// MAP ANSWERS -> TARGETS
+// =====================================================================
+function computeTargets() {
+  // Q1: dominant hue
+  if (answers[0] === null) state.hue.target = lerpColor(VIOLET, BLUE, 0.5);
+  else if (answers[0] === 0) state.hue.target = [...VIOLET];
+  else state.hue.target = [...BLUE];
+
+  // Q2: radius
+  if (answers[1] === null) state.radius.target = 120;
+  else if (answers[1] === 0) state.radius.target = 95;   // dense, concentrated
+  else state.radius.target = 155;                         // expansive
+
+  // Q3: breath period
+  if (answers[2] === null) state.breathPeriod.target = 8;
+  else if (answers[2] === 0) state.breathPeriod.target = 12; // slow deep
+  else state.breathPeriod.target = 5;                        // quick
+
+  // Q4: layers
+  if (answers[3] === null) state.layers.target = 2;
+  else if (answers[3] === 0) state.layers.target = 4;   // complex layered
+  else state.layers.target = 1;                           // smooth single
+
+  // Q5: outer glow
+  if (answers[4] === null) state.outerGlow.target = 0.4;
+  else if (answers[4] === 0) state.outerGlow.target = 0.85; // strong halo
+  else state.outerGlow.target = 0.15;                        // tight edges
+
+  // Q6: opacity
+  if (answers[5] === null) state.opacity.target = 0.65;
+  else if (answers[5] === 0) state.opacity.target = 0.88; // vivid
+  else state.opacity.target = 0.38;                         // ethereal
+
+  // Q7: secondary accent
+  if (answers[6] === null) state.accent.target = lerpColor(EMERALD, CYAN, 0.5);
+  else if (answers[6] === 0) state.accent.target = [...EMERALD];
+  else state.accent.target = [...CYAN];
+
+  // Q8: tertiary zone
+  if (answers[7] === null) {
+    state.tertiary.target = lerpColor(PINK, INDIGO, 0.5);
+    state.tertiaryStrength.target = 0;
+  } else if (answers[7] === 0) {
+    state.tertiary.target = [...PINK];
+    state.tertiaryStrength.target = 1;
+  } else {
+    state.tertiary.target = [...INDIGO];
+    state.tertiaryStrength.target = 1;
+  }
+
+  // Q9: turbulence
+  if (answers[8] === null) state.turbulence.target = 0.4;
+  else if (answers[8] === 0) state.turbulence.target = 1.0; // lots of movement
+  else state.turbulence.target = 0.15;                       // calm
+
+  // Q10: sparkle / dust
+  if (answers[9] === null) state.sparkle.target = 0;
+  else if (answers[9] === 0) state.sparkle.target = 1;  // bright sparkle
+  else state.sparkle.target = -1;                         // soft dust
+}
+
+// =====================================================================
+// SMOOTH STATE UPDATES
+// =====================================================================
+function smoothState(dt) {
+  const speed = 2.2 * dt; // ~0.03 per frame at 60fps -> nice smooth
+  const cSpeed = 4.0 * dt;
+
+  state.hue.current = lerpColor(state.hue.current, state.hue.target, cSpeed);
+  state.accent.current = lerpColor(state.accent.current, state.accent.target, cSpeed);
+  state.tertiary.current = lerpColor(state.tertiary.current, state.tertiary.target, cSpeed);
+
+  state.radius.current      = lerp(state.radius.current, state.radius.target, speed);
+  state.breathPeriod.current = lerp(state.breathPeriod.current, state.breathPeriod.target, speed);
+  state.layers.current       = lerp(state.layers.current, state.layers.target, speed);
+  state.outerGlow.current    = lerp(state.outerGlow.current, state.outerGlow.target, speed);
+  state.opacity.current      = lerp(state.opacity.current, state.opacity.target, speed);
+  state.tertiaryStrength.current = lerp(state.tertiaryStrength.current, state.tertiaryStrength.target, speed);
+  state.turbulence.current   = lerp(state.turbulence.current, state.turbulence.target, speed);
+  state.sparkle.current      = lerp(state.sparkle.current, state.sparkle.target, speed);
+}
+
+// =====================================================================
+// NOISE (simplex-like, fast)
+// =====================================================================
+function noise2D(x, y) {
+  const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return (n - Math.floor(n)) * 2 - 1;
+}
+
+function smoothNoise(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = x - ix, fy = y - iy;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const n00 = noise2D(ix, iy), n10 = noise2D(ix+1, iy);
+  const n01 = noise2D(ix, iy+1), n11 = noise2D(ix+1, iy+1);
+  return lerp(lerp(n00, n10, sx), lerp(n01, n11, sx), sy);
+}
+
+function fbm(x, y, octaves) {
+  let val = 0, amp = 0.5, freq = 1;
+  for (let i = 0; i < octaves; i++) {
+    val += amp * smoothNoise(x * freq, y * freq);
+    amp *= 0.5;
+    freq *= 2.1;
+  }
+  return val;
+}
+
+// =====================================================================
+// PARTICLES (sparkles and dust)
+// =====================================================================
+const particles = [];
+const MAX_PARTICLES = 80;
+
+function initParticles() {
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    particles.push({
+      angle: Math.random() * Math.PI * 2,
+      dist: 30 + Math.random() * 160,
+      speed: 0.1 + Math.random() * 0.4,
+      size: 0.5 + Math.random() * 2,
+      phase: Math.random() * Math.PI * 2,
+      twinkleSpeed: 1 + Math.random() * 3,
+      drift: (Math.random() - 0.5) * 0.3,
+    });
+  }
+}
+initParticles();
+
+// =====================================================================
+// DRAWING
+// =====================================================================
+const canvas = document.getElementById('aura');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const CX = W / 2, CY = H / 2;
+
+let lastTime = performance.now();
+
+function draw(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  computeTargets();
+  smoothState(dt);
+
+  // Clear
+  ctx.fillStyle = '#030712';
+  ctx.fillRect(0, 0, W, H);
+
+  const t = now / 1000;
+  const breathPhase = Math.sin(t * Math.PI * 2 / state.breathPeriod.current);
+  const breathScale = 1 + breathPhase * 0.08;
+  const baseRadius = state.radius.current * breathScale;
+  const turb = state.turbulence.current;
+  const layerCount = state.layers.current;
+
+  // ---- Outer glow halo ----
+  const glowStrength = state.outerGlow.current;
+  if (glowStrength > 0.05) {
+    const glowRadius = baseRadius * (1.4 + glowStrength * 0.8);
+    const glowGrad = ctx.createRadialGradient(CX, CY, baseRadius * 0.6, CX, CY, glowRadius);
+    glowGrad.addColorStop(0, rgbToStr(state.hue.current, 0));
+    glowGrad.addColorStop(0.3, rgbToStr(state.hue.current, glowStrength * 0.12 * state.opacity.current));
+    glowGrad.addColorStop(0.6, rgbToStr(state.accent.current, glowStrength * 0.06 * state.opacity.current));
+    glowGrad.addColorStop(1, rgbToStr(state.hue.current, 0));
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // ---- Nebula cloud layers ----
+  // We draw several cloud "blobs" using radial gradients offset by noise
+  const numBlobs = Math.round(lerp(6, 18, (layerCount - 1) / 3));
+  const masterAlpha = state.opacity.current;
+
+  // Sort blobs into color zones
+  for (let i = 0; i < numBlobs; i++) {
+    const frac = i / numBlobs;
+    const angleBase = frac * Math.PI * 2;
+
+    // Turbulence-driven offset
+    const noiseVal = fbm(
+      Math.cos(angleBase) * 2 + t * 0.15 * (0.5 + turb),
+      Math.sin(angleBase) * 2 + t * 0.12 * (0.5 + turb),
+      3
+    );
+    const noiseVal2 = fbm(
+      Math.sin(angleBase) * 2 + t * 0.1 * (0.5 + turb) + 50,
+      Math.cos(angleBase) * 2 + t * 0.13 * (0.5 + turb) + 50,
+      3
+    );
+
+    const offsetDist = (baseRadius * 0.35) + noiseVal * baseRadius * 0.3 * turb;
+    const offsetAngle = angleBase + noiseVal2 * 0.5 * turb;
+    const bx = CX + Math.cos(offsetAngle) * offsetDist;
+    const by = CY + Math.sin(offsetAngle) * offsetDist;
+
+    // Size variation
+    const blobSize = baseRadius * lerp(0.5, 0.9, 0.5 + noiseVal * 0.5);
+
+    // Color: cycle through hue -> accent -> tertiary
+    let color;
+    const zone = frac * 3;
+    if (zone < 1) {
+      color = lerpColor(state.hue.current, state.accent.current, zone);
+    } else if (zone < 2) {
+      const tertiaryColor = lerpColor(state.accent.current, state.tertiary.current, state.tertiaryStrength.current);
+      color = lerpColor(state.accent.current, tertiaryColor, zone - 1);
+    } else {
+      const tertiaryColor = lerpColor(state.hue.current, state.tertiary.current, state.tertiaryStrength.current);
+      color = lerpColor(tertiaryColor, state.hue.current, zone - 2);
+    }
+
+    const alpha = masterAlpha * lerp(0.08, 0.18, 0.5 + noiseVal * 0.5);
+
+    const grad = ctx.createRadialGradient(bx, by, 0, bx, by, blobSize);
+    grad.addColorStop(0, rgbToStr(color, alpha * 1.5));
+    grad.addColorStop(0.4, rgbToStr(color, alpha));
+    grad.addColorStop(0.75, rgbToStr(color, alpha * 0.3));
+    grad.addColorStop(1, rgbToStr(color, 0));
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(bx, by, blobSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---- Core glow ----
+  const coreGrad = ctx.createRadialGradient(CX, CY, 0, CX, CY, baseRadius * 0.6);
+  coreGrad.addColorStop(0, rgbToStr(lerpColor(state.hue.current, [255,255,255], 0.3), masterAlpha * 0.4));
+  coreGrad.addColorStop(0.3, rgbToStr(state.hue.current, masterAlpha * 0.25));
+  coreGrad.addColorStop(0.7, rgbToStr(state.accent.current, masterAlpha * 0.08));
+  coreGrad.addColorStop(1, rgbToStr(state.hue.current, 0));
+  ctx.fillStyle = coreGrad;
+  ctx.beginPath();
+  ctx.arc(CX, CY, baseRadius * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ---- Secondary layer blobs for complexity (layers > 2) ----
+  if (layerCount > 1.5) {
+    const extraBlobs = Math.round(lerp(0, 8, (layerCount - 1.5) / 2.5));
+    for (let i = 0; i < extraBlobs; i++) {
+      const frac = i / Math.max(extraBlobs, 1);
+      const angle = frac * Math.PI * 2 + t * 0.07;
+      const dist = baseRadius * 0.25 + fbm(frac * 5 + t * 0.2, frac * 3 - t * 0.15, 2) * baseRadius * 0.2;
+      const bx = CX + Math.cos(angle) * dist;
+      const by = CY + Math.sin(angle) * dist;
+      const size = baseRadius * lerp(0.25, 0.45, frac);
+
+      const color = lerpColor(state.accent.current, state.tertiary.current, frac);
+      const alpha = masterAlpha * 0.12 * state.tertiaryStrength.current;
+
+      const g = ctx.createRadialGradient(bx, by, 0, bx, by, size);
+      g.addColorStop(0, rgbToStr(color, alpha));
+      g.addColorStop(0.6, rgbToStr(color, alpha * 0.4));
+      g.addColorStop(1, rgbToStr(color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(bx, by, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ---- Wispy tendrils (turbulence-driven) ----
+  if (turb > 0.2) {
+    ctx.save();
+    ctx.globalAlpha = masterAlpha * 0.3 * Math.min(turb, 1);
+    ctx.strokeStyle = rgbToStr(state.hue.current, 0.15);
+    ctx.lineWidth = 1.5;
+    const numTendrils = Math.round(lerp(3, 10, turb));
+    for (let i = 0; i < numTendrils; i++) {
+      ctx.beginPath();
+      const startAngle = (i / numTendrils) * Math.PI * 2 + t * 0.05;
+      let px = CX + Math.cos(startAngle) * baseRadius * 0.3;
+      let py = CY + Math.sin(startAngle) * baseRadius * 0.3;
+      ctx.moveTo(px, py);
+      for (let s = 0; s < 20; s++) {
+        const sf = s / 20;
+        const nx = fbm(px * 0.01 + t * 0.1, py * 0.01, 2) * turb * 15;
+        const ny = fbm(py * 0.01, px * 0.01 + t * 0.1, 2) * turb * 15;
+        px += nx;
+        py += ny;
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---- Particles: sparkle (Q10=A) or dust (Q10=B) ----
+  const sparkleVal = state.sparkle.current;
+  if (Math.abs(sparkleVal) > 0.05) {
+    const isSparkle = sparkleVal > 0;
+    const strength = Math.abs(sparkleVal);
+    const count = Math.round(MAX_PARTICLES * strength);
+
+    for (let i = 0; i < count; i++) {
+      const p = particles[i];
+      p.angle += p.speed * dt * (0.3 + turb * 0.5);
+      p.dist += p.drift * 5 * dt;
+      if (p.dist > baseRadius * 1.4) p.dist = 30 + Math.random() * 40;
+      if (p.dist < 20) p.dist = baseRadius * 1.2;
+
+      const px = CX + Math.cos(p.angle) * p.dist;
+      const py = CY + Math.sin(p.angle) * p.dist;
+
+      if (isSparkle) {
+        // Bright sparkle
+        const twinkle = 0.3 + 0.7 * Math.max(0, Math.sin(t * p.twinkleSpeed + p.phase));
+        const size = p.size * (1 + twinkle * 1.5) * strength;
+        const alpha = twinkle * 0.9 * strength * masterAlpha;
+        ctx.fillStyle = rgbToStr([255, 255, 255], alpha);
+        ctx.beginPath();
+        ctx.arc(px, py, size, 0, Math.PI * 2);
+        ctx.fill();
+        // cross flare
+        if (twinkle > 0.7) {
+          ctx.save();
+          ctx.globalAlpha = (twinkle - 0.7) * 3 * strength * masterAlpha;
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 0.5;
+          const fl = size * 3;
+          ctx.beginPath();
+          ctx.moveTo(px - fl, py);
+          ctx.lineTo(px + fl, py);
+          ctx.moveTo(px, py - fl);
+          ctx.lineTo(px, py + fl);
+          ctx.stroke();
+          ctx.restore();
+        }
+      } else {
+        // Soft ambient dust
+        const drift = 0.5 + 0.5 * Math.sin(t * 0.5 + p.phase);
+        const size = p.size * 2.5 * strength;
+        const alpha = drift * 0.3 * strength * masterAlpha;
+        const dustColor = lerpColor(state.hue.current, state.accent.current, drift);
+        ctx.fillStyle = rgbToStr(dustColor, alpha);
+        ctx.beginPath();
+        ctx.arc(px, py, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // ---- Very subtle ambient particles always present ----
+  for (let i = 0; i < 12; i++) {
+    const p = particles[MAX_PARTICLES - 12 + i] || particles[i];
+    p.angle += p.speed * dt * 0.15;
+    const px = CX + Math.cos(p.angle + t * 0.02) * p.dist * 1.1;
+    const py = CY + Math.sin(p.angle + t * 0.02) * p.dist * 1.1;
+    const alpha = 0.08 + 0.05 * Math.sin(t + p.phase);
+    ctx.fillStyle = rgbToStr(state.hue.current, alpha);
+    ctx.beginPath();
+    ctx.arc(px, py, 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

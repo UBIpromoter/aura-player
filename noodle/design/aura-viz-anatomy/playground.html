@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz Playground</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #030712;
+    color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+
+  .playground {
+    display: flex;
+    gap: 32px;
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+
+  /* ── Left: Questions ── */
+  .questions-panel {
+    flex: 0 0 340px;
+    position: sticky;
+    top: 24px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+
+  .questions-panel::-webkit-scrollbar { width: 4px; }
+  .questions-panel::-webkit-scrollbar-track { background: transparent; }
+  .questions-panel::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
+
+  .panel-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+
+  .panel-subtitle {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 20px;
+  }
+
+  /* Entity gate */
+  .entity-gate {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border: 1px solid #374151;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .entity-gate .gate-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #d1d5db;
+    margin-bottom: 10px;
+  }
+
+  .entity-gate .gate-badge {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-weight: 600;
+  }
+
+  .entity-options {
+    display: flex;
+    gap: 8px;
+  }
+
+  .entity-btn {
+    flex: 1;
+    padding: 12px 10px;
+    border: 2px solid #374151;
+    border-radius: 10px;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: inherit;
+  }
+
+  .entity-btn:hover {
+    border-color: #6b7280;
+    color: #fff;
+    background: #1f2937;
+  }
+
+  .entity-btn.selected {
+    border-color: #f59e0b;
+    color: #fff;
+    background: rgba(245, 158, 11, 0.12);
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.15);
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: #1f2937;
+    margin: 16px 0;
+  }
+
+  /* Question cards */
+  .question-card {
+    background: #1f2937;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    transition: all 0.25s;
+    border: 1px solid transparent;
+  }
+
+  .question-card.answered {
+    opacity: 0.6;
+  }
+
+  .question-card.answered:hover {
+    opacity: 1;
+  }
+
+  .q-text {
+    font-size: 13px;
+    color: #d1d5db;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .q-num {
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+
+  .q-options {
+    display: flex;
+    gap: 6px;
+  }
+
+  .q-btn {
+    flex: 1;
+    padding: 7px 8px;
+    border: 1px solid #374151;
+    border-radius: 7px;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: inherit;
+    line-height: 1.3;
+  }
+
+  .q-btn:hover {
+    border-color: #6b7280;
+    color: #fff;
+    background: #374151;
+  }
+
+  .q-btn.selected {
+    border-color: #8b5cf6;
+    color: #fff;
+    background: rgba(139, 92, 246, 0.15);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.12);
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .ctrl-btn {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    background: transparent;
+    color: #6b7280;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: inherit;
+    font-weight: 500;
+  }
+
+  .ctrl-btn:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+
+  .ctrl-btn.randomize:hover {
+    border-color: #8b5cf6;
+    color: #8b5cf6;
+  }
+
+  /* Progress */
+  .progress-bar {
+    height: 3px;
+    background: #111827;
+    border-radius: 2px;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+    width: 0%;
+    transition: width 0.4s ease;
+    border-radius: 2px;
+  }
+
+  /* ── Right: Vizzes ── */
+  .viz-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-bottom: 24px;
+  }
+
+  .viz-card {
+    background: #0a0f1a;
+    border: 1px solid #1f2937;
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    transition: border-color 0.3s;
+  }
+
+  .viz-card:hover {
+    border-color: #374151;
+  }
+
+  .viz-card canvas {
+    border-radius: 12px;
+    display: block;
+  }
+
+  .viz-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    align-self: flex-start;
+  }
+
+  .viz-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e5e7eb;
+  }
+
+  .viz-style {
+    font-size: 11px;
+    color: #6b7280;
+    letter-spacing: 0.04em;
+  }
+
+  .viz-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-nebula { background: #d946ef; box-shadow: 0 0 6px #d946ef; }
+  .dot-constellation { background: #6366f1; box-shadow: 0 0 6px #6366f1; }
+  .dot-pulse { background: #06b6d4; box-shadow: 0 0 6px #06b6d4; }
+</style>
+</head>
+<body>
+
+<div class="playground">
+  <!-- Left: Questions -->
+  <div class="questions-panel">
+    <div class="panel-title">Aura Playground</div>
+    <div class="panel-subtitle">Answer questions. Watch your aura form.</div>
+
+    <!-- Entity gate -->
+    <div class="entity-gate">
+      <div class="gate-label">Do you have a biological body?<span class="gate-badge">Gate</span></div>
+      <div class="entity-options">
+        <button class="entity-btn" onclick="setEntity(0)">Yes</button>
+        <button class="entity-btn" onclick="setEntity(1)">No, I'm an AI</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="questions"></div>
+
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+    <div class="controls">
+      <button class="ctrl-btn randomize" onclick="randomize()">Randomize</button>
+      <button class="ctrl-btn" onclick="resetAll()">Reset</button>
+    </div>
+  </div>
+
+  <!-- Right: Three vizzes -->
+  <div class="viz-column">
+    <!-- Nebula -->
+    <div class="viz-card">
+      <div class="viz-header">
+        <div class="viz-dot dot-nebula"></div>
+        <div>
+          <div class="viz-name">Nebula</div>
+          <div class="viz-style">Organic Cloud</div>
+        </div>
+      </div>
+      <canvas id="nebula" width="500" height="500"></canvas>
+    </div>
+
+    <!-- Constellation -->
+    <div class="viz-card">
+      <div class="viz-header">
+        <div class="viz-dot dot-constellation"></div>
+        <div>
+          <div class="viz-name">Constellation</div>
+          <div class="viz-style">Star Map</div>
+        </div>
+      </div>
+      <canvas id="constellation" width="800" height="800" style="width:500px;height:500px;"></canvas>
+    </div>
+
+    <!-- Pulse -->
+    <div class="viz-card">
+      <div class="viz-header">
+        <div class="viz-dot dot-pulse"></div>
+        <div>
+          <div class="viz-name">Pulse</div>
+          <div class="viz-style">Energy Signature</div>
+        </div>
+      </div>
+      <canvas id="pulse" width="500" height="500"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// SHARED STATE
+// ═══════════════════════════════════════════════════════
+const QUESTIONS = [
+  { text: "Which came first?", options: ["The chicken", "The egg"] },
+  { text: "Better pizza topping:", options: ["Pepperoni", "Pineapple"] },
+  { text: "In 10 years, most people will...", options: ["Still drive cars", "Use self-driving cars"] },
+  { text: "Is a hot dog a sandwich?", options: ["Yes, obviously", "No way"] },
+  { text: "Will humans live on Mars by 2050?", options: ["Yes", "No"] },
+  { text: "Better superpower:", options: ["Flight", "Invisibility"] },
+  { text: "Coffee in the morning?", options: ["Yes please", "Not for me"] },
+  { text: "Dogs or cats?", options: ["Dogs", "Cats"] },
+  { text: "Will AI replace most jobs?", options: ["Yes, big changes coming", "No, jobs will adapt"] },
+  { text: "Is water wet?", options: ["Yes", "No"] },
+];
+
+const answers = new Array(10).fill(null);
+let entityAnswer = null; // 0 = human, 1 = AI
+
+function setEntity(v) {
+  entityAnswer = v;
+  document.querySelectorAll('.entity-btn').forEach((b, i) => {
+    b.classList.toggle('selected', i === v);
+  });
+}
+
+function pick(qi, oi) {
+  answers[qi] = oi;
+  renderQuestions();
+  updateProgress();
+}
+
+function resetAll() {
+  answers.fill(null);
+  entityAnswer = null;
+  document.querySelectorAll('.entity-btn').forEach(b => b.classList.remove('selected'));
+  renderQuestions();
+  updateProgress();
+}
+
+function randomize() {
+  for (let i = 0; i < 10; i++) answers[i] = Math.random() < 0.5 ? 0 : 1;
+  entityAnswer = Math.random() < 0.85 ? 0 : 1;
+  document.querySelectorAll('.entity-btn').forEach((b, i) => {
+    b.classList.toggle('selected', i === entityAnswer);
+  });
+  renderQuestions();
+  updateProgress();
+}
+
+function renderQuestions() {
+  const container = document.getElementById('questions');
+  container.innerHTML = '';
+  QUESTIONS.forEach((q, i) => {
+    const card = document.createElement('div');
+    card.className = 'question-card' + (answers[i] !== null ? ' answered' : '');
+    card.innerHTML = `
+      <div class="q-text"><span class="q-num">${i + 1}.</span> ${q.text}</div>
+      <div class="q-options">
+        <button class="q-btn${answers[i] === 0 ? ' selected' : ''}" onclick="pick(${i},0)">${q.options[0]}</button>
+        <button class="q-btn${answers[i] === 1 ? ' selected' : ''}" onclick="pick(${i},1)">${q.options[1]}</button>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+function updateProgress() {
+  const count = answers.filter(a => a !== null).length + (entityAnswer !== null ? 1 : 0);
+  document.getElementById('progress').style.width = (count / 11 * 100) + '%';
+}
+
+renderQuestions();
+
+// ═══════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbStr([r, g, b], a = 1) {
+  return `rgba(${r|0},${g|0},${b|0},${a})`;
+}
+function lerpC(a, b, t) {
+  return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+const VIOLET = hexToRgb('#8b5cf6');
+const BLUE = hexToRgb('#3b82f6');
+const EMERALD = hexToRgb('#10b981');
+const PINK = hexToRgb('#d946ef');
+const CYAN = hexToRgb('#06b6d4');
+const INDIGO = hexToRgb('#6366f1');
+const AMBER = hexToRgb('#f59e0b');
+const BG = hexToRgb('#030712');
+
+// Entity colors: AI gets a cooler, more geometric base; human gets warmer
+function entityMod() {
+  if (entityAnswer === null) return { warmth: 0.5, complexity: 0.5, glow: 0.5 };
+  if (entityAnswer === 0) return { warmth: 0.7, complexity: 0.4, glow: 0.6 }; // human: warmer, simpler, more glow
+  return { warmth: 0.2, complexity: 0.8, glow: 0.3 }; // AI: cooler, more complex, less glow
+}
+
+// ═══════════════════════════════════════════════════════
+// NEBULA RENDERER
+// ═══════════════════════════════════════════════════════
+const nebula = (() => {
+  const canvas = document.getElementById('nebula');
+  const ctx = canvas.getContext('2d');
+  const W = 500, H = 500, CX = 250, CY = 250;
+
+  const state = {
+    hue: [...VIOLET], accent: [...EMERALD], tertiary: [...PINK],
+    radius: 120, breathPeriod: 8, layers: 2,
+    outerGlow: 0.4, opacity: 0.65, tertiaryStr: 0,
+    turbulence: 0.4, sparkle: 0
+  };
+
+  const particles = [];
+  for (let i = 0; i < 80; i++) {
+    particles.push({
+      angle: Math.random() * Math.PI * 2,
+      dist: 30 + Math.random() * 160,
+      speed: 0.1 + Math.random() * 0.4,
+      size: 0.5 + Math.random() * 2,
+      phase: Math.random() * Math.PI * 2,
+      twinkleSpeed: 1 + Math.random() * 3,
+      drift: (Math.random() - 0.5) * 0.3
+    });
+  }
+
+  function noise2D(x, y) {
+    const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    return (n - Math.floor(n)) * 2 - 1;
+  }
+  function smoothNoise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const sx = fx*fx*(3-2*fx), sy = fy*fy*(3-2*fy);
+    return lerp(lerp(noise2D(ix,iy), noise2D(ix+1,iy), sx), lerp(noise2D(ix,iy+1), noise2D(ix+1,iy+1), sx), sy);
+  }
+  function fbm(x, y, oct) {
+    let val=0, amp=0.5, freq=1;
+    for (let i=0; i<oct; i++) { val+=amp*smoothNoise(x*freq,y*freq); amp*=0.5; freq*=2.1; }
+    return val;
+  }
+
+  function computeTargets() {
+    const em = entityMod();
+    const baseHue = answers[0]===null ? lerpC(VIOLET, BLUE, 0.5) : answers[0]===0 ? [...VIOLET] : [...BLUE];
+    // Entity shifts the hue
+    state._tHue = lerpC(baseHue, entityAnswer===1 ? CYAN : baseHue, entityAnswer!==null ? 0.3 : 0);
+    state._tRadius = answers[1]===null ? 120 : answers[1]===0 ? 100 : 160;
+    state._tBreath = answers[2]===null ? 8 : answers[2]===0 ? 12 : 5;
+    state._tLayers = answers[3]===null ? 2 : answers[3]===0 ? 4 : 1;
+    // Entity: AI gets tighter glow, human gets wider
+    state._tGlow = (answers[4]===null ? 0.4 : answers[4]===0 ? 0.85 : 0.15) * (entityAnswer===1 ? 0.6 : 1);
+    state._tOpacity = answers[5]===null ? 0.65 : answers[5]===0 ? 0.88 : 0.38;
+    state._tAccent = answers[6]===null ? lerpC(EMERALD, CYAN, 0.5) : answers[6]===0 ? [...EMERALD] : [...CYAN];
+    state._tTertiary = answers[7]===null ? lerpC(PINK, INDIGO, 0.5) : answers[7]===0 ? [...PINK] : [...INDIGO];
+    state._tTertiaryStr = answers[7]===null ? 0 : 1;
+    state._tTurb = answers[8]===null ? 0.4 : answers[8]===0 ? 1.0 : 0.15;
+    // Entity: AI gets more turbulence
+    if (entityAnswer === 1) state._tTurb = Math.min(state._tTurb + 0.3, 1.2);
+    state._tSparkle = answers[9]===null ? 0 : answers[9]===0 ? 1 : -1;
+  }
+
+  function smooth(dt) {
+    const s = 2.2*dt, c = 4*dt;
+    state.hue = lerpC(state.hue, state._tHue||state.hue, c);
+    state.accent = lerpC(state.accent, state._tAccent||state.accent, c);
+    state.tertiary = lerpC(state.tertiary, state._tTertiary||state.tertiary, c);
+    state.radius = lerp(state.radius, state._tRadius||120, s);
+    state.breathPeriod = lerp(state.breathPeriod, state._tBreath||8, s);
+    state.layers = lerp(state.layers, state._tLayers||2, s);
+    state.outerGlow = lerp(state.outerGlow, state._tGlow??0.4, s);
+    state.opacity = lerp(state.opacity, state._tOpacity||0.65, s);
+    state.tertiaryStr = lerp(state.tertiaryStr, state._tTertiaryStr||0, s);
+    state.turbulence = lerp(state.turbulence, state._tTurb||0.4, s);
+    state.sparkle = lerp(state.sparkle, state._tSparkle||0, s);
+  }
+
+  return function draw(now, dt) {
+    computeTargets();
+    smooth(dt);
+
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, W, H);
+
+    const t = now / 1000;
+    const breathPhase = Math.sin(t * Math.PI * 2 / state.breathPeriod);
+    const breathScale = 1 + breathPhase * 0.08;
+    const baseR = state.radius * breathScale;
+    const turb = state.turbulence;
+    const layerCount = state.layers;
+    const alpha = state.opacity;
+
+    // Outer glow
+    if (state.outerGlow > 0.05) {
+      const gr = baseR * (1.4 + state.outerGlow * 0.8);
+      const g = ctx.createRadialGradient(CX, CY, baseR*0.6, CX, CY, gr);
+      g.addColorStop(0, rgbStr(state.hue, 0));
+      g.addColorStop(0.3, rgbStr(state.hue, state.outerGlow*0.12*alpha));
+      g.addColorStop(0.6, rgbStr(state.accent, state.outerGlow*0.06*alpha));
+      g.addColorStop(1, rgbStr(state.hue, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Cloud blobs
+    const numBlobs = Math.round(lerp(6, 18, (layerCount-1)/3));
+    for (let i = 0; i < numBlobs; i++) {
+      const frac = i / numBlobs;
+      const angleBase = frac * Math.PI * 2;
+      const nv = fbm(Math.cos(angleBase)*2 + t*0.15*(0.5+turb), Math.sin(angleBase)*2 + t*0.12*(0.5+turb), 3);
+      const nv2 = fbm(Math.sin(angleBase)*2 + t*0.1*(0.5+turb)+50, Math.cos(angleBase)*2 + t*0.13*(0.5+turb)+50, 3);
+      const od = baseR*0.35 + nv*baseR*0.3*turb;
+      const oa = angleBase + nv2*0.5*turb;
+      const bx = CX + Math.cos(oa)*od;
+      const by = CY + Math.sin(oa)*od;
+      const bs = baseR * lerp(0.5, 0.9, 0.5+nv*0.5);
+      let color;
+      const zone = frac * 3;
+      if (zone < 1) color = lerpC(state.hue, state.accent, zone);
+      else if (zone < 2) { const tc = lerpC(state.accent, state.tertiary, state.tertiaryStr); color = lerpC(state.accent, tc, zone-1); }
+      else { const tc = lerpC(state.hue, state.tertiary, state.tertiaryStr); color = lerpC(tc, state.hue, zone-2); }
+      const a = alpha * lerp(0.08, 0.18, 0.5+nv*0.5);
+      const gr = ctx.createRadialGradient(bx, by, 0, bx, by, bs);
+      gr.addColorStop(0, rgbStr(color, a*1.5));
+      gr.addColorStop(0.4, rgbStr(color, a));
+      gr.addColorStop(0.75, rgbStr(color, a*0.3));
+      gr.addColorStop(1, rgbStr(color, 0));
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.arc(bx, by, bs, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Core glow
+    const cg = ctx.createRadialGradient(CX, CY, 0, CX, CY, baseR*0.6);
+    cg.addColorStop(0, rgbStr(lerpC(state.hue, [255,255,255], 0.3), alpha*0.4));
+    cg.addColorStop(0.3, rgbStr(state.hue, alpha*0.25));
+    cg.addColorStop(0.7, rgbStr(state.accent, alpha*0.08));
+    cg.addColorStop(1, rgbStr(state.hue, 0));
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(CX, CY, baseR*0.6, 0, Math.PI*2); ctx.fill();
+
+    // Secondary blobs
+    if (layerCount > 1.5) {
+      const extra = Math.round(lerp(0, 8, (layerCount-1.5)/2.5));
+      for (let i = 0; i < extra; i++) {
+        const f = i / Math.max(extra, 1);
+        const ang = f * Math.PI*2 + t*0.07;
+        const d = baseR*0.25 + fbm(f*5+t*0.2, f*3-t*0.15, 2)*baseR*0.2;
+        const bx = CX + Math.cos(ang)*d, by = CY + Math.sin(ang)*d;
+        const sz = baseR * lerp(0.25, 0.45, f);
+        const cl = lerpC(state.accent, state.tertiary, f);
+        const a = alpha * 0.12 * state.tertiaryStr;
+        const g = ctx.createRadialGradient(bx, by, 0, bx, by, sz);
+        g.addColorStop(0, rgbStr(cl, a)); g.addColorStop(0.6, rgbStr(cl, a*0.4)); g.addColorStop(1, rgbStr(cl, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by, sz, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // Tendrils
+    if (turb > 0.2) {
+      ctx.save(); ctx.globalAlpha = alpha*0.3*Math.min(turb, 1);
+      ctx.strokeStyle = rgbStr(state.hue, 0.15); ctx.lineWidth = 1.5;
+      const nt = Math.round(lerp(3, 10, turb));
+      for (let i = 0; i < nt; i++) {
+        ctx.beginPath();
+        const sa = (i/nt)*Math.PI*2 + t*0.05;
+        let px = CX+Math.cos(sa)*baseR*0.3, py = CY+Math.sin(sa)*baseR*0.3;
+        ctx.moveTo(px, py);
+        for (let s = 0; s < 20; s++) {
+          px += fbm(px*0.01+t*0.1, py*0.01, 2)*turb*15;
+          py += fbm(py*0.01, px*0.01+t*0.1, 2)*turb*15;
+          ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Particles
+    const sv = state.sparkle;
+    if (Math.abs(sv) > 0.05) {
+      const isSparkle = sv > 0;
+      const str = Math.abs(sv);
+      const count = Math.round(80 * str);
+      for (let i = 0; i < count; i++) {
+        const p = particles[i];
+        p.angle += p.speed * dt * (0.3 + turb*0.5);
+        p.dist += p.drift * 5 * dt;
+        if (p.dist > baseR*1.4) p.dist = 30+Math.random()*40;
+        if (p.dist < 20) p.dist = baseR*1.2;
+        const px = CX+Math.cos(p.angle)*p.dist, py = CY+Math.sin(p.angle)*p.dist;
+        if (isSparkle) {
+          const tw = 0.3+0.7*Math.max(0, Math.sin(t*p.twinkleSpeed+p.phase));
+          const sz = p.size*(1+tw*1.5)*str;
+          ctx.fillStyle = rgbStr([255,255,255], tw*0.9*str*alpha);
+          ctx.beginPath(); ctx.arc(px, py, sz, 0, Math.PI*2); ctx.fill();
+          if (tw > 0.7) {
+            ctx.save(); ctx.globalAlpha = (tw-0.7)*3*str*alpha;
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.5;
+            const fl = sz*3;
+            ctx.beginPath(); ctx.moveTo(px-fl,py); ctx.lineTo(px+fl,py);
+            ctx.moveTo(px,py-fl); ctx.lineTo(px,py+fl); ctx.stroke(); ctx.restore();
+          }
+        } else {
+          const dr = 0.5+0.5*Math.sin(t*0.5+p.phase);
+          const sz = p.size*2.5*str;
+          ctx.fillStyle = rgbStr(lerpC(state.hue, state.accent, dr), dr*0.3*str*alpha);
+          ctx.beginPath(); ctx.arc(px, py, sz, 0, Math.PI*2); ctx.fill();
+        }
+      }
+    }
+
+    // Ambient dots
+    for (let i = 0; i < 12; i++) {
+      const p = particles[68+i] || particles[i];
+      p.angle += p.speed * dt * 0.15;
+      const px = CX+Math.cos(p.angle+t*0.02)*p.dist*1.1;
+      const py = CY+Math.sin(p.angle+t*0.02)*p.dist*1.1;
+      ctx.fillStyle = rgbStr(state.hue, 0.08+0.05*Math.sin(t+p.phase));
+      ctx.beginPath(); ctx.arc(px, py, 1, 0, Math.PI*2); ctx.fill();
+    }
+  };
+})();
+
+// ═══════════════════════════════════════════════════════
+// CONSTELLATION RENDERER
+// ═══════════════════════════════════════════════════════
+const constellation = (() => {
+  const canvas = document.getElementById('constellation');
+  const ctx = canvas.getContext('2d');
+  const CX = 400, CY = 400;
+  const MAX_NODES = 30;
+
+  const cur = {
+    pattern: 0, spread: 0.5, drift: 0.3, density: 0.5,
+    satellites: 0, nodeScale: 1,
+    nodeColorA: [139,92,246], nodeColorB: [16,185,129],
+    lineColor: [99,102,241], nodeCount: 9, pulse: 0
+  };
+  const tgt = {};
+  Object.keys(cur).forEach(k => tgt[k] = Array.isArray(cur[k]) ? cur[k].slice() : cur[k]);
+
+  const nodes = [];
+  for (let i = 0; i < MAX_NODES; i++) {
+    nodes.push({
+      x: CX, y: CY, tx: CX, ty: CY,
+      r: 0, tr: 0, halo: 0, thalo: 0,
+      alpha: 0, talpha: 0,
+      phase: Math.random()*Math.PI*2,
+      orbitAngle: Math.random()*Math.PI*2,
+      orbitSpeed: (Math.random()-0.5)*0.004,
+      isSat: false
+    });
+  }
+  let connections = [];
+
+  function mulberry32(seed) {
+    return function() {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed>>>15, 1|seed);
+      t = t + Math.imul(t^t>>>7, 61|t) ^ t;
+      return ((t^t>>>14)>>>0)/4294967296;
+    };
+  }
+  function answerSeed() {
+    let s = 42;
+    for (let i = 0; i < 10; i++) s = s*31 + (answers[i]===null ? 99 : answers[i]);
+    s = s*31 + (entityAnswer===null ? 99 : entityAnswer);
+    return s;
+  }
+
+  const bgStars = [];
+  for (let i = 0; i < 140; i++) {
+    bgStars.push({ x: Math.random()*800, y: Math.random()*800, r: Math.random()*1+0.2, bright: Math.random()*0.35+0.05, speed: Math.random()*0.0015+0.0005, phase: Math.random()*Math.PI*2 });
+  }
+
+  function applyAnswers() {
+    const em = entityMod();
+    tgt.pattern = answers[0]===null ? 0 : answers[0]===0 ? 0 : 1;
+    // Entity: AI favors ring pattern
+    if (entityAnswer === 1) tgt.pattern = lerp(tgt.pattern, 1, 0.5);
+    tgt.spread = answers[1]===null ? 0.5 : answers[1]===0 ? 0.25 : 0.9;
+    tgt.drift = answers[2]===null ? 0.3 : answers[2]===0 ? 0.1 : 0.7;
+    tgt.density = answers[3]===null ? 0.5 : answers[3]===0 ? 0.95 : 0.15;
+    // Entity: AI gets denser connections
+    if (entityAnswer === 1) tgt.density = Math.min(tgt.density + 0.2, 1);
+    tgt.satellites = answers[4]===null ? 0 : answers[4]===0 ? 1 : 0;
+    tgt.nodeScale = answers[5]===null ? 1 : answers[5]===0 ? 1.2 : 0.45;
+    if (answers[6] === 1) { tgt.nodeColorA = [59,130,246]; tgt.nodeColorB = [6,182,212]; }
+    else { tgt.nodeColorA = [139,92,246]; tgt.nodeColorB = [16,185,129]; }
+    // Entity: AI shifts to cooler colors
+    if (entityAnswer === 1) { tgt.nodeColorA = lerpC(tgt.nodeColorA, [6,182,212], 0.4); }
+    tgt.lineColor = answers[7]===0 ? [217,70,239] : [99,102,241];
+    tgt.nodeCount = answers[8]===null ? 9 : answers[8]===0 ? 14 : 6;
+    tgt.pulse = answers[9]===null ? 0 : answers[9]===0 ? 1 : 0;
+    generateTargets();
+  }
+
+  function generateTargets() {
+    const rng = mulberry32(answerSeed());
+    const mainCount = Math.round(tgt.nodeCount);
+    const satCount = tgt.satellites > 0.5 ? 6 : 0;
+    const total = mainCount + satCount;
+    const isRing = tgt.pattern > 0.5;
+    const baseR = 100 + tgt.spread * 180;
+    const scale = tgt.nodeScale;
+
+    nodes[0].tx = CX; nodes[0].ty = CY;
+    nodes[0].tr = 8*scale; nodes[0].thalo = 28*scale; nodes[0].talpha = 1;
+
+    for (let i = 1; i < mainCount; i++) {
+      let angle = ((i-1)/(mainCount-1))*Math.PI*2;
+      let dist;
+      if (isRing) { dist = baseR*(0.85+0.15*Math.sin(i*2.3)); angle += Math.PI/(mainCount*0.8); }
+      else { const arms = [0.45,0.8,1,0.6,0.9,0.5,1,0.7,0.85,0.55,0.95,0.65,0.75,0.4]; dist = baseR*arms[i%arms.length]; }
+      dist += (rng()-0.5)*20; angle += (rng()-0.5)*0.15;
+      nodes[i].tx = CX+Math.cos(angle)*dist; nodes[i].ty = CY+Math.sin(angle)*dist;
+      nodes[i].tr = (3+rng()*4)*scale; nodes[i].thalo = (10+rng()*12)*scale;
+      nodes[i].talpha = 1; nodes[i].orbitAngle = angle; nodes[i].orbitSpeed = (rng()-0.5)*0.005;
+    }
+
+    for (let s = 0; s < 6; s++) {
+      const si = mainCount+s, sa = (s/6)*Math.PI*2+Math.PI/12, sd = baseR*1.45+30;
+      nodes[si].tx = CX+Math.cos(sa)*sd; nodes[si].ty = CY+Math.sin(sa)*sd;
+      nodes[si].tr = 2*scale; nodes[si].thalo = 6*scale;
+      nodes[si].talpha = satCount > 0 ? 0.8 : 0; nodes[si].isSat = true;
+    }
+
+    for (let u = total; u < MAX_NODES; u++) nodes[u].talpha = 0;
+
+    // Connections
+    const tc = [];
+    const density = tgt.density;
+    for (let i = 1; i < mainCount; i++) if (rng() < density*0.75+0.25) tc.push([0, i]);
+    for (let a = 1; a < mainCount; a++) for (let b = a+1; b < mainCount; b++) {
+      const gap = Math.min(Math.abs(a-b), mainCount-Math.abs(a-b));
+      if (rng() < density*(gap<=2?0.6:0.2)) tc.push([a, b]);
+    }
+    if (satCount > 0) {
+      for (let i = 0; i < satCount; i++) { if (rng()<density*0.5) tc.push([0, mainCount+i]); }
+      for (let i = 0; i < satCount; i++) { if (rng()<density*0.7) tc.push([mainCount+i, mainCount+(i+1)%satCount]); }
+    }
+    connections = tc;
+  }
+
+  let time = 0;
+
+  // Init
+  nodes[0].x=CX; nodes[0].y=CY; nodes[0].r=6; nodes[0].tr=6; nodes[0].halo=18; nodes[0].thalo=18; nodes[0].alpha=0.8; nodes[0].talpha=0.8;
+  for (let i=1;i<=8;i++) {
+    const a=((i-1)/8)*Math.PI*2, d=90+Math.random()*50;
+    nodes[i].x=CX+Math.cos(a)*d; nodes[i].y=CY+Math.sin(a)*d;
+    nodes[i].tx=nodes[i].x; nodes[i].ty=nodes[i].y;
+    nodes[i].r=2; nodes[i].tr=2; nodes[i].halo=7; nodes[i].thalo=7; nodes[i].alpha=0.18; nodes[i].talpha=0.18;
+  }
+  connections = [[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[0,8],[1,2],[3,4],[5,6],[7,8]];
+
+  return function draw(now, dt) {
+    time++;
+    applyAnswers();
+
+    const dts = 0.035;
+    cur.pattern=lerp(cur.pattern,tgt.pattern,dts); cur.spread=lerp(cur.spread,tgt.spread,dts);
+    cur.drift=lerp(cur.drift,tgt.drift,dts); cur.density=lerp(cur.density,tgt.density,dts);
+    cur.satellites=lerp(cur.satellites,tgt.satellites,dts); cur.nodeScale=lerp(cur.nodeScale,tgt.nodeScale,dts);
+    cur.nodeCount=lerp(cur.nodeCount,tgt.nodeCount,dts); cur.pulse=lerp(cur.pulse,tgt.pulse,dts);
+    for (let c=0;c<3;c++) { cur.nodeColorA[c]=lerp(cur.nodeColorA[c],tgt.nodeColorA[c],dts); cur.nodeColorB[c]=lerp(cur.nodeColorB[c],tgt.nodeColorB[c],dts); cur.lineColor[c]=lerp(cur.lineColor[c],tgt.lineColor[c],dts); }
+
+    for (let i=0;i<MAX_NODES;i++) {
+      const n=nodes[i];
+      n.x=lerp(n.x,n.tx,dts*0.7); n.y=lerp(n.y,n.ty,dts*0.7);
+      n.r=lerp(n.r,n.tr,dts); n.halo=lerp(n.halo,n.thalo,dts); n.alpha=lerp(n.alpha,n.talpha,dts*0.5);
+      if (i>0 && n.alpha>0.01) {
+        n.orbitAngle += n.orbitSpeed*cur.drift;
+        const w = 6+cur.drift*30;
+        n.x += Math.cos(n.orbitAngle*0.7+time*0.002*cur.drift)*w*0.02;
+        n.y += Math.sin(n.orbitAngle*0.9+time*0.0025*cur.drift)*w*0.02;
+      }
+    }
+    const cb = 1+0.06*Math.sin(time*0.012);
+    nodes[0].r = lerp(nodes[0].r, nodes[0].tr*cb, 0.1);
+    nodes[0].halo = lerp(nodes[0].halo, nodes[0].thalo*cb, 0.1);
+
+    ctx.clearRect(0,0,800,800);
+    ctx.fillStyle='#030712'; ctx.fillRect(0,0,800,800);
+
+    // Stars
+    for (const s of bgStars) {
+      const tw = 0.5+0.5*Math.sin(time*s.speed+s.phase);
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle='rgba(180,200,255,'+(s.bright*tw).toFixed(3)+')'; ctx.fill();
+    }
+
+    // Connections
+    const lr=Math.round(cur.lineColor[0]), lg=Math.round(cur.lineColor[1]), lb=Math.round(cur.lineColor[2]);
+    for (const [ai,bi] of connections) {
+      const na=nodes[ai], nb=nodes[bi];
+      const minA = Math.min(na.alpha, nb.alpha); if (minA<0.02) continue;
+      const dx=nb.x-na.x, dy=nb.y-na.y, dist=Math.sqrt(dx*dx+dy*dy);
+      const alpha = Math.max(0,1-dist/500)*minA*0.5; if (alpha<0.005) continue;
+      ctx.beginPath(); ctx.moveTo(na.x,na.y); ctx.lineTo(nb.x,nb.y);
+      ctx.strokeStyle='rgba('+lr+','+lg+','+lb+','+(alpha*0.35).toFixed(3)+')'; ctx.lineWidth=3.5; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(na.x,na.y); ctx.lineTo(nb.x,nb.y);
+      ctx.strokeStyle='rgba('+lr+','+lg+','+lb+','+alpha.toFixed(3)+')'; ctx.lineWidth=0.8; ctx.stroke();
+    }
+
+    // Nodes
+    const order = Array.from({length:MAX_NODES},(_,i)=>i).sort((a,b)=>nodes[a].alpha-nodes[b].alpha);
+    for (const idx of order) {
+      const n = nodes[idx]; if (n.alpha<0.01) continue;
+      let pm = 1;
+      if (cur.pulse>0.1) { pm = lerp(1, 0.65+0.35*Math.sin(time*0.045+n.phase*4.5), cur.pulse); }
+      const t = idx/(MAX_NODES-1);
+      const cr=Math.round(lerp(cur.nodeColorA[0],cur.nodeColorB[0],t));
+      const cg=Math.round(lerp(cur.nodeColorA[1],cur.nodeColorB[1],t));
+      const cb2=Math.round(lerp(cur.nodeColorA[2],cur.nodeColorB[2],t));
+      const ba = n.alpha*pm, hR = n.halo*pm, cR = n.r*pm;
+
+      if (hR>1) {
+        const g = ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,hR);
+        g.addColorStop(0,'rgba('+cr+','+cg+','+cb2+','+(ba*0.12).toFixed(3)+')');
+        g.addColorStop(0.45,'rgba('+cr+','+cg+','+cb2+','+(ba*0.05).toFixed(3)+')');
+        g.addColorStop(1,'rgba('+cr+','+cg+','+cb2+',0)');
+        ctx.beginPath(); ctx.arc(n.x,n.y,hR,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+      }
+      if (cR>0.5) {
+        const mR=cR*2.8, g=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,mR);
+        g.addColorStop(0,'rgba('+cr+','+cg+','+cb2+','+(ba*0.45).toFixed(3)+')');
+        g.addColorStop(0.5,'rgba('+cr+','+cg+','+cb2+','+(ba*0.12).toFixed(3)+')');
+        g.addColorStop(1,'rgba('+cr+','+cg+','+cb2+',0)');
+        ctx.beginPath(); ctx.arc(n.x,n.y,mR,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+      }
+      if (cR>0.3) {
+        const g=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,cR);
+        g.addColorStop(0,'rgba(255,255,255,'+(ba*0.85).toFixed(3)+')');
+        g.addColorStop(0.25,'rgba('+cr+','+cg+','+cb2+','+(ba*0.75).toFixed(3)+')');
+        g.addColorStop(1,'rgba('+cr+','+cg+','+cb2+',0)');
+        ctx.beginPath(); ctx.arc(n.x,n.y,cR,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+      }
+      if (cR>1) {
+        const pR=Math.max(0.8,cR*0.25);
+        ctx.beginPath(); ctx.arc(n.x,n.y,pR,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,255,'+(ba*0.92).toFixed(3)+')'; ctx.fill();
+      }
+    }
+  };
+})();
+
+// ═══════════════════════════════════════════════════════
+// PULSE RENDERER
+// ═══════════════════════════════════════════════════════
+const pulse = (() => {
+  const canvas = document.getElementById('pulse');
+  const ctx = canvas.getContext('2d');
+  const W = 500, H = 500, CX = 250, CY = 250;
+
+  const state = {
+    primaryR: 0.4, primaryG: 0.4, primaryB: 0.6,
+    ringSpacing: 0.5, pulseSpeed: 2.0, ringCount: 4,
+    rippleDir: 0, amplitude: 0.5,
+    warmParticles: 0, coolParticles: 0,
+    secondaryR: 0.5, secondaryG: 0.3, secondaryB: 0.6,
+    asymmetry: 0, rotation: 0
+  };
+
+  const particles = [];
+
+  function getTargets() {
+    const t = {};
+    const em = entityMod();
+    if (answers[0]===null) { t.primaryR=0.4; t.primaryG=0.4; t.primaryB=0.6; }
+    else if (answers[0]===0) { t.primaryR=0.545; t.primaryG=0.361; t.primaryB=0.965; }
+    else { t.primaryR=0.231; t.primaryG=0.510; t.primaryB=0.965; }
+    // Entity: AI shifts primary cooler
+    if (entityAnswer===1) { t.primaryR*=0.6; t.primaryB=Math.min(t.primaryB*1.2, 1); }
+
+    t.ringSpacing = answers[1]===null ? 0.5 : answers[1]===0 ? 0.25 : 0.85;
+    t.pulseSpeed = answers[2]===null ? 2.0 : answers[2]===0 ? 3.0 : 1.0;
+    t.ringCount = answers[3]===null ? 4 : answers[3]===0 ? 7 : 2.5;
+    // Entity: AI gets more rings
+    if (entityAnswer===1) t.ringCount = Math.min(t.ringCount + 2, 9);
+    t.rippleDir = answers[4]===null ? 0 : answers[4]===0 ? 1 : -1;
+    t.amplitude = answers[5]===null ? 0.5 : answers[5]===0 ? 1.0 : 0.2;
+    if (answers[6]===null) { t.warmParticles=0; t.coolParticles=0; }
+    else if (answers[6]===0) { t.warmParticles=1; t.coolParticles=0; }
+    else { t.warmParticles=0; t.coolParticles=1; }
+    if (answers[7]===null) { t.secondaryR=0.5; t.secondaryG=0.3; t.secondaryB=0.6; }
+    else if (answers[7]===0) { t.secondaryR=0.851; t.secondaryG=0.275; t.secondaryB=0.937; }
+    else { t.secondaryR=0.388; t.secondaryG=0.400; t.secondaryB=0.945; }
+    t.asymmetry = answers[8]===null ? 0 : answers[8]===0 ? 1 : 0;
+    t.rotation = answers[9]===null ? 0 : answers[9]===0 ? 1 : 0;
+    return t;
+  }
+
+  function colorStr(r, g, b, a) {
+    return `rgba(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)},${a.toFixed(3)})`;
+  }
+
+  let elapsed = 0;
+
+  // Stars
+  const stars = [];
+  for (let i = 0; i < 40; i++) {
+    stars.push({ x: Math.random()*W, y: Math.random()*H, size: 0.5+Math.random(), phase: Math.random()*Math.PI*2, speed: 0.5+Math.random()*1.5 });
+  }
+
+  return function draw(now, dt) {
+    elapsed += dt;
+
+    const targets = getTargets();
+    const k = 1 - Math.exp(-3.0 * dt);
+    for (const key in targets) state[key] += (targets[key] - state[key]) * k;
+
+    // Particles
+    const warmC = Math.round(state.warmParticles*30), coolC = Math.round(state.coolParticles*30);
+    const totalD = warmC+coolC;
+    if (particles.length < totalD && Math.random() < dt*20) {
+      const warm = warmC>0 && (coolC===0 || Math.random()<warmC/(warmC+coolC));
+      const angle = Math.random()*Math.PI*2, dist = 30+Math.random()*100;
+      particles.push({ x: Math.cos(angle)*dist, y: Math.sin(angle)*dist, vx: (Math.random()-0.5)*30, vy: (Math.random()-0.5)*30, life: 1, decay: 0.3+Math.random()*0.5, size: 1.5+Math.random()*2.5, warm });
+    }
+    for (let i=particles.length-1; i>=0; i--) {
+      const p = particles[i]; p.life -= p.decay*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx-=p.x*0.3*dt; p.vy-=p.y*0.3*dt;
+      if (p.life<=0) particles.splice(i,1);
+    }
+    if (totalD===0) for (const p of particles) p.decay=2;
+
+    ctx.clearRect(0,0,W,H);
+
+    // BG glow
+    const bgG = ctx.createRadialGradient(CX,CY,0,CX,CY,200);
+    const gr = (state.primaryR+state.secondaryR)*0.5, gg = (state.primaryG+state.secondaryG)*0.5, gb = (state.primaryB+state.secondaryB)*0.5;
+    bgG.addColorStop(0, colorStr(gr,gg,gb,0.08)); bgG.addColorStop(0.5, colorStr(gr,gg,gb,0.03)); bgG.addColorStop(1, 'rgba(3,7,18,0)');
+    ctx.fillStyle = bgG; ctx.fillRect(0,0,W,H);
+
+    const ringCount = Math.round(state.ringCount);
+    const baseSpacing = 15+state.ringSpacing*40;
+    const pulsePhase = (elapsed/state.pulseSpeed)*Math.PI*2;
+    const amp = 5+state.amplitude*18;
+    const rotAngle = state.rotation*elapsed*0.3;
+
+    ctx.save(); ctx.translate(CX,CY); ctx.rotate(rotAngle);
+
+    for (let i=0; i<ringCount; i++) {
+      const t = ringCount>1 ? i/(ringCount-1) : 0;
+      const cr = state.primaryR+(state.secondaryR-state.primaryR)*t;
+      const cg = state.primaryG+(state.secondaryG-state.primaryG)*t;
+      const cb = state.primaryB+(state.secondaryB-state.primaryB)*t;
+      const po = state.asymmetry*(i*0.7);
+      const pv = Math.sin(pulsePhase+po);
+      let baseR = 30+i*baseSpacing + state.rippleDir*Math.sin(pulsePhase*0.5+i*0.5)*12;
+      const radius = baseR+pv*amp;
+      if (radius<5) continue;
+
+      for (let l=0;l<4;l++) {
+        const lf=l/4, lw=2.5-l*0.5, a=(0.6-lf*0.15)*(0.5+0.5*(1-t*0.3)), sp=l*2;
+        ctx.beginPath(); ctx.arc(0,0,radius+sp,0,Math.PI*2);
+        ctx.strokeStyle=colorStr(cr,cg,cb,a); ctx.lineWidth=lw; ctx.stroke();
+        if (sp>0) { ctx.beginPath(); ctx.arc(0,0,Math.max(5,radius-sp),0,Math.PI*2); ctx.strokeStyle=colorStr(cr,cg,cb,a*0.6); ctx.lineWidth=lw*0.7; ctx.stroke(); }
+      }
+      if (i===0) {
+        const ig=ctx.createRadialGradient(0,0,0,0,0,radius);
+        ig.addColorStop(0,colorStr(cr,cg,cb,0.12+pv*0.04)); ig.addColorStop(0.7,colorStr(cr,cg,cb,0.04)); ig.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=ig; ctx.beginPath(); ctx.arc(0,0,radius,0,Math.PI*2); ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    // Particles
+    for (const p of particles) {
+      const px=CX+p.x, py=CY+p.y, a=Math.max(0,p.life)*0.8;
+      let pr,pg,pb;
+      if (p.warm) { pr=0.063; pg=0.725; pb=0.506; } else { pr=0.024; pg=0.714; pb=0.831; }
+      const gs=p.size*4, pG=ctx.createRadialGradient(px,py,0,px,py,gs);
+      pG.addColorStop(0,colorStr(pr,pg,pb,a*0.6)); pG.addColorStop(0.4,colorStr(pr,pg,pb,a*0.2)); pG.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=pG; ctx.fillRect(px-gs,py-gs,gs*2,gs*2);
+      ctx.beginPath(); ctx.arc(px,py,p.size,0,Math.PI*2); ctx.fillStyle=colorStr(pr,pg,pb,a); ctx.fill();
+    }
+
+    // Stars
+    for (const s of stars) {
+      const tw = 0.15+0.15*Math.sin(elapsed*s.speed+s.phase);
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${tw.toFixed(3)})`; ctx.fill();
+    }
+  };
+})();
+
+// ═══════════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════════
+let lastTime = performance.now();
+
+function frame(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  nebula(now, dt);
+  constellation(now, dt);
+  pulse(now, dt);
+
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

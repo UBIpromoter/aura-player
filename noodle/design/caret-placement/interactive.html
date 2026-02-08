@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caret Placement — Interactive Picker</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+    color: #e2e8f0;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* LEFT: Phone */
+  .phone-side {
+    flex: 0 0 440px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .phone-frame {
+    width: 390px;
+    height: 844px;
+    background: #0d1117;
+    border-radius: 44px;
+    border: 3px solid #1a1a2e;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 60px rgba(0,0,0,0.5);
+  }
+
+  /* RIGHT: Options panel */
+  .options-side {
+    flex: 1;
+    padding: 40px 40px 40px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .options-side h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .options-side .sub {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: -12px;
+  }
+
+  .opt-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .opt-card {
+    background: #111827;
+    border-radius: 14px;
+    padding: 14px;
+    border: 2px solid #1e293b;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .opt-card:hover {
+    border-color: #334155;
+    background: #1a2234;
+  }
+  .opt-card.active {
+    border-color: #8b5cf6;
+    background: rgba(139,92,246,0.08);
+  }
+  .opt-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .opt-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .opt-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+  .opt-preview {
+    background: #1f2937;
+    border-radius: 10px;
+    border: 1px solid rgba(100,116,139,0.2);
+    overflow: hidden;
+  }
+  .opt-preview-inner {
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .mini-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgba(100,116,139,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .mini-circle::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: #64748b;
+    border-right-color: #64748b;
+    transform: rotate(-20deg);
+  }
+  .mini-name {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: #f1f5f9;
+    white-space: nowrap;
+  }
+  .mini-pill {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(100,116,139,0.25);
+    color: #cbd5e1;
+    border: 1px solid rgba(100,116,139,0.3);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .mini-chev {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .mini-chev svg {
+    stroke: #94a3b8;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .opt-desc {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 8px;
+    line-height: 1.35;
+  }
+
+  /* Bottom strip for option C */
+  .mini-bottom-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0 6px;
+    border-top: 1px solid rgba(100,116,139,0.12);
+  }
+
+  /* Phone screen internals */
+  .status-bar {
+    height: 54px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 28px 8px;
+  }
+  .top-bar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+  }
+  .nav-bar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 10px;
+  }
+  .profile-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 6px 16px 10px;
+    justify-content: center;
+  }
+  .tab-pill {
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .scroll-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 14px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Cards in phone */
+  .p-card {
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+  .p-card-inner {
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 2;
+  }
+  .p-circle {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .p-circle-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+  .p-name {
+    flex: 1;
+    font-size: 15.5px;
+    font-weight: 600;
+    color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .p-pill {
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Caret elements inside phone cards */
+  .caret-slot { display: none; }
+  .caret-slot.visible { display: flex; }
+
+  .caret-circle-bg {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(100,116,139,0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .caret-bare {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: 0.5;
+  }
+  .caret-inline {
+    display: flex;
+    align-items: center;
+    opacity: 0.5;
+  }
+
+  .chev-svg {
+    stroke: #94a3b8;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Completed rows */
+  .completed-block {
+    border-radius: 16px;
+    background: #1f2937;
+    border: 1px solid rgba(100,116,139,0.1);
+    overflow: hidden;
+  }
+  .completed-row {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0.7;
+  }
+  .completed-row + .completed-row {
+    border-top: 1px solid rgba(100,116,139,0.1);
+  }
+  .completed-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  .home-bar {
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Split pill for option D */
+  .split-pill-wrap {
+    display: flex;
+    align-items: stretch;
+    flex-shrink: 0;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .split-pill-left {
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 6px 8px 6px 14px;
+    white-space: nowrap;
+  }
+  .split-pill-right {
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Bottom strip inside phone card */
+  .p-bottom-strip {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0 8px;
+    border-top: 1px solid rgba(100,116,139,0.12);
+  }
+  .p-bottom-strip.visible { display: flex; }
+</style>
+</head>
+<body>
+
+<!-- LEFT: Phone screen -->
+<div class="phone-side">
+  <div class="phone-frame">
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span style="color:#fff; font-size:15px; font-weight:600;">9:41</span>
+      <div style="display:flex; gap:5px; align-items:center;">
+        <span style="color:#fff; font-size:11px;">▂▄▆█</span>
+        <span style="color:#fff; font-size:13px;">⚡</span>
+      </div>
+    </div>
+
+    <!-- Top bar -->
+    <div class="top-bar">
+      <div style="width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,#3b82f6,#8b5cf6); display:flex; align-items:center; justify-content:center; font-size:12px;">🌀</div>
+      <div style="flex:1; text-align:center; color:#94a3b8; font-size:13px;">0 answered</div>
+      <span style="color:#f59e0b; font-size:13px;">🔥3</span>
+      <div style="width:26px; height:26px; border-radius:50%; border:1.5px dashed #475569; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:12px;">?</div>
+      <span style="color:#64748b; font-size:15px;">☰</span>
+    </div>
+
+    <!-- Nav bar -->
+    <div class="nav-bar">
+      <span style="color:#94a3b8; font-size:18px;">←</span>
+      <span style="font-size:15px;">🕯️</span>
+      <span style="color:#fff; font-size:16px; font-weight:700; flex:1;">Reveal</span>
+      <div style="background:linear-gradient(135deg,#d946ef,#f43f5e); padding:5px 14px; border-radius:999px; font-size:12px; font-weight:600; color:#fff;">Analysis</div>
+    </div>
+
+    <!-- Profile tabs -->
+    <div class="profile-tabs">
+      <div class="tab-pill" style="border:1px solid #8b5cf6; color:#8b5cf6;">Me</div>
+      <div class="tab-pill" style="color:#64748b;">DEMO ⓘ</div>
+      <div class="tab-pill" style="border:1px solid #475569; color:#e2e8f0;">Alex</div>
+      <div class="tab-pill" style="border:1px solid #3b82f6; color:#3b82f6;">Bob</div>
+      <div class="tab-pill" style="border:1px solid #f43f5e; color:#f43f5e;">Cindy</div>
+    </div>
+
+    <!-- Scrollable cards -->
+    <div class="scroll-content">
+
+      <!-- PERSONALITY (Hero) -->
+      <div class="p-card" style="background:#1f2937; border:1px solid rgba(139,92,246,0.3);">
+        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:1;">
+          <div style="width:220px; height:220px; border-radius:50%; background:radial-gradient(ellipse at center, rgba(139,92,246,0.12) 0%, transparent 70%);"></div>
+        </div>
+        <div class="p-card-inner">
+          <div class="p-circle">
+            <svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(139,92,246,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="47.75 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+            <div class="p-circle-num" style="font-size:11px; color:#a78bfa;">40%</div>
+          </div>
+          <div class="p-name">Personality</div>
+          <div class="p-pill" style="background:rgba(139,92,246,0.25); color:#c4b5fd; border:1px solid rgba(139,92,246,0.3);">Continue →</div>
+        </div>
+      </div>
+
+      <!-- SHADOW SELF (multi-test) -->
+      <div class="p-card multi-card" style="background:#1f2937; border:1px solid rgba(100,116,139,0.2);" data-color="slate">
+        <div class="p-card-inner">
+          <div class="p-circle">
+            <svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(100,116,139,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#64748b" stroke-width="3" stroke-dasharray="80 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+            <div class="p-circle-num" style="font-size:13px; color:#94a3b8;">2</div>
+          </div>
+          <div class="p-name">
+            Shadow Self
+            <!-- F: inline caret -->
+            <span class="caret-slot caret-f caret-inline"><svg class="chev-svg" width="14" height="14" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+          </div>
+          <!-- B: left of pill -->
+          <span class="caret-slot caret-b caret-circle-bg"><svg class="chev-svg" width="14" height="14" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+          <!-- Normal pill (shown for A, B, C, E, F) -->
+          <div class="p-pill normal-pill" style="background:rgba(100,116,139,0.25); color:#cbd5e1; border:1px solid rgba(100,116,139,0.3);">Continue →</div>
+          <!-- D: split pill (hidden by default) -->
+          <div class="caret-slot caret-d split-pill-wrap" style="border:1px solid rgba(100,116,139,0.3);">
+            <div class="split-pill-left" style="background:rgba(100,116,139,0.25); color:#cbd5e1;">Continue →</div>
+            <div class="split-pill-right" style="background:rgba(100,116,139,0.15); border-left:1px solid rgba(100,116,139,0.3);">
+              <svg class="chev-svg" width="12" height="12" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg>
+            </div>
+          </div>
+          <!-- A: right of pill -->
+          <span class="caret-slot caret-a caret-circle-bg"><svg class="chev-svg" width="14" height="14" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+          <!-- E: bare chevron -->
+          <span class="caret-slot caret-e caret-bare"><svg class="chev-svg" width="18" height="18" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+        </div>
+        <!-- C: bottom strip -->
+        <div class="p-bottom-strip caret-c-strip">
+          <svg class="chev-svg" width="16" height="16" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+      </div>
+
+      <!-- MIND (multi-test) -->
+      <div class="p-card multi-card" style="background:#1f2937; border:1px solid rgba(59,130,246,0.2);" data-color="blue">
+        <div class="p-card-inner">
+          <div class="p-circle">
+            <svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(59,130,246,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#3b82f6" stroke-width="3" stroke-dasharray="20 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+            <div class="p-circle-num" style="font-size:13px; color:#60a5fa;">4</div>
+          </div>
+          <div class="p-name">
+            Mind
+            <span class="caret-slot caret-f caret-inline"><svg class="chev-svg" width="14" height="14" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+          </div>
+          <span class="caret-slot caret-b caret-circle-bg"><svg class="chev-svg" width="14" height="14" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+          <div class="p-pill normal-pill" style="background:rgba(59,130,246,0.25); color:#93c5fd; border:1px solid rgba(59,130,246,0.3);">Continue →</div>
+          <div class="caret-slot caret-d split-pill-wrap" style="border:1px solid rgba(59,130,246,0.3);">
+            <div class="split-pill-left" style="background:rgba(59,130,246,0.25); color:#93c5fd;">Continue →</div>
+            <div class="split-pill-right" style="background:rgba(59,130,246,0.15); border-left:1px solid rgba(59,130,246,0.3);">
+              <svg class="chev-svg" width="12" height="12" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg>
+            </div>
+          </div>
+          <span class="caret-slot caret-a caret-circle-bg"><svg class="chev-svg" width="14" height="14" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+          <span class="caret-slot caret-e caret-bare"><svg class="chev-svg" width="18" height="18" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+        </div>
+        <div class="p-bottom-strip caret-c-strip">
+          <svg class="chev-svg" width="16" height="16" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+      </div>
+
+      <!-- BEHAVIOR (single-test, no caret) -->
+      <div class="p-card" style="background:#1f2937; border:1px solid rgba(245,158,11,0.2);">
+        <div class="p-card-inner">
+          <div class="p-circle">
+            <svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(245,158,11,0.15)" stroke-width="3"/></svg>
+            <div class="p-circle-num" style="font-size:13px; color:#fbbf24;">15</div>
+          </div>
+          <div class="p-name">Behavior</div>
+          <div class="p-pill" style="background:rgba(245,158,11,0.25); color:#fcd34d; border:1px solid rgba(245,158,11,0.3);">Start →</div>
+        </div>
+      </div>
+
+      <!-- COMPLETED -->
+      <div class="completed-block">
+        <div class="completed-row">
+          <div class="completed-icon" style="background:rgba(59,130,246,0.15);">✨</div>
+          <div style="flex:1; font-size:13px; color:#94a3b8;">Quick Profile</div>
+          <span style="color:#475569; font-size:14px;">›</span>
+        </div>
+        <div class="completed-row">
+          <div class="completed-icon" style="background:rgba(99,102,241,0.15);">🚀</div>
+          <div style="flex:1; font-size:13px; color:#94a3b8;">Starter Pack</div>
+          <span style="color:#475569; font-size:14px;">›</span>
+        </div>
+        <div class="completed-row">
+          <div class="completed-icon" style="background:rgba(16,185,129,0.15);">💎</div>
+          <div style="flex:1; font-size:13px; color:#94a3b8;">Character</div>
+          <span style="color:#475569; font-size:14px;">›</span>
+        </div>
+        <div class="completed-row">
+          <div class="completed-icon" style="background:rgba(217,70,239,0.15);">💚</div>
+          <div style="flex:1; font-size:13px; color:#94a3b8;">Relationships</div>
+          <span style="color:#475569; font-size:14px;">›</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Home indicator -->
+    <div class="home-bar">
+      <div style="width:130px; height:5px; border-radius:3px; background:#333;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT: Options panel -->
+<div class="options-side">
+  <h1>Where should the expand caret go?</h1>
+  <p class="sub">Click an option to see it on Shadow Self + Mind cards</p>
+
+  <div class="opt-grid">
+
+    <!-- A -->
+    <div class="opt-card" data-option="a" onclick="selectOption('a')">
+      <div class="opt-card-head">
+        <div class="opt-badge" style="background:rgba(239,68,68,0.15); color:#f87171;">A</div>
+        <div class="opt-name">Right of pill</div>
+      </div>
+      <div class="opt-preview">
+        <div class="opt-preview-inner">
+          <div class="mini-circle">2</div>
+          <div class="mini-name">Shadow Self</div>
+          <div class="mini-pill">Continue →</div>
+          <div class="mini-chev" style="width:22px; height:22px; background:rgba(100,116,139,0.12); border-radius:50%; display:flex; align-items:center; justify-content:center;">
+            <svg width="12" height="12" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="opt-desc">Circle button after pill. Two distinct tap targets.</div>
+    </div>
+
+    <!-- B -->
+    <div class="opt-card" data-option="b" onclick="selectOption('b')">
+      <div class="opt-card-head">
+        <div class="opt-badge" style="background:rgba(245,158,11,0.15); color:#fbbf24;">B</div>
+        <div class="opt-name">Left of pill</div>
+      </div>
+      <div class="opt-preview">
+        <div class="opt-preview-inner">
+          <div class="mini-circle">2</div>
+          <div class="mini-name">Shadow Self</div>
+          <div class="mini-chev" style="width:22px; height:22px; background:rgba(100,116,139,0.12); border-radius:50%; display:flex; align-items:center; justify-content:center;">
+            <svg width="12" height="12" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg>
+          </div>
+          <div class="mini-pill">Continue →</div>
+        </div>
+      </div>
+      <div class="opt-desc">Between name and action. L→R: expand → start.</div>
+    </div>
+
+    <!-- C -->
+    <div class="opt-card" data-option="c" onclick="selectOption('c')">
+      <div class="opt-card-head">
+        <div class="opt-badge" style="background:rgba(16,185,129,0.15); color:#34d399;">C</div>
+        <div class="opt-name">Bottom strip</div>
+      </div>
+      <div class="opt-preview">
+        <div class="opt-preview-inner">
+          <div class="mini-circle">2</div>
+          <div class="mini-name">Shadow Self</div>
+          <div class="mini-pill">Continue →</div>
+        </div>
+        <div class="mini-bottom-strip">
+          <svg width="14" height="14" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+      </div>
+      <div class="opt-desc">Clean row. Bottom hint = "expandable." Adds height.</div>
+    </div>
+
+    <!-- D -->
+    <div class="opt-card" data-option="d" onclick="selectOption('d')">
+      <div class="opt-card-head">
+        <div class="opt-badge" style="background:rgba(59,130,246,0.15); color:#60a5fa;">D</div>
+        <div class="opt-name">Split pill</div>
+      </div>
+      <div class="opt-preview">
+        <div class="opt-preview-inner">
+          <div class="mini-circle">2</div>
+          <div class="mini-name">Shadow Self</div>
+          <div style="display:flex; align-items:stretch; border-radius:999px; overflow:hidden; border:1px solid rgba(100,116,139,0.3);">
+            <div style="font-size:10px; font-weight:500; padding:3px 6px 3px 8px; background:rgba(100,116,139,0.25); color:#cbd5e1;">Continue →</div>
+            <div style="padding:0 6px; background:rgba(100,116,139,0.15); display:flex; align-items:center; border-left:1px solid rgba(100,116,139,0.3);">
+              <svg width="10" height="10" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="opt-desc">One unit, two zones. Left = start, right = expand.</div>
+    </div>
+
+    <!-- E -->
+    <div class="opt-card" data-option="e" onclick="selectOption('e')">
+      <div class="opt-card-head">
+        <div class="opt-badge" style="background:rgba(217,70,239,0.15); color:#e879f9;">E</div>
+        <div class="opt-name">Bare chevron</div>
+      </div>
+      <div class="opt-preview">
+        <div class="opt-preview-inner">
+          <div class="mini-circle">2</div>
+          <div class="mini-name">Shadow Self</div>
+          <div class="mini-pill">Continue →</div>
+          <div class="mini-chev" style="opacity:0.5; margin-left:-4px;">
+            <svg width="16" height="16" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="opt-desc">Just a ˅ at the edge. No background. Lightest touch.</div>
+    </div>
+
+    <!-- F -->
+    <div class="opt-card" data-option="f" onclick="selectOption('f')">
+      <div class="opt-card-head">
+        <div class="opt-badge" style="background:rgba(6,182,212,0.15); color:#22d3ee;">F</div>
+        <div class="opt-name">Inline after name</div>
+      </div>
+      <div class="opt-preview">
+        <div class="opt-preview-inner">
+          <div class="mini-circle">2</div>
+          <div class="mini-name" style="display:flex; align-items:center; gap:4px;">
+            Shadow Self
+            <span class="mini-chev" style="opacity:0.5;"><svg width="12" height="12" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg></span>
+          </div>
+          <div class="mini-pill">Continue →</div>
+        </div>
+      </div>
+      <div class="opt-desc">Part of the label. Rotates on expand. Current spot, bigger.</div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: 8px; padding: 14px 18px; background:#111827; border-radius:12px; border:1px solid #1e293b;">
+    <div style="font-size:12px; color:#64748b; line-height:1.5;">
+      <strong style="color:#94a3b8;">Note:</strong> Carets only appear on multi-test cards (Shadow Self, Mind). Single-test cards (Personality, Behavior) and completed rows are unaffected.
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentOption = null;
+
+  function selectOption(opt) {
+    // Update active card
+    document.querySelectorAll('.opt-card').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.opt-card[data-option="${opt}"]`).classList.add('active');
+
+    // Hide all caret slots
+    document.querySelectorAll('.caret-slot').forEach(el => el.classList.remove('visible'));
+    document.querySelectorAll('.p-bottom-strip').forEach(el => el.classList.remove('visible'));
+
+    // Show/hide normal pill vs split pill
+    const showNormalPill = opt !== 'd';
+    document.querySelectorAll('.multi-card .normal-pill').forEach(el => {
+      el.style.display = showNormalPill ? '' : 'none';
+    });
+
+    // Show the chosen option's carets
+    document.querySelectorAll(`.caret-${opt}`).forEach(el => el.classList.add('visible'));
+
+    // For option C, show bottom strips
+    if (opt === 'c') {
+      document.querySelectorAll('.caret-c-strip').forEach(el => el.classList.add('visible'));
+    }
+
+    currentOption = opt;
+  }
+
+  // Start with no selection — clean screen
+</script>
+
+</body>
+</html>

@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Breath V7 — Bigger Center</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #030712;
+    overflow-x: hidden;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     AURA BREATH V7 — V5 Design with BIGGER CENTER
+     Same slow, meditative character — just a larger glowing orb
+     ══════════════════════════════════════════════════════════════ */
+
+  .aura-container {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Deep ambient background glow — large and soft */
+  .aura-ambient {
+    position: absolute;
+    width: 400%;
+    height: 400%;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(139, 92, 246, 0.15) 0%,
+      rgba(139, 92, 246, 0.08) 20%,
+      rgba(139, 92, 246, 0.03) 40%,
+      transparent 60%
+    );
+    pointer-events: none;
+    z-index: 0;
+    animation: ambient-breathe 12s ease-in-out infinite;
+  }
+
+  @keyframes ambient-breathe {
+    0%, 100% {
+      transform: scale(0.9);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 1;
+    }
+  }
+
+  /* BIGGER central core glow — the main aura (was 160px, now 260px) */
+  .aura-core {
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(167, 139, 250, 0.7) 0%,
+      rgba(139, 92, 246, 0.5) 30%,
+      rgba(139, 92, 246, 0.25) 50%,
+      rgba(139, 92, 246, 0.1) 70%,
+      transparent 85%
+    );
+    filter: blur(25px);
+    z-index: 10;
+    animation: core-breathe 10s ease-in-out infinite;
+  }
+
+  @keyframes core-breathe {
+    0%, 100% {
+      transform: scale(0.85);
+      opacity: 0.8;
+      filter: blur(25px);
+    }
+    50% {
+      transform: scale(1.15);
+      opacity: 1;
+      filter: blur(30px);
+    }
+  }
+
+  /* Secondary core layer — BIGGER (was 100px, now 180px) */
+  .aura-core-inner {
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(196, 181, 253, 0.9) 0%,
+      rgba(167, 139, 250, 0.7) 30%,
+      rgba(139, 92, 246, 0.4) 60%,
+      transparent 80%
+    );
+    filter: blur(15px);
+    z-index: 15;
+    animation: core-inner-breathe 10s ease-in-out infinite;
+  }
+
+  @keyframes core-inner-breathe {
+    0%, 100% {
+      transform: scale(0.9);
+      opacity: 0.9;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 1;
+    }
+  }
+
+  /* Bright center point — BIGGER (was 24px, now 50px) */
+  .aura-center {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(237, 233, 254, 0.9) 30%,
+      rgba(196, 181, 253, 0.8) 60%,
+      rgba(167, 139, 250, 0.5) 100%
+    );
+    z-index: 25;
+    box-shadow:
+      0 0 40px rgba(196, 181, 253, 0.8),
+      0 0 80px rgba(167, 139, 250, 0.6),
+      0 0 130px rgba(139, 92, 246, 0.4),
+      0 0 200px rgba(139, 92, 246, 0.2);
+    animation: center-glow 10s ease-in-out infinite;
+  }
+
+  @keyframes center-glow {
+    0%, 100% {
+      transform: scale(0.95);
+      box-shadow:
+        0 0 40px rgba(196, 181, 253, 0.7),
+        0 0 80px rgba(167, 139, 250, 0.5),
+        0 0 130px rgba(139, 92, 246, 0.3),
+        0 0 200px rgba(139, 92, 246, 0.15);
+    }
+    50% {
+      transform: scale(1.05);
+      box-shadow:
+        0 0 50px rgba(196, 181, 253, 0.9),
+        0 0 100px rgba(167, 139, 250, 0.7),
+        0 0 160px rgba(139, 92, 246, 0.5),
+        0 0 240px rgba(139, 92, 246, 0.25);
+    }
+  }
+
+  /* Energy wave rings — slow ripples outward */
+  .energy-wave {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    /* Soft glowing ring, not hard edge */
+    background: transparent;
+    opacity: 0;
+  }
+
+  /* Wave animation — starts from LARGER radius (0.4 instead of 0.15) */
+  @keyframes wave-expand {
+    0% {
+      transform: scale(0.4);
+      opacity: 0;
+    }
+    8% {
+      opacity: var(--wave-opacity, 0.6);
+    }
+    70% {
+      opacity: calc(var(--wave-opacity, 0.6) * 0.4);
+    }
+    100% {
+      transform: scale(var(--max-scale, 1.2));
+      opacity: 0;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     TRAIT LEGEND
+     ══════════════════════════════════════════════════════════════ */
+
+  .legend-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .legend-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .legend-item:first-child {
+    padding-top: 0;
+  }
+
+  .legend-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+  }
+
+  .legend-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .legend-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .legend-trait-name {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .legend-percent {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend-mapping {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.5;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLS
+     ══════════════════════════════════════════════════════════════ */
+
+  .control-btn {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+  }
+
+  .control-btn.primary {
+    background: #8b5cf6;
+    color: white;
+  }
+
+  .control-btn.primary:hover {
+    background: #7c3aed;
+    transform: translateY(-1px);
+  }
+
+  .control-btn.secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .control-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  .control-btn:active {
+    transform: scale(0.97);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     SECTION STYLING
+     ══════════════════════════════════════════════════════════════ */
+
+  .section-header {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 10px;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     INSIGHT CARD
+     ══════════════════════════════════════════════════════════════ */
+
+  .insight-card {
+    text-align: center;
+    padding: 14px;
+    background: rgba(139, 92, 246, 0.05);
+    border-radius: 14px;
+    border: 1px solid rgba(139, 92, 246, 0.1);
+  }
+
+  .insight-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 6px;
+  }
+
+  .insight-text {
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .insight-text strong {
+    color: #c4b5fd;
+    font-weight: 500;
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start p-6 gap-5">
+
+  <!-- Header -->
+  <div class="text-center">
+    <div class="text-xl font-semibold mb-1 text-white">Your Aura Breath</div>
+    <div class="text-xs text-gray-500 uppercase tracking-widest">V7 — Bigger Center</div>
+  </div>
+
+  <!-- Main Visualization -->
+  <div class="aura-container" id="aura-container">
+    <!-- Deep ambient background glow -->
+    <div class="aura-ambient" id="aura-ambient"></div>
+
+    <!-- Large core glow -->
+    <div class="aura-core" id="aura-core"></div>
+
+    <!-- Inner core layer -->
+    <div class="aura-core-inner" id="aura-core-inner"></div>
+
+    <!-- Bright center point -->
+    <div class="aura-center" id="aura-center"></div>
+
+    <!-- Energy waves will be generated by JS -->
+  </div>
+
+  <!-- Trait Legend -->
+  <div class="w-full max-w-sm">
+    <div class="section-header">Breath Encoding</div>
+    <div class="legend-card">
+      <!-- Energy → Wave Speed -->
+      <div class="legend-item">
+        <div class="legend-icon" style="background: rgba(244, 114, 182, 0.15);">
+          <span style="color: #f472b6;">~</span>
+        </div>
+        <div class="legend-content">
+          <div class="legend-header">
+            <span class="legend-trait-name" style="color: #f472b6;">Energy</span>
+            <span class="legend-percent" id="energy-pct" style="color: #f472b6;">72%</span>
+          </div>
+          <div class="legend-mapping">Breath rhythm. Fast breath = active energy. Slow, deep breath = grounded presence.</div>
+        </div>
+      </div>
+
+      <!-- Openness → Wave Reach -->
+      <div class="legend-item">
+        <div class="legend-icon" style="background: rgba(96, 165, 250, 0.15);">
+          <span style="color: #60a5fa;">&#10687;</span>
+        </div>
+        <div class="legend-content">
+          <div class="legend-header">
+            <span class="legend-trait-name" style="color: #60a5fa;">Openness</span>
+            <span class="legend-percent" id="openness-pct" style="color: #60a5fa;">85%</span>
+          </div>
+          <div class="legend-mapping">Energy reach. Wide expansion = outward curiosity. Contained = focused depth.</div>
+        </div>
+      </div>
+
+      <!-- Feeling → Wave Intensity -->
+      <div class="legend-item">
+        <div class="legend-icon" style="background: rgba(167, 139, 250, 0.15);">
+          <span style="color: #a78bfa;">&#9672;</span>
+        </div>
+        <div class="legend-content">
+          <div class="legend-header">
+            <span class="legend-trait-name" style="color: #a78bfa;">Feeling</span>
+            <span class="legend-percent" id="feeling-pct" style="color: #a78bfa;">65%</span>
+          </div>
+          <div class="legend-mapping">Glow intensity. Bright, layered glow = emotional depth. Subtle = analytical clarity.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Personality Insight -->
+  <div class="insight-card w-full max-w-sm" id="insight-card">
+    <div class="insight-label">Your Breath Signature</div>
+    <p class="insight-text" id="insight-text">
+      Your aura breathes with <strong>calm rhythm</strong>, expanding <strong>wide into possibility</strong>, glowing with <strong>emotional richness</strong>.
+    </p>
+  </div>
+
+  <!-- Controls -->
+  <div class="flex gap-3">
+    <button onclick="shuffle()" class="control-btn primary">Shuffle Profile</button>
+    <button onclick="resetToDefault()" class="control-btn secondary">Reset</button>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AURA BREATH V7 — V5 with BIGGER CENTER
+// Same slow, meditative character — just a larger glowing orb
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Core state
+let traits = {
+  energy: 72,    // Controls breath SPEED (slower = more meditative)
+  openness: 85,  // Controls wave REACH (how far they expand)
+  feeling: 65,   // Controls GLOW intensity (brightness/layers)
+};
+
+// Wave color palette — soft, ethereal (same as V5)
+const WAVE_COLORS = [
+  { color: 'rgba(139, 92, 246, 0.4)', glow: 'rgba(139, 92, 246, 0.2)' },  // violet
+  { color: 'rgba(167, 139, 250, 0.35)', glow: 'rgba(167, 139, 250, 0.18)' }, // purple
+  { color: 'rgba(96, 165, 250, 0.3)', glow: 'rgba(96, 165, 250, 0.15)' },   // blue
+  { color: 'rgba(196, 181, 253, 0.3)', glow: 'rgba(196, 181, 253, 0.15)' }, // lavender
+];
+
+// Container reference
+const container = document.getElementById('aura-container');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WAVE PARAMETERS — Same timing as V5
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getWaveParams() {
+  const e = traits.energy;
+  const o = traits.openness;
+  const f = traits.feeling;
+
+  return {
+    // Spawn interval: 4s (high energy) to 12s (low energy) — MUCH slower
+    spawnInterval: 12000 - (e / 100) * 8000,
+
+    // Wave duration: 15s (high energy) to 30s (low energy) — very slow drift
+    duration: 30 - (e / 100) * 15,
+
+    // Max scale: 0.8 (low openness) to 1.4 (high openness)
+    maxScale: 0.8 + (o / 100) * 0.6,
+
+    // Wave count per spawn: 2-4 (low feeling) to 4-6 (high feeling)
+    waveCount: Math.floor(2 + (f / 100) * 4),
+
+    // Glow thickness: softer rings
+    thickness: 2 + (f / 100) * 3,
+
+    // Opacity: how visible the waves are
+    opacity: 0.3 + (f / 100) * 0.4,
+
+    // Blur amount for soft glow
+    blur: 4 + (f / 100) * 8,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WAVE CREATION — Soft glowing rings that drift outward slowly
+// Waves now start from LARGER radius (scale 0.4 instead of 0.15)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function createWave(delay = 0, waveIndex = 0) {
+  const params = getWaveParams();
+
+  // Color varies by wave index
+  const colorSet = WAVE_COLORS[waveIndex % WAVE_COLORS.length];
+
+  const wave = document.createElement('div');
+  wave.className = 'energy-wave';
+
+  // Size based on container
+  const size = 320;
+  wave.style.width = `${size}px`;
+  wave.style.height = `${size}px`;
+
+  // Soft glowing ring using box-shadow for glow effect
+  const thickness = params.thickness;
+  const blur = params.blur;
+
+  wave.style.boxShadow = `
+    inset 0 0 0 ${thickness}px ${colorSet.color},
+    inset 0 0 ${blur * 2}px ${thickness * 2}px ${colorSet.glow},
+    0 0 ${blur}px ${thickness}px ${colorSet.glow}
+  `;
+
+  wave.style.setProperty('--wave-opacity', params.opacity);
+  wave.style.setProperty('--max-scale', params.maxScale);
+
+  // Animation — SLOW drift outward
+  // Slight variance per wave for organic feel
+  const durationVariance = waveIndex * 2;
+  const duration = params.duration + durationVariance;
+
+  wave.style.animation = `wave-expand ${duration}s ease-out forwards`;
+  wave.style.animationDelay = `${delay}ms`;
+  wave.style.transformOrigin = 'center center';
+  wave.style.filter = `blur(${blur / 2}px)`;
+
+  container.appendChild(wave);
+
+  // Remove wave after animation completes
+  setTimeout(() => {
+    wave.remove();
+  }, (duration * 1000) + delay + 500);
+
+  return wave;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SPAWN LOOP — Gentle waves at long intervals
+// ═══════════════════════════════════════════════════════════════════════════
+
+function spawnWaveSet() {
+  const params = getWaveParams();
+  const waveCount = params.waveCount;
+
+  // Spawn waves with staggered delays for layered effect
+  // Stagger is slower too — 800-1500ms between waves in a set
+  for (let i = 0; i < waveCount; i++) {
+    const stagger = 800 + (i * 700);
+    createWave(stagger, i);
+  }
+}
+
+let spawnInterval;
+
+function startBreathing() {
+  // Initial spawn
+  spawnWaveSet();
+
+  // Recurring spawn at slow intervals
+  const tick = () => {
+    const params = getWaveParams();
+    spawnWaveSet();
+    spawnInterval = setTimeout(tick, params.spawnInterval);
+  };
+
+  const params = getWaveParams();
+  spawnInterval = setTimeout(tick, params.spawnInterval);
+}
+
+function stopBreathing() {
+  if (spawnInterval) {
+    clearTimeout(spawnInterval);
+  }
+}
+
+function restartBreathing() {
+  stopBreathing();
+  // Clear existing waves
+  container.querySelectorAll('.energy-wave').forEach(w => w.remove());
+  startBreathing();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CORE GLOW — BIGGER sizes (roughly 1.6x V5)
+// V5 core: 140-200px → V7 core: 220-300px
+// V5 inner: 80-120px → V7 inner: 150-220px
+// V5 center: 20-32px → V7 center: 40-60px
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateCoreGlow() {
+  const core = document.getElementById('aura-core');
+  const coreInner = document.getElementById('aura-core-inner');
+  const center = document.getElementById('aura-center');
+  const ambient = document.getElementById('aura-ambient');
+
+  // BIGGER core sizes based on feeling
+  const coreSize = 220 + (traits.feeling / 100) * 80;
+  const coreInnerSize = 150 + (traits.feeling / 100) * 70;
+  const centerSize = 40 + (traits.feeling / 100) * 20;
+
+  core.style.width = `${coreSize}px`;
+  core.style.height = `${coreSize}px`;
+  coreInner.style.width = `${coreInnerSize}px`;
+  coreInner.style.height = `${coreInnerSize}px`;
+  center.style.width = `${centerSize}px`;
+  center.style.height = `${centerSize}px`;
+
+  // Glow intensity based on feeling
+  const intensity = 0.5 + (traits.feeling / 100) * 0.5;
+  const blurAmount = 20 + (traits.feeling / 100) * 15;
+
+  // Color blend based on openness
+  const violet = [139, 92, 246];
+  const purple = [167, 139, 250];
+  const blend = traits.openness / 100;
+
+  const r = Math.round(violet[0] * (1 - blend * 0.2) + purple[0] * (blend * 0.2));
+  const g = Math.round(violet[1] * (1 - blend * 0.2) + purple[1] * (blend * 0.2));
+  const b = Math.round(violet[2] * (1 - blend * 0.2) + purple[2] * (blend * 0.2));
+
+  // Update core glow
+  core.style.background = `radial-gradient(circle,
+    rgba(${r + 28}, ${g + 47}, ${b + 4}, ${intensity * 0.8}) 0%,
+    rgba(${r}, ${g}, ${b}, ${intensity * 0.6}) 30%,
+    rgba(${r}, ${g}, ${b}, ${intensity * 0.3}) 50%,
+    rgba(${r}, ${g}, ${b}, ${intensity * 0.1}) 70%,
+    transparent 85%
+  )`;
+  core.style.filter = `blur(${blurAmount}px)`;
+
+  // Update inner core
+  coreInner.style.background = `radial-gradient(circle,
+    rgba(196, 181, 253, ${intensity}) 0%,
+    rgba(${r + 28}, ${g + 47}, ${b + 4}, ${intensity * 0.8}) 30%,
+    rgba(${r}, ${g}, ${b}, ${intensity * 0.5}) 60%,
+    transparent 80%
+  )`;
+  coreInner.style.filter = `blur(${blurAmount * 0.6}px)`;
+
+  // Update center glow — BIGGER box-shadows for larger center
+  const glowIntensity = intensity * 1.2;
+  center.style.boxShadow = `
+    0 0 ${40 * glowIntensity}px rgba(196, 181, 253, ${glowIntensity}),
+    0 0 ${80 * glowIntensity}px rgba(${r + 28}, ${g + 47}, ${b + 4}, ${glowIntensity * 0.8}),
+    0 0 ${130 * glowIntensity}px rgba(${r}, ${g}, ${b}, ${glowIntensity * 0.5}),
+    0 0 ${200 * glowIntensity}px rgba(${r}, ${g}, ${b}, ${glowIntensity * 0.25})
+  `;
+
+  // Update ambient glow opacity based on feeling
+  ambient.style.opacity = 0.6 + (traits.feeling / 100) * 0.4;
+
+  // Update breath animation speeds based on energy
+  // Lower energy = slower, more meditative breathing
+  const breathDuration = 8 + ((100 - traits.energy) / 100) * 8; // 8-16s
+
+  core.style.animationDuration = `${breathDuration}s`;
+  coreInner.style.animationDuration = `${breathDuration}s`;
+  center.style.animationDuration = `${breathDuration}s`;
+  ambient.style.animationDuration = `${breathDuration * 1.2}s`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UI UPDATES
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateUI() {
+  // Update percentages
+  document.getElementById('energy-pct').textContent = traits.energy + '%';
+  document.getElementById('openness-pct').textContent = traits.openness + '%';
+  document.getElementById('feeling-pct').textContent = traits.feeling + '%';
+
+  // Update insight text
+  const e = traits.energy;
+  const o = traits.openness;
+  const f = traits.feeling;
+
+  const energyPhrase = e > 70 ? 'active rhythm'
+    : e > 50 ? 'steady breath'
+    : e > 30 ? 'calm presence'
+    : 'deep stillness';
+
+  const openPhrase = o > 70 ? 'expanding wide into possibility'
+    : o > 50 ? 'reaching with intention'
+    : o > 30 ? 'focused inward'
+    : 'deeply centered';
+
+  const feelPhrase = f > 70 ? 'luminous emotional depth'
+    : f > 50 ? 'warm radiance'
+    : f > 30 ? 'subtle glow'
+    : 'quiet clarity';
+
+  document.getElementById('insight-text').innerHTML =
+    `Your aura breathes with <strong>${energyPhrase}</strong>, <strong>${openPhrase}</strong>, glowing with <strong>${feelPhrase}</strong>.`;
+
+  // Update core glow
+  updateCoreGlow();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function shuffle() {
+  const randomTrait = () => {
+    const r = Math.random();
+    if (r < 0.35) return 15 + Math.random() * 25;
+    if (r > 0.65) return 60 + Math.random() * 35;
+    return 35 + Math.random() * 30;
+  };
+
+  traits = {
+    energy: Math.round(randomTrait()),
+    openness: Math.round(randomTrait()),
+    feeling: Math.round(randomTrait()),
+  };
+
+  updateUI();
+  restartBreathing();
+}
+
+function resetToDefault() {
+  traits = { energy: 72, openness: 85, feeling: 65 };
+  updateUI();
+  restartBreathing();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+updateUI();
+startBreathing();
+
+// Pause when hidden for performance
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopBreathing();
+  } else {
+    restartBreathing();
+  }
+});
+</script>
+</body>
+</html>

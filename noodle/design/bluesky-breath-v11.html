@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Breath V11 — Bioluminescent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #030712;
+    color: white;
+    overflow-x: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    gap: 20px;
+  }
+
+  /* Light mode */
+  body.light {
+    background: #f0f0f4;
+  }
+  body.light .phone-outer {
+    background: linear-gradient(145deg, #d8d8dc, #c0c0c4);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 0 0 1px rgba(0,0,0,0.1), 0 20px 60px rgba(0,0,0,0.15);
+  }
+  body.light .phone-inner {
+    background: #f9fafb;
+  }
+  body.light .dynamic-island {
+    background: #1a1a1c;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     PHONE FRAME
+     ══════════════════════════════════════════════════════════════ */
+
+  .phone-outer {
+    width: calc(393px + 16px);
+    height: calc(852px + 16px);
+    border-radius: 55px;
+    padding: 8px;
+    background: linear-gradient(145deg, #2a2a2e, #1a1a1c);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.06),
+      0 0 0 1px rgba(0,0,0,0.3),
+      0 20px 80px rgba(0,0,0,0.5);
+    flex-shrink: 0;
+  }
+
+  .phone-inner {
+    width: 393px;
+    height: 852px;
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    background: #030712;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .dynamic-island {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 37px;
+    border-radius: 20px;
+    background: #000;
+    z-index: 100;
+  }
+
+  body.light .phone-inner {
+    background: #0a0a12;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     AURA STAGE — inside the phone
+     ══════════════════════════════════════════════════════════════ */
+
+  .aura-stage {
+    position: relative;
+    width: 393px;
+    height: 520px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 50px;
+    overflow: visible;
+  }
+
+  /* Canvas for organic energy waves */
+  #energy-canvas {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     ORB LAYERS — Extremely soft, no hard edges
+     All layers use heavy blur to dissolve boundaries
+     mix-blend-mode: screen for natural light mixing
+     ══════════════════════════════════════════════════════════════ */
+
+  .orb-layer {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+
+  /* Deepest ambient — fills the entire phone screen softly */
+  .orb-ambient {
+    width: 700px;
+    height: 700px;
+    filter: blur(80px);
+    opacity: 0.5;
+    z-index: 1;
+    animation: ambient-drift 16s ease-in-out infinite;
+  }
+
+  @keyframes ambient-drift {
+    0%, 100% {
+      transform: scale(0.85);
+      opacity: 0.4;
+    }
+    35% {
+      transform: scale(1.05) translate(3px, -2px);
+      opacity: 0.55;
+    }
+    65% {
+      transform: scale(1.1) translate(-2px, 3px);
+      opacity: 0.6;
+    }
+  }
+
+  /* Outer haze — dissolves the orb edge into nothing */
+  .orb-haze {
+    width: 380px;
+    height: 380px;
+    filter: blur(60px);
+    opacity: 0.7;
+    z-index: 8;
+    animation: haze-breathe 12s ease-in-out infinite;
+  }
+
+  @keyframes haze-breathe {
+    0%, 100% {
+      transform: scale(0.85) rotate(0deg);
+      opacity: 0.6;
+      filter: blur(55px);
+    }
+    30% {
+      transform: scale(1.08) rotate(2deg);
+      opacity: 0.75;
+      filter: blur(65px);
+    }
+    70% {
+      transform: scale(1.12) rotate(-1deg);
+      opacity: 0.8;
+      filter: blur(60px);
+    }
+  }
+
+  /* Mid glow — the body of the orb */
+  .orb-body {
+    width: 300px;
+    height: 300px;
+    filter: blur(40px);
+    opacity: 0.85;
+    z-index: 12;
+    animation: body-breathe 11s ease-in-out infinite;
+  }
+
+  @keyframes body-breathe {
+    0%, 100% {
+      transform: scale(0.88);
+      opacity: 0.75;
+      filter: blur(38px);
+    }
+    25% {
+      transform: scale(1.02) translate(2px, -1px);
+      opacity: 0.85;
+      filter: blur(42px);
+    }
+    50% {
+      transform: scale(1.12);
+      opacity: 0.95;
+      filter: blur(45px);
+    }
+    75% {
+      transform: scale(1.05) translate(-1px, 2px);
+      opacity: 0.88;
+      filter: blur(40px);
+    }
+  }
+
+  /* Inner luminance — warmer, brighter */
+  .orb-inner {
+    width: 200px;
+    height: 200px;
+    filter: blur(25px);
+    opacity: 0.9;
+    z-index: 16;
+    animation: inner-breathe 11s ease-in-out infinite;
+  }
+
+  @keyframes inner-breathe {
+    0%, 100% {
+      transform: scale(0.9);
+      opacity: 0.8;
+    }
+    40% {
+      transform: scale(1.08) translate(1px, -1px);
+      opacity: 0.95;
+    }
+    60% {
+      transform: scale(1.1) translate(-1px, 1px);
+      opacity: 1;
+    }
+  }
+
+  /* Core light — the brightest point, still soft */
+  .orb-core {
+    width: 100px;
+    height: 100px;
+    filter: blur(15px);
+    opacity: 1;
+    z-index: 20;
+    animation: core-pulse 11s ease-in-out infinite;
+  }
+
+  @keyframes core-pulse {
+    0%, 100% {
+      transform: scale(0.92);
+      filter: blur(14px);
+    }
+    50% {
+      transform: scale(1.08);
+      filter: blur(18px);
+    }
+  }
+
+  /* Noise texture overlay for organic feel */
+  .noise-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 30;
+    pointer-events: none;
+    opacity: 0.03;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     PHONE CONTENT — Legend + Insight inside the phone
+     ══════════════════════════════════════════════════════════════ */
+
+  .phone-content {
+    position: relative;
+    z-index: 40;
+    width: 100%;
+    padding: 0 24px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  /* Trait legend — compact row of colored dots */
+  .trait-legend {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .trait-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .trait-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: box-shadow 0.6s ease;
+  }
+
+  .trait-name {
+    font-size: 9px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.5;
+    transition: opacity 0.6s ease, color 0.6s ease;
+  }
+
+  .trait-pct {
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.7;
+    transition: opacity 0.6s ease, color 0.6s ease;
+  }
+
+  /* Gradient summary text */
+  .summary-text {
+    font-size: 12px;
+    line-height: 1.6;
+    text-align: center;
+    max-width: 320px;
+    background: linear-gradient(135deg, rgba(139,92,246,0.8), rgba(59,130,246,0.8), rgba(6,182,212,0.8));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Handle bar at bottom of phone */
+  .home-indicator {
+    width: 134px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.2);
+    margin-bottom: 8px;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     EXTERNAL CONTROLS — Outside the phone
+     ══════════════════════════════════════════════════════════════ */
+
+  .external-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .control-btn {
+    padding: 8px 18px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .control-btn.primary {
+    background: #8b5cf6;
+    color: white;
+  }
+  .control-btn.primary:hover {
+    background: #7c3aed;
+    transform: translateY(-1px);
+  }
+
+  .control-btn.secondary {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.6);
+  }
+  .control-btn.secondary:hover {
+    background: rgba(255,255,255,0.1);
+    color: white;
+  }
+
+  .control-btn:active {
+    transform: scale(0.97);
+  }
+
+  .version-label {
+    font-size: 10px;
+    color: rgba(255,255,255,0.25);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Phone Frame -->
+  <div class="phone-outer">
+    <div class="phone-inner" id="phone-screen">
+      <!-- Dynamic Island -->
+      <div class="dynamic-island"></div>
+
+      <!-- Aura Visualization -->
+      <div class="aura-stage" id="aura-stage">
+        <!-- Energy wave canvas -->
+        <canvas id="energy-canvas" width="500" height="500"></canvas>
+
+        <!-- Orb layers — deepest to brightest -->
+        <div class="orb-layer orb-ambient" id="orb-ambient"></div>
+        <div class="orb-layer orb-haze" id="orb-haze"></div>
+        <div class="orb-layer orb-body" id="orb-body"></div>
+        <div class="orb-layer orb-inner" id="orb-inner"></div>
+        <div class="orb-layer orb-core" id="orb-core"></div>
+
+        <!-- Noise for texture -->
+        <div class="noise-overlay"></div>
+      </div>
+
+      <!-- Phone Content: Legend + Summary -->
+      <div class="phone-content">
+        <div class="trait-legend" id="trait-legend"></div>
+        <p class="summary-text" id="summary-text"></p>
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- External Controls -->
+  <div class="external-controls">
+    <button onclick="shuffleProfile()" class="control-btn primary">Shuffle Profile</button>
+    <button onclick="resetProfile()" class="control-btn secondary">Reset</button>
+    <button onclick="toggleTheme()" class="control-btn secondary" id="theme-btn">Light Mode</button>
+  </div>
+  <div class="version-label">Breath V11 — Bioluminescent</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AURA BREATH V11
+// Bioluminescent. Organic. Alive.
+// Phone-framed. Soft everything. No hard edges.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Token Colors ──────────────────────────────────────────────────────────
+const TRAIT_DEFS = [
+  { id: 'intuition',  name: 'Intuition',  hex: '#8b5cf6', rgb: [139, 92, 246] },
+  { id: 'empathy',    name: 'Empathy',    hex: '#d946ef', rgb: [217, 70, 239] },
+  { id: 'clarity',    name: 'Clarity',    hex: '#3b82f6', rgb: [59, 130, 246] },
+  { id: 'growth',     name: 'Growth',     hex: '#10b981', rgb: [16, 185, 129] },
+  { id: 'flow',       name: 'Flow',       hex: '#06b6d4', rgb: [6, 182, 212] },
+];
+
+// ── Trait strengths ──────────────────────────────────────────────────────
+let traits = {
+  intuition: 80,
+  empathy: 60,
+  clarity: 45,
+  growth: 70,
+  flow: 35,
+};
+
+// ── Canvas setup ─────────────────────────────────────────────────────────
+const canvas = document.getElementById('energy-canvas');
+const ctx = canvas.getContext('2d');
+const CW = canvas.width;
+const CH = canvas.height;
+const CX = CW / 2;
+const CY = CH / 2;
+
+// ── Trait angular positions (spread around the orb) ──────────────────────
+const TRAIT_ANGLES = {
+  intuition: -Math.PI / 2,
+  empathy:   -Math.PI / 2 + 1.26,
+  clarity:    Math.PI / 2 + 1.26,
+  growth:     Math.PI / 2,
+  flow:      -Math.PI / 2 - 1.26,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ORGANIC ENERGY WAVES — Extremely soft, watercolor-like
+// Uses heavy blur, low opacity, wide strokes, screen blending
+// ═══════════════════════════════════════════════════════════════════════════
+
+let waves = [];
+let animFrame;
+let lastSpawn = 0;
+
+function spawnWaveSet() {
+  TRAIT_DEFS.forEach(def => {
+    const strength = traits[def.id];
+    const spawnChance = 0.12 + (strength / 100) * 0.55;
+    if (Math.random() > spawnChance) return;
+
+    const baseAngle = TRAIT_ANGLES[def.id];
+    const spread = (1.4 - (strength / 100) * 0.6);
+    const angle = baseAngle + (Math.random() - 0.5) * spread;
+
+    // Much lower alpha for watercolor effect
+    const alpha = 0.06 + (strength / 100) * 0.18;
+    const maxRadius = 160 + (strength / 100) * 80;
+
+    waves.push({
+      r: 70 + Math.random() * 20,
+      maxR: maxRadius + Math.random() * 30,
+      angle: angle,
+      alpha: alpha,
+      color: def.rgb,
+      // Very thick, very blurry — dissolves into fog
+      thickness: 8 + (strength / 100) * 16,
+      blur: 20 + (strength / 100) * 25,
+      speed: 0.12 + Math.random() * 0.2,
+      arcWidth: 0.8 + (strength / 100) * 1.0,
+      // Organic wobble
+      wobblePhase: Math.random() * Math.PI * 2,
+      wobbleSpeed: 0.0005 + Math.random() * 0.001,
+      wobbleAmp: 0.05 + Math.random() * 0.1,
+      born: performance.now(),
+      life: 8000 + Math.random() * 6000,
+    });
+  });
+}
+
+function drawWaves(now) {
+  ctx.clearRect(0, 0, CW, CH);
+
+  // Spawn waves at gentle intervals
+  if (now - lastSpawn > 2200) {
+    spawnWaveSet();
+    lastSpawn = now;
+  }
+
+  // Global composite for natural light mixing
+  ctx.globalCompositeOperation = 'screen';
+
+  waves.forEach(w => {
+    const age = now - w.born;
+    const progress = age / w.life;
+    if (progress > 1) return;
+
+    w.r += w.speed;
+
+    // Wobble the angle organically
+    const wobble = Math.sin(now * w.wobbleSpeed + w.wobblePhase) * w.wobbleAmp;
+    const currentAngle = w.angle + wobble;
+
+    // Very gentle fade envelope — long, soft tails
+    let alpha;
+    if (progress < 0.15) {
+      alpha = w.alpha * (progress / 0.15);
+    } else if (progress < 0.4) {
+      alpha = w.alpha;
+    } else {
+      alpha = w.alpha * Math.pow(1 - ((progress - 0.4) / 0.6), 1.5);
+    }
+
+    if (alpha <= 0.002) return;
+
+    const halfArc = w.arcWidth / 2;
+    const startAngle = currentAngle - halfArc;
+    const endAngle = currentAngle + halfArc;
+
+    ctx.save();
+    ctx.translate(CX, CY);
+
+    // Single extremely soft glow stroke — no sharp inner line
+    ctx.beginPath();
+    ctx.arc(0, 0, w.r, startAngle, endAngle);
+    ctx.strokeStyle = `rgba(${w.color[0]}, ${w.color[1]}, ${w.color[2]}, ${alpha})`;
+    ctx.lineWidth = w.thickness;
+    ctx.lineCap = 'round';
+    ctx.filter = `blur(${w.blur}px)`;
+    ctx.stroke();
+
+    // Slightly brighter, narrower inner glow
+    ctx.beginPath();
+    ctx.arc(0, 0, w.r, startAngle + halfArc * 0.3, endAngle - halfArc * 0.3);
+    ctx.strokeStyle = `rgba(${Math.min(255, w.color[0] + 40)}, ${Math.min(255, w.color[1] + 40)}, ${Math.min(255, w.color[2] + 40)}, ${alpha * 0.5})`;
+    ctx.lineWidth = w.thickness * 0.4;
+    ctx.filter = `blur(${w.blur * 0.7}px)`;
+    ctx.stroke();
+
+    ctx.restore();
+  });
+
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Prune dead waves
+  waves = waves.filter(w => {
+    const age = now - w.born;
+    return (age / w.life) <= 1 && w.r < w.maxR;
+  });
+
+  animFrame = requestAnimationFrame(drawWaves);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ORB COLOR — Blended from trait composition
+// Every layer gets its own gradient, all extremely soft
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getBlendedColor(brighten = 0) {
+  const total = Object.values(traits).reduce((a, b) => a + b, 0) || 1;
+  let r = 0, g = 0, b = 0;
+  TRAIT_DEFS.forEach(def => {
+    const w = traits[def.id] / total;
+    r += def.rgb[0] * w;
+    g += def.rgb[1] * w;
+    b += def.rgb[2] * w;
+  });
+  return [
+    Math.min(255, Math.round(r) + brighten),
+    Math.min(255, Math.round(g) + brighten),
+    Math.min(255, Math.round(b) + brighten)
+  ];
+}
+
+function getDominantTrait() {
+  let best = TRAIT_DEFS[0];
+  TRAIT_DEFS.forEach(d => { if (traits[d.id] > traits[best.id]) best = d; });
+  return best;
+}
+
+function getSecondaryTrait() {
+  const dom = getDominantTrait();
+  let best = TRAIT_DEFS.find(d => d.id !== dom.id);
+  TRAIT_DEFS.forEach(d => {
+    if (d.id !== dom.id && traits[d.id] > traits[best.id]) best = d;
+  });
+  return best;
+}
+
+function updateOrbColors() {
+  const [cr, cg, cb] = getBlendedColor(0);
+  const [lr, lg, lb] = getBlendedColor(40);
+  const [br, bg, bb] = getBlendedColor(80);
+
+  const avgStrength = Object.values(traits).reduce((a, b) => a + b, 0) / TRAIT_DEFS.length / 100;
+  const intensity = 0.5 + avgStrength * 0.5;
+
+  // Ambient — huge, extremely blurred, tints the whole screen
+  const ambient = document.getElementById('orb-ambient');
+  ambient.style.background = `radial-gradient(circle,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.3}) 0%,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.15}) 30%,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.05}) 60%,
+    transparent 80%
+  )`;
+
+  // Haze — dissolves the orb edge
+  const haze = document.getElementById('orb-haze');
+  haze.style.background = `radial-gradient(circle,
+    rgba(${lr}, ${lg}, ${lb}, ${intensity * 0.65}) 0%,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.4}) 35%,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.15}) 65%,
+    transparent 90%
+  )`;
+
+  // Body — main visible mass
+  const body = document.getElementById('orb-body');
+  body.style.background = `radial-gradient(circle,
+    rgba(${br}, ${bg}, ${bb}, ${intensity * 0.9}) 0%,
+    rgba(${lr}, ${lg}, ${lb}, ${intensity * 0.7}) 30%,
+    rgba(${cr}, ${cg}, ${cb}, ${intensity * 0.35}) 60%,
+    transparent 85%
+  )`;
+
+  // Inner — bright and warm
+  const inner = document.getElementById('orb-inner');
+  inner.style.background = `radial-gradient(circle,
+    rgba(${Math.min(255, br + 30)}, ${Math.min(255, bg + 30)}, ${Math.min(255, bb + 30)}, ${intensity}) 0%,
+    rgba(${br}, ${bg}, ${bb}, ${intensity * 0.8}) 40%,
+    rgba(${lr}, ${lg}, ${lb}, ${intensity * 0.4}) 70%,
+    transparent 100%
+  )`;
+
+  // Core — brightest point, fades to color
+  const core = document.getElementById('orb-core');
+  core.style.background = `radial-gradient(circle,
+    rgba(255, 255, 255, ${intensity * 0.95}) 0%,
+    rgba(255, 255, 255, ${intensity * 0.6}) 25%,
+    rgba(${br}, ${bg}, ${bb}, ${intensity * 0.7}) 50%,
+    rgba(${lr}, ${lg}, ${lb}, ${intensity * 0.3}) 75%,
+    transparent 100%
+  )`;
+
+  // Breath timing — higher traits = slightly faster
+  const breathDuration = 9 + (1 - avgStrength) * 5;
+  document.getElementById('orb-ambient').style.animationDuration = `${breathDuration * 1.5}s`;
+  document.getElementById('orb-haze').style.animationDuration = `${breathDuration * 1.1}s`;
+  document.getElementById('orb-body').style.animationDuration = `${breathDuration}s`;
+  document.getElementById('orb-inner').style.animationDuration = `${breathDuration}s`;
+  document.getElementById('orb-core').style.animationDuration = `${breathDuration}s`;
+
+  // Update summary gradient based on dominant colors
+  const dom = getDominantTrait();
+  const sec = getSecondaryTrait();
+  const summaryEl = document.getElementById('summary-text');
+  summaryEl.style.background = `linear-gradient(135deg, ${dom.hex}cc, ${sec.hex}cc)`;
+  summaryEl.style.webkitBackgroundClip = 'text';
+  summaryEl.style.webkitTextFillColor = 'transparent';
+  summaryEl.style.backgroundClip = 'text';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LEGEND — Compact trait dots with names
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildLegend() {
+  const container = document.getElementById('trait-legend');
+  container.innerHTML = '';
+
+  TRAIT_DEFS.forEach(def => {
+    const strength = traits[def.id];
+    const chip = document.createElement('div');
+    chip.className = 'trait-chip';
+    chip.id = `chip-${def.id}`;
+    chip.innerHTML = `
+      <div class="trait-dot" style="background: ${def.hex}; box-shadow: 0 0 6px ${def.hex}80;"></div>
+      <span class="trait-name" style="color: ${def.hex};">${def.name}</span>
+      <span class="trait-pct" id="pct-${def.id}" style="color: ${def.hex};">${strength}</span>
+    `;
+    container.appendChild(chip);
+  });
+}
+
+function updateLegend() {
+  TRAIT_DEFS.forEach(def => {
+    const strength = traits[def.id];
+    const pct = document.getElementById(`pct-${def.id}`);
+    if (pct) pct.textContent = strength;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INSIGHT SUMMARY — gradient text describing the aura
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateSummary() {
+  const sorted = TRAIT_DEFS.map(d => ({ ...d, val: traits[d.id] }))
+    .sort((a, b) => b.val - a.val);
+
+  const top = sorted[0];
+  const second = sorted[1];
+
+  const phrases = {
+    intuition: { high: 'deep intuitive knowing', low: 'grounded pragmatism' },
+    empathy:   { high: 'radiant emotional warmth', low: 'analytical detachment' },
+    clarity:   { high: 'sharp mental clarity', low: 'soft impressionistic thinking' },
+    growth:    { high: 'restless growth energy', low: 'quiet contentment' },
+    flow:      { high: 'effortless creative flow', low: 'deliberate intention' },
+  };
+
+  const topPhrase = top.val > 50 ? phrases[top.id].high : phrases[top.id].low;
+  const secPhrase = second.val > 50 ? phrases[second.id].high : phrases[second.id].low;
+
+  document.getElementById('summary-text').textContent =
+    `Leading with ${topPhrase}, blended with ${secPhrase}.`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function shuffleProfile() {
+  TRAIT_DEFS.forEach(def => {
+    const r = Math.random();
+    if (r < 0.3) traits[def.id] = Math.round(15 + Math.random() * 25);
+    else if (r > 0.7) traits[def.id] = Math.round(65 + Math.random() * 30);
+    else traits[def.id] = Math.round(30 + Math.random() * 40);
+  });
+
+  // Ensure at least one strong trait
+  const ids = TRAIT_DEFS.map(d => d.id);
+  traits[ids[Math.floor(Math.random() * ids.length)]] = Math.round(75 + Math.random() * 20);
+
+  applyUpdate();
+}
+
+function resetProfile() {
+  traits = { intuition: 80, empathy: 60, clarity: 45, growth: 70, flow: 35 };
+  applyUpdate();
+}
+
+function applyUpdate() {
+  waves = [];
+  updateLegend();
+  updateOrbColors();
+  updateSummary();
+}
+
+let isDark = true;
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.classList.toggle('light', !isDark);
+  document.getElementById('theme-btn').textContent = isDark ? 'Light Mode' : 'Dark Mode';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+buildLegend();
+updateOrbColors();
+updateSummary();
+
+lastSpawn = performance.now() - 3000;
+animFrame = requestAnimationFrame(drawWaves);
+
+// Pause when hidden
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (animFrame) cancelAnimationFrame(animFrame);
+  } else {
+    waves = [];
+    lastSpawn = performance.now() - 3000;
+    animFrame = requestAnimationFrame(drawWaves);
+  }
+});
+</script>
+</body>
+</html>

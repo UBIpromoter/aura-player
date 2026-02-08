@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Weather V7 — Extreme Glow</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  body { font-family: 'Inter', sans-serif; }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     GRAPH CONTAINER (Now at TOP)
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .graph-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .graph-container-dark {
+    background: linear-gradient(180deg,
+      #0a0a14 0%,
+      #0d0d1a 50%,
+      #0a0a14 100%
+    );
+  }
+
+  .graph-container-light {
+    background: linear-gradient(180deg,
+      #f8f9fc 0%,
+      #f0f2f8 50%,
+      #f8f9fc 100%
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     EXTREME GLOW PATCHES — 10X THE GLOW
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .glow-patch {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  .glow-patch-animate {
+    animation: glowPulse 6s ease-in-out infinite;
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { transform: scale(1); opacity: var(--glow-opacity, 0.7); }
+    50% { transform: scale(1.15); opacity: calc(var(--glow-opacity, 0.7) * 1.2); }
+  }
+
+  /* Secondary subtle pulse for depth */
+  .glow-patch-secondary {
+    animation: glowPulseSecondary 8s ease-in-out infinite;
+  }
+
+  @keyframes glowPulseSecondary {
+    0%, 100% { transform: scale(1); opacity: var(--glow-opacity, 0.5); }
+    50% { transform: scale(1.2); opacity: calc(var(--glow-opacity, 0.5) * 1.3); }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     TRAIT CARDS (Now BELOW graph)
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .trait-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    backdrop-filter: blur(12px);
+    transition: all 0.2s ease;
+  }
+
+  .trait-card-dark {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .trait-card-light {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .trait-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .trait-card-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .trait-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .trait-card-desc {
+    font-size: 12px;
+    line-height: 1.4;
+    margin-top: 2px;
+    opacity: 0.6;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     GRAPH SVG & NODES
+     ═══════════════════════════════════════════════════════════════════ */
+
+  #graph-svg {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+  }
+
+  .graph-line {
+    stroke-linecap: round;
+  }
+
+  .graph-node {
+    cursor: grab;
+    transition: filter 0.2s ease;
+  }
+
+  .graph-node:hover {
+    filter: brightness(1.3);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     BOTTOM SECTION
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .pattern-label {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    opacity: 0.5;
+    margin-top: 16px;
+  }
+
+  .cta-button {
+    display: block;
+    width: 100%;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border: none;
+  }
+
+  .cta-button-dark {
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    color: white;
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+  }
+
+  .cta-button-dark:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 25px rgba(139, 92, 246, 0.4);
+  }
+
+  .cta-button-light {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+  }
+
+  .cta-button-light:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 25px rgba(99, 102, 241, 0.4);
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 gap-6" style="background: #030712;">
+
+  <!-- Controls -->
+  <div class="flex gap-3 items-center flex-wrap justify-center">
+    <button onclick="randomize()" class="px-4 py-2 rounded-xl text-sm font-medium bg-violet-600 text-white hover:bg-violet-500 transition-colors">Shuffle</button>
+    <button onclick="toggleTheme()" id="theme-toggle" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-gray-600 hover:border-violet-500 transition-colors">Light Mode</button>
+  </div>
+
+  <!-- Phone frame — Dark Mode -->
+  <div id="phone-dark" class="w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl" style="background: #0a0a12; border: 2px solid rgba(255,255,255,0.08);">
+    <div class="p-5 pt-8 pb-6">
+
+      <!-- Graph Container FIRST (at TOP) -->
+      <div id="graph-dark" class="graph-container graph-container-dark mb-5">
+        <!-- Glow patches rendered here — EXTREME -->
+        <div id="glows-dark" class="absolute inset-0"></div>
+        <!-- SVG graph -->
+        <svg id="svg-dark" class="absolute inset-0 w-full h-full"></svg>
+      </div>
+
+      <!-- Trait Cards BELOW graph -->
+      <div class="flex flex-col gap-3">
+        <div class="trait-card trait-card-dark" data-trait="curiosity">
+          <div class="trait-dot" style="background: #3b82f6;"></div>
+          <div class="trait-card-content">
+            <div class="trait-card-name text-white">Strong curiosity</div>
+            <div class="trait-card-desc text-white">You seek out new ideas and experiences</div>
+          </div>
+        </div>
+
+        <div class="trait-card trait-card-dark" data-trait="warmth">
+          <div class="trait-dot" style="background: #10b981;"></div>
+          <div class="trait-card-content">
+            <div class="trait-card-name text-white">Natural warmth</div>
+            <div class="trait-card-desc text-white">People feel at ease around you</div>
+          </div>
+        </div>
+
+        <div class="trait-card trait-card-dark" data-trait="steadiness">
+          <div class="trait-dot" style="background: #ec4899;"></div>
+          <div class="trait-card-content">
+            <div class="trait-card-name text-white">Steady under pressure</div>
+            <div class="trait-card-desc text-white">You stay calm when things get intense</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom -->
+      <div class="pattern-label text-white">Your unique pattern</div>
+      <button class="cta-button cta-button-dark mt-4">View Full Profile</button>
+
+    </div>
+  </div>
+
+  <!-- Phone frame — Light Mode -->
+  <div id="phone-light" class="w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl hidden" style="background: #ffffff; border: 2px solid rgba(0,0,0,0.08);">
+    <div class="p-5 pt-8 pb-6">
+
+      <!-- Graph Container FIRST (at TOP) -->
+      <div id="graph-light" class="graph-container graph-container-light mb-5">
+        <!-- Glow patches rendered here — EXTREME -->
+        <div id="glows-light" class="absolute inset-0"></div>
+        <!-- SVG graph -->
+        <svg id="svg-light" class="absolute inset-0 w-full h-full"></svg>
+      </div>
+
+      <!-- Trait Cards BELOW graph -->
+      <div class="flex flex-col gap-3">
+        <div class="trait-card trait-card-light" data-trait="curiosity">
+          <div class="trait-dot" style="background: #3b82f6;"></div>
+          <div class="trait-card-content">
+            <div class="trait-card-name text-gray-900">Strong curiosity</div>
+            <div class="trait-card-desc text-gray-600">You seek out new ideas and experiences</div>
+          </div>
+        </div>
+
+        <div class="trait-card trait-card-light" data-trait="warmth">
+          <div class="trait-dot" style="background: #10b981;"></div>
+          <div class="trait-card-content">
+            <div class="trait-card-name text-gray-900">Natural warmth</div>
+            <div class="trait-card-desc text-gray-600">People feel at ease around you</div>
+          </div>
+        </div>
+
+        <div class="trait-card trait-card-light" data-trait="steadiness">
+          <div class="trait-dot" style="background: #ec4899;"></div>
+          <div class="trait-card-content">
+            <div class="trait-card-name text-gray-900">Steady under pressure</div>
+            <div class="trait-card-desc text-gray-600">You stay calm when things get intense</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom -->
+      <div class="pattern-label text-gray-900">Your unique pattern</div>
+      <button class="cta-button cta-button-light mt-4">View Full Profile</button>
+
+    </div>
+  </div>
+
+  <!-- Info -->
+  <div class="max-w-md text-center text-gray-500 text-xs mt-2">
+    <p><strong class="text-gray-400">V7:</strong> Graph at TOP, labels below. EXTREME GLOW — 10x bigger, brighter, blurrier patches</p>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AURA WEATHER V7 — Extreme Glow Edition
+// Graph at TOP, labels below. Glow is THE MAIN FEATURE.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TRAIT_COLORS = {
+  curiosity: { hex: '#3b82f6', rgb: '59, 130, 246' },  // Blue
+  warmth: { hex: '#10b981', rgb: '16, 185, 129' },     // Emerald/Teal
+  steadiness: { hex: '#ec4899', rgb: '236, 72, 153' }  // Pink
+};
+
+const GLOW_COLORS = {
+  purple: { hex: '#8b5cf6', rgb: '139, 92, 246' },
+  cyan: { hex: '#06b6d4', rgb: '6, 182, 212' },
+  pink: { hex: '#ec4899', rgb: '236, 72, 153' },
+  blue: { hex: '#3b82f6', rgb: '59, 130, 246' },
+  violet: { hex: '#7c3aed', rgb: '124, 58, 237' },
+  teal: { hex: '#14b8a6', rgb: '20, 184, 166' }
+};
+
+// Node positions (angles around circle, 0-360)
+let nodeData = {
+  curiosity: [
+    { angle: 30, radius: 0.85 },
+    { angle: 60, radius: 0.75 },
+    { angle: 45, radius: 0.9 },
+    { angle: 75, radius: 0.8 }
+  ],
+  warmth: [
+    { angle: 150, radius: 0.85 },
+    { angle: 180, radius: 0.75 },
+    { angle: 165, radius: 0.9 },
+    { angle: 195, radius: 0.8 }
+  ],
+  steadiness: [
+    { angle: 270, radius: 0.85 },
+    { angle: 300, radius: 0.75 },
+    { angle: 285, radius: 0.9 },
+    { angle: 315, radius: 0.8 }
+  ]
+};
+
+// Edges
+let edges = [
+  ['curiosity-0', 'curiosity-1'],
+  ['curiosity-1', 'curiosity-2'],
+  ['curiosity-2', 'curiosity-3'],
+  ['curiosity-0', 'curiosity-3'],
+  ['warmth-0', 'warmth-1'],
+  ['warmth-1', 'warmth-2'],
+  ['warmth-2', 'warmth-3'],
+  ['warmth-0', 'warmth-3'],
+  ['steadiness-0', 'steadiness-1'],
+  ['steadiness-1', 'steadiness-2'],
+  ['steadiness-2', 'steadiness-3'],
+  ['steadiness-0', 'steadiness-3'],
+  ['curiosity-1', 'warmth-0'],
+  ['warmth-2', 'steadiness-0'],
+  ['steadiness-2', 'curiosity-3'],
+  ['curiosity-1', 'steadiness-1'],
+  ['warmth-1', 'curiosity-2'],
+  ['steadiness-1', 'warmth-2']
+];
+
+let isDarkMode = true;
+let draggedNode = null;
+let dragOffset = { x: 0, y: 0 };
+let nodes = [];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function initNodes(containerId) {
+  const container = document.getElementById(containerId);
+  const width = container.offsetWidth;
+  const height = container.offsetHeight;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const baseRadius = Math.min(width, height) * 0.38;
+
+  nodes = [];
+
+  Object.entries(nodeData).forEach(([trait, points]) => {
+    points.forEach((point, i) => {
+      const angleRad = (point.angle * Math.PI) / 180;
+      const r = baseRadius * point.radius;
+      nodes.push({
+        id: `${trait}-${i}`,
+        trait: trait,
+        x: centerX + Math.cos(angleRad) * r,
+        y: centerY + Math.sin(angleRad) * r,
+        vx: 0,
+        vy: 0,
+        baseAngle: point.angle,
+        baseRadius: point.radius
+      });
+    });
+  });
+
+  return { width, height, centerX, centerY, baseRadius };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXTREME GLOW PATCHES — 10X THE GLOW
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderGlows(glowContainerId, dims) {
+  const container = document.getElementById(glowContainerId);
+  const { width, height, centerX, centerY, baseRadius } = dims;
+  const isDark = glowContainerId.includes('dark');
+
+  // Calculate cluster centers
+  const clusters = {};
+  Object.keys(TRAIT_COLORS).forEach(trait => {
+    const traitNodes = nodes.filter(n => n.trait === trait);
+    const avgX = traitNodes.reduce((sum, n) => sum + n.x, 0) / traitNodes.length;
+    const avgY = traitNodes.reduce((sum, n) => sum + n.y, 0) / traitNodes.length;
+    clusters[trait] = { x: avgX, y: avgY };
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // MASSIVE GLOW PATCHES — This is the main visual feature now
+  // Much bigger sizes (300-400px), higher opacity (0.6-0.8), more blur (60-80px)
+  // Multiple overlapping layers for rich color blending
+  // ═════════════════════════════════════════════════════════════════════════
+
+  const glowPatches = isDark ? [
+    // PRIMARY GLOW LAYER — Big, bold, dominant
+    {
+      color: GLOW_COLORS.cyan,
+      x: width * 0.25,
+      y: height * 0.3,
+      size: 380,
+      opacity: 0.7,
+      blur: 70,
+      delay: 0,
+      animClass: 'glow-patch-animate'
+    },
+    {
+      color: GLOW_COLORS.purple,
+      x: width * 0.65,
+      y: height * 0.25,
+      size: 400,
+      opacity: 0.75,
+      blur: 80,
+      delay: -2,
+      animClass: 'glow-patch-animate'
+    },
+    {
+      color: GLOW_COLORS.pink,
+      x: width * 0.5,
+      y: height * 0.7,
+      size: 360,
+      opacity: 0.65,
+      blur: 70,
+      delay: -4,
+      animClass: 'glow-patch-animate'
+    },
+    // SECONDARY LAYER — Fills gaps, adds depth
+    {
+      color: GLOW_COLORS.violet,
+      x: width * 0.8,
+      y: height * 0.55,
+      size: 320,
+      opacity: 0.55,
+      blur: 60,
+      delay: -1,
+      animClass: 'glow-patch-secondary'
+    },
+    {
+      color: GLOW_COLORS.teal,
+      x: width * 0.2,
+      y: height * 0.65,
+      size: 300,
+      opacity: 0.5,
+      blur: 65,
+      delay: -3,
+      animClass: 'glow-patch-secondary'
+    },
+    {
+      color: GLOW_COLORS.blue,
+      x: width * 0.45,
+      y: height * 0.4,
+      size: 340,
+      opacity: 0.6,
+      blur: 75,
+      delay: -5,
+      animClass: 'glow-patch-secondary'
+    },
+    // ACCENT LAYER — Extra richness
+    {
+      color: GLOW_COLORS.purple,
+      x: width * 0.15,
+      y: height * 0.45,
+      size: 280,
+      opacity: 0.45,
+      blur: 55,
+      delay: -2.5,
+      animClass: 'glow-patch-animate'
+    },
+    {
+      color: GLOW_COLORS.cyan,
+      x: width * 0.75,
+      y: height * 0.75,
+      size: 300,
+      opacity: 0.5,
+      blur: 60,
+      delay: -4.5,
+      animClass: 'glow-patch-secondary'
+    }
+  ] : [
+    // LIGHT MODE — Softer but still prominent
+    {
+      color: GLOW_COLORS.cyan,
+      x: width * 0.25,
+      y: height * 0.3,
+      size: 350,
+      opacity: 0.4,
+      blur: 60,
+      delay: 0,
+      animClass: 'glow-patch-animate'
+    },
+    {
+      color: GLOW_COLORS.purple,
+      x: width * 0.65,
+      y: height * 0.25,
+      size: 380,
+      opacity: 0.45,
+      blur: 70,
+      delay: -2,
+      animClass: 'glow-patch-animate'
+    },
+    {
+      color: GLOW_COLORS.pink,
+      x: width * 0.5,
+      y: height * 0.7,
+      size: 340,
+      opacity: 0.35,
+      blur: 60,
+      delay: -4,
+      animClass: 'glow-patch-animate'
+    },
+    {
+      color: GLOW_COLORS.violet,
+      x: width * 0.8,
+      y: height * 0.55,
+      size: 300,
+      opacity: 0.3,
+      blur: 55,
+      delay: -1,
+      animClass: 'glow-patch-secondary'
+    },
+    {
+      color: GLOW_COLORS.teal,
+      x: width * 0.2,
+      y: height * 0.65,
+      size: 280,
+      opacity: 0.28,
+      blur: 50,
+      delay: -3,
+      animClass: 'glow-patch-secondary'
+    },
+    {
+      color: GLOW_COLORS.blue,
+      x: width * 0.45,
+      y: height * 0.4,
+      size: 320,
+      opacity: 0.35,
+      blur: 65,
+      delay: -5,
+      animClass: 'glow-patch-secondary'
+    }
+  ];
+
+  let html = '';
+  glowPatches.forEach((patch, i) => {
+    html += `
+      <div class="glow-patch ${patch.animClass}" style="
+        left: ${patch.x - patch.size / 2}px;
+        top: ${patch.y - patch.size / 2}px;
+        width: ${patch.size}px;
+        height: ${patch.size}px;
+        background: radial-gradient(circle, rgba(${patch.color.rgb}, ${patch.opacity}) 0%, rgba(${patch.color.rgb}, ${patch.opacity * 0.5}) 40%, rgba(${patch.color.rgb}, 0) 70%);
+        filter: blur(${patch.blur}px);
+        --glow-opacity: ${patch.opacity};
+        animation-delay: ${patch.delay}s;
+      "></div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER GRAPH (SVG)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderGraph(svgId, dims) {
+  const svg = document.getElementById(svgId);
+  const isDark = svgId.includes('dark');
+  const { width, height } = dims;
+
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+  let html = '';
+
+  // Draw edges
+  edges.forEach(([sourceId, targetId]) => {
+    const source = nodes.find(n => n.id === sourceId);
+    const target = nodes.find(n => n.id === targetId);
+    if (!source || !target) return;
+
+    const color = TRAIT_COLORS[source.trait].hex;
+    const strokeOpacity = isDark ? 0.5 : 0.35;
+
+    html += `
+      <line
+        x1="${source.x}" y1="${source.y}"
+        x2="${target.x}" y2="${target.y}"
+        stroke="${color}"
+        stroke-width="1.5"
+        stroke-opacity="${strokeOpacity}"
+        class="graph-line"
+      />
+    `;
+  });
+
+  // Draw nodes
+  nodes.forEach(node => {
+    const color = TRAIT_COLORS[node.trait].hex;
+    const nodeRadius = 5;
+    const glowOpacity = isDark ? 0.6 : 0.4;
+
+    html += `
+      <circle
+        cx="${node.x}" cy="${node.y}" r="${nodeRadius}"
+        fill="${color}"
+        class="graph-node"
+        data-id="${node.id}"
+        style="filter: drop-shadow(0 0 6px rgba(${TRAIT_COLORS[node.trait].rgb}, ${glowOpacity}));"
+      />
+    `;
+  });
+
+  svg.innerHTML = html;
+  attachDragListeners(svgId);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DRAG INTERACTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function attachDragListeners(svgId) {
+  const svg = document.getElementById(svgId);
+  const nodeElements = svg.querySelectorAll('.graph-node');
+
+  nodeElements.forEach(el => {
+    el.addEventListener('mousedown', (e) => startDrag(e, svgId));
+    el.addEventListener('touchstart', (e) => startDrag(e, svgId), { passive: false });
+  });
+}
+
+function startDrag(e, svgId) {
+  e.preventDefault();
+  const nodeId = e.target.dataset.id;
+  draggedNode = nodes.find(n => n.id === nodeId);
+  if (!draggedNode) return;
+
+  const svg = document.getElementById(svgId);
+  const rect = svg.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+  dragOffset.x = draggedNode.x - (clientX - rect.left);
+  dragOffset.y = draggedNode.y - (clientY - rect.top);
+
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchmove', onDrag, { passive: false });
+  document.addEventListener('touchend', endDrag);
+}
+
+function onDrag(e) {
+  if (!draggedNode) return;
+  e.preventDefault();
+
+  const containerId = isDarkMode ? 'graph-dark' : 'graph-light';
+  const container = document.getElementById(containerId);
+  const rect = container.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+  const x = clientX - rect.left + dragOffset.x;
+  const y = clientY - rect.top + dragOffset.y;
+
+  const padding = 10;
+  draggedNode.x = Math.max(padding, Math.min(container.offsetWidth - padding, x));
+  draggedNode.y = Math.max(padding, Math.min(container.offsetHeight - padding, y));
+
+  const svgId = isDarkMode ? 'svg-dark' : 'svg-light';
+  const glowId = isDarkMode ? 'glows-dark' : 'glows-light';
+  const dims = { width: container.offsetWidth, height: container.offsetHeight, centerX: container.offsetWidth / 2, centerY: container.offsetHeight / 2, baseRadius: Math.min(container.offsetWidth, container.offsetHeight) * 0.38 };
+  renderGraph(svgId, dims);
+  renderGlows(glowId, dims);
+}
+
+function endDrag() {
+  draggedNode = null;
+  document.removeEventListener('mousemove', onDrag);
+  document.removeEventListener('mouseup', endDrag);
+  document.removeEventListener('touchmove', onDrag);
+  document.removeEventListener('touchend', endDrag);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THEME TOGGLE
+// ═══════════════════════════════════════════════════════════════════════════
+
+function toggleTheme() {
+  isDarkMode = !isDarkMode;
+  document.getElementById('phone-dark').classList.toggle('hidden', !isDarkMode);
+  document.getElementById('phone-light').classList.toggle('hidden', isDarkMode);
+  document.getElementById('theme-toggle').textContent = isDarkMode ? 'Light Mode' : 'Dark Mode';
+  document.body.style.background = isDarkMode ? '#030712' : '#e5e7eb';
+  init();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RANDOMIZE
+// ═══════════════════════════════════════════════════════════════════════════
+
+function randomize() {
+  Object.keys(nodeData).forEach(trait => {
+    nodeData[trait].forEach(point => {
+      point.angle += (Math.random() - 0.5) * 30;
+      point.radius = 0.7 + Math.random() * 0.25;
+    });
+  });
+
+  const traitOptions = {
+    curiosity: [
+      { name: 'Strong curiosity', desc: 'You seek out new ideas and experiences' },
+      { name: 'Open mind', desc: 'You embrace different perspectives' },
+      { name: 'Deep thinker', desc: 'You love exploring complex ideas' }
+    ],
+    warmth: [
+      { name: 'Natural warmth', desc: 'People feel at ease around you' },
+      { name: 'Genuine empathy', desc: 'You connect deeply with others' },
+      { name: 'Kind presence', desc: 'Your compassion shows in small ways' }
+    ],
+    steadiness: [
+      { name: 'Steady under pressure', desc: 'You stay calm when things get intense' },
+      { name: 'Inner resilience', desc: 'Challenges make you stronger' },
+      { name: 'Grounded nature', desc: 'You bring stability to chaos' }
+    ]
+  };
+
+  Object.keys(traitOptions).forEach(trait => {
+    const options = traitOptions[trait];
+    const pick = options[Math.floor(Math.random() * options.length)];
+
+    document.querySelectorAll(`[data-trait="${trait}"] .trait-card-name`).forEach(el => {
+      el.textContent = pick.name;
+    });
+    document.querySelectorAll(`[data-trait="${trait}"] .trait-card-desc`).forEach(el => {
+      el.textContent = pick.desc;
+    });
+  });
+
+  init();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function init() {
+  const containerId = isDarkMode ? 'graph-dark' : 'graph-light';
+  const svgId = isDarkMode ? 'svg-dark' : 'svg-light';
+  const glowId = isDarkMode ? 'glows-dark' : 'glows-light';
+
+  const dims = initNodes(containerId);
+  renderGlows(glowId, dims);
+  renderGraph(svgId, dims);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+window.addEventListener('resize', init);
+</script>
+</body>
+</html>

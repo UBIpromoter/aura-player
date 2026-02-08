@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constellation V2 — Teaching Through Stars</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  body {
+    font-family: 'Inter', sans-serif;
+    transition: background 0.5s ease;
+  }
+
+  .phone { transition: all 0.5s ease; }
+  .card { transition: all 0.5s ease; }
+
+  /* Star animations */
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
+  }
+
+  @keyframes gentlePulse {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 6px currentColor); }
+    50% { filter: brightness(1.2) drop-shadow(0 0 12px currentColor); }
+  }
+
+  @keyframes constellationDraw {
+    from { stroke-dashoffset: 400; opacity: 0; }
+    to { stroke-dashoffset: 0; opacity: 1; }
+  }
+
+  @keyframes averageFadeIn {
+    from { opacity: 0; }
+    to { opacity: 0.3; }
+  }
+
+  @keyframes starAppear {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .background-star {
+    animation: twinkle 3s ease-in-out infinite;
+  }
+
+  .constellation-star {
+    animation: gentlePulse 4s ease-in-out infinite;
+  }
+
+  .constellation-line {
+    stroke-dasharray: 400;
+    animation: constellationDraw 1.2s ease-out forwards;
+  }
+
+  .average-constellation {
+    animation: averageFadeIn 0.8s ease-out forwards;
+  }
+
+  .star-appear {
+    animation: starAppear 0.4s ease-out forwards;
+  }
+
+  /* Stagger animations */
+  .bg-star-1 { animation-delay: 0s; }
+  .bg-star-2 { animation-delay: 0.5s; }
+  .bg-star-3 { animation-delay: 1s; }
+  .bg-star-4 { animation-delay: 1.5s; }
+  .bg-star-5 { animation-delay: 2s; }
+  .bg-star-6 { animation-delay: 0.3s; }
+  .bg-star-7 { animation-delay: 0.8s; }
+  .bg-star-8 { animation-delay: 1.3s; }
+
+  .star-delay-1 { animation-delay: 0.2s; }
+  .star-delay-2 { animation-delay: 0.4s; }
+  .star-delay-3 { animation-delay: 0.6s; }
+
+  .line-delay-1 { animation-delay: 0.6s; }
+  .line-delay-2 { animation-delay: 0.8s; }
+  .line-delay-3 { animation-delay: 1.0s; }
+
+  /* Tooltip */
+  .star-tooltip {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+
+  .star-group:hover .star-tooltip {
+    opacity: 1;
+  }
+
+  /* Axis labels */
+  .axis-label {
+    font-size: 8px;
+    fill: currentColor;
+    opacity: 0.5;
+  }
+
+  /* Guide panel */
+  .guide-panel {
+    transition: all 0.3s ease;
+  }
+
+  .guide-panel.collapsed {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+  }
+
+  .guide-panel.expanded {
+    max-height: 400px;
+    opacity: 1;
+  }
+
+  /* Nebula glow */
+  .nebula {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(40px);
+    opacity: 0.12;
+  }
+
+  /* Comparison toggle */
+  .toggle-btn {
+    transition: all 0.2s ease;
+  }
+  .toggle-btn.active {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.6);
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 gap-4" style="background: #08080c;">
+
+  <!-- Controls -->
+  <div class="flex gap-3 items-center flex-wrap justify-center">
+    <button onclick="setMode('dark')" id="btn-dark" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-blue-500">Dark</button>
+    <button onclick="setMode('light')" id="btn-light" class="px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 border-gray-300">Light</button>
+    <div class="w-px h-6 bg-gray-600"></div>
+    <button onclick="randomize()" class="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors">Shuffle</button>
+    <button onclick="toggleComparison()" id="btn-compare" class="toggle-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-gray-600">Show Average</button>
+  </div>
+
+  <!-- Phone preview -->
+  <div id="phone" class="phone w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl" style="background: #0a0a12; border: 2px solid #151525;">
+    <div class="p-5 pt-8 pb-6">
+      <!-- ResultCard -->
+      <div id="card" class="card rounded-2xl overflow-hidden" style="background: rgba(8, 12, 24, 0.95); border: 1px solid rgba(59, 130, 246, 0.2);">
+
+        <!-- Header -->
+        <div class="p-4 pb-2 text-center">
+          <div class="text-xl mb-1">✨</div>
+          <div id="title" class="text-base font-semibold text-white">Your Personality Constellation</div>
+          <div id="subtitle" class="text-xs text-gray-400">Where your stars fall tells your story</div>
+        </div>
+
+        <!-- THE NEW CONSTELLATION: Pentagon Layout -->
+        <!-- Each vertex = one Big Five trait, fixed position -->
+        <!-- Your star's DISTANCE from center = how extreme that trait is -->
+        <!-- Your star's COLOR = which end of the spectrum (warm = high, cool = low) -->
+        <div id="constellation-container" class="relative mx-3 mb-2" style="height: 240px;">
+          <div id="sky" class="absolute inset-0 rounded-xl overflow-hidden" style="background: radial-gradient(ellipse at center, #0c1022 0%, #060610 100%);">
+
+            <!-- Nebula glows -->
+            <div class="nebula" style="width: 80px; height: 60px; background: #3b82f6; top: 15%; left: 15%;"></div>
+            <div class="nebula" style="width: 60px; height: 50px; background: #8b5cf6; top: 55%; right: 10%;"></div>
+
+            <!-- Background stars -->
+            <div id="bg-stars"></div>
+
+            <!-- The constellation SVG -->
+            <svg id="constellation-svg" class="absolute inset-0 w-full h-full" viewBox="0 0 320 220" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <!-- Glow filter for stars -->
+                <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+
+              <!-- Pentagon framework (the "chart axes") -->
+              <g id="framework"></g>
+
+              <!-- Average constellation (comparison baseline) -->
+              <g id="average-constellation" style="display: none;"></g>
+
+              <!-- Your constellation -->
+              <g id="your-lines"></g>
+              <g id="your-stars"></g>
+            </svg>
+
+            <!-- Constellation name -->
+            <div id="constellation-name" class="absolute top-2 left-0 right-0 text-center">
+              <span class="text-[9px] tracking-[0.15em] uppercase font-medium" style="color: rgba(148, 163, 184, 0.4);">Your Constellation</span>
+              <div id="constellation-title" class="text-sm font-semibold mt-0.5" style="color: rgba(148, 163, 184, 0.8);">Nova Prime</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- INTERPRETATION GUIDE (Toggle) -->
+        <div class="px-4 pb-2">
+          <button onclick="toggleGuide()" id="guide-toggle" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium" style="background: rgba(59, 130, 246, 0.08); color: rgba(148, 163, 184, 0.9);">
+            <span>How to Read Your Constellation</span>
+            <span id="guide-arrow" class="transition-transform">▼</span>
+          </button>
+
+          <div id="guide-panel" class="guide-panel collapsed mt-2 px-1">
+            <div class="space-y-3 text-[11px] leading-relaxed" style="color: rgba(148, 163, 184, 0.85);">
+
+              <!-- Visual Key -->
+              <div class="p-3 rounded-lg" style="background: rgba(59, 130, 246, 0.05);">
+                <div class="font-semibold mb-2 text-blue-300">The Shape Tells Your Story</div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="flex items-start gap-2">
+                    <div class="w-3 h-3 rounded-full mt-0.5" style="background: linear-gradient(135deg, #f59e0b, #ef4444);"></div>
+                    <div><strong>Distance from center</strong> = how strong that trait is</div>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <div class="w-3 h-3 mt-0.5" style="background: linear-gradient(90deg, #6366f1, #f59e0b); border-radius: 2px;"></div>
+                    <div><strong>Color</strong> = which end of the spectrum</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Trait Meanings -->
+              <div class="p-3 rounded-lg" style="background: rgba(59, 130, 246, 0.05);">
+                <div class="font-semibold mb-2 text-blue-300">The Five Stars</div>
+                <div class="space-y-1.5">
+                  <div class="flex justify-between"><span class="text-amber-400">Energy</span><span class="opacity-60">Reserved ←→ Outgoing</span></div>
+                  <div class="flex justify-between"><span class="text-pink-400">Warmth</span><span class="opacity-60">Direct ←→ Empathetic</span></div>
+                  <div class="flex justify-between"><span class="text-emerald-400">Structure</span><span class="opacity-60">Flexible ←→ Organized</span></div>
+                  <div class="flex justify-between"><span class="text-cyan-400">Sensitivity</span><span class="opacity-60">Steady ←→ Reactive</span></div>
+                  <div class="flex justify-between"><span class="text-purple-400">Curiosity</span><span class="opacity-60">Practical ←→ Imaginative</span></div>
+                </div>
+              </div>
+
+              <!-- Shape meaning -->
+              <div class="p-3 rounded-lg" style="background: rgba(59, 130, 246, 0.05);">
+                <div class="font-semibold mb-2 text-blue-300">What Shapes Mean</div>
+                <div class="space-y-1">
+                  <div><strong>Balanced pentagon</strong> → even across all traits</div>
+                  <div><strong>Stretched in one direction</strong> → that trait defines you</div>
+                  <div><strong>Pulled inward</strong> → moderate, flexible there</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trait Summary Pills -->
+        <div id="trait-labels" class="px-4 py-2 flex justify-center gap-1.5 flex-wrap"></div>
+
+        <!-- Narrative Summary -->
+        <div class="px-4 pb-2">
+          <p id="summary" class="text-xs text-center text-gray-400 leading-relaxed"></p>
+        </div>
+
+        <!-- CTA -->
+        <div class="px-4 pb-4 pt-1">
+          <div id="cta" class="p-3 rounded-xl text-center" style="background: rgba(59, 130, 246, 0.08);">
+            <div id="cta-sub" class="text-[10px] text-gray-400">10 questions mapped</div>
+            <div id="cta-main" class="text-xs font-medium mt-1 text-blue-300">Expand your constellation with Starter Pack →</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Design explanation (desktop only) -->
+  <div class="max-w-lg text-center mt-2 space-y-2">
+    <p class="text-gray-500 text-sm">
+      <strong class="text-gray-400">V2 Changes:</strong> Pentagon layout where position = trait direction.
+      Distance from center = intensity. Shape has meaning. Comparison baseline available.
+    </p>
+  </div>
+
+<script>
+// ============================================
+// THE NEW MODEL: Pentagon Radar Chart
+// Each vertex is a FIXED position for one trait
+// Your score determines how far from center your star sits
+// This makes position MEANINGFUL and LEARNABLE
+// ============================================
+
+const traits = {
+  E: {
+    name: 'Energy',
+    left: 'Reserved', right: 'Outgoing',
+    leftColor: '#6366f1', rightColor: '#f59e0b',
+    angle: -90  // Top vertex
+  },
+  A: {
+    name: 'Warmth',
+    left: 'Direct', right: 'Empathetic',
+    leftColor: '#3b82f6', rightColor: '#ec4899',
+    angle: -18  // Upper right
+  },
+  C: {
+    name: 'Structure',
+    left: 'Flexible', right: 'Organized',
+    leftColor: '#8b5cf6', rightColor: '#10b981',
+    angle: 54   // Lower right
+  },
+  N: {
+    name: 'Sensitivity',
+    left: 'Steady', right: 'Reactive',
+    leftColor: '#06b6d4', rightColor: '#f97316',
+    angle: 126  // Lower left
+  },
+  O: {
+    name: 'Curiosity',
+    left: 'Practical', right: 'Imaginative',
+    leftColor: '#14b8a6', rightColor: '#a855f7',
+    angle: 198  // Upper left
+  }
+};
+
+const traitOrder = ['E', 'A', 'C', 'N', 'O'];
+
+// User scores (0-100, 50 = center/average)
+let scores = { E: 78, C: 72, A: 65, N: 32, O: 85 };
+
+// Population average (for comparison)
+const averageScores = { E: 50, A: 55, C: 50, N: 45, O: 50 };
+
+let isDark = true;
+let showComparison = false;
+let guideExpanded = false;
+
+// Pentagon geometry
+const centerX = 160;
+const centerY = 120;
+const maxRadius = 80;
+const minRadius = 15; // Inner circle for "average" zone
+
+// Convert trait score to position on the pentagon
+function scoreToPosition(traitKey, score) {
+  const trait = traits[traitKey];
+  const angleRad = (trait.angle * Math.PI) / 180;
+
+  // Distance from center based on how FAR from 50 the score is
+  // Score 50 = at minRadius (center zone)
+  // Score 0 or 100 = at maxRadius (outer edge)
+  const deviation = Math.abs(score - 50) / 50; // 0-1 scale
+  const radius = minRadius + deviation * (maxRadius - minRadius);
+
+  const x = centerX + Math.cos(angleRad) * radius;
+  const y = centerY + Math.sin(angleRad) * radius;
+
+  return { x, y, radius, deviation };
+}
+
+// Color interpolation
+function lerpColor(c1, c2, t) {
+  const parse = c => [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)];
+  const [r1, g1, b1] = parse(c1);
+  const [r2, g2, b2] = parse(c2);
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// Generate constellation name based on dominant traits
+function generateConstellationName() {
+  const sorted = traitOrder
+    .map(k => ({ key: k, score: scores[k], distance: Math.abs(scores[k] - 50) }))
+    .sort((a, b) => b.distance - a.distance);
+
+  const primary = sorted[0];
+  const prefixes = {
+    E: { high: 'Solaris', low: 'Lunara' },
+    A: { high: 'Cordis', low: 'Acuta' },
+    C: { high: 'Ordo', low: 'Libera' },
+    N: { high: 'Sentio', low: 'Firma' },
+    O: { high: 'Nova', low: 'Terra' }
+  };
+
+  const suffixes = ['Minor', 'Rising', 'Major', 'Prime', 'Ascendant'];
+  const prefix = primary.score > 50 ? prefixes[primary.key].high : prefixes[primary.key].low;
+  const suffixIndex = Math.min(Math.floor(primary.distance / 12), suffixes.length - 1);
+
+  return `${prefix} ${suffixes[suffixIndex]}`;
+}
+
+// Generate background stars
+function generateBackgroundStars() {
+  const container = document.getElementById('bg-stars');
+  container.innerHTML = '';
+
+  for (let i = 0; i < 8; i++) {
+    const star = document.createElement('div');
+    const size = 1 + Math.random() * 1.5;
+    star.className = `background-star bg-star-${i + 1} absolute rounded-full`;
+    star.style.cssText = `
+      width: ${size}px;
+      height: ${size}px;
+      left: ${5 + Math.random() * 90}%;
+      top: ${5 + Math.random() * 90}%;
+      background: rgba(255, 255, 255, ${0.3 + Math.random() * 0.3});
+    `;
+    container.appendChild(star);
+  }
+}
+
+// Render the pentagon framework (axes)
+function renderFramework() {
+  const framework = document.getElementById('framework');
+  framework.innerHTML = '';
+
+  const axisColor = isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(71, 85, 105, 0.15)';
+  const labelColor = isDark ? 'rgba(148, 163, 184, 0.5)' : 'rgba(71, 85, 105, 0.6)';
+
+  // Draw concentric pentagons (reference rings)
+  [0.33, 0.66, 1].forEach((scale, i) => {
+    const points = traitOrder.map(k => {
+      const trait = traits[k];
+      const angleRad = (trait.angle * Math.PI) / 180;
+      const r = minRadius + scale * (maxRadius - minRadius);
+      return `${centerX + Math.cos(angleRad) * r},${centerY + Math.sin(angleRad) * r}`;
+    }).join(' ');
+
+    const ring = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    ring.setAttribute('points', points);
+    ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', axisColor);
+    ring.setAttribute('stroke-width', i === 2 ? '1' : '0.5');
+    ring.setAttribute('stroke-dasharray', i < 2 ? '2,4' : 'none');
+    framework.appendChild(ring);
+  });
+
+  // Draw axis lines from center to each vertex
+  traitOrder.forEach(k => {
+    const trait = traits[k];
+    const angleRad = (trait.angle * Math.PI) / 180;
+    const x = centerX + Math.cos(angleRad) * maxRadius;
+    const y = centerY + Math.sin(angleRad) * maxRadius;
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', centerX);
+    line.setAttribute('y1', centerY);
+    line.setAttribute('x2', x);
+    line.setAttribute('y2', y);
+    line.setAttribute('stroke', axisColor);
+    line.setAttribute('stroke-width', '0.5');
+    framework.appendChild(line);
+
+    // Add trait label at vertex
+    const labelX = centerX + Math.cos(angleRad) * (maxRadius + 14);
+    const labelY = centerY + Math.sin(angleRad) * (maxRadius + 14);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', labelX);
+    label.setAttribute('y', labelY);
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('dominant-baseline', 'middle');
+    label.setAttribute('fill', labelColor);
+    label.setAttribute('font-size', '8');
+    label.setAttribute('font-weight', '500');
+    label.textContent = trait.name;
+    framework.appendChild(label);
+  });
+
+  // Center dot
+  const centerDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  centerDot.setAttribute('cx', centerX);
+  centerDot.setAttribute('cy', centerY);
+  centerDot.setAttribute('r', '2');
+  centerDot.setAttribute('fill', axisColor);
+  framework.appendChild(centerDot);
+}
+
+// Render average constellation (comparison baseline)
+function renderAverageConstellation() {
+  const container = document.getElementById('average-constellation');
+  container.innerHTML = '';
+
+  if (!showComparison) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  container.classList.add('average-constellation');
+
+  const avgColor = isDark ? 'rgba(148, 163, 184, 0.3)' : 'rgba(71, 85, 105, 0.25)';
+
+  // Draw the average polygon
+  const points = traitOrder.map(k => {
+    const pos = scoreToPosition(k, averageScores[k]);
+    return `${pos.x},${pos.y}`;
+  }).join(' ');
+
+  const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  polygon.setAttribute('points', points);
+  polygon.setAttribute('fill', avgColor);
+  polygon.setAttribute('stroke', isDark ? 'rgba(148, 163, 184, 0.4)' : 'rgba(71, 85, 105, 0.35)');
+  polygon.setAttribute('stroke-width', '1');
+  polygon.setAttribute('stroke-dasharray', '3,3');
+  container.appendChild(polygon);
+
+  // Label
+  const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  label.setAttribute('x', centerX);
+  label.setAttribute('y', centerY + maxRadius + 30);
+  label.setAttribute('text-anchor', 'middle');
+  label.setAttribute('fill', isDark ? 'rgba(148, 163, 184, 0.4)' : 'rgba(71, 85, 105, 0.4)');
+  label.setAttribute('font-size', '8');
+  label.textContent = '— Average —';
+  container.appendChild(label);
+}
+
+// Render your constellation
+function renderYourConstellation() {
+  const linesGroup = document.getElementById('your-lines');
+  const starsGroup = document.getElementById('your-stars');
+  linesGroup.innerHTML = '';
+  starsGroup.innerHTML = '';
+
+  // Calculate all positions
+  const positions = traitOrder.map(k => ({
+    key: k,
+    ...traits[k],
+    score: scores[k],
+    ...scoreToPosition(k, scores[k])
+  }));
+
+  // Draw connecting lines (the pentagon shape)
+  const lineColor = isDark ? 'rgba(59, 130, 246, 0.5)' : 'rgba(59, 130, 246, 0.4)';
+
+  // Filled polygon area
+  const polygonPoints = positions.map(p => `${p.x},${p.y}`).join(' ');
+  const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  polygon.setAttribute('points', polygonPoints);
+  polygon.setAttribute('fill', isDark ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.06)');
+  polygon.setAttribute('stroke', lineColor);
+  polygon.setAttribute('stroke-width', '1.5');
+  polygon.setAttribute('class', 'constellation-line');
+  linesGroup.appendChild(polygon);
+
+  // Draw stars at each vertex
+  positions.forEach((pos, i) => {
+    const pct = pos.score / 100;
+    const starColor = lerpColor(pos.leftColor, pos.rightColor, pct);
+
+    // Star size based on how distinctive (distance from center)
+    const baseSize = 5 + pos.deviation * 8;
+
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', `star-group cursor-pointer star-appear star-delay-${(i % 3) + 1}`);
+    group.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+
+    // Outer glow
+    const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    glow.setAttribute('r', baseSize * 2.2);
+    glow.setAttribute('fill', starColor);
+    glow.setAttribute('opacity', isDark ? '0.15' : '0.1');
+    group.appendChild(glow);
+
+    // Main star
+    const star = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    star.setAttribute('r', baseSize);
+    star.setAttribute('fill', starColor);
+    star.setAttribute('filter', 'url(#starGlow)');
+    star.setAttribute('class', 'constellation-star');
+    star.style.color = starColor;
+    group.appendChild(star);
+
+    // Inner core
+    const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    core.setAttribute('r', baseSize * 0.4);
+    core.setAttribute('fill', isDark ? 'white' : 'rgba(255,255,255,0.9)');
+    core.setAttribute('opacity', '0.8');
+    group.appendChild(core);
+
+    // Tooltip
+    const tooltip = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    tooltip.setAttribute('class', 'star-tooltip');
+
+    const tooltipWidth = 100;
+    const tooltipHeight = 36;
+    const tooltipY = -baseSize - tooltipHeight - 4;
+
+    const tooltipBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    tooltipBg.setAttribute('x', -tooltipWidth/2);
+    tooltipBg.setAttribute('y', tooltipY);
+    tooltipBg.setAttribute('width', tooltipWidth);
+    tooltipBg.setAttribute('height', tooltipHeight);
+    tooltipBg.setAttribute('rx', 6);
+    tooltipBg.setAttribute('fill', isDark ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)');
+    tooltipBg.setAttribute('stroke', starColor);
+    tooltipBg.setAttribute('stroke-width', '1.5');
+    tooltip.appendChild(tooltipBg);
+
+    // Trait name
+    const tooltipTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    tooltipTitle.setAttribute('x', 0);
+    tooltipTitle.setAttribute('y', tooltipY + 13);
+    tooltipTitle.setAttribute('text-anchor', 'middle');
+    tooltipTitle.setAttribute('fill', starColor);
+    tooltipTitle.setAttribute('font-size', '9');
+    tooltipTitle.setAttribute('font-weight', '600');
+    tooltipTitle.textContent = pos.name;
+    tooltip.appendChild(tooltipTitle);
+
+    // Score description
+    const label = pos.score > 50 ? pos.right : pos.left;
+    const intensity = pos.deviation > 0.5 ? 'Very ' : pos.deviation > 0.25 ? '' : 'Somewhat ';
+
+    const tooltipDesc = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    tooltipDesc.setAttribute('x', 0);
+    tooltipDesc.setAttribute('y', tooltipY + 26);
+    tooltipDesc.setAttribute('text-anchor', 'middle');
+    tooltipDesc.setAttribute('fill', isDark ? 'white' : '#1f2937');
+    tooltipDesc.setAttribute('font-size', '10');
+    tooltipDesc.setAttribute('font-weight', '500');
+    tooltipDesc.textContent = `${intensity}${label}`;
+    tooltip.appendChild(tooltipDesc);
+
+    group.appendChild(tooltip);
+    starsGroup.appendChild(group);
+  });
+
+  // Update trait label pills
+  updateTraitLabels(positions);
+
+  // Update constellation name
+  document.getElementById('constellation-title').textContent = generateConstellationName();
+
+  // Update narrative summary
+  updateNarrativeSummary(positions);
+}
+
+// Update trait label pills
+function updateTraitLabels(positions) {
+  const container = document.getElementById('trait-labels');
+  container.innerHTML = '';
+
+  // Sort by distinctiveness for display
+  const sorted = [...positions].sort((a, b) => b.deviation - a.deviation);
+
+  // Show top 3 most distinctive
+  sorted.slice(0, 3).forEach(pos => {
+    const pct = pos.score / 100;
+    const color = lerpColor(pos.leftColor, pos.rightColor, pct);
+    const label = pos.score > 50 ? pos.right : pos.left;
+
+    const chip = document.createElement('span');
+    chip.className = 'px-2 py-1 rounded-full text-[10px] font-medium';
+    chip.style.cssText = `
+      background: ${color}18;
+      color: ${color};
+      border: 1px solid ${color}35;
+    `;
+    chip.textContent = label;
+    container.appendChild(chip);
+  });
+}
+
+// Generate narrative summary
+function updateNarrativeSummary(positions) {
+  const sorted = [...positions].sort((a, b) => b.deviation - a.deviation);
+  const top2 = sorted.slice(0, 2);
+
+  const describe = p => {
+    const label = p.score > 50 ? p.right.toLowerCase() : p.left.toLowerCase();
+    return label;
+  };
+
+  // Build a meaningful sentence
+  const summary = document.getElementById('summary');
+
+  if (top2[0].deviation > 0.4) {
+    summary.innerHTML = `Your constellation stretches toward <strong>${describe(top2[0])}</strong> — this is your defining star. ${top2[1].deviation > 0.3 ? `<strong>${describe(top2[1])}</strong> shines brightly too.` : ''}`;
+  } else {
+    summary.innerHTML = `Your constellation is well-balanced, with slight leanings toward <strong>${describe(top2[0])}</strong> and <strong>${describe(top2[1])}</strong>.`;
+  }
+}
+
+// Apply theme
+function applyTheme() {
+  const phone = document.getElementById('phone');
+  const card = document.getElementById('card');
+  const sky = document.getElementById('sky');
+
+  if (isDark) {
+    document.body.style.background = '#08080c';
+    phone.style.background = '#0a0a12';
+    phone.style.borderColor = '#151525';
+    card.style.background = 'rgba(8, 12, 24, 0.95)';
+    card.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+    sky.style.background = 'radial-gradient(ellipse at center, #0c1022 0%, #060610 100%)';
+
+    document.getElementById('title').className = 'text-base font-semibold text-white';
+    document.getElementById('subtitle').className = 'text-xs text-gray-400';
+  } else {
+    document.body.style.background = '#f0f5ff';
+    phone.style.background = '#ffffff';
+    phone.style.borderColor = '#c7d2fe';
+    card.style.background = 'rgba(248, 250, 255, 1)';
+    card.style.borderColor = 'rgba(59, 130, 246, 0.15)';
+    sky.style.background = 'radial-gradient(ellipse at center, #e0e7ff 0%, #c7d2fe 100%)';
+
+    document.getElementById('title').className = 'text-base font-semibold text-gray-900';
+    document.getElementById('subtitle').className = 'text-xs text-gray-500';
+  }
+
+  // Update constellation name colors
+  const nameEl = document.getElementById('constellation-name');
+  const titleEl = document.getElementById('constellation-title');
+  nameEl.querySelector('span').style.color = isDark ? 'rgba(148, 163, 184, 0.4)' : 'rgba(71, 85, 105, 0.5)';
+  titleEl.style.color = isDark ? 'rgba(148, 163, 184, 0.8)' : 'rgba(71, 85, 105, 0.85)';
+
+  // Nebula visibility
+  document.querySelectorAll('.nebula').forEach(el => {
+    el.style.opacity = isDark ? '0.12' : '0.06';
+  });
+}
+
+// Full render
+function render() {
+  generateBackgroundStars();
+  renderFramework();
+  renderAverageConstellation();
+  renderYourConstellation();
+  applyTheme();
+}
+
+// Toggle functions
+function setMode(mode) {
+  isDark = mode === 'dark';
+  document.getElementById('btn-dark').className = `px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 ${isDark ? 'border-blue-500' : 'border-gray-600'}`;
+  document.getElementById('btn-light').className = `px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 ${!isDark ? 'border-blue-500' : 'border-gray-300'}`;
+  render();
+}
+
+function toggleComparison() {
+  showComparison = !showComparison;
+  const btn = document.getElementById('btn-compare');
+  btn.textContent = showComparison ? 'Hide Average' : 'Show Average';
+  btn.classList.toggle('active', showComparison);
+  render();
+}
+
+function toggleGuide() {
+  guideExpanded = !guideExpanded;
+  const panel = document.getElementById('guide-panel');
+  const arrow = document.getElementById('guide-arrow');
+
+  panel.classList.toggle('collapsed', !guideExpanded);
+  panel.classList.toggle('expanded', guideExpanded);
+  arrow.style.transform = guideExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+
+function randomize() {
+  // Generate biased random scores
+  Object.keys(scores).forEach(k => {
+    const r = Math.random();
+    if (r < 0.35) {
+      scores[k] = Math.round(10 + Math.random() * 25); // Low
+    } else if (r > 0.65) {
+      scores[k] = Math.round(65 + Math.random() * 30); // High
+    } else {
+      scores[k] = Math.round(40 + Math.random() * 20); // Middle
+    }
+  });
+  render();
+}
+
+// Initial render
+render();
+</script>
+</body>
+</html>

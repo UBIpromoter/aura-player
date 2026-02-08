@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constellation V5 — Simple Beauty</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    transition: background 0.6s ease, color 0.6s ease;
+    background: #030712;
+    color: white;
+    overflow-x: hidden;
+  }
+
+  /* ── Scrollbar ── */
+  * { scrollbar-width: thin; scrollbar-color: rgba(139, 92, 246, 0.3) transparent; }
+  *::-webkit-scrollbar { width: 4px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 2px; }
+
+  /* ── Star twinkle ── */
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.6; }
+  }
+
+  @keyframes starBreathe {
+    0%, 100% {
+      filter: brightness(1) drop-shadow(0 0 8px var(--star-color));
+      transform: scale(1);
+    }
+    50% {
+      filter: brightness(1.15) drop-shadow(0 0 18px var(--star-color));
+      transform: scale(1.04);
+    }
+  }
+
+  @keyframes starEnter {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .ambient-star {
+    position: absolute;
+    border-radius: 50%;
+    background: white;
+    pointer-events: none;
+  }
+
+  .trait-star {
+    animation: starBreathe 5s ease-in-out infinite;
+    cursor: default;
+    transition: transform 0.4s ease, filter 0.4s ease;
+  }
+
+  .trait-star:hover {
+    transform: scale(1.12) !important;
+    filter: brightness(1.3) drop-shadow(0 0 24px var(--star-color)) !important;
+  }
+
+  .star-enter {
+    animation: starEnter 0.6s ease-out forwards;
+  }
+
+  /* ── Phone frame ── */
+  .phone-frame {
+    transition: background 0.6s ease, border-color 0.6s ease;
+  }
+
+  /* ── Legend ── */
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px var(--dot-color);
+  }
+
+  .legend-name {
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0.85;
+    min-width: 72px;
+  }
+
+  .legend-word {
+    font-size: 11px;
+    font-weight: 300;
+    opacity: 0.5;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Light mode ── */
+  body.light-mode {
+    background: #f9fafb;
+    color: #1e293b;
+  }
+
+  .light-mode .sky-bg {
+    background: radial-gradient(ellipse at 50% 40%, #e0e7ff 0%, #c7d2fe 40%, #ddd6fe 100%) !important;
+  }
+
+  .light-mode .ambient-star {
+    background: rgba(99, 102, 241, 0.5);
+  }
+
+  .light-mode .legend-name {
+    opacity: 0.9;
+    color: #334155;
+  }
+
+  .light-mode .legend-word {
+    opacity: 0.55;
+    color: #475569;
+  }
+
+  .light-mode .subtitle-text {
+    color: rgba(99, 102, 241, 0.6) !important;
+  }
+
+  .light-mode .title-text {
+    color: #1e293b !important;
+  }
+
+  /* ── Shuffle button ── */
+  .shuffle-btn {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 8px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    background: rgba(139, 92, 246, 0.08);
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+
+  .shuffle-btn:hover {
+    background: rgba(139, 92, 246, 0.18);
+    border-color: rgba(139, 92, 246, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .light-mode .shuffle-btn {
+    color: rgba(99, 102, 241, 0.7);
+    border-color: rgba(99, 102, 241, 0.25);
+    background: rgba(99, 102, 241, 0.06);
+  }
+
+  .light-mode .shuffle-btn:hover {
+    background: rgba(99, 102, 241, 0.14);
+    border-color: rgba(99, 102, 241, 0.45);
+    color: rgba(99, 102, 241, 1);
+  }
+
+  /* ── Mode toggle ── */
+  .mode-toggle {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+
+  .mode-toggle:hover {
+    color: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .light-mode .mode-toggle {
+    color: rgba(71, 85, 105, 0.5);
+    border-color: rgba(99, 102, 241, 0.15);
+  }
+
+  .light-mode .mode-toggle:hover {
+    color: rgba(71, 85, 105, 0.8);
+    border-color: rgba(99, 102, 241, 0.3);
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 gap-5">
+
+  <!-- Controls (outside phone) -->
+  <div class="flex gap-3 items-center">
+    <button onclick="shuffleProfile()" class="shuffle-btn">Shuffle Profile</button>
+    <button onclick="toggleMode()" class="mode-toggle" id="mode-btn">Light</button>
+  </div>
+
+  <!-- Phone frame -->
+  <div class="phone-frame w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl" style="background: #0a0a14; border: 2px solid rgba(139, 92, 246, 0.12);">
+    <div class="px-5 pt-10 pb-8">
+
+      <!-- Header -->
+      <div class="text-center mb-5">
+        <div class="subtitle-text text-[10px] uppercase tracking-[0.2em] font-medium mb-1.5" style="color: rgba(139, 92, 246, 0.45);">Your Constellation</div>
+        <div class="title-text text-lg font-semibold" id="constellation-name" style="color: rgba(255, 255, 255, 0.9);">Nova Prime</div>
+      </div>
+
+      <!-- The Sky -->
+      <div class="relative rounded-2xl overflow-hidden mx-auto" style="height: 320px;" id="sky-container">
+        <div class="sky-bg absolute inset-0" style="background: radial-gradient(ellipse at 50% 40%, #0f1129 0%, #080b1a 50%, #050710 100%);">
+
+          <!-- Ambient stars (generated) -->
+          <div id="ambient-stars"></div>
+
+          <!-- Constellation SVG -->
+          <svg id="constellation-svg" class="absolute inset-0 w-full h-full" viewBox="0 0 340 320" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+                <feGaussianBlur stdDeviation="3" result="blur"/>
+                <feMerge>
+                  <feMergeNode in="blur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- Connection lines -->
+            <g id="connection-lines"></g>
+
+            <!-- Stars -->
+            <g id="trait-stars"></g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="mt-6 px-3" id="legend"></div>
+
+    </div>
+  </div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// CONSTELLATION V5 — SIMPLE BEAUTY
+// "That's pretty" before "what does it mean"
+// ════════════════════════════════════════════════════════════════════
+
+// Production colors from TOKENS.md
+const COLORS = {
+  violet:  '#8b5cf6',
+  blue:    '#3b82f6',
+  emerald: '#10b981',
+  fuchsia: '#d946ef',
+  cyan:    '#06b6d4'
+};
+
+// Five traits, mapped to production colors
+const TRAITS = [
+  { key: 'O', name: 'Openness',          color: COLORS.violet,  word: { high: 'Imaginative', mid: 'Curious', low: 'Grounded' }},
+  { key: 'C', name: 'Conscientiousness', color: COLORS.emerald, word: { high: 'Disciplined',  mid: 'Steady',  low: 'Flexible' }},
+  { key: 'E', name: 'Extraversion',      color: COLORS.fuchsia, word: { high: 'Outgoing',     mid: 'Ambivert', low: 'Reflective' }},
+  { key: 'A', name: 'Agreeableness',     color: COLORS.blue,    word: { high: 'Warm',         mid: 'Balanced', low: 'Direct' }},
+  { key: 'N', name: 'Composure',         color: COLORS.cyan,    word: { high: 'Steady',       mid: 'Responsive', low: 'Sensitive' }}
+];
+
+// Scores (0–100)
+let scores = { O: 82, C: 65, E: 45, A: 71, N: 58 };
+
+let isDark = true;
+
+// Star positions — organic, spread out, not a grid or pentagon
+// These are base positions; score shifts them slightly
+const BASE_POSITIONS = [
+  { x: 170, y: 72  },  // O — top center
+  { x: 268, y: 135 },  // C — right
+  { x: 235, y: 248 },  // E — bottom right
+  { x: 105, y: 248 },  // A — bottom left
+  { x: 72,  y: 135 }   // N — left
+];
+
+// ────────────────────────────────────────────────────
+// Constellation name generator
+// ────────────────────────────────────────────────────
+
+const PREFIXES = {
+  O: { high: 'Nova',    low: 'Terra' },
+  C: { high: 'Ordo',    low: 'Libera' },
+  E: { high: 'Solaris', low: 'Lunara' },
+  A: { high: 'Cordis',  low: 'Acuta' },
+  N: { high: 'Firma',   low: 'Vela' }
+};
+
+const SUFFIXES = ['Minor', 'Rising', 'Major', 'Prime', 'Ascendant'];
+
+function generateName() {
+  const ranked = TRAITS
+    .map(t => ({ key: t.key, dist: Math.abs(scores[t.key] - 50) }))
+    .sort((a, b) => b.dist - a.dist);
+
+  const top = ranked[0];
+  const prefix = scores[top.key] >= 50 ? PREFIXES[top.key].high : PREFIXES[top.key].low;
+  const si = Math.min(Math.floor(top.dist / 12), SUFFIXES.length - 1);
+  return `${prefix} ${SUFFIXES[si]}`;
+}
+
+// ────────────────────────────────────────────────────
+// Star position: base + slight radial shift from score
+// ────────────────────────────────────────────────────
+
+function getStarPosition(index) {
+  const base = BASE_POSITIONS[index];
+  const trait = TRAITS[index];
+  const score = scores[trait.key];
+
+  // Center of the sky
+  const cx = 170, cy = 160;
+
+  // Direction from center to base position
+  const dx = base.x - cx;
+  const dy = base.y - cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // Shift outward for high scores, inward for low
+  const shift = ((score - 50) / 50) * 18;
+  const nx = dx / dist;
+  const ny = dy / dist;
+
+  return {
+    x: base.x + nx * shift,
+    y: base.y + ny * shift
+  };
+}
+
+// Star size: bigger for more extreme scores, but always visible
+function getStarSize(score) {
+  const deviation = Math.abs(score - 50) / 50;
+  return 8 + deviation * 10; // range: 8 – 18
+}
+
+function getScoreLevel(score) {
+  if (score >= 62) return 'high';
+  if (score <= 38) return 'low';
+  return 'mid';
+}
+
+// ────────────────────────────────────────────────────
+// Ambient background sparkle
+// ────────────────────────────────────────────────────
+
+function renderAmbientStars() {
+  const container = document.getElementById('ambient-stars');
+  container.innerHTML = '';
+
+  const count = 18;
+  for (let i = 0; i < count; i++) {
+    const star = document.createElement('div');
+    const size = 0.8 + Math.random() * 1.2;
+    const delay = Math.random() * 6;
+    const duration = 3 + Math.random() * 4;
+
+    star.className = 'ambient-star';
+    star.style.cssText = `
+      width: ${size}px;
+      height: ${size}px;
+      left: ${4 + Math.random() * 92}%;
+      top: ${4 + Math.random() * 92}%;
+      opacity: ${0.1 + Math.random() * 0.25};
+      animation: twinkle ${duration}s ease-in-out ${delay}s infinite;
+    `;
+    container.appendChild(star);
+  }
+}
+
+// ────────────────────────────────────────────────────
+// Render the constellation
+// ────────────────────────────────────────────────────
+
+function renderConstellation() {
+  const linesGroup = document.getElementById('connection-lines');
+  const starsGroup = document.getElementById('trait-stars');
+  linesGroup.innerHTML = '';
+  starsGroup.innerHTML = '';
+
+  // Calculate positions
+  const positions = TRAITS.map((trait, i) => ({
+    ...trait,
+    ...getStarPosition(i),
+    size: getStarSize(scores[trait.key]),
+    score: scores[trait.key]
+  }));
+
+  // Connection lines — very subtle, connecting adjacent stars
+  const lineOpacity = isDark ? 0.08 : 0.12;
+  for (let i = 0; i < positions.length; i++) {
+    const a = positions[i];
+    const b = positions[(i + 1) % positions.length];
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', a.x);
+    line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x);
+    line.setAttribute('y2', b.y);
+    line.setAttribute('stroke', isDark ? 'rgba(255,255,255,' + lineOpacity + ')' : 'rgba(99,102,241,' + (lineOpacity + 0.04) + ')');
+    line.setAttribute('stroke-width', '0.8');
+    line.setAttribute('stroke-linecap', 'round');
+    linesGroup.appendChild(line);
+  }
+
+  // Also connect a couple of cross-lines for constellation feel (non-adjacent)
+  const crossPairs = [[0, 2], [0, 3]];
+  crossPairs.forEach(([ai, bi]) => {
+    const a = positions[ai];
+    const b = positions[bi];
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', a.x);
+    line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x);
+    line.setAttribute('y2', b.y);
+    line.setAttribute('stroke', isDark ? 'rgba(255,255,255,' + (lineOpacity * 0.6) + ')' : 'rgba(99,102,241,' + (lineOpacity * 0.5) + ')');
+    line.setAttribute('stroke-width', '0.5');
+    line.setAttribute('stroke-linecap', 'round');
+    linesGroup.appendChild(line);
+  });
+
+  // Stars
+  positions.forEach((pos, i) => {
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+    group.style.setProperty('--star-color', pos.color);
+
+    // Outer soft glow
+    const outerGlow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    outerGlow.setAttribute('r', pos.size * 2.8);
+    outerGlow.setAttribute('fill', pos.color);
+    outerGlow.setAttribute('opacity', isDark ? '0.06' : '0.08');
+    group.appendChild(outerGlow);
+
+    // Mid glow
+    const midGlow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    midGlow.setAttribute('r', pos.size * 1.6);
+    midGlow.setAttribute('fill', pos.color);
+    midGlow.setAttribute('opacity', isDark ? '0.12' : '0.15');
+    group.appendChild(midGlow);
+
+    // Main star body
+    const star = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    star.setAttribute('r', pos.size);
+    star.setAttribute('fill', pos.color);
+    star.setAttribute('filter', 'url(#glow)');
+    star.setAttribute('class', 'trait-star star-enter');
+    star.style.setProperty('--star-color', pos.color);
+    star.style.animationDelay = `${i * 0.7}s`;
+    star.style.transformOrigin = 'center';
+    group.appendChild(star);
+
+    // Bright inner core
+    const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    core.setAttribute('r', pos.size * 0.3);
+    core.setAttribute('fill', 'white');
+    core.setAttribute('opacity', isDark ? '0.8' : '0.9');
+    group.appendChild(core);
+
+    starsGroup.appendChild(group);
+  });
+
+  // Update name
+  document.getElementById('constellation-name').textContent = generateName();
+
+  // Update legend
+  renderLegend(positions);
+}
+
+// ────────────────────────────────────────────────────
+// Legend: dot + name + one word
+// ────────────────────────────────────────────────────
+
+function renderLegend(positions) {
+  const container = document.getElementById('legend');
+  container.innerHTML = '';
+
+  positions.forEach(pos => {
+    const level = getScoreLevel(pos.score);
+    const word = pos.word[level];
+
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.style.setProperty('--dot-color', pos.color);
+
+    item.innerHTML = `
+      <div class="legend-dot" style="background: ${pos.color};"></div>
+      <div class="legend-name">${pos.name}</div>
+      <div class="legend-word">${word}</div>
+    `;
+
+    container.appendChild(item);
+  });
+}
+
+// ────────────────────────────────────────────────────
+// Theme
+// ────────────────────────────────────────────────────
+
+function applyTheme() {
+  const body = document.body;
+  const phone = document.querySelector('.phone-frame');
+  const nameEl = document.getElementById('constellation-name');
+  const btn = document.getElementById('mode-btn');
+
+  body.classList.toggle('light-mode', !isDark);
+
+  if (isDark) {
+    phone.style.background = '#0a0a14';
+    phone.style.borderColor = 'rgba(139, 92, 246, 0.12)';
+    nameEl.style.color = 'rgba(255, 255, 255, 0.9)';
+    btn.textContent = 'Light';
+  } else {
+    phone.style.background = '#ffffff';
+    phone.style.borderColor = 'rgba(99, 102, 241, 0.2)';
+    nameEl.style.color = '#1e293b';
+    btn.textContent = 'Dark';
+  }
+}
+
+function toggleMode() {
+  isDark = !isDark;
+  applyTheme();
+  renderAmbientStars();
+  renderConstellation();
+}
+
+// ────────────────────────────────────────────────────
+// Shuffle
+// ────────────────────────────────────────────────────
+
+function shuffleProfile() {
+  TRAITS.forEach(t => {
+    const r = Math.random();
+    if (r < 0.3) {
+      scores[t.key] = Math.round(18 + Math.random() * 20);
+    } else if (r > 0.7) {
+      scores[t.key] = Math.round(62 + Math.random() * 32);
+    } else {
+      scores[t.key] = Math.round(38 + Math.random() * 24);
+    }
+  });
+
+  renderConstellation();
+}
+
+// ────────────────────────────────────────────────────
+// Init
+// ────────────────────────────────────────────────────
+
+renderAmbientStars();
+renderConstellation();
+applyTheme();
+</script>
+</body>
+</html>
+

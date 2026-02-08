@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spectrum Color Options — B Variants</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  body { font-family: 'Inter', sans-serif; }
+</style>
+</head>
+<body class="min-h-screen p-8" style="background: #08080c;">
+
+  <div class="max-w-[1200px] mx-auto">
+    <div class="mb-8">
+      <div class="text-xs text-gray-500 font-mono">noodle/design/spectrum-color-options</div>
+      <div class="text-lg text-gray-300 mt-1 font-semibold">B Variants — Same warm E, different color shuffles</div>
+      <div class="text-sm text-gray-500 mt-1">All 5 traits shown so you see the full palette together</div>
+    </div>
+
+    <div class="flex gap-3 mb-8">
+      <button onclick="setMode('dark')" id="btn-dark" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-indigo-500">Dark</button>
+      <button onclick="setMode('light')" id="btn-light" class="px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 border-gray-300">Light</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="options-grid"></div>
+  </div>
+
+<script>
+let isDark = true;
+
+const options = {
+  'B1 — Original B': {
+    tag: '',
+    note: 'Warm E, everything else untouched. One change from current.',
+    colors: {
+      E: { left: '#f43f5e', right: '#f59e0b', leftLabel: 'Reserved', rightLabel: 'Outgoing' },
+      A: { left: '#3b82f6', right: '#ec4899', leftLabel: 'Direct', rightLabel: 'Empathetic' },
+      C: { left: '#8b5cf6', right: '#10b981', leftLabel: 'Flexible', rightLabel: 'Organized' },
+      N: { left: '#06b6d4', right: '#f97316', leftLabel: 'Steady', rightLabel: 'Sensitive' },
+      O: { left: '#14b8a6', right: '#a855f7', leftLabel: 'Practical', rightLabel: 'Curious' },
+    }
+  },
+  'B2 — Flip C direction': {
+    tag: '',
+    note: 'C runs emerald→violet instead of violet→emerald. Organized gets the purple, Flexible gets green.',
+    colors: {
+      E: { left: '#f43f5e', right: '#f59e0b', leftLabel: 'Reserved', rightLabel: 'Outgoing' },
+      A: { left: '#3b82f6', right: '#ec4899', leftLabel: 'Direct', rightLabel: 'Empathetic' },
+      C: { left: '#10b981', right: '#8b5cf6', leftLabel: 'Flexible', rightLabel: 'Organized' },
+      N: { left: '#06b6d4', right: '#f97316', leftLabel: 'Steady', rightLabel: 'Sensitive' },
+      O: { left: '#14b8a6', right: '#a855f7', leftLabel: 'Practical', rightLabel: 'Curious' },
+    }
+  },
+  'B3 — Cool A, warm N': {
+    tag: '',
+    note: 'Swap the cool tones: A gets cyan→pink, N gets blue→orange. Different vibe on the middle bars.',
+    colors: {
+      E: { left: '#f43f5e', right: '#f59e0b', leftLabel: 'Reserved', rightLabel: 'Outgoing' },
+      A: { left: '#06b6d4', right: '#ec4899', leftLabel: 'Direct', rightLabel: 'Empathetic' },
+      C: { left: '#8b5cf6', right: '#10b981', leftLabel: 'Flexible', rightLabel: 'Organized' },
+      N: { left: '#3b82f6', right: '#f97316', leftLabel: 'Steady', rightLabel: 'Sensitive' },
+      O: { left: '#14b8a6', right: '#a855f7', leftLabel: 'Practical', rightLabel: 'Curious' },
+    }
+  },
+  'B4 — O goes gold': {
+    tag: '',
+    note: 'O loses purple entirely: teal→gold. Only C has purple now. Pulls from D\'s idea.',
+    colors: {
+      E: { left: '#f43f5e', right: '#f59e0b', leftLabel: 'Reserved', rightLabel: 'Outgoing' },
+      A: { left: '#3b82f6', right: '#ec4899', leftLabel: 'Direct', rightLabel: 'Empathetic' },
+      C: { left: '#8b5cf6', right: '#10b981', leftLabel: 'Flexible', rightLabel: 'Organized' },
+      N: { left: '#06b6d4', right: '#f97316', leftLabel: 'Steady', rightLabel: 'Sensitive' },
+      O: { left: '#14b8a6', right: '#eab308', leftLabel: 'Practical', rightLabel: 'Curious' },
+    }
+  },
+  'B5 — C goes navy→emerald': {
+    tag: '',
+    note: 'C drops violet for navy blue. Zero purple on left sides. Purple only lives on O\'s right.',
+    colors: {
+      E: { left: '#f43f5e', right: '#f59e0b', leftLabel: 'Reserved', rightLabel: 'Outgoing' },
+      A: { left: '#3b82f6', right: '#ec4899', leftLabel: 'Direct', rightLabel: 'Empathetic' },
+      C: { left: '#6366f1', right: '#10b981', leftLabel: 'Flexible', rightLabel: 'Organized' },
+      N: { left: '#06b6d4', right: '#f97316', leftLabel: 'Steady', rightLabel: 'Sensitive' },
+      O: { left: '#14b8a6', right: '#a855f7', leftLabel: 'Practical', rightLabel: 'Curious' },
+    }
+  },
+  'B6 — Full shuffle': {
+    tag: '',
+    note: 'Warm E + flip C + gold O + cyan A. Most different from current while keeping each bar unique.',
+    colors: {
+      E: { left: '#f43f5e', right: '#f59e0b', leftLabel: 'Reserved', rightLabel: 'Outgoing' },
+      A: { left: '#06b6d4', right: '#ec4899', leftLabel: 'Direct', rightLabel: 'Empathetic' },
+      C: { left: '#10b981', right: '#8b5cf6', leftLabel: 'Flexible', rightLabel: 'Organized' },
+      N: { left: '#3b82f6', right: '#f97316', leftLabel: 'Steady', rightLabel: 'Sensitive' },
+      O: { left: '#14b8a6', right: '#eab308', leftLabel: 'Practical', rightLabel: 'Curious' },
+    }
+  },
+};
+
+const allFiveScores = { E: 78, A: 35, C: 72, N: 28, O: 85 };
+
+function lerpColor(c1, c2, t) {
+  const p = (s, i) => parseInt(s.slice(i, i+2), 16);
+  const r = Math.round(p(c1,1)+(p(c2,1)-p(c1,1))*t);
+  const g = Math.round(p(c1,3)+(p(c2,3)-p(c1,3))*t);
+  const b = Math.round(p(c1,5)+(p(c2,5)-p(c1,5))*t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function render() {
+  const grid = document.getElementById('options-grid');
+  grid.innerHTML = '';
+
+  Object.entries(options).forEach(([name, opt]) => {
+    const card = document.createElement('div');
+    card.className = 'rounded-2xl p-5';
+    card.style.background = isDark ? 'rgba(12, 12, 22, 0.85)' : 'rgba(248, 248, 252, 1)';
+    card.style.border = isDark ? '1px solid rgba(99, 102, 241, 0.2)' : '1px solid rgba(99, 102, 241, 0.12)';
+
+    let tagHtml = '';
+    if (opt.tag === 'current') tagHtml = `<span class="ml-2 px-2 py-0.5 rounded-full text-[10px] font-medium ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}">CURRENT</span>`;
+
+    let barsHtml = '';
+    Object.entries(opt.colors).forEach(([trait, spec]) => {
+      const score = allFiveScores[trait];
+      const dotColor = lerpColor(spec.left, spec.right, score / 100);
+      const gradientOpacity = isDark ? 0.5 : 0.75;
+      const labelStyle = isDark ? 'opacity: 1; filter: brightness(1.3)' : 'opacity: 1; filter: saturate(1.3) brightness(0.75)';
+      const dotStyle = isDark
+        ? `background: ${dotColor}; box-shadow: 0 0 10px ${dotColor}, 0 0 20px ${dotColor}80;`
+        : `background: white; border: 2px solid ${dotColor}; box-shadow: 0 1px 4px rgba(0,0,0,0.15);`;
+
+      barsHtml += `
+        <div class="px-1">
+          <div class="flex justify-between text-[10px] mb-1">
+            <span style="color: ${spec.left}; ${labelStyle}">${spec.leftLabel}</span>
+            <span style="color: ${spec.right}; ${labelStyle}">${spec.rightLabel}</span>
+          </div>
+          <div class="h-3 rounded-full relative" style="background: linear-gradient(to right, ${spec.left}, ${spec.right}); opacity: ${gradientOpacity};">
+            <div class="absolute rounded-full" style="
+              width: 16px; height: 16px; top: 50%; transform: translateY(-50%);
+              left: ${Math.max(8, Math.min(92, score))}%; margin-left: -8px; ${dotStyle}
+            "></div>
+          </div>
+        </div>`;
+    });
+
+    card.innerHTML = `
+      <div class="flex items-center mb-1">
+        <div class="text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}">${name}</div>
+        ${tagHtml}
+      </div>
+      <div class="text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-4">${opt.note}</div>
+      <div class="space-y-3">${barsHtml}</div>
+    `;
+    grid.appendChild(card);
+  });
+
+  document.body.style.background = isDark ? '#08080c' : '#f3f4f6';
+}
+
+function setMode(mode) {
+  isDark = mode === 'dark';
+  document.getElementById('btn-dark').className = `px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 ${isDark ? 'border-indigo-500' : 'border-gray-600'}`;
+  document.getElementById('btn-light').className = `px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 ${!isDark ? 'border-indigo-500' : 'border-gray-300'}`;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

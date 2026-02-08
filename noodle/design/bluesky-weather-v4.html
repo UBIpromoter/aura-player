@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Glow V4 — Sky Presence</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  body { font-family: 'Inter', sans-serif; }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     SKY BACKDROP — Deep space feel, production-aligned
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .sky-backdrop {
+    position: relative;
+    overflow: hidden;
+    border-radius: 20px;
+    background: linear-gradient(180deg,
+      #050510 0%,
+      #0a0a1a 30%,
+      #0d0d20 60%,
+      #10101a 100%
+    );
+  }
+
+  .sky-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* Subtle star field */
+  .star-field {
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 60px 70px, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 100px 20px, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1.5px 1.5px at 150px 80px, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 200px 40px, rgba(255,255,255,0.25), transparent),
+      radial-gradient(1px 1px at 250px 90px, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 80px 110px, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1px 1px at 180px 130px, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 30px 140px, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1.5px 1.5px at 280px 60px, rgba(255,255,255,0.45), transparent),
+      radial-gradient(1px 1px at 130px 50px, rgba(255,255,255,0.25), transparent),
+      radial-gradient(1px 1px at 220px 120px, rgba(255,255,255,0.35), transparent);
+    opacity: 0.6;
+    animation: starTwinkle 8s ease-in-out infinite;
+  }
+
+  @keyframes starTwinkle {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.7; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     CENTRAL AURA — The luminous presence
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .aura-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .aura-core {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(2px);
+    transition: all 0.8s ease;
+  }
+
+  .aura-glow {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    transition: all 0.8s ease;
+  }
+
+  .aura-pulse {
+    animation: auraPulse 4s ease-in-out infinite;
+  }
+
+  @keyframes auraPulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: var(--base-opacity);
+    }
+    50% {
+      transform: scale(1.08);
+      opacity: calc(var(--base-opacity) * 1.2);
+    }
+  }
+
+  .aura-breathe {
+    animation: auraBreathe 6s ease-in-out infinite;
+  }
+
+  @keyframes auraBreathe {
+    0%, 100% {
+      transform: scale(1) rotate(0deg);
+    }
+    25% {
+      transform: scale(1.03) rotate(1deg);
+    }
+    50% {
+      transform: scale(1.06) rotate(0deg);
+    }
+    75% {
+      transform: scale(1.03) rotate(-1deg);
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     PARTICLES — Gently drifting around the light source
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .particle-orbit {
+    animation: particleOrbit ease-in-out infinite;
+    animation-duration: var(--orbit-duration, 12s);
+    animation-delay: var(--orbit-delay, 0s);
+  }
+
+  @keyframes particleOrbit {
+    0% {
+      transform: rotate(var(--start-angle, 0deg)) translateX(var(--orbit-radius, 60px)) rotate(calc(-1 * var(--start-angle, 0deg)));
+      opacity: var(--min-opacity, 0.3);
+    }
+    25% {
+      opacity: var(--max-opacity, 0.8);
+    }
+    50% {
+      transform: rotate(calc(var(--start-angle, 0deg) + 180deg)) translateX(var(--orbit-radius, 60px)) rotate(calc(-1 * (var(--start-angle, 0deg) + 180deg)));
+      opacity: var(--min-opacity, 0.3);
+    }
+    75% {
+      opacity: var(--max-opacity, 0.8);
+    }
+    100% {
+      transform: rotate(calc(var(--start-angle, 0deg) + 360deg)) translateX(var(--orbit-radius, 60px)) rotate(calc(-1 * (var(--start-angle, 0deg) + 360deg)));
+      opacity: var(--min-opacity, 0.3);
+    }
+  }
+
+  .particle-drift {
+    animation: particleDrift ease-in-out infinite;
+    animation-duration: var(--drift-duration, 8s);
+    animation-delay: var(--drift-delay, 0s);
+  }
+
+  @keyframes particleDrift {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+      opacity: var(--base-opacity, 0.5);
+    }
+    25% {
+      transform: translate(var(--drift-x1, 5px), var(--drift-y1, -8px)) scale(1.15);
+      opacity: calc(var(--base-opacity, 0.5) * 1.4);
+    }
+    50% {
+      transform: translate(var(--drift-x2, -3px), var(--drift-y2, 4px)) scale(0.9);
+      opacity: var(--base-opacity, 0.5);
+    }
+    75% {
+      transform: translate(var(--drift-x3, 4px), var(--drift-y3, 6px)) scale(1.1);
+      opacity: calc(var(--base-opacity, 0.5) * 1.3);
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     CONNECTION LINES — Aura radiating to traits
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .connection-line {
+    position: absolute;
+    height: 1px;
+    transform-origin: left center;
+    pointer-events: none;
+  }
+
+  .connection-pulse {
+    animation: connectionPulse 3s ease-in-out infinite;
+    animation-delay: var(--pulse-delay, 0s);
+  }
+
+  @keyframes connectionPulse {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     TRAIT LABELS — Floating around the aura
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .trait-label {
+    position: absolute;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+    transition: all 0.3s ease;
+  }
+
+  .trait-label:hover {
+    transform: scale(1.05);
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+
+  .trait-label .value {
+    font-weight: 700;
+    margin-left: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .trait-float {
+    animation: traitFloat 6s ease-in-out infinite;
+    animation-delay: var(--float-delay, 0s);
+  }
+
+  @keyframes traitFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     AURA NAME DISPLAY
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .aura-name {
+    text-align: center;
+    padding: 4px 0;
+  }
+
+  .aura-name-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  .aura-name-value {
+    font-size: 16px;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--name-color-1, #8b5cf6), var(--name-color-2, #3b82f6));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     LEGEND CARD — Matches production style
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .legend-card {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .legend-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .legend-item:first-child { padding-top: 0; }
+
+  .legend-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    margin: 0 -8px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-radius: 8px;
+  }
+
+  .legend-item.active {
+    background: rgba(255, 255, 255, 0.05);
+    margin: 0 -8px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-radius: 8px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  .legend-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .legend-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .legend-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .legend-value {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend-desc {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-top: 2px;
+  }
+
+  /* Progress bar */
+  .trait-bar {
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    margin-top: 8px;
+    overflow: hidden;
+  }
+
+  .trait-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     POETIC NARRATION
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .narration {
+    text-align: center;
+    font-style: italic;
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 0 8px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     SHIMMER OVERLAY
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .shimmer-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.015) 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.015) 75%,
+      transparent 100%
+    );
+    background-size: 200% 200%;
+    animation: shimmer 10s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 0% 0%; }
+    50% { background-position: 100% 100%; }
+    100% { background-position: 0% 0%; }
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-8 gap-6" style="background: #030712;">
+
+  <!-- Controls -->
+  <div class="flex gap-3 items-center flex-wrap justify-center">
+    <button onclick="randomize()" class="px-4 py-2 rounded-xl text-sm font-medium bg-violet-600 text-white hover:bg-violet-500 transition-colors">Shuffle</button>
+    <button onclick="toggleLabels()" id="btn-labels" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-gray-600 hover:border-violet-500 transition-colors">Toggle Labels</button>
+    <button onclick="toggleConnections()" id="btn-connections" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-gray-600 hover:border-violet-500 transition-colors">Toggle Connections</button>
+  </div>
+
+  <!-- Phone frame -->
+  <div id="phone" class="w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl" style="background: #0a0a12; border: 2px solid rgba(255,255,255,0.08);">
+    <div class="p-5 pt-8 pb-6">
+
+      <!-- Card -->
+      <div class="rounded-2xl overflow-hidden" style="background: rgba(12, 12, 22, 0.9); border: 1px solid rgba(139, 92, 246, 0.15);">
+
+        <!-- Header -->
+        <div class="p-4 pb-2">
+          <div class="aura-name">
+            <div class="aura-name-label">Your Aura</div>
+            <div id="aura-name-value" class="aura-name-value">Radiant Explorer</div>
+          </div>
+        </div>
+
+        <!-- Aura Visualization -->
+        <div class="px-4 py-2">
+          <div id="aura-canvas" class="sky-backdrop w-full h-64 relative">
+            <!-- Dynamic content rendered here -->
+          </div>
+        </div>
+
+        <!-- Narration -->
+        <div class="px-5 py-3">
+          <p id="narration" class="narration">"A luminous presence that draws others in with warmth and curiosity."</p>
+        </div>
+
+        <!-- Legend -->
+        <div class="px-4 pb-4">
+          <div class="legend-card">
+            <div class="legend-item" data-trait="openness" onclick="highlightTrait('openness')">
+              <div class="legend-dot" style="background: #3b82f6; color: #3b82f6;"></div>
+              <div class="legend-content">
+                <div class="legend-row">
+                  <span class="legend-name">Openness</span>
+                  <span id="legend-openness" class="legend-value text-blue-400">72%</span>
+                </div>
+                <div class="legend-desc">Curiosity and imagination</div>
+                <div class="trait-bar">
+                  <div id="bar-openness" class="trait-bar-fill bg-blue-500" style="width: 72%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="legend-item" data-trait="warmth" onclick="highlightTrait('warmth')">
+              <div class="legend-dot" style="background: #f59e0b; color: #f59e0b;"></div>
+              <div class="legend-content">
+                <div class="legend-row">
+                  <span class="legend-name">Warmth</span>
+                  <span id="legend-warmth" class="legend-value text-amber-400">78%</span>
+                </div>
+                <div class="legend-desc">Empathy and connection</div>
+                <div class="trait-bar">
+                  <div id="bar-warmth" class="trait-bar-fill bg-amber-500" style="width: 78%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="legend-item" data-trait="energy" onclick="highlightTrait('energy')">
+              <div class="legend-dot" style="background: #10b981; color: #10b981;"></div>
+              <div class="legend-content">
+                <div class="legend-row">
+                  <span class="legend-name">Energy</span>
+                  <span id="legend-energy" class="legend-value text-emerald-400">65%</span>
+                </div>
+                <div class="legend-desc">Vitality and drive</div>
+                <div class="trait-bar">
+                  <div id="bar-energy" class="trait-bar-fill bg-emerald-500" style="width: 65%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Hint -->
+  <div class="max-w-md text-center text-gray-500 text-xs mt-2">
+    <p><strong class="text-gray-400">V4 Aura Glow:</strong> Central luminous presence with orbiting particles and trait connections</p>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AURA GLOW V4 — Sky Presence
+// Central aura that glows, radiates, and connects to traits
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Production-aligned colors from TOKENS.md
+const COLORS = {
+  violet: { base: '#8b5cf6', light: '#a78bfa', rgb: '139, 92, 246' },
+  blue: { base: '#3b82f6', light: '#60a5fa', rgb: '59, 130, 246' },
+  emerald: { base: '#10b981', light: '#34d399', rgb: '16, 185, 129' },
+  amber: { base: '#f59e0b', light: '#fbbf24', rgb: '245, 158, 11' },
+  pink: { base: '#ec4899', light: '#f472b6', rgb: '236, 72, 153' },
+  cyan: { base: '#06b6d4', light: '#22d3ee', rgb: '6, 182, 212' },
+};
+
+// Trait to color mapping
+const TRAIT_COLORS = {
+  openness: COLORS.blue,
+  warmth: COLORS.amber,
+  energy: COLORS.emerald,
+};
+
+let traits = {
+  openness: 72,
+  warmth: 78,
+  energy: 65
+};
+
+let showLabels = true;
+let showConnections = true;
+let highlightedTrait = null;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AURA NAME GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function generateAuraName() {
+  const o = traits.openness;
+  const w = traits.warmth;
+  const e = traits.energy;
+
+  // Adjectives based on combined traits
+  const intensity = (o + w + e) / 3;
+  const adjectives = intensity > 70
+    ? ['Radiant', 'Luminous', 'Brilliant', 'Vibrant']
+    : intensity > 50
+    ? ['Gentle', 'Steady', 'Balanced', 'Grounded']
+    : ['Deep', 'Quiet', 'Subtle', 'Mysterious'];
+
+  // Nouns based on dominant trait
+  const dominant = o >= w && o >= e ? 'openness'
+    : w >= o && w >= e ? 'warmth'
+    : 'energy';
+
+  const nouns = {
+    openness: ['Explorer', 'Dreamer', 'Seeker', 'Voyager'],
+    warmth: ['Healer', 'Guardian', 'Nurturer', 'Beacon'],
+    energy: ['Catalyst', 'Spark', 'Force', 'Pulse']
+  };
+
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[dominant][Math.floor(Math.random() * nouns[dominant].length)];
+
+  return `${adj} ${noun}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NARRATION GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function generateNarration() {
+  const o = traits.openness;
+  const w = traits.warmth;
+  const e = traits.energy;
+
+  // Find most distinctive trait
+  const deviations = [
+    { name: 'openness', val: o, dev: Math.abs(o - 50) },
+    { name: 'warmth', val: w, dev: Math.abs(w - 50) },
+    { name: 'energy', val: e, dev: Math.abs(e - 50) }
+  ].sort((a, b) => b.dev - a.dev);
+
+  const primary = deviations[0];
+
+  const narratives = {
+    openness: {
+      high: "A curious spirit that sees possibility everywhere. Your mind reaches toward horizons others haven't imagined.",
+      low: "A focused presence with depth. You know the value of what's proven and real."
+    },
+    warmth: {
+      high: "A luminous presence that draws others in. People feel safe in your glow.",
+      low: "A clear-eyed observer. You see what others miss because you look without bias."
+    },
+    energy: {
+      high: "A dynamic force that moves through the world. Your vitality is contagious.",
+      low: "A grounded anchor. Your stillness creates space for others to find their footing."
+    }
+  };
+
+  const direction = primary.val > 50 ? 'high' : 'low';
+  return `"${narratives[primary.name][direction]}"`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER AURA
+// ═══════════════════════════════════════════════════════════════════════════
+
+function render() {
+  const canvas = document.getElementById('aura-canvas');
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+  const centerX = width / 2;
+  const centerY = height / 2;
+
+  // Calculate aura properties from traits
+  const avgIntensity = (traits.openness + traits.warmth + traits.energy) / 300;
+  const coreSize = 20 + avgIntensity * 25;
+  const glowSize = 60 + avgIntensity * 50;
+  const outerGlow = 100 + avgIntensity * 60;
+
+  // Determine primary and secondary colors based on traits
+  const traitWeights = [
+    { name: 'openness', weight: traits.openness, color: COLORS.blue },
+    { name: 'warmth', weight: traits.warmth, color: COLORS.amber },
+    { name: 'energy', weight: traits.energy, color: COLORS.emerald }
+  ].sort((a, b) => b.weight - a.weight);
+
+  const primary = traitWeights[0].color;
+  const secondary = traitWeights[1].color;
+  const tertiary = traitWeights[2].color;
+
+  let html = '';
+
+  // Star field
+  html += `<div class="star-field"></div>`;
+
+  // Outer glow layers
+  html += `
+    <div class="aura-glow aura-breathe" style="
+      left: ${centerX - outerGlow}px;
+      top: ${centerY - outerGlow}px;
+      width: ${outerGlow * 2}px;
+      height: ${outerGlow * 2}px;
+      background: radial-gradient(circle,
+        ${tertiary.base}15 0%,
+        ${tertiary.base}08 40%,
+        transparent 70%
+      );
+      filter: blur(20px);
+      --base-opacity: 0.6;
+    "></div>
+  `;
+
+  html += `
+    <div class="aura-glow aura-pulse" style="
+      left: ${centerX - glowSize * 1.5}px;
+      top: ${centerY - glowSize * 1.5}px;
+      width: ${glowSize * 3}px;
+      height: ${glowSize * 3}px;
+      background: radial-gradient(circle,
+        ${secondary.base}25 0%,
+        ${secondary.base}12 35%,
+        transparent 65%
+      );
+      filter: blur(15px);
+      --base-opacity: 0.7;
+    "></div>
+  `;
+
+  html += `
+    <div class="aura-glow aura-pulse" style="
+      left: ${centerX - glowSize}px;
+      top: ${centerY - glowSize}px;
+      width: ${glowSize * 2}px;
+      height: ${glowSize * 2}px;
+      background: radial-gradient(circle,
+        ${primary.base}40 0%,
+        ${primary.base}20 40%,
+        transparent 70%
+      );
+      filter: blur(10px);
+      --base-opacity: 0.85;
+      animation-delay: -1s;
+    "></div>
+  `;
+
+  // Core
+  html += `
+    <div class="aura-core" style="
+      left: ${centerX - coreSize}px;
+      top: ${centerY - coreSize}px;
+      width: ${coreSize * 2}px;
+      height: ${coreSize * 2}px;
+      background: radial-gradient(circle,
+        rgba(255,255,255,0.9) 0%,
+        ${primary.light}90 30%,
+        ${primary.base}60 60%,
+        transparent 100%
+      );
+      box-shadow: 0 0 ${coreSize}px ${primary.base}80, 0 0 ${coreSize * 2}px ${primary.base}40;
+    "></div>
+  `;
+
+  // Orbiting particles
+  const particleCount = Math.round(8 + avgIntensity * 12);
+  const traitColors = [COLORS.blue, COLORS.amber, COLORS.emerald];
+
+  for (let i = 0; i < particleCount; i++) {
+    const color = traitColors[i % 3];
+    const orbitRadius = 45 + (i % 4) * 20 + Math.random() * 15;
+    const startAngle = (i * 137.5) % 360; // Golden angle
+    const duration = 10 + Math.random() * 8;
+    const size = 3 + Math.random() * 4;
+    const delay = Math.random() * -duration;
+
+    html += `
+      <div class="particle particle-orbit" style="
+        left: ${centerX}px;
+        top: ${centerY}px;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color.light};
+        box-shadow: 0 0 ${size * 2}px ${color.base};
+        --orbit-radius: ${orbitRadius}px;
+        --start-angle: ${startAngle}deg;
+        --orbit-duration: ${duration}s;
+        --orbit-delay: ${delay}s;
+        --min-opacity: 0.2;
+        --max-opacity: 0.8;
+      "></div>
+    `;
+  }
+
+  // Drifting ambient particles
+  const driftCount = Math.round(5 + avgIntensity * 8);
+  for (let i = 0; i < driftCount; i++) {
+    const color = traitColors[i % 3];
+    const x = 20 + Math.random() * (width - 40);
+    const y = 20 + Math.random() * (height - 40);
+    const size = 2 + Math.random() * 3;
+    const duration = 6 + Math.random() * 6;
+    const delay = Math.random() * -duration;
+
+    html += `
+      <div class="particle particle-drift" style="
+        left: ${x}px;
+        top: ${y}px;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color.base};
+        box-shadow: 0 0 ${size * 3}px ${color.base}80;
+        --drift-x1: ${Math.random() * 12 - 6}px;
+        --drift-y1: ${Math.random() * -15 - 5}px;
+        --drift-x2: ${Math.random() * 10 - 5}px;
+        --drift-y2: ${Math.random() * 10}px;
+        --drift-x3: ${Math.random() * 12 - 6}px;
+        --drift-y3: ${Math.random() * 12 - 4}px;
+        --drift-duration: ${duration}s;
+        --drift-delay: ${delay}s;
+        --base-opacity: 0.4;
+      "></div>
+    `;
+  }
+
+  // Connection lines to traits (if enabled)
+  if (showConnections) {
+    const traitPositions = {
+      openness: { x: 30, y: 40 },
+      warmth: { x: width - 30, y: 40 },
+      energy: { x: width / 2, y: height - 35 }
+    };
+
+    Object.entries(traitPositions).forEach(([trait, pos]) => {
+      const color = TRAIT_COLORS[trait];
+      const dx = pos.x - centerX;
+      const dy = pos.y - centerY;
+      const length = Math.sqrt(dx * dx + dy * dy) - coreSize - 10;
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      const isHighlighted = highlightedTrait === trait;
+      const delay = Math.random() * 2;
+
+      html += `
+        <div class="connection-line connection-pulse" style="
+          left: ${centerX + Math.cos(angle * Math.PI / 180) * coreSize}px;
+          top: ${centerY + Math.sin(angle * Math.PI / 180) * coreSize}px;
+          width: ${length}px;
+          background: linear-gradient(90deg, ${color.base}60, ${color.base}20);
+          transform: rotate(${angle}deg);
+          opacity: ${isHighlighted ? 0.6 : 0.25};
+          --pulse-delay: ${delay}s;
+        "></div>
+      `;
+    });
+  }
+
+  // Floating trait labels (if enabled)
+  if (showLabels) {
+    const labelPositions = {
+      openness: { x: 20, y: 25, align: 'left' },
+      warmth: { x: width - 20, y: 25, align: 'right' },
+      energy: { x: width / 2, y: height - 25, align: 'center' }
+    };
+
+    Object.entries(labelPositions).forEach(([trait, pos], i) => {
+      const color = TRAIT_COLORS[trait];
+      const value = traits[trait];
+      const isHighlighted = highlightedTrait === trait;
+
+      const translateX = pos.align === 'right' ? '-100%' : pos.align === 'center' ? '-50%' : '0';
+
+      html += `
+        <div class="trait-label trait-float" style="
+          left: ${pos.x}px;
+          top: ${pos.y}px;
+          transform: translateX(${translateX});
+          background: rgba(${color.rgb}, ${isHighlighted ? 0.25 : 0.12});
+          border-color: rgba(${color.rgb}, ${isHighlighted ? 0.5 : 0.2});
+          color: ${color.light};
+          --float-delay: ${i * 0.8}s;
+          ${isHighlighted ? 'box-shadow: 0 0 15px ' + color.base + '40;' : ''}
+        ">
+          ${trait.charAt(0).toUpperCase() + trait.slice(1)}
+          <span class="value">${value}%</span>
+        </div>
+      `;
+    });
+  }
+
+  // Shimmer overlay
+  html += `<div class="shimmer-overlay"></div>`;
+
+  canvas.innerHTML = html;
+
+  // Update legend
+  updateLegend();
+
+  // Update name and narration
+  document.getElementById('aura-name-value').textContent = generateAuraName();
+  document.getElementById('aura-name-value').style.setProperty('--name-color-1', primary.base);
+  document.getElementById('aura-name-value').style.setProperty('--name-color-2', secondary.base);
+  document.getElementById('narration').textContent = generateNarration();
+}
+
+function updateLegend() {
+  Object.keys(traits).forEach(trait => {
+    const value = traits[trait];
+    document.getElementById(`legend-${trait}`).textContent = `${value}%`;
+    document.getElementById(`bar-${trait}`).style.width = `${value}%`;
+
+    const item = document.querySelector(`[data-trait="${trait}"]`);
+    item.classList.toggle('active', highlightedTrait === trait);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function randomize() {
+  const patterns = [
+    { openness: 85, warmth: 70, energy: 75 }, // Radiant explorer
+    { openness: 65, warmth: 88, energy: 55 }, // Warm nurturer
+    { openness: 45, warmth: 55, energy: 82 }, // Dynamic catalyst
+    { openness: 78, warmth: 45, energy: 68 }, // Cool explorer
+    { openness: 35, warmth: 72, energy: 40 }, // Quiet healer
+    { openness: 55, warmth: 55, energy: 55 }, // Balanced
+  ];
+
+  const base = patterns[Math.floor(Math.random() * patterns.length)];
+  traits.openness = Math.max(15, Math.min(95, base.openness + (Math.random() * 20 - 10)));
+  traits.warmth = Math.max(15, Math.min(95, base.warmth + (Math.random() * 20 - 10)));
+  traits.energy = Math.max(15, Math.min(95, base.energy + (Math.random() * 20 - 10)));
+
+  traits.openness = Math.round(traits.openness);
+  traits.warmth = Math.round(traits.warmth);
+  traits.energy = Math.round(traits.energy);
+
+  highlightedTrait = null;
+  render();
+}
+
+function toggleLabels() {
+  showLabels = !showLabels;
+  const btn = document.getElementById('btn-labels');
+  btn.style.borderColor = showLabels ? '#8b5cf6' : '#4b5563';
+  render();
+}
+
+function toggleConnections() {
+  showConnections = !showConnections;
+  const btn = document.getElementById('btn-connections');
+  btn.style.borderColor = showConnections ? '#8b5cf6' : '#4b5563';
+  render();
+}
+
+function highlightTrait(trait) {
+  highlightedTrait = highlightedTrait === trait ? null : trait;
+  render();
+}
+
+// Initial render
+render();
+</script>
+</body>
+</html>

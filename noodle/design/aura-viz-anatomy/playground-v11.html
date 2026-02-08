@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz — Constellation Organism v11</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #030712; color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh; padding: 24px;
+  }
+  .harness {
+    max-width: 960px; margin: 0 auto;
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
+  }
+  .title { font-size: 16px; font-weight: 700; color: #fff; }
+  .subtitle { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
+  .main-viz { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .scaling-row { display: flex; gap: 16px; align-items: flex-end; }
+  .scaling-label { font-size: 10px; color: #6b7280; text-align: center; margin-bottom: 4px; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 600px;
+  }
+  .ctrl-btn {
+    padding: 8px 14px; border: 1px solid #374151; border-radius: 8px;
+    background: transparent; color: #9ca3af; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s; font-family: inherit;
+  }
+  .ctrl-btn:hover { border-color: #6b7280; color: #fff; }
+  .ctrl-btn.active { border-color: #8b5cf6; color: #fff; background: rgba(139,92,246,0.12); }
+  .ctrl-group { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .ctrl-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; font-weight: 600; }
+  .tier-section { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .tier-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; font-weight: 600; }
+  .tier-grid { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+  .assess-toggle {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 8px; border: 1px solid #1f2937; border-radius: 6px;
+    background: transparent; color: #6b7280; font-size: 10px; cursor: pointer;
+    transition: all 0.25s; font-family: inherit; white-space: nowrap;
+  }
+  .assess-toggle:hover { border-color: #374151; color: #9ca3af; }
+  .assess-toggle.on { color: #e5e7eb; background: rgba(99,102,241,0.08); }
+  .assess-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    opacity: 0.4; transition: opacity 0.2s;
+  }
+  .assess-toggle.on .assess-dot { opacity: 1; }
+  .slider-group { display: flex; align-items: center; gap: 8px; }
+  .slider-group label { font-size: 11px; color: #9ca3af; }
+  .slider-group input[type="range"] { width: 140px; accent-color: #8b5cf6; }
+  .slider-val { font-size: 11px; color: #6b7280; min-width: 36px; }
+  .divider { width: 100%; max-width: 400px; height: 1px; background: #1f2937; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+
+// === AURA VISUALIZATION COMPONENT START ===
+
+const AuraVisualization = React.memo(function AuraVisualization({
+  onboardingAnswers = {},
+  assessCompleted = {},
+  entityType = 'human',
+  darkMode = true,
+  size = 200,
+}) {
+  const canvasRef = React.useRef(null);
+  const stateRef = React.useRef(null);
+  const animRef = React.useRef(null);
+  const propsRef = React.useRef({ onboardingAnswers, assessCompleted, entityType, darkMode, size });
+
+  // Keep propsRef current
+  propsRef.current = { onboardingAnswers, assessCompleted, entityType, darkMode, size };
+
+  // -------------------------------------------------------
+  // PALETTE
+  // -------------------------------------------------------
+  const C = {
+    violet:'#8b5cf6', blue:'#3b82f6', teal:'#14b8a6', rose:'#f43f5e',
+    pink:'#d946ef', emerald:'#10b981', amber:'#f59e0b', indigo:'#6366f1', cyan:'#06b6d4',
+  };
+
+  function hexRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n>>16)&255, (n>>8)&255, n&255];
+  }
+
+  // -------------------------------------------------------
+  // NEURON MAPPING
+  // -------------------------------------------------------
+  // Map onboarding question IDs to neuron indices
+  // colorQ determines neuron color, posQ determines neuron position
+  const NEURON_MAP = [
+    { colorQ: 'onboard-1',  posQ: 'onboard-2',  colors: [C.violet, C.blue] },
+    { colorQ: 'onboard-4',  posQ: 'onboard-8',  colors: [C.indigo, C.rose] },
+    { colorQ: 'onboard-5',  posQ: 'onboard-3',  colors: [C.pink, C.teal] },
+    { colorQ: 'onboard-6',  posQ: 'onboard-9',  colors: [C.emerald, C.amber] },
+    { colorQ: 'onboard-7',  posQ: 'onboard-10', colors: [C.cyan, C.violet] },
+  ];
+
+  const SENSITIVE = [false, false, false, true, true];
+
+  const HUMAN_POS = [
+    [{ x:150, y:140 }, { x:270, y:120 }],
+    [{ x:350, y:170 }, { x:380, y:300 }],
+    [{ x:240, y:250 }, { x:290, y:320 }],
+    [{ x:140, y:340 }, { x:220, y:410 }],
+    [{ x:340, y:380 }, { x:400, y:430 }],
+  ];
+
+  const AI_POS = [
+    [{ x:270, y:90 },  { x:270, y:180 }],
+    [{ x:400, y:220 }, { x:380, y:340 }],
+    [{ x:320, y:410 }, { x:220, y:410 }],
+    [{ x:140, y:340 }, { x:160, y:220 }],
+    [{ x:270, y:290 }, { x:270, y:260 }],
+  ];
+
+  const HUMAN_CONNS = [[0,1],[0,2],[1,2],[2,3],[2,4],[3,4],[0,3],[1,4]];
+  const AI_CONNS = [[0,1],[0,2],[1,2],[2,3],[2,4],[3,4],[0,4],[1,3],[0,3],[1,4]];
+
+  // -------------------------------------------------------
+  // ASSESSMENT MAP
+  // -------------------------------------------------------
+  const ASSESS_MAP = [
+    // v11: affinities = which 2-3 primaries this assessment semantically relates to
+    // Primary 0: identity/perception, Primary 1: drive/passion
+    // Primary 2: connection/empathy, Primary 3: values/stability, Primary 4: mind/intuition
+    { ids: ['starter-personality'], name: 'Personality', color: C.violet, tier: 1, nodes: 3, affinities: [0, 2] },
+    { ids: ['starter-motivation'], name: 'Motivation', color: C.amber, tier: 1, nodes: 3, affinities: [1, 3] },
+    { ids: ['starter-thinking'], name: 'Thinking', color: C.blue, tier: 1, nodes: 3, affinities: [0, 4] },
+    { ids: ['starter-connection'], name: 'Connection', color: C.pink, tier: 1, nodes: 3, affinities: [2, 3] },
+    { ids: ['starter-strategy'], name: 'Strategy', color: C.emerald, tier: 1, nodes: 3, affinities: [1, 4] },
+    { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: C.violet, tier: 2, nodes: 5, affinities: [0, 2, 4] },
+    { ids: ['integrity'], name: 'Character', color: C.emerald, tier: 2, nodes: 3, affinities: [3, 1] },
+    { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: C.indigo, tier: 2, nodes: 4, affinities: [3, 4] },
+    { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: C.cyan, tier: 2, nodes: 4, affinities: [4, 0] },
+    { ids: ['attachment'], name: 'Relationships', color: C.rose, tier: 2, nodes: 3, affinities: [2, 3] },
+    { ids: ['risk'], name: 'Behavior', color: C.amber, tier: 2, nodes: 3, affinities: [1, 4] },
+  ];
+
+  // -------------------------------------------------------
+  // HELPERS
+  // -------------------------------------------------------
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpRgb(a, b, t) { return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
+  function rgbStr(c, a) { return `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a.toFixed(3)})`; }
+
+  function seededRng(seed) {
+    let s = seed;
+    return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
+  }
+
+  // -------------------------------------------------------
+  // DERIVE ANSWERS FROM PROPS
+  // -------------------------------------------------------
+  function deriveAnswers(answers) {
+    const colorAns = new Array(5).fill(null);
+    const posAns = new Array(5).fill(null);
+    for (let i = 0; i < 5; i++) {
+      const nm = NEURON_MAP[i];
+      if (nm.colorQ in answers) colorAns[i] = answers[nm.colorQ];
+      if (nm.posQ in answers) posAns[i] = answers[nm.posQ];
+    }
+    return { colorAns, posAns };
+  }
+
+  function deriveAssessState(completed) {
+    const state = {};
+    ASSESS_MAP.forEach((assess, idx) => {
+      state[idx] = assess.ids.some(id => id in completed);
+    });
+    return state;
+  }
+
+  // -------------------------------------------------------
+  // NODE FACTORY
+  // -------------------------------------------------------
+  function makeNode(opts) {
+    return {
+      x: opts.x || 300, y: opts.y || 300,
+      tx: opts.x || 300, ty: opts.y || 300,
+      color: opts.color ? hexRgb(opts.color) : [70,75,90],
+      tcolor: opts.color ? hexRgb(opts.color) : [70,75,90],
+      r: opts.r || 2, tr: opts.r || 2,
+      halo: opts.halo || 8, thalo: opts.halo || 8,
+      alpha: 0, talpha: 0,
+      phase: Math.random() * Math.PI * 2,
+      orbitAngle: Math.random() * Math.PI * 2,
+      orbitSpeed: (Math.random() - 0.5) * 0.006,
+      driftSpeed: 0.35 + Math.random() * 0.5,
+      driftAmp: 2.5 + Math.random() * 3.5,
+      phaseX: Math.random() * 6, phaseY: Math.random() * 6,
+      flash: 0,
+      type: opts.type || 'primary',
+      parent: opts.parent ?? -1,
+      sensitive: opts.sensitive || false,
+      assessIdx: opts.assessIdx ?? null,
+      affinities: opts.affinities || null,
+      tier: opts.tier || 0,
+      twinklePhase: Math.random() * Math.PI * 2,
+      twinkleSpeed: 0.3 + Math.random() * 0.7,
+      twinklePeak: 0,
+    };
+  }
+
+  // -------------------------------------------------------
+  // BUILD ALL NODES
+  // -------------------------------------------------------
+  function buildAllNodes(assessState) {
+    const nodes = [];
+    const CX = 300, CY = 300;
+
+    // 5 primaries (idx 0-4)
+    // v11: positions pulled closer to center by 0.6 multiplier
+    for (let i = 0; i < 5; i++) {
+      const mid = {
+        x: (HUMAN_POS[i][0].x + HUMAN_POS[i][1].x) / 2 + 30,
+        y: (HUMAN_POS[i][0].y + HUMAN_POS[i][1].y) / 2 + 30,
+      };
+      // Pull toward center by 0.6
+      const px = CX + (mid.x - CX) * 0.6;
+      const py = CY + (mid.y - CY) * 0.6;
+      nodes.push(makeNode({
+        x: px, y: py, r: 5, halo: 22,
+        type: 'primary', sensitive: SENSITIVE[i],
+      }));
+    }
+
+    // 10 companions (idx 5-14): 2 per primary
+    for (let i = 0; i < 5; i++) {
+      for (let c = 0; c < 2; c++) {
+        nodes.push(makeNode({
+          x: nodes[i].x, y: nodes[i].y,
+          type: 'companion', parent: i, r: 2.5, halo: 10,
+        }));
+      }
+    }
+
+    // 5 satellites (idx 15-19)
+    for (let s = 0; s < 5; s++) {
+      nodes.push(makeNode({
+        x: CX, y: CY,
+        type: 'satellite', parent: s, r: 2, halo: 7,
+      }));
+    }
+
+    // v11: Assessment nodes positioned between affinity primaries
+    ASSESS_MAP.forEach((assess, ai) => {
+      if (!assessState[ai]) return;
+      const rng = seededRng(ai * 137 + 42);
+      const affs = assess.affinities;
+      const p0 = nodes[affs[0]], p1 = nodes[affs[1]];
+      // Midpoint of affinity primaries
+      const midX = affs.length === 3
+        ? (nodes[affs[0]].x + nodes[affs[1]].x + nodes[affs[2]].x) / 3
+        : (p0.x + p1.x) / 2;
+      const midY = affs.length === 3
+        ? (nodes[affs[0]].y + nodes[affs[1]].y + nodes[affs[2]].y) / 3
+        : (p0.y + p1.y) / 2;
+      // Perpendicular vector for spread
+      const dx = p1.x - p0.x, dy = p1.y - p0.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const perpX = -dy / len, perpY = dx / len;
+
+      for (let ni = 0; ni < assess.nodes; ni++) {
+        // Spread along the line between primaries + perpendicular offset
+        const along = (ni / Math.max(1, assess.nodes - 1) - 0.5) * len * 0.4;
+        const perp = (rng() - 0.5) * 35;
+        // Slight outward push so they don't collapse onto the midpoint
+        const outward = 15 + rng() * 20;
+        const outAngle = Math.atan2(midY - CY, midX - CX);
+        const x = midX + (dx / len) * along + perpX * perp + Math.cos(outAngle) * outward;
+        const y = midY + (dy / len) * along + perpY * perp + Math.sin(outAngle) * outward;
+        nodes.push(makeNode({
+          x, y, r: 2 + rng() * 2, halo: 8 + rng() * 10,
+          type: 'assess', color: assess.color,
+          assessIdx: ai, tier: assess.tier,
+          parent: affs[0], // primary affinity
+          affinities: affs, // all affinities stored on node
+        }));
+      }
+    });
+
+    return nodes;
+  }
+
+  // -------------------------------------------------------
+  // STARS
+  // -------------------------------------------------------
+  function buildStars() {
+    const stars = [];
+    for (let i = 0; i < 100; i++) {
+      stars.push({
+        x: Math.random() * 600, y: Math.random() * 600,
+        r: 0.2 + Math.random() * 0.9,
+        bright: Math.random() * 0.35 + 0.05,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.5 + Math.random() * 2.5,
+      });
+    }
+    return stars;
+  }
+
+  // -------------------------------------------------------
+  // CONNECTION BUILDER
+  // -------------------------------------------------------
+  function buildConnections(nodes, isAI, colorAns, posAns, assessState) {
+    const conns = [];
+    const answeredCount = colorAns.filter(a => a !== null).length + posAns.filter(a => a !== null).length;
+    const N = nodes.length;
+
+    // Primary-to-primary (low threshold so unanswered core still connects)
+    const primConns = isAI ? AI_CONNS : HUMAN_CONNS;
+    for (const [a, b] of primConns) {
+      if (nodes[a].alpha > 0.1 && nodes[b].alpha > 0.1) conns.push([a, b]);
+    }
+
+    // Primary-to-companion
+    for (let ci = 5; ci < 15; ci++) {
+      const p = nodes[ci].parent;
+      if (nodes[ci].alpha > 0.05 && nodes[p].alpha > 0.2) conns.push([p, ci]);
+    }
+
+    // Companion-to-companion (same parent)
+    for (let i = 0; i < 5; i++) {
+      const c1 = 5 + i * 2, c2 = 5 + i * 2 + 1;
+      if (nodes[c1].alpha > 0.05 && nodes[c2].alpha > 0.05) conns.push([c1, c2]);
+    }
+
+    // Cross-parent companion bridges (creates the dense inner web)
+    // v11: always present, no answeredCount gate
+    for (let i = 0; i < 5; i++) {
+      const next = (i + 1) % 5;
+      const c1 = 5 + i * 2 + 1; // second companion of neuron i
+      const c2 = 5 + next * 2;   // first companion of next neuron
+      if (nodes[c1].alpha > 0.05 && nodes[c2].alpha > 0.05) {
+        conns.push([c1, c2]);
+      }
+      // Also connect first companion to next primary
+      const c3 = 5 + i * 2;
+      if (nodes[c3].alpha > 0.05 && nodes[next].alpha > 0.2) {
+        conns.push([c3, next]);
+      }
+    }
+
+    // Satellite connections
+    for (let si = 15; si < 20; si++) {
+      const p = nodes[si].parent;
+      if (nodes[si].alpha > 0.05 && nodes[p].alpha > 0.2) conns.push([p, si]);
+    }
+    if (answeredCount >= 8) {
+      for (let si = 0; si < 5; si++) {
+        const next = (si + 1) % 5;
+        if (nodes[15 + si].alpha > 0.05 && nodes[15 + next].alpha > 0.05) conns.push([15 + si, 15 + next]);
+      }
+    }
+
+    // v11: Assessment connections — multi-parent, cross-assessment bridges
+    const connSet = new Set();
+    function addConn(a, b) {
+      const key = Math.min(a,b) * 10000 + Math.max(a,b);
+      if (connSet.has(key)) return;
+      connSet.add(key);
+      conns.push([a, b]);
+    }
+
+    for (let ai = 20; ai < N; ai++) {
+      const an = nodes[ai];
+      if (an.alpha < 0.03) continue;
+
+      // Connect to ALL affinity primaries (not just one parent)
+      if (an.affinities) {
+        for (const pi of an.affinities) {
+          if (nodes[pi].alpha > 0.1) addConn(pi, ai);
+        }
+      } else if (an.parent >= 0 && nodes[an.parent].alpha > 0.1) {
+        addConn(an.parent, ai);
+      }
+
+      // Connect to nearest 2 nodes of any type (not just same assessment)
+      const nearby = [];
+      for (let bi = 0; bi < N; bi++) {
+        if (bi === ai || nodes[bi].alpha < 0.05) continue;
+        const dx = an.x - nodes[bi].x, dy = an.y - nodes[bi].y;
+        nearby.push({ idx: bi, d: dx * dx + dy * dy });
+      }
+      nearby.sort((a, b) => a.d - b.d);
+      const nearCount = Math.min(2, nearby.length);
+      for (let k = 0; k < nearCount; k++) {
+        if (nearby[k].d < 150 * 150) addConn(ai, nearby[k].idx);
+      }
+    }
+
+    return conns;
+  }
+
+  // -------------------------------------------------------
+  // TARGET COMPUTATION
+  // -------------------------------------------------------
+  function computeTargets(nodes, isAI, colorAns, posAns, assessState, time) {
+    const CX = 300, CY = 300;
+    const answeredCount = colorAns.filter(a => a !== null).length + posAns.filter(a => a !== null).length;
+
+    // Primary nodes
+    for (let i = 0; i < 5; i++) {
+      const posSet = isAI ? AI_POS[i] : HUMAN_POS[i];
+      const node = nodes[i];
+
+      let rawX, rawY;
+      if (posAns[i] !== null) {
+        rawX = posSet[posAns[i]].x + 30;
+        rawY = posSet[posAns[i]].y + 30;
+      } else {
+        rawX = (posSet[0].x + posSet[1].x) / 2 + 30;
+        rawY = (posSet[0].y + posSet[1].y) / 2 + 30;
+      }
+
+      // Pull positions toward center — tighter when unanswered (core cluster), wider when answered
+      const answered = colorAns[i] !== null || posAns[i] !== null;
+      const pullFactor = answered ? 0.6 : 0.25;
+      node.tx = CX + (rawX - CX) * pullFactor;
+      node.ty = CY + (rawY - CY) * pullFactor;
+
+      if (colorAns[i] !== null) {
+        node.tcolor = hexRgb(NEURON_MAP[i].colors[colorAns[i]]);
+        node.tr = 6; node.thalo = 28; node.talpha = 1;
+      } else {
+        // Unanswered: hint at neuron's palette (blend of both possible colors at 35%)
+        const c0 = hexRgb(NEURON_MAP[i].colors[0]);
+        const c1 = hexRgb(NEURON_MAP[i].colors[1]);
+        node.tcolor = [
+          Math.round((c0[0] + c1[0]) * 0.18 + 60 * 0.64),
+          Math.round((c0[1] + c1[1]) * 0.18 + 65 * 0.64),
+          Math.round((c0[2] + c1[2]) * 0.18 + 80 * 0.64),
+        ];
+        node.tr = 3.5; node.thalo = 14; node.talpha = 0.45;
+      }
+      if (posAns[i] !== null && colorAns[i] === null) {
+        // Position answered but not color: brighter hint, leaning toward palette
+        const c0 = hexRgb(NEURON_MAP[i].colors[0]);
+        const c1 = hexRgb(NEURON_MAP[i].colors[1]);
+        node.tcolor = [
+          Math.round((c0[0] + c1[0]) * 0.25 + 50 * 0.5),
+          Math.round((c0[1] + c1[1]) * 0.25 + 55 * 0.5),
+          Math.round((c0[2] + c1[2]) * 0.25 + 70 * 0.5),
+        ];
+        node.talpha = 0.6; node.tr = 4.5; node.thalo = 18;
+      }
+    }
+
+    // Companion nodes
+    for (let ci = 0; ci < 10; ci++) {
+      const node = nodes[5 + ci];
+      const pi = node.parent;
+      const parent = nodes[pi];
+      const answered = colorAns[pi] !== null || posAns[pi] !== null;
+      if (answered) {
+        const angle = node.orbitAngle + time * 0.0008;
+        const dist = 15 + (ci % 2) * 12;
+        node.tx = parent.tx + Math.cos(angle) * dist;
+        node.ty = parent.ty + Math.sin(angle) * dist;
+        node.tcolor = parent.tcolor;
+        node.tr = 2 + (ci % 2) * 1.2;
+        node.thalo = 8 + (ci % 2) * 4;
+        node.talpha = parent.talpha * 0.6;
+      } else {
+        // Unanswered companions: inherit parent's color hint, tight orbit
+        const angle = node.orbitAngle + time * 0.0006;
+        const dist = 6 + (ci % 2) * 5;
+        node.tx = parent.tx + Math.cos(angle) * dist;
+        node.ty = parent.ty + Math.sin(angle) * dist;
+        node.tcolor = parent.tcolor;
+        node.tr = 1.5; node.thalo = 6;
+        node.talpha = 0.2;
+      }
+    }
+
+    // Satellite nodes
+    for (let si = 0; si < 5; si++) {
+      const node = nodes[15 + si];
+      const parent = nodes[node.parent];
+      if (answeredCount >= 6 && parent.talpha > 0.3) {
+        const baseAngle = (si / 5) * Math.PI * 2 + Math.PI / 10;
+        const angle = baseAngle + Math.sin(time * 0.15 + si * 1.2) * (isAI ? 0.05 : 0.15);
+        // v11: satellite base distance 140 (was 180-195)
+        const dist = (isAI ? 140 : 140 + Math.sin(time * 0.1 + si) * 15);
+        node.tx = CX + Math.cos(angle) * dist;
+        node.ty = CY + Math.sin(angle) * dist;
+        node.tcolor = parent.tcolor;
+        node.tr = 2; node.thalo = 7;
+        node.talpha = 0.5 * Math.min(1, (answeredCount - 5) / 4);
+      } else {
+        node.talpha = 0;
+      }
+    }
+
+    // v11: Assessment nodes — blend color from affinity primaries, pull position inward
+    for (let ai = 20; ai < nodes.length; ai++) {
+      const node = nodes[ai];
+      if (assessState[node.assessIdx]) {
+        node.talpha = 0.85;
+
+        // Color: 70% blend of affinity primaries, 30% assessment's own color
+        if (node.affinities && node.affinities.length >= 2) {
+          const assessColor = node.tcolor; // original assessment color
+          // Average affinity primary colors
+          let ar = 0, ag = 0, ab = 0;
+          for (const pi of node.affinities) {
+            ar += nodes[pi].color[0];
+            ag += nodes[pi].color[1];
+            ab += nodes[pi].color[2];
+          }
+          const n = node.affinities.length;
+          const parentBlend = [ar / n, ag / n, ab / n];
+          // If primaries are still unanswered (gray), lean more on assessment color
+          const primaryStrength = nodes[node.affinities[0]].talpha > 0.6 ? 0.7 : 0.4;
+          node.tcolor = lerpRgb(
+            hexRgb(ASSESS_MAP[node.assessIdx].color),
+            parentBlend,
+            primaryStrength
+          );
+        }
+
+        // Position: blend toward affinity primaries (35% pull inward)
+        if (node.affinities) {
+          let bx = 0, by = 0, tw = 0;
+          for (let k = 0; k < node.affinities.length; k++) {
+            const w = k === 0 ? 0.6 : 0.3; // primary affinity pulls harder
+            bx += nodes[node.affinities[k]].tx * w;
+            by += nodes[node.affinities[k]].ty * w;
+            tw += w;
+          }
+          if (tw > 0) {
+            const blend = isAI ? 0.25 : 0.35;
+            node.tx = lerp(node.tx, bx / tw, blend);
+            node.ty = lerp(node.ty, by / tw, blend);
+          }
+        }
+      } else {
+        node.talpha = 0;
+      }
+    }
+
+    // v11: Soft repulsion pass — prevent assessment nodes from crowding
+    const MIN_D = 16, MIN_D_SQ = MIN_D * MIN_D;
+    for (let i = 20; i < nodes.length; i++) {
+      if (nodes[i].talpha < 0.05) continue;
+      for (let j = i + 1; j < nodes.length; j++) {
+        if (nodes[j].talpha < 0.05) continue;
+        const dx = nodes[i].tx - nodes[j].tx;
+        const dy = nodes[i].ty - nodes[j].ty;
+        const dsq = dx * dx + dy * dy;
+        if (dsq < MIN_D_SQ && dsq > 0.01) {
+          const d = Math.sqrt(dsq);
+          const push = (MIN_D - d) * 0.5;
+          const nx = dx / d, ny = dy / d;
+          nodes[i].tx += nx * push;
+          nodes[j].tx -= nx * push;
+          nodes[i].ty += ny * push;
+          nodes[j].ty -= ny * push;
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------
+  // SHAPE HELPERS
+  // -------------------------------------------------------
+  function diamond(ctx, cx, cy, s) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s);
+    ctx.lineTo(cx + s, cy);
+    ctx.lineTo(cx, cy + s);
+    ctx.lineTo(cx - s, cy);
+    ctx.closePath();
+  }
+
+  function triangle(ctx, cx, cy, s) {
+    const h = s * 1.15;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - h);
+    ctx.lineTo(cx + s, cy + h * 0.5);
+    ctx.lineTo(cx - s, cy + h * 0.5);
+    ctx.closePath();
+  }
+
+  // Animated position with multi-harmonic drift
+  function animPos(n, time, isAI) {
+    const sp = n.driftSpeed;
+    const amp = n.driftAmp * (isAI ? 0.3 : 1.0);
+    // v11: reduced secondary harmonic amplitudes (0.3 and 0.25, was 0.5 and 0.4)
+    const dx = Math.sin(time * sp + n.phaseX) * amp
+             + Math.sin(time * sp * 0.4 + n.phaseX * 2.1) * amp * 0.3;
+    const dy = Math.cos(time * sp * 0.75 + n.phaseY) * amp
+             + Math.cos(time * sp * 0.35 + n.phaseY * 1.7) * amp * 0.25;
+    // More organic wobble
+    const wobble = isAI ? 1.2 : 3.0;
+    const ox = Math.cos(n.orbitAngle * 0.7 + time * 0.15) * wobble;
+    const oy = Math.sin(n.orbitAngle * 0.9 + time * 0.12) * wobble;
+    return { x: n.x + dx + ox, y: n.y + dy + oy };
+  }
+
+  // -------------------------------------------------------
+  // RENDER
+  // -------------------------------------------------------
+  function render(ctx, nodes, conns, stars, isAI, time, scale) {
+    const W = 600, H = 600;
+    const CX = 300, CY = 300;
+    // v11: slower breathing (0.04 at 0.3, was 0.06 at 0.4)
+    const breath = 1 + 0.04 * Math.sin(time * 0.3);
+
+    ctx.save();
+    ctx.scale(scale, scale);
+
+    ctx.clearRect(0, 0, W, H);
+    // AI: cooler blue-black, Human: warmer dark
+    ctx.fillStyle = isAI ? '#020810' : '#060712';
+    ctx.fillRect(0, 0, W, H);
+
+    // -- STARS --
+    for (const s of stars) {
+      const tw = s.bright * (0.5 + 0.5 * Math.sin(time * s.speed + s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr([180, 200, 255], tw);
+      ctx.fill();
+    }
+
+    // -- AI HEX GRID (more visible, geometric precision) --
+    if (isAI) {
+      ctx.save();
+      // Subtle rotating hex grid
+      const gridRotation = time * 0.02;
+      ctx.translate(CX, CY);
+      ctx.rotate(gridRotation);
+      ctx.translate(-CX, -CY);
+      ctx.strokeStyle = '#4b5563';
+      ctx.lineWidth = 0.5;
+      for (let ring = 1; ring <= 5; ring++) {
+        ctx.globalAlpha = 0.04 - ring * 0.005;
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+          const r = ring * 48;
+          const px = CX + Math.cos(a) * r;
+          const py = CY + Math.sin(a) * r;
+          i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        // Radial spokes
+        if (ring > 1) {
+          ctx.globalAlpha = 0.02;
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+            const r1 = (ring - 1) * 48;
+            const r2 = ring * 48;
+            ctx.beginPath();
+            ctx.moveTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+            ctx.lineTo(CX + Math.cos(a) * r2, CY + Math.sin(a) * r2);
+            ctx.stroke();
+          }
+        }
+      }
+      ctx.restore();
+    }
+
+    // -- MULTI-COLOR ORGANISM GLOW (production-style color zones) --
+    // Group visible nodes by color to create distinct color zone glows
+    const colorKey = (c) => c[0] + ',' + c[1] + ',' + c[2];
+    const zones = {};
+    let maxDist = 0;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.alpha < 0.08) continue;
+      const p = animPos(n, time, isAI);
+      const dist = Math.sqrt((p.x - CX) ** 2 + (p.y - CY) ** 2);
+      maxDist = Math.max(maxDist, dist);
+      const k = colorKey(n.color);
+      if (!zones[k]) zones[k] = { sx: 0, sy: 0, count: 0, weight: 0, color: n.color };
+      const w = n.alpha * (n.type === 'primary' ? 2.5 : n.type === 'assess' ? 1.5 : 0.8);
+      zones[k].sx += p.x * w;
+      zones[k].sy += p.y * w;
+      zones[k].weight += w;
+      zones[k].count++;
+    }
+
+    // Render each color zone as a large soft ellipse glow
+    const zoneList = Object.values(zones);
+    const totalWeight = zoneList.reduce((s, z) => s + z.weight, 0);
+    const baseRadius = Math.max(80, maxDist + 60);
+    for (const zone of zoneList) {
+      const cx = zone.sx / zone.weight;
+      const cy = zone.sy / zone.weight;
+      // Radius grows with node count, breathing
+      const zoneR = (baseRadius + zone.count * 12) * breath;
+      // Opacity proportional to zone weight, capped
+      const zoneAlpha = Math.min(0.3, zone.weight * 0.018) * breath;
+
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, zoneR);
+      g.addColorStop(0, rgbStr(zone.color, zoneAlpha * 1.2));
+      g.addColorStop(0.15, rgbStr(zone.color, zoneAlpha * 0.8));
+      g.addColorStop(0.35, rgbStr(zone.color, zoneAlpha * 0.35));
+      g.addColorStop(0.6, rgbStr(zone.color, zoneAlpha * 0.1));
+      g.addColorStop(1, rgbStr(zone.color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(cx, cy, zoneR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Second pass: unified outer halo (soft blend of all zones at the boundary)
+    if (totalWeight > 0.5) {
+      const avgColor = [0, 0, 0];
+      for (const z of zoneList) {
+        const f = z.weight / totalWeight;
+        avgColor[0] += z.color[0] * f;
+        avgColor[1] += z.color[1] * f;
+        avgColor[2] += z.color[2] * f;
+      }
+      const haloR = (maxDist + 140) * breath;
+      const haloA = Math.min(0.12, totalWeight * 0.006) * breath;
+      // Ripple: slight radius oscillation for living feel
+      const ripple = 1 + Math.sin(time * 0.3) * 0.03 + Math.sin(time * 0.17) * 0.02;
+      const g2 = ctx.createRadialGradient(CX, CY, 0, CX, CY, haloR * ripple);
+      g2.addColorStop(0, rgbStr(avgColor, 0));
+      g2.addColorStop(0.4, rgbStr(avgColor, haloA * 0.3));
+      g2.addColorStop(0.65, rgbStr(avgColor, haloA * 0.6));
+      g2.addColorStop(0.85, rgbStr(avgColor, haloA * 0.25));
+      g2.addColorStop(1, rgbStr(avgColor, 0));
+      ctx.fillStyle = g2;
+      ctx.beginPath();
+      ctx.arc(CX, CY, haloR * ripple, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // -- NEBULA GLOW (v11: reduced 30% radius, 40% alpha) --
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.alpha < 0.1) continue;
+      if (n.type !== 'primary' && n.type !== 'assess') continue;
+      const p = animPos(n, time, isAI);
+      const c = n.color;
+
+      // v11: reduced nebula radius by 30%
+      let nebulaR = n.type === 'primary'
+        ? (n.halo * 2 + 20) * breath
+        : (n.halo * 1.4 + 10) * breath;
+      if (isAI) nebulaR *= 0.65;
+      // v11: reduced nebula alpha by 40%
+      const na = n.alpha * (isAI ? 0.09 : 0.14) * (n.type === 'assess' ? 0.7 : 1) * 0.6;
+
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, nebulaR);
+      g.addColorStop(0, rgbStr(c, na));
+      g.addColorStop(0.35, rgbStr(c, na * 0.45));
+      g.addColorStop(0.7, rgbStr(c, na * 0.1));
+      g.addColorStop(1, rgbStr(c, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, nebulaR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // -- CONNECTIONS (v11: luminous single thread) --
+    for (const [a, b] of conns) {
+      const na = nodes[a], nb = nodes[b];
+      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+
+      const pa = animPos(na, time, isAI);
+      const pb = animPos(nb, time, isAI);
+      const dx = pa.x - pb.x, dy = pa.y - pb.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const distFade = Math.max(0, 1 - dist / 500);
+      const minA = Math.min(na.alpha, nb.alpha);
+      // v11: tiered opacity — assessment connections subtler
+      const isAssessConn = (a >= 20 || b >= 20);
+      const typeMult = isAssessConn ? 0.55 : 1.0;
+      const lineAlpha = distFade * minA * 0.35 * typeMult;
+      if (lineAlpha < 0.005) continue;
+
+      const mc = lerpRgb(na.color, nb.color, 0.5);
+
+      ctx.beginPath();
+      if (isAI) {
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+      } else {
+        // v11: gentler curve offset (6px, was 10px)
+        const mx = (pa.x + pb.x) / 2 + Math.sin(time * 0.15 + a + b) * 6;
+        const my = (pa.y + pb.y) / 2 + Math.cos(time * 0.1 + a * 0.7) * 6;
+        ctx.moveTo(pa.x, pa.y);
+        ctx.quadraticCurveTo(mx, my, pb.x, pb.y);
+      }
+      ctx.strokeStyle = rgbStr(mc, lineAlpha);
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Subtle glow pass (very faint, wide)
+      ctx.strokeStyle = rgbStr(mc, lineAlpha * 0.15);
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
+
+    // -- NODE GLOW --
+    // Sort by alpha (low first)
+    const order = [];
+    for (let i = 0; i < nodes.length; i++) order.push(i);
+    order.sort((aa, bb) => nodes[aa].alpha - nodes[bb].alpha);
+
+    for (const idx of order) {
+      const n = nodes[idx];
+      if (n.alpha < 0.02) continue;
+
+      const p = animPos(n, time, isAI);
+      const c = n.color;
+      const ba = n.alpha;
+      const hR = (n.halo + n.flash * 15) * breath;
+      const cR = (n.r + n.flash * 3) * breath;
+
+      // Layer 1: Outer halo (v11: opacity 0.15, was 0.12)
+      if (hR > 2) {
+        const g1 = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, hR);
+        g1.addColorStop(0, rgbStr(c, ba * 0.15));
+        g1.addColorStop(0.45, rgbStr(c, ba * 0.05));
+        g1.addColorStop(1, rgbStr(c, 0));
+
+        if (isAI && n.type === 'primary') {
+          const isSens = n.sensitive;
+          ctx.save();
+          if (isSens) triangle(ctx, p.x, p.y, hR * 1.3);
+          else diamond(ctx, p.x, p.y, hR * 1.3);
+          ctx.clip();
+          ctx.fillStyle = g1;
+          ctx.fillRect(p.x - hR, p.y - hR, hR * 2, hR * 2);
+          ctx.restore();
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, hR, 0, Math.PI * 2);
+          ctx.fillStyle = g1;
+          ctx.fill();
+        }
+      }
+
+      // Layer 2: Mid glow
+      if (cR > 0.5) {
+        const midR = cR * 2.8;
+        const g2 = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, midR);
+        g2.addColorStop(0, rgbStr(c, ba * 0.45));
+        g2.addColorStop(0.5, rgbStr(c, ba * 0.12));
+        g2.addColorStop(1, rgbStr(c, 0));
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, midR, 0, Math.PI * 2);
+        ctx.fillStyle = g2;
+        ctx.fill();
+      }
+
+      // Layer 3: Bright core (v11: white stops at 0.35, was 0.25)
+      if (cR > 0.3) {
+        const g3 = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, cR);
+        g3.addColorStop(0, rgbStr([255, 255, 255], ba * 0.85));
+        g3.addColorStop(0.35, rgbStr(c, ba * 0.75));
+        g3.addColorStop(1, rgbStr(c, 0));
+
+        if (isAI && n.type === 'primary') {
+          const isSens = n.sensitive;
+          if (isSens) triangle(ctx, p.x, p.y, cR);
+          else diamond(ctx, p.x, p.y, cR);
+          ctx.fillStyle = rgbStr(c, ba * 0.9);
+          ctx.fill();
+          // White pip as shape
+          if (isSens) triangle(ctx, p.x, p.y, cR * 0.35);
+          else diamond(ctx, p.x, p.y, cR * 0.35);
+          ctx.fillStyle = rgbStr([255, 255, 255], ba * 0.8);
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, cR, 0, Math.PI * 2);
+          ctx.fillStyle = g3;
+          ctx.fill();
+        }
+      }
+
+      // Layer 4: White pip — subtle size pulse on twinkle (not big white circles)
+      if (cR > 1 && !(isAI && n.type === 'primary')) {
+        const pipR = Math.max(0.8, cR * 0.35) * (1 + n.twinklePeak * 0.4);
+        const pipAlpha = Math.min(1, ba * 0.85 + n.twinklePeak * 0.15);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, pipR, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr([255, 255, 255], pipAlpha);
+        ctx.fill();
+      }
+
+      // Layer 5: Twinkle glow — soft halo shimmer, not a flare
+      if (n.twinklePeak > 0.05 && cR > 0.5) {
+        const glowR = cR * 2.2;
+        const glowAlpha = n.twinklePeak * 0.08 * ba;
+        const gGlow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+        gGlow.addColorStop(0, rgbStr(c, glowAlpha));
+        gGlow.addColorStop(0.5, rgbStr(c, glowAlpha * 0.3));
+        gGlow.addColorStop(1, rgbStr(c, 0));
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
+        ctx.fillStyle = gGlow;
+        ctx.fill();
+      }
+
+      // Flash ring
+      if (n.flash > 0.05) {
+        const flashR = cR * (3 + (1 - n.flash) * 8);
+        if (isAI && n.type === 'primary' && n.sensitive) {
+          triangle(ctx, p.x, p.y, flashR);
+        } else if (isAI && n.type === 'primary') {
+          diamond(ctx, p.x, p.y, flashR);
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, flashR, 0, Math.PI * 2);
+        }
+        ctx.strokeStyle = rgbStr(c, n.flash * 0.4);
+        ctx.lineWidth = 2 * n.flash;
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // -------------------------------------------------------
+  // INIT STATE (once)
+  // -------------------------------------------------------
+  React.useEffect(() => {
+    const assessState = deriveAssessState(propsRef.current.assessCompleted);
+    const nodes = buildAllNodes(assessState);
+    const stars = buildStars();
+    stateRef.current = {
+      nodes,
+      stars,
+      conns: [],
+      lastTime: performance.now(),
+      prevAnswersKey: '',
+      prevAssessKey: '',
+      prevEntityType: '',
+    };
+  }, []);
+
+  // -------------------------------------------------------
+  // PROP CHANGE DETECTION -> update targets + flash
+  // -------------------------------------------------------
+  React.useEffect(() => {
+    if (!stateRef.current) return;
+    const { nodes } = stateRef.current;
+    const { onboardingAnswers, assessCompleted, entityType } = propsRef.current;
+
+    const answersKey = JSON.stringify(onboardingAnswers);
+    const assessKey = JSON.stringify(Object.keys(assessCompleted).sort());
+    const entityKey = entityType;
+
+    const answersChanged = answersKey !== stateRef.current.prevAnswersKey;
+    const assessChanged = assessKey !== stateRef.current.prevAssessKey;
+    const entityChanged = entityKey !== stateRef.current.prevEntityType;
+
+    stateRef.current.prevAnswersKey = answersKey;
+    stateRef.current.prevAssessKey = assessKey;
+    stateRef.current.prevEntityType = entityKey;
+
+    // Entity change -> flash all visible nodes
+    if (entityChanged) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].alpha > 0.05) nodes[i].flash = 0.6;
+      }
+    }
+
+    // Assessment change -> rebuild assessment nodes
+    if (assessChanged) {
+      const assessState = deriveAssessState(assessCompleted);
+      // Remove old assessment nodes
+      nodes.length = 20;
+      // Rebuild
+      let assessIdx = 0;
+      const enabledCount = Object.values(assessState).filter(v => v).length;
+      ASSESS_MAP.forEach((assess, ai) => {
+        if (!assessState[ai]) return;
+        const rng = seededRng(ai * 137 + 42);
+        const ringDist = assess.tier === 1 ? 140 : 210;
+        const baseAngle = (assessIdx / Math.max(1, enabledCount)) * Math.PI * 2;
+
+        for (let ni = 0; ni < assess.nodes; ni++) {
+          const angle = baseAngle + (ni / assess.nodes) * 0.6 - 0.3;
+          const dist = ringDist + (rng() - 0.5) * 40;
+          const x = 300 + Math.cos(angle) * dist;
+          const y = 300 + Math.sin(angle) * dist;
+          nodes.push(makeNode({
+            x, y, r: 2 + rng() * 2, halo: 8 + rng() * 10,
+            type: 'assess', color: assess.color,
+            assessIdx: ai, tier: assess.tier,
+            parent: Math.floor(rng() * 5),
+          }));
+        }
+        assessIdx++;
+      });
+      // Flash new assessment nodes
+      for (let i = 20; i < nodes.length; i++) nodes[i].flash = 0.5;
+    }
+
+    // Answer change -> flash affected neurons
+    if (answersChanged && !entityChanged) {
+      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+      const { colorAns: prevColor, posAns: prevPos } = deriveAnswers(
+        JSON.parse(stateRef.current.prevAnswersKey || '{}')
+      );
+      for (let i = 0; i < 5; i++) {
+        if (colorAns[i] !== prevColor?.[i] || posAns[i] !== prevPos?.[i]) {
+          nodes[i].flash = 1.0;
+          if (nodes[5 + i * 2]) nodes[5 + i * 2].flash = 0.6;
+          if (nodes[5 + i * 2 + 1]) nodes[5 + i * 2 + 1].flash = 0.5;
+        }
+      }
+    }
+  }, [onboardingAnswers, assessCompleted, entityType]);
+
+  // -------------------------------------------------------
+  // ANIMATION LOOP
+  // -------------------------------------------------------
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    function frame(now) {
+      if (!stateRef.current) {
+        animRef.current = requestAnimationFrame(frame);
+        return;
+      }
+
+      const { nodes, stars } = stateRef.current;
+      const { onboardingAnswers, assessCompleted, entityType, size } = propsRef.current;
+      const scale = size / 600;
+      const isAI = entityType === 'ai';
+      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
+      const assessState = deriveAssessState(assessCompleted);
+
+      const dt = Math.min((now - stateRef.current.lastTime) / 1000, 0.05);
+      stateRef.current.lastTime = now;
+      const time = now / 1000;
+
+      // Compute targets
+      computeTargets(nodes, isAI, colorAns, posAns, assessState, time);
+
+      // Build connections
+      const conns = buildConnections(nodes, isAI, colorAns, posAns, assessState);
+      stateRef.current.conns = conns;
+
+      // Lerp state
+      const spd = 4 * dt;
+      const cspd = 6 * dt;
+
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        n.x = lerp(n.x, n.tx, spd);
+        n.y = lerp(n.y, n.ty, spd);
+        n.r = lerp(n.r, n.tr + n.flash * 5, spd);
+        n.halo = lerp(n.halo, n.thalo + n.flash * 20, spd);
+        n.alpha = lerp(n.alpha, n.talpha + n.flash * 0.3, spd * 0.7);
+        n.color = lerpRgb(n.color, n.tcolor, cspd);
+
+        const driftMult = isAI ? 0.3 : 1.0;
+        n.orbitAngle += n.orbitSpeed * driftMult;
+
+        n.flash *= 0.91;
+        if (n.flash < 0.01) n.flash = 0;
+
+        // v11: twinkle update — sharp spike, slow decay
+        const twinkleWave = Math.pow(Math.max(0, Math.sin(time * n.twinkleSpeed + n.twinklePhase)), 8);
+        n.twinklePeak = twinkleWave;
+      }
+
+      // Set canvas physical size for DPR
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = size * dpr;
+      canvas.height = size * dpr;
+      canvas.style.width = size + 'px';
+      canvas.style.height = size + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // Render
+      render(ctx, nodes, conns, stars, isAI, time, scale);
+
+      animRef.current = requestAnimationFrame(frame);
+    }
+
+    animRef.current = requestAnimationFrame(frame);
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, []);
+
+  const scaledRadius = Math.round(14 * (size / 600));
+
+  return React.createElement('canvas', {
+    ref: canvasRef,
+    style: {
+      display: 'block',
+      borderRadius: scaledRadius + 'px',
+      width: size + 'px',
+      height: size + 'px',
+    },
+  });
+});
+
+// === AURA VISUALIZATION COMPONENT END ===
+
+
+// ═══════════════════════════════════════════════════════
+// TEST HARNESS
+// ═══════════════════════════════════════════════════════
+
+const C_HARNESS = {
+  violet:'#8b5cf6', blue:'#3b82f6', teal:'#14b8a6', rose:'#f43f5e',
+  pink:'#d946ef', emerald:'#10b981', amber:'#f59e0b', indigo:'#6366f1', cyan:'#06b6d4',
+};
+
+const ASSESS_DEFS = [
+  { ids: ['starter-personality'], name: 'Personality', color: C_HARNESS.violet, tier: 1 },
+  { ids: ['starter-motivation'], name: 'Motivation', color: C_HARNESS.amber, tier: 1 },
+  { ids: ['starter-thinking'], name: 'Thinking', color: C_HARNESS.blue, tier: 1 },
+  { ids: ['starter-connection'], name: 'Connection', color: C_HARNESS.pink, tier: 1 },
+  { ids: ['starter-strategy'], name: 'Strategy', color: C_HARNESS.emerald, tier: 1 },
+  { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: C_HARNESS.violet, tier: 2 },
+  { ids: ['integrity'], name: 'Character', color: C_HARNESS.emerald, tier: 2 },
+  { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: C_HARNESS.indigo, tier: 2 },
+  { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: C_HARNESS.cyan, tier: 2 },
+  { ids: ['attachment'], name: 'Relationships', color: C_HARNESS.rose, tier: 2 },
+  { ids: ['risk'], name: 'Behavior', color: C_HARNESS.amber, tier: 2 },
+];
+
+const ONBOARD_KEYS = [
+  'onboard-entity',
+  'onboard-1','onboard-2','onboard-3','onboard-4','onboard-5',
+  'onboard-6','onboard-7','onboard-8','onboard-9','onboard-10',
+];
+
+function TestHarness() {
+  const [entityType, setEntityType] = React.useState('human');
+  const [onboardingAnswers, setOnboardingAnswers] = React.useState({});
+  const [assessToggles, setAssessToggles] = React.useState({});
+  const [vizSize, setVizSize] = React.useState(400);
+
+  // Build assessCompleted from toggles
+  const assessCompleted = React.useMemo(() => {
+    const obj = {};
+    ASSESS_DEFS.forEach((def, idx) => {
+      if (assessToggles[idx]) {
+        // Add first id as a key with a dummy result object
+        obj[def.ids[0]] = { score: 1 };
+      }
+    });
+    return obj;
+  }, [assessToggles]);
+
+  function randomizeOnboarding() {
+    const answers = {};
+    // Skip onboard-entity, it maps to entityType
+    for (let i = 1; i <= 10; i++) {
+      answers['onboard-' + i] = Math.random() < 0.5 ? 0 : 1;
+    }
+    setOnboardingAnswers(answers);
+    setEntityType(Math.random() < 0.85 ? 'human' : 'ai');
+  }
+
+  function toggleQuestion(qNum) {
+    setOnboardingAnswers(prev => {
+      const key = 'onboard-' + qNum;
+      const next = { ...prev };
+      if (key in next) {
+        delete next[key];
+      } else {
+        next[key] = Math.random() < 0.5 ? 0 : 1;
+      }
+      return next;
+    });
+  }
+
+  function resetAll() {
+    setOnboardingAnswers({});
+    setEntityType('human');
+    setAssessToggles({});
+  }
+
+  function toggleAssess(idx) {
+    setAssessToggles(prev => ({ ...prev, [idx]: !prev[idx] }));
+  }
+
+  function allAssessOn() {
+    const t = {};
+    ASSESS_DEFS.forEach((_, i) => t[i] = true);
+    setAssessToggles(t);
+  }
+
+  function allAssessOff() {
+    setAssessToggles({});
+  }
+
+  function randomAssess() {
+    const t = {};
+    ASSESS_DEFS.forEach((_, i) => t[i] = Math.random() < 0.5);
+    setAssessToggles(t);
+  }
+
+  const tier1 = ASSESS_DEFS.filter(d => d.tier === 1).map((d, i) => {
+    const realIdx = ASSESS_DEFS.indexOf(d);
+    return d;
+  });
+  const tier2 = ASSESS_DEFS.filter(d => d.tier === 2);
+
+  return React.createElement('div', { className: 'harness' },
+    React.createElement('div', { className: 'title' }, 'AuraVisualization React Component — v11'),
+    React.createElement('div', { className: 'subtitle' }, 'Self-contained component test page. Component is between marker comments for easy copy.'),
+
+    // Main viz
+    React.createElement('div', { className: 'main-viz' },
+      React.createElement('div', {
+        style: { fontSize: '11px', color: entityType === 'ai' ? '#06b6d4' : '#10b981',
+                 padding: '4px 12px', border: '1px solid',
+                 borderColor: entityType === 'ai' ? '#06b6d4' : '#10b981',
+                 borderRadius: '20px', marginBottom: '4px' }
+      }, entityType === 'ai' ? 'Artificial Intelligence' : 'Biological'),
+      React.createElement(AuraVisualization, {
+        onboardingAnswers,
+        assessCompleted,
+        entityType,
+        darkMode: true,
+        size: vizSize,
+      }),
+    ),
+
+    // Controls
+    React.createElement('div', { className: 'controls' },
+      React.createElement('button', {
+        className: 'ctrl-btn' + (entityType === 'human' ? ' active' : ''),
+        onClick: () => setEntityType('human'),
+      }, 'Human'),
+      React.createElement('button', {
+        className: 'ctrl-btn' + (entityType === 'ai' ? ' active' : ''),
+        onClick: () => setEntityType('ai'),
+      }, 'AI'),
+      React.createElement('button', {
+        className: 'ctrl-btn',
+        onClick: randomizeOnboarding,
+        style: { borderColor: '#8b5cf6' },
+      }, 'Randomize Onboarding'),
+      React.createElement('button', {
+        className: 'ctrl-btn',
+        onClick: resetAll,
+        style: { borderColor: '#ef4444', color: '#ef4444' },
+      }, 'Reset'),
+    ),
+
+    // Individual onboarding question toggles
+    React.createElement('div', { className: 'tier-section' },
+      React.createElement('div', { className: 'tier-label' }, 'Onboarding Questions (click to toggle)'),
+      React.createElement('div', { className: 'tier-grid' },
+        Array.from({ length: 10 }, (_, i) => {
+          const qNum = i + 1;
+          const isOn = ('onboard-' + qNum) in onboardingAnswers;
+          return React.createElement('button', {
+            key: qNum,
+            className: 'assess-toggle' + (isOn ? ' on' : ''),
+            style: { borderColor: isOn ? '#8b5cf6' : undefined, minWidth: '38px' },
+            onClick: () => toggleQuestion(qNum),
+          },
+            React.createElement('span', {
+              className: 'assess-dot',
+              style: { background: '#8b5cf6', opacity: isOn ? 1 : 0.3 },
+            }),
+            'Q' + qNum,
+          );
+        }),
+      ),
+    ),
+
+    // Size slider
+    React.createElement('div', { className: 'slider-group' },
+      React.createElement('label', null, 'Size:'),
+      React.createElement('input', {
+        type: 'range', min: 100, max: 600, value: vizSize,
+        onChange: (e) => setVizSize(Number(e.target.value)),
+      }),
+      React.createElement('span', { className: 'slider-val' }, vizSize + 'px'),
+    ),
+
+    React.createElement('div', { className: 'divider' }),
+
+    // Assessment toggles - Tier 1
+    React.createElement('div', { className: 'tier-section' },
+      React.createElement('div', { className: 'tier-label' }, 'Tier 1 -- Starter Pack'),
+      React.createElement('div', { className: 'tier-grid' },
+        ASSESS_DEFS.filter(d => d.tier === 1).map((def, i) => {
+          const realIdx = ASSESS_DEFS.indexOf(def);
+          return React.createElement('button', {
+            key: realIdx,
+            className: 'assess-toggle' + (assessToggles[realIdx] ? ' on' : ''),
+            style: { borderColor: assessToggles[realIdx] ? def.color : undefined },
+            onClick: () => toggleAssess(realIdx),
+          },
+            React.createElement('span', {
+              className: 'assess-dot',
+              style: { background: def.color, opacity: assessToggles[realIdx] ? 1 : 0.4 },
+            }),
+            def.name,
+          );
+        }),
+      ),
+    ),
+
+    // Assessment toggles - Tier 2
+    React.createElement('div', { className: 'tier-section' },
+      React.createElement('div', { className: 'tier-label' }, 'Tier 2 -- Deep Assessments'),
+      React.createElement('div', { className: 'tier-grid' },
+        ASSESS_DEFS.filter(d => d.tier === 2).map((def, i) => {
+          const realIdx = ASSESS_DEFS.indexOf(def);
+          return React.createElement('button', {
+            key: realIdx,
+            className: 'assess-toggle' + (assessToggles[realIdx] ? ' on' : ''),
+            style: { borderColor: assessToggles[realIdx] ? def.color : undefined },
+            onClick: () => toggleAssess(realIdx),
+          },
+            React.createElement('span', {
+              className: 'assess-dot',
+              style: { background: def.color, opacity: assessToggles[realIdx] ? 1 : 0.4 },
+            }),
+            def.name,
+          );
+        }),
+      ),
+    ),
+
+    // Tier actions
+    React.createElement('div', { className: 'controls' },
+      React.createElement('button', { className: 'ctrl-btn', onClick: allAssessOn }, 'All On'),
+      React.createElement('button', { className: 'ctrl-btn', onClick: allAssessOff }, 'All Off'),
+      React.createElement('button', { className: 'ctrl-btn', onClick: randomAssess }, 'Random Mix'),
+    ),
+
+    React.createElement('div', { className: 'divider' }),
+
+    // Scaling comparison row
+    React.createElement('div', { className: 'ctrl-label', style: { marginTop: '8px' } }, 'Scaling Verification'),
+    React.createElement('div', { className: 'scaling-row' },
+      React.createElement('div', { style: { textAlign: 'center' } },
+        React.createElement('div', { className: 'scaling-label' }, '100px'),
+        React.createElement(AuraVisualization, {
+          onboardingAnswers,
+          assessCompleted,
+          entityType,
+          darkMode: true,
+          size: 100,
+        }),
+      ),
+      React.createElement('div', { style: { textAlign: 'center' } },
+        React.createElement('div', { className: 'scaling-label' }, '200px'),
+        React.createElement(AuraVisualization, {
+          onboardingAnswers,
+          assessCompleted,
+          entityType,
+          darkMode: true,
+          size: 200,
+        }),
+      ),
+    ),
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(TestHarness));
+</script>
+</body>
+</html>

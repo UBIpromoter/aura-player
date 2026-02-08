@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constellation V4 — Production Polish</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  body {
+    font-family: 'Inter', sans-serif;
+    transition: background 0.5s ease;
+  }
+
+  .phone { transition: all 0.5s ease; }
+  .card { transition: all 0.5s ease; }
+
+  /* ═══════════════════════════════════════════════════════
+     SCROLLBAR STYLING — NEVER WHITE
+     Dark themed scrollbars for any overflow
+     ═══════════════════════════════════════════════════════ */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.4);
+    border-radius: 3px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.6);
+  }
+  /* Light mode scrollbar - still dark/purple, never white */
+  .light-mode *::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.5);
+  }
+  .light-mode * {
+    scrollbar-color: rgba(99, 102, 241, 0.5) transparent;
+  }
+
+  /* Star animations */
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
+  }
+
+  @keyframes gentlePulse {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 6px currentColor); }
+    50% { filter: brightness(1.3) drop-shadow(0 0 14px currentColor); }
+  }
+
+  @keyframes starAppear {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes focusPulse {
+    0%, 100% { filter: brightness(1.2) drop-shadow(0 0 12px currentColor); transform: scale(1); }
+    50% { filter: brightness(1.5) drop-shadow(0 0 24px currentColor); transform: scale(1.15); }
+  }
+
+  .background-star {
+    animation: twinkle 3s ease-in-out infinite;
+  }
+
+  .constellation-star {
+    animation: gentlePulse 4s ease-in-out infinite;
+    cursor: pointer;
+  }
+
+  .constellation-star.focused {
+    animation: focusPulse 2s ease-in-out infinite;
+  }
+
+  .constellation-star.dimmed {
+    opacity: 0.15 !important;
+    filter: grayscale(0.8);
+  }
+
+  .star-appear {
+    animation: starAppear 0.4s ease-out forwards;
+  }
+
+  /* Stagger animations */
+  .bg-star-1 { animation-delay: 0s; }
+  .bg-star-2 { animation-delay: 0.5s; }
+  .bg-star-3 { animation-delay: 1s; }
+  .bg-star-4 { animation-delay: 1.5s; }
+  .bg-star-5 { animation-delay: 2s; }
+
+  /* ═══════════════════════════════════════════════════════
+     HOVER TOOLTIPS — Stolen from Weather
+     ═══════════════════════════════════════════════════════ */
+  .star-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(12px);
+    border-radius: 12px;
+    padding: 12px 14px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: all 0.2s ease;
+    z-index: 100;
+    min-width: 180px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    text-align: left;
+  }
+
+  .star-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .tooltip-trait {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .tooltip-percent {
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tooltip-state {
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 4px;
+  }
+
+  .tooltip-insight {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.5;
+  }
+
+  .tooltip-mapping {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     MODE TABS — FIXED: Fits without scroll
+     Compact design, NO horizontal scroll needed
+     ═══════════════════════════════════════════════════════ */
+  .mode-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin: 0 12px;
+    /* NO overflow-x, NO scrolling — tabs MUST fit */
+  }
+
+  .mode-tab {
+    padding: 5px 8px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    /* Dark mode defaults */
+    color: rgba(255,255,255,0.45);
+    background: transparent;
+  }
+
+  .mode-tab:hover {
+    color: rgba(255,255,255,0.7);
+    background: rgba(255,255,255,0.06);
+  }
+
+  .mode-tab.active {
+    color: white;
+    background: rgba(255,255,255,0.12);
+  }
+
+  /* Trait-specific active colors - Dark mode */
+  .mode-tab.active[data-trait="E"] { background: rgba(245,158,11,0.25); color: #f59e0b; }
+  .mode-tab.active[data-trait="A"] { background: rgba(236,72,153,0.25); color: #ec4899; }
+  .mode-tab.active[data-trait="C"] { background: rgba(16,185,129,0.25); color: #10b981; }
+  .mode-tab.active[data-trait="N"] { background: rgba(6,182,212,0.25); color: #06b6d4; }
+  .mode-tab.active[data-trait="O"] { background: rgba(168,85,247,0.25); color: #a855f7; }
+
+  /* ═══════════════════════════════════════════════════════
+     LIGHT MODE TABS — NO GRAY BOX, clean look
+     ═══════════════════════════════════════════════════════ */
+  .light-mode .mode-tab {
+    color: rgba(71, 85, 105, 0.6);
+    background: transparent;
+  }
+
+  .light-mode .mode-tab:hover {
+    color: rgba(71, 85, 105, 0.85);
+    background: rgba(59, 130, 246, 0.08);
+  }
+
+  .light-mode .mode-tab.active {
+    color: #1e40af;
+    background: rgba(59, 130, 246, 0.15);
+  }
+
+  /* Light mode trait-specific - MORE SATURATED */
+  .light-mode .mode-tab.active[data-trait="E"] { background: rgba(217,119,6,0.2); color: #b45309; }
+  .light-mode .mode-tab.active[data-trait="A"] { background: rgba(219,39,119,0.2); color: #be185d; }
+  .light-mode .mode-tab.active[data-trait="C"] { background: rgba(5,150,105,0.2); color: #047857; }
+  .light-mode .mode-tab.active[data-trait="N"] { background: rgba(8,145,178,0.2); color: #0e7490; }
+  .light-mode .mode-tab.active[data-trait="O"] { background: rgba(147,51,234,0.2); color: #7c3aed; }
+
+  /* ═══════════════════════════════════════════════════════
+     TEACHING CALLOUT — Dynamic based on mode
+     ═══════════════════════════════════════════════════════ */
+  .teaching-callout {
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    border-radius: 10px;
+    padding: 12px;
+    margin: 0 16px;
+    transition: all 0.3s ease;
+  }
+
+  .light-mode .teaching-callout {
+    background: rgba(37, 99, 235, 0.08);
+    border: 1px solid rgba(37, 99, 235, 0.2);
+  }
+
+  .teaching-callout .callout-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .teaching-callout .callout-icon {
+    font-size: 14px;
+  }
+
+  .teaching-callout .callout-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+  }
+
+  .light-mode .teaching-callout .callout-title {
+    color: #1e3a8a;
+  }
+
+  .teaching-callout .callout-body {
+    font-size: 11px;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.7);
+  }
+
+  .light-mode .teaching-callout .callout-body {
+    color: rgba(30, 58, 138, 0.75);
+  }
+
+  .teaching-callout .callout-highlight {
+    color: #60a5fa;
+    font-weight: 500;
+  }
+
+  .light-mode .teaching-callout .callout-highlight {
+    color: #2563eb;
+    font-weight: 600;
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     LEGEND PANEL — Expanded with mappings
+     ═══════════════════════════════════════════════════════ */
+  .legend-panel {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 12px;
+    margin: 0 16px;
+  }
+
+  .light-mode .legend-panel {
+    background: rgba(37, 99, 235, 0.06);
+    border: 1px solid rgba(37, 99, 235, 0.1);
+  }
+
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    transition: opacity 0.3s ease;
+  }
+
+  .light-mode .legend-row {
+    border-bottom: 1px solid rgba(37, 99, 235, 0.08);
+  }
+
+  .legend-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .legend-row:first-child {
+    padding-top: 0;
+  }
+
+  .legend-row.dimmed {
+    opacity: 0.25;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .legend-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .legend-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+  }
+
+  .light-mode .legend-name {
+    color: rgba(30, 58, 138, 0.9);
+  }
+
+  .legend-value {
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    width: 32px;
+    text-align: right;
+  }
+
+  .legend-bar-container {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .light-mode .legend-bar-container {
+    background: rgba(37, 99, 235, 0.12);
+  }
+
+  .legend-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  .legend-descriptor {
+    font-size: 9px;
+    color: rgba(255,255,255,0.5);
+    width: 60px;
+    text-align: right;
+  }
+
+  .light-mode .legend-descriptor {
+    color: rgba(30, 58, 138, 0.6);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     NEBULA & VISUAL POLISH
+     ═══════════════════════════════════════════════════════ */
+  .nebula {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(40px);
+    opacity: 0.12;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+
+  .nebula.focused {
+    opacity: 0.25;
+  }
+
+  /* Comparison toggle */
+  .toggle-btn {
+    transition: all 0.2s ease;
+  }
+  .toggle-btn.active {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.6);
+  }
+
+  /* Axis labels in SVG */
+  .axis-label {
+    transition: opacity 0.3s ease;
+  }
+  .axis-label.dimmed {
+    opacity: 0.15 !important;
+  }
+  .axis-label.focused {
+    opacity: 1 !important;
+    font-weight: 600;
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     CTA STYLING — Light mode polish
+     ═══════════════════════════════════════════════════════ */
+  .cta-box {
+    background: rgba(59, 130, 246, 0.08);
+  }
+
+  .light-mode .cta-box {
+    background: rgba(37, 99, 235, 0.1);
+    border: 1px solid rgba(37, 99, 235, 0.15);
+  }
+
+  .light-mode .cta-sub {
+    color: rgba(30, 58, 138, 0.6);
+  }
+
+  .light-mode .cta-main {
+    color: #2563eb;
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 gap-4" style="background: #08080c;">
+
+  <!-- Controls -->
+  <div class="flex gap-3 items-center flex-wrap justify-center">
+    <button onclick="setMode('dark')" id="btn-dark" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-blue-500">Dark</button>
+    <button onclick="setMode('light')" id="btn-light" class="px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 border-gray-300">Light</button>
+    <div class="w-px h-6 bg-gray-600"></div>
+    <button onclick="randomize()" class="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors">Shuffle</button>
+    <button onclick="toggleComparison()" id="btn-compare" class="toggle-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-gray-600">Show Average</button>
+  </div>
+
+  <!-- Phone preview -->
+  <div id="phone" class="phone w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl" style="background: #0a0a12; border: 2px solid #151525;">
+    <div class="p-5 pt-8 pb-6">
+      <!-- ResultCard -->
+      <div id="card" class="card rounded-2xl overflow-hidden" style="background: rgba(8, 12, 24, 0.95); border: 1px solid rgba(59, 130, 246, 0.2);">
+
+        <!-- Header -->
+        <div class="p-4 pb-2 text-center">
+          <div id="subtitle" class="text-xs text-gray-500 uppercase tracking-widest mb-1">Your unique pattern</div>
+          <div id="title" class="text-base font-semibold text-white">Personality Constellation</div>
+        </div>
+
+        <!-- MODE TABS — Compact, NO scroll -->
+        <div class="mode-tabs mb-3" id="mode-tabs">
+          <div class="mode-tab active" data-trait="all" onclick="setFocusMode('all')">All</div>
+          <div class="mode-tab" data-trait="E" onclick="setFocusMode('E')">Energy</div>
+          <div class="mode-tab" data-trait="A" onclick="setFocusMode('A')">Warmth</div>
+          <div class="mode-tab" data-trait="C" onclick="setFocusMode('C')">Structure</div>
+          <div class="mode-tab" data-trait="N" onclick="setFocusMode('N')">Calm</div>
+          <div class="mode-tab" data-trait="O" onclick="setFocusMode('O')">Curiosity</div>
+        </div>
+
+        <!-- THE CONSTELLATION -->
+        <div id="constellation-container" class="relative mx-3 mb-3" style="height: 220px;">
+          <div id="sky" class="absolute inset-0 rounded-xl overflow-hidden" style="background: radial-gradient(ellipse at center, #0c1022 0%, #060610 100%);">
+
+            <!-- Nebula glows -->
+            <div id="nebula-1" class="nebula" style="width: 80px; height: 60px; background: #3b82f6; top: 15%; left: 15%;"></div>
+            <div id="nebula-2" class="nebula" style="width: 60px; height: 50px; background: #8b5cf6; top: 55%; right: 10%;"></div>
+
+            <!-- Background stars -->
+            <div id="bg-stars"></div>
+
+            <!-- The constellation SVG -->
+            <svg id="constellation-svg" class="absolute inset-0 w-full h-full" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <filter id="starGlowStrong" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+
+              <!-- Pentagon framework -->
+              <g id="framework"></g>
+
+              <!-- Average constellation (comparison) -->
+              <g id="average-constellation" style="display: none;"></g>
+
+              <!-- Your constellation -->
+              <g id="your-lines"></g>
+              <g id="your-stars"></g>
+            </svg>
+
+            <!-- Constellation name badge -->
+            <div id="constellation-name" class="absolute top-2 left-0 right-0 text-center">
+              <span class="text-[8px] tracking-[0.15em] uppercase font-medium" style="color: rgba(148, 163, 184, 0.4);">Your Constellation</span>
+              <div id="constellation-title" class="text-sm font-semibold mt-0.5" style="color: rgba(148, 163, 184, 0.8);">Nova Prime</div>
+            </div>
+          </div>
+
+          <!-- HOVER TOOLTIP — Positioned dynamically -->
+          <div id="star-tooltip" class="star-tooltip">
+            <div class="tooltip-header">
+              <span id="tooltip-trait" class="tooltip-trait">ENERGY</span>
+              <span id="tooltip-percent" class="tooltip-percent">78%</span>
+            </div>
+            <div id="tooltip-state" class="tooltip-state">Highly Outgoing</div>
+            <div id="tooltip-insight" class="tooltip-insight">You draw energy from interaction. Social settings recharge you.</div>
+            <div id="tooltip-mapping" class="tooltip-mapping">Inward ← → Outward</div>
+          </div>
+        </div>
+
+        <!-- TEACHING CALLOUT — Changes based on mode -->
+        <div class="teaching-callout mb-3" id="teaching-callout">
+          <div class="callout-header">
+            <span class="callout-icon" id="callout-icon">&#9733;</span>
+            <span class="callout-title" id="callout-title">Reading Your Constellation</span>
+          </div>
+          <div class="callout-body" id="callout-body">
+            Each <span class="callout-highlight">star</span> represents one dimension of your personality.
+            <span class="callout-highlight">Distance from center</span> = how strongly you lean that way.
+            <span class="callout-highlight">Color</span> = which end of the spectrum.
+            <strong>Tap a trait above to focus on it.</strong>
+          </div>
+        </div>
+
+        <!-- LEGEND PANEL — Shows all traits with bars -->
+        <div class="legend-panel mb-3" id="legend-panel">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Narrative Summary -->
+        <div class="px-4 pb-2">
+          <p id="summary" class="text-xs text-center text-gray-400 leading-relaxed"></p>
+        </div>
+
+        <!-- CTA -->
+        <div class="px-4 pb-4 pt-1">
+          <div id="cta" class="cta-box p-3 rounded-xl text-center">
+            <div id="cta-sub" class="cta-sub text-[10px] text-gray-400">10 questions mapped</div>
+            <div id="cta-main" class="cta-main text-xs font-medium mt-1 text-blue-300">Sharpen your stars with Starter Pack &rarr;</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="max-w-md text-center text-gray-500 text-xs">
+    <strong class="text-gray-400">V4:</strong> Tabs fit without scroll. Scrollbars always dark. Light mode polished.
+    Tap any star or trait tab to focus.
+  </div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// CONSTELLATION V4 — PRODUCTION POLISH
+// Fixes: No horizontal scroll on tabs, dark scrollbars, light mode polish
+// ════════════════════════════════════════════════════════════════════════════
+
+const traits = {
+  E: {
+    name: 'Energy',
+    leftLabel: 'Reserved', rightLabel: 'Outgoing',
+    leftColor: '#6366f1', rightColor: '#f59e0b',
+    // Light mode: more saturated versions
+    leftColorLight: '#4f46e5', rightColorLight: '#d97706',
+    angle: -90,
+    insights: {
+      high: 'You draw energy from interaction. Social settings recharge rather than drain you.',
+      mid: 'You balance social energy well — engaging when needed, recharging when not.',
+      low: 'You recharge through solitude. Deep focus and reflection are your superpowers.'
+    },
+    descriptors: {
+      high: 'Outgoing', mid: 'Balanced', low: 'Reserved'
+    }
+  },
+  A: {
+    name: 'Warmth',
+    leftLabel: 'Direct', rightLabel: 'Empathetic',
+    leftColor: '#3b82f6', rightColor: '#ec4899',
+    leftColorLight: '#2563eb', rightColorLight: '#db2777',
+    angle: -18,
+    insights: {
+      high: 'You lead with empathy. People feel heard and valued in your presence.',
+      mid: 'You balance directness with care — honest but not harsh.',
+      low: 'You prioritize clarity over comfort. Your feedback is honest and actionable.'
+    },
+    descriptors: {
+      high: 'Empathetic', mid: 'Balanced', low: 'Direct'
+    }
+  },
+  C: {
+    name: 'Structure',
+    leftLabel: 'Flexible', rightLabel: 'Organized',
+    leftColor: '#8b5cf6', rightColor: '#10b981',
+    leftColorLight: '#7c3aed', rightColorLight: '#059669',
+    angle: 54,
+    insights: {
+      high: 'You thrive with systems. Planning and follow-through come naturally to you.',
+      mid: 'You adapt your approach — structured when needed, flexible when helpful.',
+      low: 'You prefer spontaneity over systems. You adapt quickly to changing circumstances.'
+    },
+    descriptors: {
+      high: 'Organized', mid: 'Adaptive', low: 'Flexible'
+    }
+  },
+  N: {
+    name: 'Calm',
+    leftLabel: 'Reactive', rightLabel: 'Steady',
+    leftColor: '#f97316', rightColor: '#06b6d4',
+    leftColorLight: '#ea580c', rightColorLight: '#0891b2',
+    angle: 126,
+    insights: {
+      high: 'You stay steady under pressure. Your calm presence anchors those around you.',
+      mid: 'You feel things but manage them well — responsive without being reactive.',
+      low: 'You feel deeply and react strongly. This intensity fuels passion and creativity.'
+    },
+    descriptors: {
+      high: 'Steady', mid: 'Responsive', low: 'Reactive'
+    }
+  },
+  O: {
+    name: 'Curiosity',
+    leftLabel: 'Practical', rightLabel: 'Imaginative',
+    leftColor: '#14b8a6', rightColor: '#a855f7',
+    leftColorLight: '#0d9488', rightColorLight: '#9333ea',
+    angle: 198,
+    insights: {
+      high: 'You live in possibility. New ideas and abstract thinking energize you.',
+      mid: 'You balance imagination with practicality — creative but grounded.',
+      low: 'You prefer proven approaches. You build on what works rather than reinventing.'
+    },
+    descriptors: {
+      high: 'Imaginative', mid: 'Balanced', low: 'Practical'
+    }
+  }
+};
+
+const traitOrder = ['E', 'A', 'C', 'N', 'O'];
+
+// User scores (0-100, 50 = center/average)
+let scores = { E: 78, A: 65, C: 72, N: 68, O: 85 };
+
+// Population average
+const averageScores = { E: 50, A: 55, C: 50, N: 50, O: 50 };
+
+let isDark = true;
+let showComparison = false;
+let focusMode = 'all';
+let hoveredStar = null;
+
+// Pentagon geometry
+const centerX = 160;
+const centerY = 105;
+const maxRadius = 72;
+const minRadius = 12;
+
+// ════════════════════════════════════════════════════════════════════════════
+// CORE GEOMETRY
+// ════════════════════════════════════════════════════════════════════════════
+
+function scoreToPosition(traitKey, score) {
+  const trait = traits[traitKey];
+  const angleRad = (trait.angle * Math.PI) / 180;
+  const deviation = Math.abs(score - 50) / 50;
+  const radius = minRadius + deviation * (maxRadius - minRadius);
+  const x = centerX + Math.cos(angleRad) * radius;
+  const y = centerY + Math.sin(angleRad) * radius;
+  return { x, y, radius, deviation };
+}
+
+function lerpColor(c1, c2, t) {
+  const parse = c => [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)];
+  const [r1, g1, b1] = parse(c1);
+  const [r2, g2, b2] = parse(c2);
+  return `rgb(${Math.round(r1 + (r2 - r1) * t)}, ${Math.round(g1 + (g2 - g1) * t)}, ${Math.round(b1 + (b2 - b1) * t)})`;
+}
+
+function getScoreLevel(score) {
+  if (score >= 65) return 'high';
+  if (score <= 35) return 'low';
+  return 'mid';
+}
+
+function getTraitColors(traitKey) {
+  const trait = traits[traitKey];
+  if (isDark) {
+    return { left: trait.leftColor, right: trait.rightColor };
+  } else {
+    return { left: trait.leftColorLight, right: trait.rightColorLight };
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONSTELLATION NAME GENERATOR
+// ════════════════════════════════════════════════════════════════════════════
+
+function generateConstellationName() {
+  const sorted = traitOrder
+    .map(k => ({ key: k, score: scores[k], distance: Math.abs(scores[k] - 50) }))
+    .sort((a, b) => b.distance - a.distance);
+
+  const primary = sorted[0];
+  const prefixes = {
+    E: { high: 'Solaris', low: 'Lunara' },
+    A: { high: 'Cordis', low: 'Acuta' },
+    C: { high: 'Ordo', low: 'Libera' },
+    N: { high: 'Firma', low: 'Sentio' },
+    O: { high: 'Nova', low: 'Terra' }
+  };
+
+  const suffixes = ['Minor', 'Rising', 'Major', 'Prime', 'Ascendant'];
+  const prefix = primary.score > 50 ? prefixes[primary.key].high : prefixes[primary.key].low;
+  const suffixIndex = Math.min(Math.floor(primary.distance / 12), suffixes.length - 1);
+
+  return `${prefix} ${suffixes[suffixIndex]}`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BACKGROUND STARS
+// ════════════════════════════════════════════════════════════════════════════
+
+function generateBackgroundStars() {
+  const container = document.getElementById('bg-stars');
+  container.innerHTML = '';
+
+  for (let i = 0; i < 6; i++) {
+    const star = document.createElement('div');
+    const size = 1 + Math.random() * 1.5;
+    star.className = `background-star bg-star-${(i % 5) + 1} absolute rounded-full`;
+    star.style.cssText = `
+      width: ${size}px;
+      height: ${size}px;
+      left: ${5 + Math.random() * 90}%;
+      top: ${5 + Math.random() * 90}%;
+      background: rgba(255, 255, 255, ${isDark ? (0.3 + Math.random() * 0.3) : (0.5 + Math.random() * 0.3)});
+    `;
+    container.appendChild(star);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FRAMEWORK RENDERING
+// ════════════════════════════════════════════════════════════════════════════
+
+function renderFramework() {
+  const framework = document.getElementById('framework');
+  framework.innerHTML = '';
+
+  const axisColor = isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(37, 99, 235, 0.2)';
+  const labelColor = isDark ? 'rgba(148, 163, 184, 0.5)' : 'rgba(37, 99, 235, 0.7)';
+
+  // Concentric pentagons
+  [0.33, 0.66, 1].forEach((scale, i) => {
+    const points = traitOrder.map(k => {
+      const trait = traits[k];
+      const angleRad = (trait.angle * Math.PI) / 180;
+      const r = minRadius + scale * (maxRadius - minRadius);
+      return `${centerX + Math.cos(angleRad) * r},${centerY + Math.sin(angleRad) * r}`;
+    }).join(' ');
+
+    const ring = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    ring.setAttribute('points', points);
+    ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', axisColor);
+    ring.setAttribute('stroke-width', i === 2 ? '1' : '0.5');
+    ring.setAttribute('stroke-dasharray', i < 2 ? '2,4' : 'none');
+    framework.appendChild(ring);
+  });
+
+  // Axis lines and labels
+  traitOrder.forEach(k => {
+    const trait = traits[k];
+    const angleRad = (trait.angle * Math.PI) / 180;
+    const x = centerX + Math.cos(angleRad) * maxRadius;
+    const y = centerY + Math.sin(angleRad) * maxRadius;
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', centerX);
+    line.setAttribute('y1', centerY);
+    line.setAttribute('x2', x);
+    line.setAttribute('y2', y);
+    line.setAttribute('stroke', axisColor);
+    line.setAttribute('stroke-width', '0.5');
+    line.setAttribute('class', `axis-line axis-line-${k}`);
+    framework.appendChild(line);
+
+    // Label
+    const labelX = centerX + Math.cos(angleRad) * (maxRadius + 12);
+    const labelY = centerY + Math.sin(angleRad) * (maxRadius + 12);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', labelX);
+    label.setAttribute('y', labelY);
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('dominant-baseline', 'middle');
+    label.setAttribute('fill', labelColor);
+    label.setAttribute('font-size', '8');
+    label.setAttribute('font-weight', '500');
+    label.setAttribute('class', `axis-label axis-label-${k}`);
+    label.textContent = trait.name;
+    framework.appendChild(label);
+  });
+
+  // Center dot
+  const centerDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  centerDot.setAttribute('cx', centerX);
+  centerDot.setAttribute('cy', centerY);
+  centerDot.setAttribute('r', '2');
+  centerDot.setAttribute('fill', axisColor);
+  framework.appendChild(centerDot);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// AVERAGE CONSTELLATION (COMPARISON)
+// ════════════════════════════════════════════════════════════════════════════
+
+function renderAverageConstellation() {
+  const container = document.getElementById('average-constellation');
+  container.innerHTML = '';
+
+  if (!showComparison) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+
+  const avgColor = isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(37, 99, 235, 0.15)';
+
+  const points = traitOrder.map(k => {
+    const pos = scoreToPosition(k, averageScores[k]);
+    return `${pos.x},${pos.y}`;
+  }).join(' ');
+
+  const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  polygon.setAttribute('points', points);
+  polygon.setAttribute('fill', avgColor);
+  polygon.setAttribute('stroke', isDark ? 'rgba(148, 163, 184, 0.35)' : 'rgba(37, 99, 235, 0.25)');
+  polygon.setAttribute('stroke-width', '1');
+  polygon.setAttribute('stroke-dasharray', '3,3');
+  container.appendChild(polygon);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// YOUR CONSTELLATION — With hover interactions
+// ════════════════════════════════════════════════════════════════════════════
+
+function renderYourConstellation() {
+  const linesGroup = document.getElementById('your-lines');
+  const starsGroup = document.getElementById('your-stars');
+  linesGroup.innerHTML = '';
+  starsGroup.innerHTML = '';
+
+  const positions = traitOrder.map(k => {
+    const colors = getTraitColors(k);
+    return {
+      key: k,
+      ...traits[k],
+      leftColor: colors.left,
+      rightColor: colors.right,
+      score: scores[k],
+      ...scoreToPosition(k, scores[k])
+    };
+  });
+
+  // Filled polygon area - more saturated in light mode
+  const lineColor = isDark ? 'rgba(59, 130, 246, 0.4)' : 'rgba(37, 99, 235, 0.5)';
+  const fillColor = isDark ? 'rgba(59, 130, 246, 0.06)' : 'rgba(37, 99, 235, 0.08)';
+
+  const polygonPoints = positions.map(p => `${p.x},${p.y}`).join(' ');
+  const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  polygon.setAttribute('points', polygonPoints);
+  polygon.setAttribute('fill', fillColor);
+  polygon.setAttribute('stroke', lineColor);
+  polygon.setAttribute('stroke-width', '1.5');
+  polygon.setAttribute('id', 'constellation-polygon');
+  linesGroup.appendChild(polygon);
+
+  // Stars
+  positions.forEach((pos, i) => {
+    const pct = pos.score / 100;
+    const starColor = lerpColor(pos.leftColor, pos.rightColor, pct);
+    const baseSize = 6 + pos.deviation * 7;
+
+    const isFocused = focusMode === 'all' || focusMode === pos.key;
+    const isDimmed = focusMode !== 'all' && focusMode !== pos.key;
+
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'star-group');
+    group.setAttribute('data-trait', pos.key);
+    group.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+    group.style.cursor = 'pointer';
+
+    // Outer glow
+    const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    glow.setAttribute('r', baseSize * 2.5);
+    glow.setAttribute('fill', starColor);
+    glow.setAttribute('opacity', isDimmed ? '0.05' : (isFocused && focusMode !== 'all' ? '0.25' : '0.12'));
+    group.appendChild(glow);
+
+    // Main star
+    const star = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    star.setAttribute('r', baseSize);
+    star.setAttribute('fill', starColor);
+    star.setAttribute('filter', isFocused && focusMode !== 'all' ? 'url(#starGlowStrong)' : 'url(#starGlow)');
+    star.setAttribute('class', `constellation-star ${isDimmed ? 'dimmed' : ''} ${isFocused && focusMode !== 'all' ? 'focused' : ''}`);
+    star.style.color = starColor;
+    group.appendChild(star);
+
+    // Inner core
+    const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    core.setAttribute('r', baseSize * 0.35);
+    core.setAttribute('fill', isDark ? 'white' : 'rgba(255,255,255,0.95)');
+    core.setAttribute('opacity', isDimmed ? '0.3' : '0.85');
+    group.appendChild(core);
+
+    // Hover events
+    group.addEventListener('mouseenter', (e) => showTooltip(pos.key, e));
+    group.addEventListener('mouseleave', hideTooltip);
+    group.addEventListener('click', () => setFocusMode(pos.key));
+
+    starsGroup.appendChild(group);
+  });
+
+  // Update other UI
+  document.getElementById('constellation-title').textContent = generateConstellationName();
+  updateLegend(positions);
+  updateNarrativeSummary(positions);
+  updateAxisLabels();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TOOLTIP SYSTEM
+// ════════════════════════════════════════════════════════════════════════════
+
+function showTooltip(traitKey, event) {
+  hoveredStar = traitKey;
+  const trait = traits[traitKey];
+  const score = scores[traitKey];
+  const level = getScoreLevel(score);
+  const colors = getTraitColors(traitKey);
+  const pct = score / 100;
+  const starColor = lerpColor(colors.left, colors.right, pct);
+
+  const tooltip = document.getElementById('star-tooltip');
+
+  document.getElementById('tooltip-trait').textContent = trait.name.toUpperCase();
+  document.getElementById('tooltip-trait').style.color = starColor;
+  document.getElementById('tooltip-percent').textContent = score + '%';
+  document.getElementById('tooltip-percent').style.color = starColor;
+  document.getElementById('tooltip-state').textContent = trait.descriptors[level];
+  document.getElementById('tooltip-insight').textContent = trait.insights[level];
+  document.getElementById('tooltip-mapping').textContent = `${trait.leftLabel} ← → ${trait.rightLabel}`;
+
+  tooltip.style.borderColor = starColor;
+  tooltip.style.border = `1px solid ${starColor}50`;
+
+  const container = document.getElementById('constellation-container');
+  const pos = scoreToPosition(traitKey, score);
+
+  const svgRect = document.getElementById('constellation-svg').getBoundingClientRect();
+  const scaleX = svgRect.width / 320;
+  const scaleY = svgRect.height / 200;
+
+  let tooltipX = pos.x * scaleX;
+  let tooltipY = pos.y * scaleY - 90;
+
+  if (tooltipY < 10) tooltipY = pos.y * scaleY + 30;
+  if (tooltipX < 100) tooltipX = 100;
+  if (tooltipX > 220) tooltipX = 220;
+
+  tooltip.style.left = (tooltipX - 90) + 'px';
+  tooltip.style.top = tooltipY + 'px';
+  tooltip.classList.add('visible');
+}
+
+function hideTooltip() {
+  hoveredStar = null;
+  document.getElementById('star-tooltip').classList.remove('visible');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FOCUS MODE
+// ════════════════════════════════════════════════════════════════════════════
+
+function setFocusMode(mode) {
+  focusMode = mode;
+
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    const tabTrait = tab.dataset.trait;
+    tab.classList.toggle('active', tabTrait === mode);
+  });
+
+  updateTeachingCallout();
+  renderYourConstellation();
+  renderAverageConstellation();
+  updateLegendHighlighting();
+}
+
+function updateAxisLabels() {
+  document.querySelectorAll('.axis-label').forEach(label => {
+    const traitKey = label.classList[1]?.replace('axis-label-', '');
+    if (focusMode === 'all') {
+      label.classList.remove('dimmed', 'focused');
+    } else if (traitKey === focusMode) {
+      label.classList.remove('dimmed');
+      label.classList.add('focused');
+    } else {
+      label.classList.add('dimmed');
+      label.classList.remove('focused');
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TEACHING CALLOUT
+// ════════════════════════════════════════════════════════════════════════════
+
+function updateTeachingCallout() {
+  const icon = document.getElementById('callout-icon');
+  const title = document.getElementById('callout-title');
+  const body = document.getElementById('callout-body');
+
+  if (focusMode === 'all') {
+    icon.innerHTML = '&#9733;';
+    title.textContent = 'Reading Your Constellation';
+    title.style.color = '';
+    body.innerHTML = `
+      Each <span class="callout-highlight">star</span> is one dimension of your personality.
+      <span class="callout-highlight">Distance from center</span> = how strongly you lean that way.
+      <span class="callout-highlight">Color</span> = which end of the spectrum.
+      <strong>Tap a trait to focus on it.</strong>
+    `;
+  } else {
+    const trait = traits[focusMode];
+    const score = scores[focusMode];
+    const level = getScoreLevel(score);
+    const colors = getTraitColors(focusMode);
+    const pct = score / 100;
+    const starColor = lerpColor(colors.left, colors.right, pct);
+
+    icon.innerHTML = '&#128269;';
+    title.textContent = `Focusing: ${trait.name}`;
+    title.style.color = starColor;
+
+    body.innerHTML = `
+      Your ${trait.name.toLowerCase()} score is <span class="callout-highlight" style="color: ${starColor}">${score}%</span> —
+      <strong>${trait.descriptors[level]}</strong>. ${trait.insights[level]}
+      <br><br>
+      <span style="opacity: 0.6; font-size: 10px;">${trait.leftLabel} (low) ← → ${trait.rightLabel} (high)</span>
+    `;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// LEGEND PANEL
+// ════════════════════════════════════════════════════════════════════════════
+
+function updateLegend(positions) {
+  const container = document.getElementById('legend-panel');
+  container.innerHTML = '';
+
+  positions.forEach(pos => {
+    const pct = pos.score / 100;
+    const color = lerpColor(pos.leftColor, pos.rightColor, pct);
+    const level = getScoreLevel(pos.score);
+    const isDimmedState = focusMode !== 'all' && focusMode !== pos.key;
+
+    const row = document.createElement('div');
+    row.className = `legend-row ${isDimmedState ? 'dimmed' : ''}`;
+    row.dataset.trait = pos.key;
+
+    row.innerHTML = `
+      <div class="legend-dot" style="background: ${color};"></div>
+      <div class="legend-content">
+        <div class="legend-name">${pos.name}</div>
+      </div>
+      <div class="legend-bar-container">
+        <div class="legend-bar" style="width: ${pos.score}%; background: ${color};"></div>
+      </div>
+      <div class="legend-value" style="color: ${color};">${pos.score}</div>
+      <div class="legend-descriptor">${traits[pos.key].descriptors[level]}</div>
+    `;
+
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => setFocusMode(pos.key));
+
+    container.appendChild(row);
+  });
+}
+
+function updateLegendHighlighting() {
+  document.querySelectorAll('.legend-row').forEach(row => {
+    const traitKey = row.dataset.trait;
+    if (focusMode === 'all') {
+      row.classList.remove('dimmed');
+    } else if (traitKey === focusMode) {
+      row.classList.remove('dimmed');
+    } else {
+      row.classList.add('dimmed');
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// NARRATIVE SUMMARY
+// ════════════════════════════════════════════════════════════════════════════
+
+function updateNarrativeSummary(positions) {
+  const sorted = [...positions].sort((a, b) => b.deviation - a.deviation);
+  const top2 = sorted.slice(0, 2);
+
+  const describe = p => {
+    const level = getScoreLevel(p.score);
+    return traits[p.key].descriptors[level].toLowerCase();
+  };
+
+  const summary = document.getElementById('summary');
+
+  if (focusMode !== 'all') {
+    const trait = traits[focusMode];
+    const score = scores[focusMode];
+    const level = getScoreLevel(score);
+    summary.innerHTML = `<em>"${trait.insights[level]}"</em>`;
+  } else if (top2[0].deviation > 0.4) {
+    summary.innerHTML = `Your constellation reaches toward <strong>${describe(top2[0])}</strong> — this is your defining star. ${top2[1].deviation > 0.25 ? `<strong>${describe(top2[1])}</strong> also shines bright.` : ''}`;
+  } else {
+    summary.innerHTML = `Your constellation is well-balanced, with gentle leanings toward <strong>${describe(top2[0])}</strong> and <strong>${describe(top2[1])}</strong>.`;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// THEME
+// ════════════════════════════════════════════════════════════════════════════
+
+function applyTheme() {
+  const phone = document.getElementById('phone');
+  const card = document.getElementById('card');
+  const sky = document.getElementById('sky');
+
+  // Toggle light-mode class on body for CSS rules
+  document.body.classList.toggle('light-mode', !isDark);
+
+  if (isDark) {
+    document.body.style.background = '#08080c';
+    phone.style.background = '#0a0a12';
+    phone.style.borderColor = '#151525';
+    card.style.background = 'rgba(8, 12, 24, 0.95)';
+    card.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+    sky.style.background = 'radial-gradient(ellipse at center, #0c1022 0%, #060610 100%)';
+    document.getElementById('title').className = 'text-base font-semibold text-white';
+    document.getElementById('subtitle').className = 'text-xs text-gray-500 uppercase tracking-widest mb-1';
+    document.getElementById('summary').className = 'text-xs text-center text-gray-400 leading-relaxed';
+  } else {
+    // Light mode - clean, no ugly gray warmth
+    document.body.style.background = '#f0f4ff';
+    phone.style.background = '#ffffff';
+    phone.style.borderColor = '#a5b4fc';
+    card.style.background = 'rgba(255, 255, 255, 1)';
+    card.style.borderColor = 'rgba(37, 99, 235, 0.2)';
+    // Light mode sky - subtle blue gradient, NOT gray
+    sky.style.background = 'radial-gradient(ellipse at center, #dbeafe 0%, #bfdbfe 100%)';
+    document.getElementById('title').className = 'text-base font-semibold text-gray-900';
+    document.getElementById('subtitle').className = 'text-xs text-blue-600/60 uppercase tracking-widest mb-1';
+    document.getElementById('summary').className = 'text-xs text-center text-blue-900/60 leading-relaxed';
+  }
+
+  // Update nebulas
+  document.querySelectorAll('.nebula').forEach(el => {
+    el.style.opacity = isDark ? '0.12' : '0.08';
+  });
+
+  // Update constellation name
+  document.getElementById('constellation-name').querySelector('span').style.color = isDark ? 'rgba(148, 163, 184, 0.4)' : 'rgba(37, 99, 235, 0.5)';
+  document.getElementById('constellation-title').style.color = isDark ? 'rgba(148, 163, 184, 0.8)' : 'rgba(37, 99, 235, 0.85)';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FULL RENDER
+// ════════════════════════════════════════════════════════════════════════════
+
+function render() {
+  generateBackgroundStars();
+  renderFramework();
+  renderAverageConstellation();
+  renderYourConstellation();
+  updateTeachingCallout();
+  applyTheme();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ════════════════════════════════════════════════════════════════════════════
+
+function setMode(mode) {
+  isDark = mode === 'dark';
+  document.getElementById('btn-dark').className = `px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 ${isDark ? 'border-blue-500' : 'border-gray-600'}`;
+  document.getElementById('btn-light').className = `px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 ${!isDark ? 'border-blue-500' : 'border-gray-300'}`;
+  render();
+}
+
+function toggleComparison() {
+  showComparison = !showComparison;
+  const btn = document.getElementById('btn-compare');
+  btn.textContent = showComparison ? 'Hide Average' : 'Show Average';
+  btn.classList.toggle('active', showComparison);
+  renderAverageConstellation();
+}
+
+function randomize() {
+  Object.keys(scores).forEach(k => {
+    const r = Math.random();
+    if (r < 0.35) {
+      scores[k] = Math.round(15 + Math.random() * 20);
+    } else if (r > 0.65) {
+      scores[k] = Math.round(65 + Math.random() * 30);
+    } else {
+      scores[k] = Math.round(40 + Math.random() * 20);
+    }
+  });
+  render();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════════════
+
+render();
+</script>
+</body>
+</html>

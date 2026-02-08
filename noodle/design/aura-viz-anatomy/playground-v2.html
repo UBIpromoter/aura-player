@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz — Evolved Playground v2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #030712;
+    color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+
+  .playground {
+    display: flex;
+    gap: 40px;
+    padding: 28px 36px;
+    max-width: 1100px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+
+  /* ── Questions ── */
+  .questions-panel {
+    flex: 0 0 320px;
+    position: sticky;
+    top: 24px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+
+  .questions-panel::-webkit-scrollbar { width: 4px; }
+  .questions-panel::-webkit-scrollbar-track { background: transparent; }
+  .questions-panel::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
+
+  .panel-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+
+  .panel-sub {
+    font-size: 11px;
+    color: #6b7280;
+    margin-bottom: 16px;
+  }
+
+  /* Entity gate */
+  .entity-gate {
+    background: linear-gradient(135deg, #1f2937, #111827);
+    border: 1px solid #374151;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+
+  .gate-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #d1d5db;
+    margin-bottom: 10px;
+  }
+
+  .gate-badge {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #f59e0b;
+    background: rgba(245,158,11,0.12);
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-weight: 700;
+  }
+
+  .gate-options { display: flex; gap: 8px; }
+
+  .gate-btn {
+    flex: 1;
+    padding: 11px 10px;
+    border: 2px solid #374151;
+    border-radius: 10px;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: inherit;
+  }
+
+  .gate-btn:hover { border-color: #6b7280; color: #fff; background: #1f2937; }
+
+  .gate-btn.selected {
+    border-color: #f59e0b;
+    color: #fff;
+    background: rgba(245,158,11,0.1);
+    box-shadow: 0 0 14px rgba(245,158,11,0.12);
+  }
+
+  /* Neuron groups */
+  .neuron-group {
+    border: 1px solid #1f2937;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background: #111827;
+  }
+
+  .neuron-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #4b5563;
+    margin-bottom: 8px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .neuron-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .q-row {
+    margin-bottom: 8px;
+  }
+
+  .q-row:last-child { margin-bottom: 0; }
+
+  .q-type {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .q-text {
+    font-size: 12px;
+    color: #d1d5db;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  .q-options { display: flex; gap: 5px; }
+
+  .q-btn {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    line-height: 1.3;
+  }
+
+  .q-btn:hover { border-color: #6b7280; color: #fff; background: #1f2937; }
+
+  .q-btn.selected {
+    border-color: #8b5cf6;
+    color: #fff;
+    background: rgba(139,92,246,0.12);
+  }
+
+  .controls { display: flex; gap: 8px; margin-top: 12px; }
+
+  .ctrl-btn {
+    flex: 1; padding: 9px; border: 1px solid #374151; border-radius: 7px;
+    background: transparent; color: #6b7280; font-size: 11px; cursor: pointer;
+    transition: all 0.2s; font-family: inherit; font-weight: 500;
+  }
+
+  .ctrl-btn:hover { border-color: #ef4444; color: #ef4444; }
+  .ctrl-btn.rand:hover { border-color: #8b5cf6; color: #8b5cf6; }
+
+  .progress-bar {
+    height: 3px; background: #111827; border-radius: 2px;
+    margin-top: 10px; overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #8b5cf6, #3b82f6, #10b981);
+    transition: width 0.4s; border-radius: 2px;
+  }
+
+  /* ── Viz ── */
+  .viz-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding-top: 8px;
+  }
+
+  .viz-label {
+    font-size: 12px;
+    color: #6b7280;
+    letter-spacing: 0.06em;
+  }
+
+  .viz-label strong { color: #9ca3af; font-weight: 600; }
+
+  .entity-indicator {
+    font-size: 11px;
+    color: #4b5563;
+    padding: 4px 12px;
+    border: 1px solid #1f2937;
+    border-radius: 20px;
+    transition: all 0.4s;
+  }
+
+  .entity-indicator.human { border-color: #10b981; color: #10b981; }
+  .entity-indicator.ai { border-color: #06b6d4; color: #06b6d4; }
+
+  svg { display: block; }
+</style>
+</head>
+<body>
+
+<div class="playground">
+  <div class="questions-panel">
+    <div class="panel-title">Shape Your Aura</div>
+    <div class="panel-sub">Each answer shapes a neuron. Every choice is visible.</div>
+
+    <div class="entity-gate">
+      <div class="gate-label">Do you have a biological body?<span class="gate-badge">Structure</span></div>
+      <div class="gate-options">
+        <button class="gate-btn" id="gate-0" onclick="setEntity(0)">Yes</button>
+        <button class="gate-btn" id="gate-1" onclick="setEntity(1)">No, I'm an AI</button>
+      </div>
+    </div>
+
+    <div id="neuron-groups"></div>
+
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+    <div class="controls">
+      <button class="ctrl-btn rand" onclick="randomize()">Randomize</button>
+      <button class="ctrl-btn" onclick="resetAll()">Reset</button>
+    </div>
+  </div>
+
+  <div class="viz-panel">
+    <div class="entity-indicator" id="entityLabel">Unanswered</div>
+    <svg id="aura" width="520" height="520" viewBox="0 0 200 200" style="overflow:visible;"></svg>
+    <div class="viz-label"><strong>Your Aura</strong> — 5 neurons, 10 answers</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// PALETTE — all 9 assessment colors
+// ═══════════════════════════════════════════════════════
+const C = {
+  violet:  '#8b5cf6',
+  blue:    '#3b82f6',
+  teal:    '#14b8a6',
+  rose:    '#f43f5e',
+  pink:    '#d946ef',
+  emerald: '#10b981',
+  amber:   '#f59e0b',
+  indigo:  '#6366f1',
+  cyan:    '#06b6d4',
+};
+
+function hexToRgba(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+// ═══════════════════════════════════════════════════════
+// NEURON CONFIG — 5 neurons, each has color Q + position Q
+// ═══════════════════════════════════════════════════════
+const NEURONS = [
+  {
+    label: 'Neuron 1',
+    colorQ: { text: "Which came first?", options: ["The chicken", "The egg"], colors: [C.violet, C.blue] },
+    posQ:   { text: "Better pizza topping:", options: ["Pepperoni", "Pineapple"] },
+    // Human positions (organic scatter)
+    humanPos: [{ x: 72, y: 65 }, { x: 128, y: 58 }],
+    // AI positions (geometric grid)
+    aiPos: [{ x: 60, y: 50 }, { x: 140, y: 50 }],
+  },
+  {
+    label: 'Neuron 2',
+    colorQ: { text: "In 10 years, most people will...", options: ["Still drive cars", "Self-driving cars"], colors: [C.emerald, C.teal] },
+    posQ:   { text: "Is a hot dog a sandwich?", options: ["Yes, obviously", "No way"] },
+    humanPos: [{ x: 58, y: 105 }, { x: 142, y: 98 }],
+    aiPos: [{ x: 50, y: 100 }, { x: 150, y: 100 }],
+  },
+  {
+    label: 'Neuron 3',
+    colorQ: { text: "Will humans live on Mars by 2050?", options: ["Yes", "No"], colors: [C.pink, C.rose] },
+    posQ:   { text: "Better superpower:", options: ["Flight", "Invisibility"] },
+    humanPos: [{ x: 100, y: 88 }, { x: 100, y: 115 }],
+    aiPos: [{ x: 100, y: 75 }, { x: 100, y: 125 }],
+  },
+  {
+    label: 'Neuron 4',
+    colorQ: { text: "Coffee in the morning?", options: ["Yes please", "Not for me"], colors: [C.amber, C.indigo] },
+    posQ:   { text: "Dogs or cats?", options: ["Dogs", "Cats"] },
+    humanPos: [{ x: 70, y: 140 }, { x: 130, y: 145 }],
+    aiPos: [{ x: 60, y: 150 }, { x: 140, y: 150 }],
+  },
+  {
+    label: 'Neuron 5',
+    colorQ: { text: "Will AI replace most jobs?", options: ["Yes, big changes", "No, jobs adapt"], colors: [C.cyan, C.violet] },
+    posQ:   { text: "Is water wet?", options: ["Yes", "No"] },
+    humanPos: [{ x: 115, y: 60 }, { x: 88, y: 130 }],
+    aiPos: [{ x: 100, y: 50 }, { x: 100, y: 150 }],
+  },
+];
+
+// Connection templates
+const HUMAN_CONNECTIONS_BASE = [
+  [0,2],[1,2],[2,3],[2,4],[0,4],[1,3],[0,1],[3,4],
+];
+const AI_CONNECTIONS_BASE = [
+  // Grid-like: top row, middle, bottom row, cross
+  [0,1],[0,2],[1,2],[2,3],[2,4],[3,4],[0,3],[1,4],
+];
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const colorAnswers = new Array(5).fill(null);   // color choice per neuron
+const posAnswers = new Array(5).fill(null);     // position choice per neuron
+let entityAnswer = null;
+
+// ═══════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════
+function buildUI() {
+  const container = document.getElementById('neuron-groups');
+  container.innerHTML = '';
+
+  NEURONS.forEach((n, ni) => {
+    const color = colorAnswers[ni] !== null ? n.colorQ.colors[colorAnswers[ni]] : '#6b7280';
+    const group = document.createElement('div');
+    group.className = 'neuron-group';
+    group.innerHTML = `
+      <div class="neuron-label">
+        <span class="neuron-dot" style="background:${color};box-shadow:0 0 6px ${color}"></span>
+        ${n.label}
+      </div>
+      <div class="q-row">
+        <div class="q-type">Color</div>
+        <div class="q-text">${n.colorQ.text}</div>
+        <div class="q-options">
+          <button class="q-btn${colorAnswers[ni]===0?' selected':''}" onclick="pickColor(${ni},0)">${n.colorQ.options[0]}</button>
+          <button class="q-btn${colorAnswers[ni]===1?' selected':''}" onclick="pickColor(${ni},1)">${n.colorQ.options[1]}</button>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-type">Position</div>
+        <div class="q-text">${n.posQ.text}</div>
+        <div class="q-options">
+          <button class="q-btn${posAnswers[ni]===0?' selected':''}" onclick="pickPos(${ni},0)">${n.posQ.options[0]}</button>
+          <button class="q-btn${posAnswers[ni]===1?' selected':''}" onclick="pickPos(${ni},1)">${n.posQ.options[1]}</button>
+        </div>
+      </div>`;
+    container.appendChild(group);
+  });
+}
+
+function pickColor(ni, v) { colorAnswers[ni] = v; buildUI(); updateProgress(); }
+function pickPos(ni, v) { posAnswers[ni] = v; buildUI(); updateProgress(); }
+
+function setEntity(v) {
+  entityAnswer = v;
+  document.getElementById('gate-0').classList.toggle('selected', v === 0);
+  document.getElementById('gate-1').classList.toggle('selected', v === 1);
+  const el = document.getElementById('entityLabel');
+  if (v === 0) { el.textContent = 'Biological'; el.className = 'entity-indicator human'; }
+  else if (v === 1) { el.textContent = 'Artificial Intelligence'; el.className = 'entity-indicator ai'; }
+  updateProgress();
+}
+
+function resetAll() {
+  colorAnswers.fill(null); posAnswers.fill(null); entityAnswer = null;
+  document.getElementById('gate-0').classList.remove('selected');
+  document.getElementById('gate-1').classList.remove('selected');
+  document.getElementById('entityLabel').textContent = 'Unanswered';
+  document.getElementById('entityLabel').className = 'entity-indicator';
+  buildUI(); updateProgress();
+}
+
+function randomize() {
+  for (let i = 0; i < 5; i++) { colorAnswers[i] = Math.random() < 0.5 ? 0 : 1; posAnswers[i] = Math.random() < 0.5 ? 0 : 1; }
+  setEntity(Math.random() < 0.85 ? 0 : 1);
+  buildUI(); updateProgress();
+}
+
+function updateProgress() {
+  const count = colorAnswers.filter(a => a !== null).length + posAnswers.filter(a => a !== null).length + (entityAnswer !== null ? 1 : 0);
+  document.getElementById('progress').style.width = (count / 11 * 100) + '%';
+}
+
+buildUI();
+
+// ═══════════════════════════════════════════════════════
+// SVG VISUALIZATION (production style)
+// ═══════════════════════════════════════════════════════
+const svg = document.getElementById('aura');
+const svgNS = 'http://www.w3.org/2000/svg';
+
+// Animated state
+const neurons = NEURONS.map((n, i) => ({
+  x: 100, y: 100,
+  tx: 100, ty: 100,
+  color: '#6b7280',
+  tcolor: '#6b7280',
+  r: 4.5,
+  visible: false,
+}));
+
+let time = 0;
+let lastTime = performance.now();
+
+// SVG filter IDs — build defs
+function buildDefs() {
+  // Clear existing defs
+  let defs = svg.querySelector('defs');
+  if (defs) defs.remove();
+  defs = document.createElementNS(svgNS, 'defs');
+
+  // Glow blur for color zones
+  const glowFilter = document.createElementNS(svgNS, 'filter');
+  glowFilter.setAttribute('id', 'glow'); glowFilter.setAttribute('x', '-80%'); glowFilter.setAttribute('y', '-80%');
+  glowFilter.setAttribute('width', '260%'); glowFilter.setAttribute('height', '260%');
+  const glowBlur = document.createElementNS(svgNS, 'feGaussianBlur');
+  glowBlur.setAttribute('in', 'SourceGraphic'); glowBlur.setAttribute('stdDeviation', '18');
+  glowFilter.appendChild(glowBlur);
+  defs.appendChild(glowFilter);
+
+  // Node glow
+  const nodeFilter = document.createElementNS(svgNS, 'filter');
+  nodeFilter.setAttribute('id', 'nodeGlow'); nodeFilter.setAttribute('x', '-200%'); nodeFilter.setAttribute('y', '-200%');
+  nodeFilter.setAttribute('width', '500%'); nodeFilter.setAttribute('height', '500%');
+  const nodeBlur = document.createElementNS(svgNS, 'feGaussianBlur');
+  nodeBlur.setAttribute('in', 'SourceGraphic'); nodeBlur.setAttribute('stdDeviation', '8');
+  nodeFilter.appendChild(nodeBlur);
+  defs.appendChild(nodeFilter);
+
+  // Radial fade mask
+  const radGrad = document.createElementNS(svgNS, 'radialGradient');
+  radGrad.setAttribute('id', 'fadeMask'); radGrad.setAttribute('cx', '50%'); radGrad.setAttribute('cy', '50%'); radGrad.setAttribute('r', '50%');
+  [['0%','1'],['55%','1'],['80%','0.6'],['100%','0']].forEach(([o, a]) => {
+    const stop = document.createElementNS(svgNS, 'stop');
+    stop.setAttribute('offset', o); stop.setAttribute('stop-color', 'white'); stop.setAttribute('stop-opacity', a);
+    radGrad.appendChild(stop);
+  });
+  defs.appendChild(radGrad);
+
+  const mask = document.createElementNS(svgNS, 'mask');
+  mask.setAttribute('id', 'auraMask');
+  const maskRect = document.createElementNS(svgNS, 'rect');
+  maskRect.setAttribute('x', '-20'); maskRect.setAttribute('y', '-20');
+  maskRect.setAttribute('width', '240'); maskRect.setAttribute('height', '240');
+  maskRect.setAttribute('fill', 'url(#fadeMask)');
+  mask.appendChild(maskRect);
+  defs.appendChild(mask);
+
+  svg.insertBefore(defs, svg.firstChild);
+}
+buildDefs();
+
+// Stars
+const stars = [];
+for (let i = 0; i < 20; i++) {
+  stars.push({ cx: Math.random()*200, cy: Math.random()*200, r: 0.3+Math.random()*0.6, delay: Math.random()*6, dur: 3+Math.random()*4 });
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function lerpColor(from, to, t) {
+  const f = parseInt(from.slice(1), 16), t2 = parseInt(to.slice(1), 16);
+  const fr = (f>>16)&255, fg = (f>>8)&255, fb = f&255;
+  const tr = (t2>>16)&255, tg = (t2>>8)&255, tb = t2&255;
+  const r = Math.round(fr+(tr-fr)*t), g = Math.round(fg+(tg-fg)*t), b = Math.round(fb+(tb-fb)*t);
+  return `#${((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1)}`;
+}
+
+function computeTargets() {
+  const isAI = entityAnswer === 1;
+  const isHuman = entityAnswer === 0;
+
+  NEURONS.forEach((n, i) => {
+    // Color
+    if (colorAnswers[i] !== null) {
+      neurons[i].tcolor = n.colorQ.colors[colorAnswers[i]];
+    } else {
+      // Default: muted blend of both options
+      neurons[i].tcolor = lerpColor(n.colorQ.colors[0], n.colorQ.colors[1], 0.5);
+    }
+
+    // Position
+    const posSet = isAI ? n.aiPos : n.humanPos;
+    const defaultPos = { x: (posSet[0].x + posSet[1].x) / 2, y: (posSet[0].y + posSet[1].y) / 2 };
+
+    if (posAnswers[i] !== null) {
+      neurons[i].tx = posSet[posAnswers[i]].x;
+      neurons[i].ty = posSet[posAnswers[i]].y;
+    } else {
+      neurons[i].tx = defaultPos.x;
+      neurons[i].ty = defaultPos.y;
+    }
+
+    neurons[i].visible = true;
+  });
+}
+
+function animate(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  time = now / 1000;
+
+  computeTargets();
+
+  const speed = 2.5 * dt;
+
+  // Smooth neuron positions
+  neurons.forEach((n, i) => {
+    n.x = lerp(n.x, n.tx, speed);
+    n.y = lerp(n.y, n.ty, speed);
+    n.color = lerpColor(n.color, n.tcolor, speed * 2);
+  });
+
+  render();
+  requestAnimationFrame(animate);
+}
+
+function render() {
+  // Clear SVG content (keep defs)
+  while (svg.children.length > 1) svg.removeChild(svg.lastChild);
+
+  const isAI = entityAnswer === 1;
+  const isHuman = entityAnswer === 0;
+  const breathScale = 1 + Math.sin(time * 0.5) * 0.04;
+
+  // Create a group for the whole visualization
+  const g = document.createElementNS(svgNS, 'g');
+
+  // ── Stars ──
+  stars.forEach(s => {
+    const twinkle = 0.15 + 0.35 * Math.max(0, Math.sin(time * (1/s.dur) * Math.PI * 2 + s.delay));
+    const star = document.createElementNS(svgNS, 'circle');
+    star.setAttribute('cx', s.cx); star.setAttribute('cy', s.cy); star.setAttribute('r', s.r);
+    star.setAttribute('fill', `rgba(180,200,255,${twinkle})`);
+    g.appendChild(star);
+  });
+
+  // ── Glow layer — color zones behind the nodes ──
+  const glowGroup = document.createElementNS(svgNS, 'g');
+  glowGroup.setAttribute('mask', 'url(#auraMask)');
+  glowGroup.setAttribute('filter', 'url(#glow)');
+  glowGroup.style.transformOrigin = '100px 100px';
+  glowGroup.style.transform = `scale(${breathScale})`;
+
+  // Animated neuron positions drive the glow
+  neurons.forEach((n, i) => {
+    if (!n.visible) return;
+    // Organic drift
+    const driftX = Math.sin(time * 0.4 + i * 1.3) * (isAI ? 1 : 2.5);
+    const driftY = Math.cos(time * 0.3 + i * 0.9) * (isAI ? 1 : 2.5);
+    const nx = n.x + driftX;
+    const ny = n.y + driftY;
+
+    // Glow ellipse
+    const rx = isAI ? 30 : 40;
+    const ry = isAI ? 30 : 35;
+    const ellipse = document.createElementNS(svgNS, 'ellipse');
+    ellipse.setAttribute('cx', nx); ellipse.setAttribute('cy', ny);
+    ellipse.setAttribute('rx', rx); ellipse.setAttribute('ry', ry);
+    ellipse.setAttribute('fill', n.color);
+    ellipse.setAttribute('opacity', isAI ? '0.5' : '0.65');
+    glowGroup.appendChild(ellipse);
+  });
+  g.appendChild(glowGroup);
+
+  // ── Connection lines ──
+  const connections = isAI ? AI_CONNECTIONS_BASE : HUMAN_CONNECTIONS_BASE;
+  const lineGroup = document.createElementNS(svgNS, 'g');
+  lineGroup.style.transformOrigin = '100px 100px';
+  lineGroup.style.transform = `scale(${breathScale})`;
+
+  connections.forEach(([from, to]) => {
+    const a = neurons[from], b = neurons[to];
+    if (!a.visible || !b.visible) return;
+    const dxa = Math.sin(time * 0.4 + from * 1.3) * (isAI ? 1 : 2.5);
+    const dya = Math.cos(time * 0.3 + from * 0.9) * (isAI ? 1 : 2.5);
+    const dxb = Math.sin(time * 0.4 + to * 1.3) * (isAI ? 1 : 2.5);
+    const dyb = Math.cos(time * 0.3 + to * 0.9) * (isAI ? 1 : 2.5);
+    const ax = a.x + dxa, ay = a.y + dya;
+    const bx = b.x + dxb, by = b.y + dyb;
+
+    const dx = ax - bx, dy = ay - by;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const opacity = Math.max(0, (1 - dist / 140)) * (isAI ? 0.35 : 0.25);
+    if (opacity < 0.01) return;
+
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', ax); line.setAttribute('y1', ay);
+    line.setAttribute('x2', bx); line.setAttribute('y2', by);
+
+    if (isAI) {
+      // Sharp, straight, slightly brighter
+      line.setAttribute('stroke', `rgba(150,170,220,${opacity})`);
+      line.setAttribute('stroke-width', '0.8');
+    } else {
+      // Softer, organic
+      line.setAttribute('stroke', `rgba(255,255,255,${opacity})`);
+      line.setAttribute('stroke-width', '1');
+      line.setAttribute('stroke-linecap', 'round');
+    }
+    lineGroup.appendChild(line);
+  });
+  g.appendChild(lineGroup);
+
+  // ── Nodes with 3-layer glow ──
+  const nodeGroup = document.createElementNS(svgNS, 'g');
+  nodeGroup.style.transformOrigin = '100px 100px';
+  nodeGroup.style.transform = `scale(${breathScale})`;
+
+  neurons.forEach((n, i) => {
+    if (!n.visible) return;
+    const driftX = Math.sin(time * 0.4 + i * 1.3) * (isAI ? 1 : 2.5);
+    const driftY = Math.cos(time * 0.3 + i * 0.9) * (isAI ? 1 : 2.5);
+    const nx = n.x + driftX;
+    const ny = n.y + driftY;
+    const r = n.r;
+
+    // Layer 1: Outer halo (blurred)
+    const halo = document.createElementNS(svgNS, 'circle');
+    halo.setAttribute('cx', nx); halo.setAttribute('cy', ny);
+    halo.setAttribute('r', r * 3.5);
+    halo.setAttribute('fill', hexToRgba(n.color, isAI ? 0.15 : 0.2));
+    halo.setAttribute('filter', 'url(#nodeGlow)');
+    nodeGroup.appendChild(halo);
+
+    // Layer 2: Mid glow
+    const mid = document.createElementNS(svgNS, 'circle');
+    mid.setAttribute('cx', nx); mid.setAttribute('cy', ny);
+    mid.setAttribute('r', r * 1.8);
+    mid.setAttribute('fill', hexToRgba(n.color, isAI ? 0.3 : 0.35));
+    nodeGroup.appendChild(mid);
+
+    // Layer 3: Core
+    const core = document.createElementNS(svgNS, 'circle');
+    core.setAttribute('cx', nx); core.setAttribute('cy', ny);
+    core.setAttribute('r', r);
+    core.setAttribute('fill', n.color);
+    core.setAttribute('opacity', '0.95');
+    nodeGroup.appendChild(core);
+
+    // Layer 4: White pip
+    const pip = document.createElementNS(svgNS, 'circle');
+    pip.setAttribute('cx', nx); pip.setAttribute('cy', ny);
+    pip.setAttribute('r', r * 0.35);
+    pip.setAttribute('fill', 'white');
+    pip.setAttribute('opacity', isAI ? '0.7' : '0.55');
+    nodeGroup.appendChild(pip);
+  });
+  g.appendChild(nodeGroup);
+
+  // AI-specific: add subtle grid lines in background
+  if (isAI) {
+    const gridGroup = document.createElementNS(svgNS, 'g');
+    gridGroup.setAttribute('opacity', '0.04');
+    for (let x = 20; x <= 180; x += 20) {
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', x); line.setAttribute('y1', 10);
+      line.setAttribute('x2', x); line.setAttribute('y2', 190);
+      line.setAttribute('stroke', '#6b7280'); line.setAttribute('stroke-width', '0.3');
+      gridGroup.appendChild(line);
+    }
+    for (let y = 20; y <= 180; y += 20) {
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', 10); line.setAttribute('y1', y);
+      line.setAttribute('x2', 190); line.setAttribute('y2', y);
+      line.setAttribute('stroke', '#6b7280'); line.setAttribute('stroke-width', '0.3');
+      gridGroup.appendChild(line);
+    }
+    // Insert grid BEHIND everything else
+    g.insertBefore(gridGroup, g.firstChild);
+  }
+
+  svg.appendChild(g);
+}
+
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

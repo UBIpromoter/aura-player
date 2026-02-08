@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Reveal - Full Assessments</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { background: #030712; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // ============ FULL QUESTION BANKS ============
+
+    const QUESTIONS = {
+      bigfive: {
+        name: 'Big Five Personality',
+        icon: '🎭',
+        color: 'violet',
+        desc: 'Core personality traits',
+        time: '8 min',
+        scale: { min: 'Not like me at all', max: 'Very much like me' },
+        traits: ['Extraversion', 'Agreeableness', 'Conscientiousness', 'Neuroticism', 'Openness'],
+        items: [
+          // Extraversion (E) - 10 items
+          { text: "I am the life of the party", trait: 'Extraversion', key: '+' },
+          { text: "I feel comfortable around people", trait: 'Extraversion', key: '+' },
+          { text: "I start conversations", trait: 'Extraversion', key: '+' },
+          { text: "I talk to a lot of different people at parties", trait: 'Extraversion', key: '+' },
+          { text: "I don't mind being the center of attention", trait: 'Extraversion', key: '+' },
+          { text: "I don't talk a lot", trait: 'Extraversion', key: '-' },
+          { text: "I keep in the background", trait: 'Extraversion', key: '-' },
+          { text: "I have little to say", trait: 'Extraversion', key: '-' },
+          { text: "I don't like to draw attention to myself", trait: 'Extraversion', key: '-' },
+          { text: "I am quiet around strangers", trait: 'Extraversion', key: '-' },
+          // Agreeableness (A) - 10 items
+          { text: "I sympathize with others' feelings", trait: 'Agreeableness', key: '+' },
+          { text: "I am interested in people", trait: 'Agreeableness', key: '+' },
+          { text: "I take time out for others", trait: 'Agreeableness', key: '+' },
+          { text: "I feel others' emotions", trait: 'Agreeableness', key: '+' },
+          { text: "I make people feel at ease", trait: 'Agreeableness', key: '+' },
+          { text: "I am not really interested in others", trait: 'Agreeableness', key: '-' },
+          { text: "I insult people", trait: 'Agreeableness', key: '-' },
+          { text: "I am not interested in other people's problems", trait: 'Agreeableness', key: '-' },
+          { text: "I feel little concern for others", trait: 'Agreeableness', key: '-' },
+          { text: "I am hard to get to know", trait: 'Agreeableness', key: '-' },
+          // Conscientiousness (C) - 10 items
+          { text: "I am always prepared", trait: 'Conscientiousness', key: '+' },
+          { text: "I pay attention to details", trait: 'Conscientiousness', key: '+' },
+          { text: "I get chores done right away", trait: 'Conscientiousness', key: '+' },
+          { text: "I like order", trait: 'Conscientiousness', key: '+' },
+          { text: "I follow a schedule", trait: 'Conscientiousness', key: '+' },
+          { text: "I leave my belongings around", trait: 'Conscientiousness', key: '-' },
+          { text: "I make a mess of things", trait: 'Conscientiousness', key: '-' },
+          { text: "I often forget to put things back in their proper place", trait: 'Conscientiousness', key: '-' },
+          { text: "I shirk my duties", trait: 'Conscientiousness', key: '-' },
+          { text: "I neglect my responsibilities", trait: 'Conscientiousness', key: '-' },
+          // Neuroticism (N) - 10 items
+          { text: "I get stressed out easily", trait: 'Neuroticism', key: '+' },
+          { text: "I worry about things", trait: 'Neuroticism', key: '+' },
+          { text: "I am easily disturbed", trait: 'Neuroticism', key: '+' },
+          { text: "I get upset easily", trait: 'Neuroticism', key: '+' },
+          { text: "I change my mood a lot", trait: 'Neuroticism', key: '+' },
+          { text: "I am relaxed most of the time", trait: 'Neuroticism', key: '-' },
+          { text: "I seldom feel blue", trait: 'Neuroticism', key: '-' },
+          { text: "I am not easily bothered by things", trait: 'Neuroticism', key: '-' },
+          { text: "I rarely get irritated", trait: 'Neuroticism', key: '-' },
+          { text: "I keep my emotions under control", trait: 'Neuroticism', key: '-' },
+          // Openness (O) - 10 items
+          { text: "I have a vivid imagination", trait: 'Openness', key: '+' },
+          { text: "I have excellent ideas", trait: 'Openness', key: '+' },
+          { text: "I am quick to understand things", trait: 'Openness', key: '+' },
+          { text: "I use difficult words", trait: 'Openness', key: '+' },
+          { text: "I spend time reflecting on things", trait: 'Openness', key: '+' },
+          { text: "I am not interested in abstract ideas", trait: 'Openness', key: '-' },
+          { text: "I do not have a good imagination", trait: 'Openness', key: '-' },
+          { text: "I have difficulty understanding abstract ideas", trait: 'Openness', key: '-' },
+          { text: "I am not interested in theoretical discussions", trait: 'Openness', key: '-' },
+          { text: "I avoid philosophical discussions", trait: 'Openness', key: '-' },
+        ]
+      },
+
+      adhd: {
+        name: 'ADHD Screen',
+        icon: '⚡',
+        color: 'amber',
+        desc: 'Attention patterns',
+        time: '2 min',
+        scale: { min: 'Never', max: 'Very often' },
+        items: [
+          { text: "How often do you have trouble wrapping up the final details of a project, once the challenging parts have been done?" },
+          { text: "How often do you have difficulty getting things in order when you have to do a task that requires organization?" },
+          { text: "How often do you have problems remembering appointments or obligations?" },
+          { text: "When you have a task that requires a lot of thought, how often do you avoid or delay getting started?" },
+          { text: "How often do you fidget or squirm with your hands or feet when you have to sit down for a long time?" },
+          { text: "How often do you feel overly active and compelled to do things, like you were driven by a motor?" },
+        ]
+      },
+
+      cognitive: {
+        name: 'Cognitive Style',
+        icon: '🧩',
+        color: 'teal',
+        desc: 'How you process information',
+        time: '3 min',
+        scale: { min: 'Strongly disagree', max: 'Strongly agree' },
+        categories: ['Detail Processing', 'Cognitive Flexibility', 'Social Processing', 'Reading Others', 'Systematizing'],
+        items: [
+          { text: "I notice things others seem to miss—small changes, background sounds, subtle patterns", category: 'Detail Processing' },
+          { text: "When looking at something, I'm drawn to specific details before seeing the overall picture", category: 'Detail Processing' },
+          { text: "Switching between tasks quickly feels uncomfortable or draining", category: 'Cognitive Flexibility' },
+          { text: "When interrupted, getting back into what I was doing takes significant effort", category: 'Cognitive Flexibility' },
+          { text: "I often take what people say literally, then realize later they meant something else", category: 'Social Processing' },
+          { text: "Figuring out if someone wants to end a conversation doesn't come naturally to me", category: 'Social Processing' },
+          { text: "I rely on what people explicitly say rather than their tone or facial expressions", category: 'Reading Others' },
+          { text: "Understanding why characters in movies make certain decisions often puzzles me", category: 'Reading Others' },
+          { text: "I enjoy organizing information into categories, lists, or systems", category: 'Systematizing' },
+          { text: "Learning the rules or patterns behind how something works is deeply satisfying", category: 'Systematizing' },
+        ]
+      },
+
+      attachment: {
+        name: 'Attachment Style',
+        icon: '💝',
+        color: 'rose',
+        desc: 'Relationship patterns',
+        time: '4 min',
+        scale: { min: 'Strongly disagree', max: 'Strongly agree' },
+        dimensions: ['Anxiety', 'Avoidance'],
+        items: [
+          // Anxiety (6)
+          { text: "When I don't hear from someone I care about, I tend to assume something is wrong", dimension: 'Anxiety' },
+          { text: "I find myself looking for signs that a partner might be losing interest", dimension: 'Anxiety' },
+          { text: "Feeling truly secure in a relationship is rare for me", dimension: 'Anxiety' },
+          { text: "I need more reassurance than most people that I'm valued", dimension: 'Anxiety' },
+          { text: "The possibility of being left weighs on me more than it probably should", dimension: 'Anxiety' },
+          { text: "I sometimes push for closeness in ways that feel desperate afterward", dimension: 'Anxiety' },
+          // Avoidance (6)
+          { text: "I feel most comfortable when I don't have to depend on anyone", dimension: 'Avoidance' },
+          { text: "Opening up emotionally makes me feel exposed in a bad way", dimension: 'Avoidance' },
+          { text: "When relationships get too close, I start wanting more space", dimension: 'Avoidance' },
+          { text: "I'd rather solve my problems alone than ask a partner for help", dimension: 'Avoidance' },
+          { text: "Keeping some emotional distance feels safer than full vulnerability", dimension: 'Avoidance' },
+          { text: "I've been told I'm hard to read or emotionally unavailable", dimension: 'Avoidance' },
+        ]
+      },
+
+      risk: {
+        name: 'Risk Tolerance',
+        icon: '🎲',
+        color: 'emerald',
+        desc: 'Where you take chances',
+        time: '5 min',
+        scale: { min: 'Very unlikely', max: 'Very likely' },
+        domains: ['Financial', 'Social', 'Physical', 'Career', 'Ethical'],
+        items: [
+          // Financial (3)
+          { text: "Invest 20% of savings in a high-risk/high-reward opportunity", domain: 'Financial' },
+          { text: "Quit a stable job to start a business", domain: 'Financial' },
+          { text: "Lend a significant amount of money to a friend", domain: 'Financial' },
+          // Social (3)
+          { text: "Share an unpopular opinion publicly", domain: 'Social' },
+          { text: "Confront a friend about something bothering you", domain: 'Social' },
+          { text: "Introduce yourself to a stranger at an event", domain: 'Social' },
+          // Physical (3)
+          { text: "Try an extreme sport like skydiving or bungee jumping", domain: 'Physical' },
+          { text: "Travel solo to an unfamiliar country", domain: 'Physical' },
+          { text: "Eat food from a street vendor in a foreign country", domain: 'Physical' },
+          // Career (3)
+          { text: "Take a job in a completely new field", domain: 'Career' },
+          { text: "Speak up in a meeting to challenge your boss's idea", domain: 'Career' },
+          { text: "Negotiate aggressively for a much higher salary", domain: 'Career' },
+          // Ethical (3)
+          { text: "Bend the rules slightly if it helps someone you care about", domain: 'Ethical' },
+          { text: "Keep extra change if a cashier makes a mistake in your favor", domain: 'Ethical' },
+          { text: "Tell a white lie to avoid hurting someone's feelings", domain: 'Ethical' },
+        ]
+      }
+    };
+
+    // ============ MAIN COMPONENT ============
+
+    function RevealApp() {
+      const [darkMode, setDarkMode] = useState(true);
+      const [view, setView] = useState('picker'); // picker, question, results, profile
+      const [selectedTest, setSelectedTest] = useState(null);
+      const [questionIndex, setQuestionIndex] = useState(0);
+      const [answers, setAnswers] = useState({});
+      const [completedTests, setCompletedTests] = useState({});
+      const [currentAnswer, setCurrentAnswer] = useState(null);
+
+      // Theme
+      const t = {
+        bg: darkMode ? 'bg-gray-950' : 'bg-gray-50',
+        text: darkMode ? 'text-white' : 'text-gray-900',
+        textSec: darkMode ? 'text-gray-400' : 'text-gray-500',
+        textMuted: darkMode ? 'text-gray-500' : 'text-gray-400',
+        card: darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200',
+        input: darkMode ? 'bg-gray-800' : 'bg-gray-200',
+        border: darkMode ? 'border-gray-800' : 'border-gray-200',
+      };
+
+      const colorMap = {
+        violet: { bg: 'bg-violet-500', ring: 'ring-violet-400', text: 'text-violet-400', light: 'bg-violet-500/10' },
+        amber: { bg: 'bg-amber-500', ring: 'ring-amber-400', text: 'text-amber-400', light: 'bg-amber-500/10' },
+        teal: { bg: 'bg-teal-500', ring: 'ring-teal-400', text: 'text-teal-400', light: 'bg-teal-500/10' },
+        rose: { bg: 'bg-rose-500', ring: 'ring-rose-400', text: 'text-rose-400', light: 'bg-rose-500/10' },
+        emerald: { bg: 'bg-emerald-500', ring: 'ring-emerald-400', text: 'text-emerald-400', light: 'bg-emerald-500/10' },
+      };
+
+      const startTest = (testId) => {
+        setSelectedTest(testId);
+        setQuestionIndex(0);
+        setAnswers({});
+        setCurrentAnswer(null);
+        setView('question');
+      };
+
+      const submitAnswer = () => {
+        if (currentAnswer === null) return;
+        const newAnswers = { ...answers, [questionIndex]: currentAnswer };
+        setAnswers(newAnswers);
+
+        const test = QUESTIONS[selectedTest];
+        if (questionIndex < test.items.length - 1) {
+          setQuestionIndex(questionIndex + 1);
+          setCurrentAnswer(null);
+        } else {
+          // Calculate results
+          const results = calculateResults(selectedTest, newAnswers);
+          setCompletedTests({ ...completedTests, [selectedTest]: results });
+          setView('results');
+        }
+      };
+
+      const calculateResults = (testId, ans) => {
+        const test = QUESTIONS[testId];
+        const scores = {};
+
+        if (testId === 'bigfive') {
+          test.traits.forEach(trait => { scores[trait] = { total: 0, count: 0 }; });
+          test.items.forEach((item, i) => {
+            if (ans[i] !== undefined) {
+              let score = ans[i];
+              if (item.key === '-') score = 8 - score; // Reverse score
+              scores[item.trait].total += score;
+              scores[item.trait].count++;
+            }
+          });
+          Object.keys(scores).forEach(trait => {
+            scores[trait] = Math.round((scores[trait].total / (scores[trait].count * 7)) * 100);
+          });
+        } else if (testId === 'adhd') {
+          let total = 0;
+          Object.values(ans).forEach(v => { total += v; });
+          scores.total = total;
+          scores.average = (total / 6).toFixed(1);
+          scores.indicatorCount = Object.values(ans).filter(v => v >= 5).length;
+        } else if (testId === 'cognitive') {
+          test.categories.forEach(cat => { scores[cat] = { total: 0, count: 0 }; });
+          test.items.forEach((item, i) => {
+            if (ans[i] !== undefined) {
+              scores[item.category].total += ans[i];
+              scores[item.category].count++;
+            }
+          });
+          Object.keys(scores).forEach(cat => {
+            scores[cat] = Math.round((scores[cat].total / (scores[cat].count * 7)) * 100);
+          });
+          scores.overall = Math.round(Object.values(scores).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) / 5);
+        } else if (testId === 'attachment') {
+          scores.Anxiety = { total: 0, count: 0 };
+          scores.Avoidance = { total: 0, count: 0 };
+          test.items.forEach((item, i) => {
+            if (ans[i] !== undefined) {
+              scores[item.dimension].total += ans[i];
+              scores[item.dimension].count++;
+            }
+          });
+          scores.Anxiety = (scores.Anxiety.total / scores.Anxiety.count).toFixed(1);
+          scores.Avoidance = (scores.Avoidance.total / scores.Avoidance.count).toFixed(1);
+          // Determine style
+          const highAnx = scores.Anxiety > 4;
+          const highAvoid = scores.Avoidance > 4;
+          if (!highAnx && !highAvoid) scores.style = 'Secure';
+          else if (highAnx && !highAvoid) scores.style = 'Anxious';
+          else if (!highAnx && highAvoid) scores.style = 'Avoidant';
+          else scores.style = 'Fearful';
+        } else if (testId === 'risk') {
+          test.domains.forEach(dom => { scores[dom] = { total: 0, count: 0 }; });
+          test.items.forEach((item, i) => {
+            if (ans[i] !== undefined) {
+              scores[item.domain].total += ans[i];
+              scores[item.domain].count++;
+            }
+          });
+          Object.keys(scores).forEach(dom => {
+            scores[dom] = Math.round((scores[dom].total / (scores[dom].count * 7)) * 100);
+          });
+          scores.overall = Math.round(Object.values(scores).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) / 5);
+        }
+        return scores;
+      };
+
+      // ============ VIEWS ============
+
+      const Picker = () => (
+        <div className="flex flex-col h-full">
+          <div className={`h-[44px] flex items-center justify-between px-4 border-b ${t.border}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🪞</span>
+              <span className={`font-medium ${t.text}`}>Reveal</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {Object.keys(completedTests).length > 0 && (
+                <button
+                  onClick={() => setView('profile')}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-violet-600 text-white"
+                >
+                  My Profile
+                </button>
+              )}
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className={`text-xs px-2 py-1 rounded ${t.input} ${t.textSec}`}
+              >
+                {darkMode ? '☀️' : '🌙'}
+              </button>
+            </div>
+          </div>
+
+          <div className="px-4 pt-4 pb-2">
+            <h1 className={`text-lg font-medium ${t.text}`}>Learn about yourself</h1>
+            <p className={`text-sm mt-1 ${t.textSec}`}>Take assessments to build your profile</p>
+          </div>
+
+          <div className={`mx-4 mb-4 px-3 py-2 rounded-lg text-xs ${t.input} ${t.textMuted}`}>
+            For fun and self-discovery, not medical advice
+          </div>
+
+          <div className="flex-1 overflow-auto px-4 space-y-3 pb-4 hide-scrollbar">
+            {Object.entries(QUESTIONS).map(([id, test]) => {
+              const completed = completedTests[id];
+              const c = colorMap[test.color];
+              return (
+                <button
+                  key={id}
+                  onClick={() => startTest(id)}
+                  className={`w-full p-4 rounded-xl text-left transition-all ${t.card} hover:scale-[1.01] ${completed ? 'ring-2 ' + c.ring : ''}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">{test.icon}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium ${t.text}`}>{test.name}</span>
+                        {completed && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">✓ Done</span>}
+                      </div>
+                      <div className={`text-sm ${t.textSec}`}>{test.desc}</div>
+                      <div className={`text-xs mt-2 ${t.textMuted}`}>
+                        {test.items.length} questions · {test.time}
+                      </div>
+                    </div>
+                    <span className={t.textSec}>→</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+
+      const Question = () => {
+        const test = QUESTIONS[selectedTest];
+        const item = test.items[questionIndex];
+        const progress = ((questionIndex + 1) / test.items.length) * 100;
+        const c = colorMap[test.color];
+
+        return (
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className={`h-[44px] flex items-center gap-3 px-4 border-b ${t.border}`}>
+              <button onClick={() => setView('picker')} className={`${t.textSec} hover:${t.text}`}>←</button>
+              <span className={`font-medium flex-1 ${t.text}`}>{test.name}</span>
+              <span className={`text-xs ${t.textMuted}`}>{questionIndex + 1} / {test.items.length}</span>
+            </div>
+
+            {/* Progress */}
+            <div className={`h-1 ${t.input}`}>
+              <div className={`h-full ${c.bg} transition-all duration-300`} style={{ width: `${progress}%` }} />
+            </div>
+
+            {/* Question */}
+            <div className="flex-1 flex flex-col px-5 py-6">
+              {/* Category/Trait/Domain label */}
+              {(item.trait || item.category || item.dimension || item.domain) && (
+                <div className={`text-xs mb-2 px-2 py-1 rounded-full w-fit ${c.light} ${c.text}`}>
+                  {item.trait || item.category || item.dimension || item.domain}
+                </div>
+              )}
+
+              <h2 className={`text-lg font-medium leading-relaxed ${t.text}`}>
+                {item.text}
+              </h2>
+
+              {/* Scale Explanation */}
+              <div className={`mt-6 p-3 rounded-lg ${t.input}`}>
+                <div className={`text-xs font-medium mb-2 ${t.textSec}`}>Choose 1-7</div>
+                <div className="flex justify-between items-center">
+                  <div className="text-center">
+                    <div className={`text-lg font-bold ${t.text}`}>1</div>
+                    <div className={`text-xs ${t.textMuted}`}>{test.scale.min}</div>
+                  </div>
+                  <div className={`flex-1 h-px mx-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+                  <div className="text-center">
+                    <div className={`text-lg font-bold ${t.text}`}>7</div>
+                    <div className={`text-xs ${t.textMuted}`}>{test.scale.max}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Answer Buttons */}
+              <div className="mt-6 flex gap-2 justify-center">
+                {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setCurrentAnswer(n)}
+                    className={`w-11 h-11 rounded-xl font-bold text-lg transition-all ${
+                      currentAnswer === n
+                        ? `${c.bg} text-white ring-2 ${c.ring} scale-110`
+                        : `${t.card} ${t.text} hover:scale-105`
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+
+              {/* Current Selection */}
+              {currentAnswer && (
+                <div className={`mt-4 text-center text-sm ${t.textSec}`}>
+                  {currentAnswer <= 2 && test.scale.min}
+                  {currentAnswer === 3 && 'Somewhat disagree'}
+                  {currentAnswer === 4 && 'Neutral'}
+                  {currentAnswer === 5 && 'Somewhat agree'}
+                  {currentAnswer >= 6 && test.scale.max}
+                </div>
+              )}
+            </div>
+
+            {/* Next Button */}
+            <div className="px-4 pb-6">
+              <button
+                onClick={submitAnswer}
+                disabled={currentAnswer === null}
+                className={`w-full py-3 rounded-xl font-medium transition-all ${
+                  currentAnswer !== null
+                    ? `${c.bg} text-white hover:opacity-90`
+                    : `${t.input} ${t.textMuted} cursor-not-allowed`
+                }`}
+              >
+                {questionIndex < test.items.length - 1 ? 'Next' : 'See Results'}
+              </button>
+            </div>
+          </div>
+        );
+      };
+
+      const Results = () => {
+        const test = QUESTIONS[selectedTest];
+        const results = completedTests[selectedTest];
+        const c = colorMap[test.color];
+
+        const TraitBar = ({ label, value, color = 'violet' }) => (
+          <div className="space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className={t.textSec}>{label}</span>
+              <span className={t.text}>{value}%</span>
+            </div>
+            <div className={`h-2 rounded-full ${t.input}`}>
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${colorMap[color].bg}`}
+                style={{ width: `${value}%` }}
+              />
+            </div>
+          </div>
+        );
+
+        const getSummary = () => {
+          if (selectedTest === 'bigfive') {
+            const traits = Object.entries(results).sort((a, b) => b[1] - a[1]);
+            const high = traits.slice(0, 2).map(t => t[0].toLowerCase());
+            const low = traits.slice(-1).map(t => t[0].toLowerCase());
+            return `You score highest in ${high.join(' and ')}, suggesting ${high.includes('openness') ? 'creativity and curiosity' : high.includes('extraversion') ? 'social energy' : high.includes('agreeableness') ? 'empathy and cooperation' : high.includes('conscientiousness') ? 'discipline and organization' : 'emotional depth'}. Your lower ${low[0]} score indicates ${low[0] === 'neuroticism' ? 'emotional stability' : low[0] === 'conscientiousness' ? 'flexibility over rigid structure' : 'room for growth in that area'}.`;
+          }
+          if (selectedTest === 'adhd') {
+            if (results.indicatorCount >= 4) return "You show patterns common in people with attention differences. This isn't a diagnosis—but these patterns around focus, organization, and restlessness may be worth exploring with a professional if they affect daily life.";
+            return "Your responses don't strongly indicate ADHD patterns. Everyone has occasional focus challenges, but yours appear within typical ranges.";
+          }
+          if (selectedTest === 'cognitive') {
+            if (results.overall >= 60) return "Your cognitive style aligns with neurodivergent patterns. You likely notice details others miss, prefer systematic thinking, and may process social cues differently. These traits often correlate with deep focus, precision, and directness.";
+            if (results.overall >= 40) return "You show a mix of processing styles. Some neurodivergent traits blend with neurotypical patterns, giving you flexibility in how you approach problems.";
+            return "Your processing style leans neurotypical. You likely find social navigation intuitive and adapt easily between tasks.";
+          }
+          if (selectedTest === 'attachment') {
+            const summaries = {
+              'Secure': "You're comfortable with emotional intimacy and don't worry excessively about relationships. You can depend on others and let others depend on you.",
+              'Anxious': "You value deep connection and are attuned to relationship dynamics—sometimes hyperattuned. You may seek reassurance more than others. Knowing this helps communicate needs clearly.",
+              'Avoidant': "You prize independence and self-reliance. Emotional vulnerability doesn't come naturally. This protects you but can limit intimacy. Recognizing the pattern is the first step.",
+              'Fearful': "You want close relationships but find them anxiety-provoking. You may pull people close then push away. Understanding this pattern helps break cycles."
+            };
+            return summaries[results.style];
+          }
+          if (selectedTest === 'risk') {
+            const sorted = Object.entries(results).filter(([k]) => k !== 'overall').sort((a, b) => b[1] - a[1]);
+            const high = sorted[0][0];
+            const low = sorted[sorted.length - 1][0];
+            return `You're a ${low.toLowerCase()} conservative but ${high.toLowerCase()} risk-taker. You protect your ${low.toLowerCase() === 'financial' ? 'money' : low.toLowerCase() + ' standing'} but readily ${high.toLowerCase() === 'social' ? 'speak your mind' : high.toLowerCase() === 'career' ? 'bet on yourself professionally' : 'take chances'} when it comes to ${high.toLowerCase()}.`;
+          }
+          return '';
+        };
+
+        return (
+          <div className="flex flex-col h-full">
+            <div className={`h-[44px] flex items-center gap-3 px-4 border-b ${t.border}`}>
+              <button onClick={() => setView('picker')} className={t.textSec}>←</button>
+              <span className={`font-medium flex-1 ${t.text}`}>Your Results</span>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 space-y-4 hide-scrollbar">
+              {/* Title */}
+              <div className="text-center py-4">
+                <span className="text-4xl">{test.icon}</span>
+                <h2 className={`text-xl font-bold mt-2 ${t.text}`}>{test.name}</h2>
+              </div>
+
+              {/* Big Five Results */}
+              {selectedTest === 'bigfive' && (
+                <div className={`p-4 rounded-xl ${t.card}`}>
+                  <h3 className={`font-medium mb-4 ${t.text}`}>Your Traits</h3>
+                  <div className="space-y-4">
+                    {Object.entries(results).map(([trait, score]) => (
+                      <TraitBar key={trait} label={trait} value={score} color="violet" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ADHD Results */}
+              {selectedTest === 'adhd' && (
+                <div className={`p-4 rounded-xl ${t.card}`}>
+                  <div className="text-center">
+                    <div className={`text-5xl font-bold ${t.text}`}>{results.indicatorCount}/6</div>
+                    <div className={`text-sm mt-1 ${t.textSec}`}>indicators present</div>
+                  </div>
+                  <div className={`mt-4 p-3 rounded-lg ${results.indicatorCount >= 4 ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
+                    <span className={results.indicatorCount >= 4 ? 'text-amber-400' : 'text-emerald-400'}>
+                      {results.indicatorCount >= 4 ? 'Patterns consistent with ADHD' : 'Below screening threshold'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Cognitive Style Results */}
+              {selectedTest === 'cognitive' && (
+                <div className={`p-4 rounded-xl ${t.card}`}>
+                  <div className="text-center mb-4">
+                    <div className={`text-5xl font-bold ${t.text}`}>{results.overall}%</div>
+                    <div className={`text-sm mt-1 ${t.textSec}`}>neurodivergent alignment</div>
+                  </div>
+                  <div className="space-y-4 mt-4">
+                    {Object.entries(results).filter(([k]) => k !== 'overall').map(([cat, score]) => (
+                      <TraitBar key={cat} label={cat} value={score} color="teal" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Attachment Results */}
+              {selectedTest === 'attachment' && (
+                <div className={`p-4 rounded-xl ${t.card}`}>
+                  <div className="text-center mb-4">
+                    <div className={`text-3xl font-bold ${c.text}`}>{results.style}</div>
+                    <div className={`text-sm mt-1 ${t.textSec}`}>attachment style</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="text-center p-3 rounded-lg" style={{ background: darkMode ? 'rgba(244,63,94,0.1)' : 'rgba(244,63,94,0.05)' }}>
+                      <div className="text-2xl font-bold text-rose-400">{results.Anxiety}</div>
+                      <div className={`text-xs ${t.textSec}`}>Anxiety</div>
+                    </div>
+                    <div className="text-center p-3 rounded-lg" style={{ background: darkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)' }}>
+                      <div className="text-2xl font-bold text-blue-400">{results.Avoidance}</div>
+                      <div className={`text-xs ${t.textSec}`}>Avoidance</div>
+                    </div>
+                  </div>
+                  {/* 2D Plot */}
+                  <div className={`mt-4 relative h-32 rounded-lg ${t.input}`}>
+                    <div className={`absolute top-1 left-1/2 -translate-x-1/2 text-xs ${t.textMuted}`}>Low Anxiety</div>
+                    <div className={`absolute bottom-1 left-1/2 -translate-x-1/2 text-xs ${t.textMuted}`}>High Anxiety</div>
+                    <div className={`absolute left-1 top-1/2 -translate-y-1/2 text-xs ${t.textMuted}`}>Low</div>
+                    <div className={`absolute right-1 top-1/2 -translate-y-1/2 text-xs ${t.textMuted}`}>High Avoid</div>
+                    <div
+                      className="absolute w-4 h-4 bg-rose-500 rounded-full border-2 border-white shadow-lg"
+                      style={{
+                        left: `${(results.Avoidance / 7) * 100}%`,
+                        top: `${(results.Anxiety / 7) * 100}%`,
+                        transform: 'translate(-50%, -50%)'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Risk Results */}
+              {selectedTest === 'risk' && (
+                <div className={`p-4 rounded-xl ${t.card}`}>
+                  <div className="text-center mb-4">
+                    <div className={`text-5xl font-bold ${t.text}`}>{results.overall}%</div>
+                    <div className={`text-sm mt-1 ${t.textSec}`}>overall risk tolerance</div>
+                  </div>
+                  <div className="space-y-4 mt-4">
+                    {Object.entries(results).filter(([k]) => k !== 'overall').map(([domain, score]) => (
+                      <TraitBar key={domain} label={domain} value={score} color="emerald" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className={`p-4 rounded-xl ${t.card}`}>
+                <h3 className={`font-medium mb-2 ${t.text}`}>What This Means</h3>
+                <p className={`text-sm leading-relaxed ${t.textSec}`}>{getSummary()}</p>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-2 pb-4">
+                {Object.keys(completedTests).length >= 2 && (
+                  <button
+                    onClick={() => setView('profile')}
+                    className="w-full py-3 bg-violet-600 text-white rounded-xl font-medium"
+                  >
+                    View Full Profile
+                  </button>
+                )}
+                <button
+                  onClick={() => setView('picker')}
+                  className={`w-full py-3 rounded-xl font-medium ${t.card} ${t.text}`}
+                >
+                  Take Another Assessment
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const Profile = () => {
+        const completedCount = Object.keys(completedTests).length;
+        const totalTests = Object.keys(QUESTIONS).length;
+
+        const getCrossInsights = () => {
+          const insights = [];
+
+          if (completedTests.bigfive && completedTests.risk) {
+            const bf = completedTests.bigfive;
+            const risk = completedTests.risk;
+            if (bf.Openness > 60 && risk.Career > 60) {
+              insights.push("High openness + career risk tolerance = You're built for entrepreneurship or creative pivots.");
+            }
+            if (bf.Neuroticism > 60 && risk.Financial < 40) {
+              insights.push("Higher anxiety + financial conservatism = You protect against worst-case scenarios.");
+            }
+          }
+
+          if (completedTests.bigfive && completedTests.attachment) {
+            const bf = completedTests.bigfive;
+            const att = completedTests.attachment;
+            if (bf.Neuroticism > 60 && att.style === 'Anxious') {
+              insights.push("Neuroticism + anxious attachment often amplify each other. Mindfulness may help.");
+            }
+            if (bf.Extraversion < 40 && att.style === 'Avoidant') {
+              insights.push("Low extraversion + avoidant style = You deeply value your independence and solitude.");
+            }
+          }
+
+          if (completedTests.cognitive && completedTests.bigfive) {
+            const cog = completedTests.cognitive;
+            const bf = completedTests.bigfive;
+            if (cog.overall > 50 && bf.Openness > 60) {
+              insights.push("Neurodivergent cognition + high openness = Unique perspective that sees what others miss.");
+            }
+          }
+
+          if (completedTests.adhd && completedTests.risk) {
+            const adhd = completedTests.adhd;
+            const risk = completedTests.risk;
+            if (adhd.indicatorCount >= 4 && risk.overall > 60) {
+              insights.push("ADHD patterns + high risk tolerance = You thrive on novelty but may need guardrails.");
+            }
+          }
+
+          if (insights.length === 0 && completedCount >= 2) {
+            insights.push("Complete more assessments to unlock cross-test insights.");
+          }
+
+          return insights;
+        };
+
+        const getProfileSummary = () => {
+          const parts = [];
+
+          if (completedTests.bigfive) {
+            const bf = completedTests.bigfive;
+            const highest = Object.entries(bf).sort((a, b) => b[1] - a[1])[0][0];
+            parts.push(`Dominant trait: ${highest}`);
+          }
+
+          if (completedTests.attachment) {
+            parts.push(`Attachment: ${completedTests.attachment.style}`);
+          }
+
+          if (completedTests.cognitive) {
+            const cog = completedTests.cognitive.overall;
+            parts.push(`Cognitive style: ${cog > 60 ? 'Neurodivergent-leaning' : cog > 40 ? 'Mixed' : 'Neurotypical-leaning'}`);
+          }
+
+          if (completedTests.adhd) {
+            const adhd = completedTests.adhd.indicatorCount;
+            if (adhd >= 4) parts.push('ADHD indicators present');
+          }
+
+          if (completedTests.risk) {
+            const risk = completedTests.risk;
+            const highest = Object.entries(risk).filter(([k]) => k !== 'overall').sort((a, b) => b[1] - a[1])[0][0];
+            parts.push(`Highest risk: ${highest}`);
+          }
+
+          return parts;
+        };
+
+        return (
+          <div className="flex flex-col h-full">
+            <div className={`h-[44px] flex items-center gap-3 px-4 border-b ${t.border}`}>
+              <button onClick={() => setView('picker')} className={t.textSec}>←</button>
+              <span className={`font-medium flex-1 ${t.text}`}>Your Profile</span>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 space-y-4 hide-scrollbar">
+              {/* Header */}
+              <div className={`p-4 rounded-xl ${t.card} text-center`}>
+                <div className="text-5xl mb-2">🪞</div>
+                <h2 className={`text-xl font-bold ${t.text}`}>Your Reveal Profile</h2>
+                <p className={`text-sm mt-1 ${t.textSec}`}>{completedCount}/{totalTests} assessments completed</p>
+
+                {/* Progress */}
+                <div className={`mt-4 h-2 rounded-full ${t.input}`}>
+                  <div
+                    className="h-full rounded-full bg-violet-500 transition-all duration-500"
+                    style={{ width: `${(completedCount / totalTests) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Quick Summary */}
+              <div className={`p-4 rounded-xl ${t.card}`}>
+                <h3 className={`font-medium mb-3 ${t.text}`}>At a Glance</h3>
+                <div className="flex flex-wrap gap-2">
+                  {getProfileSummary().map((item, i) => (
+                    <span key={i} className={`text-xs px-3 py-1.5 rounded-full ${t.input} ${t.textSec}`}>
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cross-Assessment Insights */}
+              {completedCount >= 2 && (
+                <div className={`p-4 rounded-xl ${t.card}`}>
+                  <h3 className={`font-medium mb-3 ${t.text}`}>🔮 Cross-Assessment Insights</h3>
+                  <div className="space-y-3">
+                    {getCrossInsights().map((insight, i) => (
+                      <div key={i} className={`p-3 rounded-lg ${t.input}`}>
+                        <p className={`text-sm ${t.textSec}`}>{insight}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Individual Results */}
+              <div className={`p-4 rounded-xl ${t.card}`}>
+                <h3 className={`font-medium mb-3 ${t.text}`}>Completed Assessments</h3>
+                <div className="space-y-2">
+                  {Object.entries(completedTests).map(([id, results]) => {
+                    const test = QUESTIONS[id];
+                    const c = colorMap[test.color];
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => { setSelectedTest(id); setView('results'); }}
+                        className={`w-full p-3 rounded-lg text-left flex items-center gap-3 ${t.input}`}
+                      >
+                        <span className="text-xl">{test.icon}</span>
+                        <div className="flex-1">
+                          <div className={`text-sm font-medium ${t.text}`}>{test.name}</div>
+                          <div className={`text-xs ${t.textMuted}`}>
+                            {id === 'bigfive' && `Highest: ${Object.entries(results).sort((a,b)=>b[1]-a[1])[0][0]}`}
+                            {id === 'adhd' && `${results.indicatorCount}/6 indicators`}
+                            {id === 'cognitive' && `${results.overall}% ND alignment`}
+                            {id === 'attachment' && results.style}
+                            {id === 'risk' && `${results.overall}% overall`}
+                          </div>
+                        </div>
+                        <span className={t.textSec}>→</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Remaining Tests */}
+              {completedCount < totalTests && (
+                <div className={`p-4 rounded-xl ${t.card}`}>
+                  <h3 className={`font-medium mb-3 ${t.text}`}>Continue Building</h3>
+                  <div className="space-y-2">
+                    {Object.entries(QUESTIONS).filter(([id]) => !completedTests[id]).map(([id, test]) => (
+                      <button
+                        key={id}
+                        onClick={() => startTest(id)}
+                        className={`w-full p-3 rounded-lg text-left flex items-center gap-3 ${t.input} opacity-70 hover:opacity-100`}
+                      >
+                        <span className="text-xl">{test.icon}</span>
+                        <div className="flex-1">
+                          <div className={`text-sm font-medium ${t.text}`}>{test.name}</div>
+                          <div className={`text-xs ${t.textMuted}`}>{test.items.length} questions · {test.time}</div>
+                        </div>
+                        <span className={t.textSec}>+</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pb-4" />
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className={`w-full max-w-md mx-auto h-[750px] ${t.bg} ${t.text} rounded-2xl overflow-hidden shadow-2xl border ${t.border}`}>
+          {view === 'picker' && <Picker />}
+          {view === 'question' && <Question />}
+          {view === 'results' && <Results />}
+          {view === 'profile' && <Profile />}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<RevealApp />, document.getElementById('root'));
+  </script>
+</body>
+</html>
