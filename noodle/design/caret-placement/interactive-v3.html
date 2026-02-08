@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caret Placement — B & F Variations</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+    color: #e2e8f0;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+  .phone-side {
+    flex: 0 0 440px;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .phone-frame {
+    width: 390px; height: 844px; background: #0d1117;
+    border-radius: 44px; border: 3px solid #1a1a2e;
+    overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 0 60px rgba(0,0,0,0.5);
+  }
+  .options-side {
+    flex: 1; padding: 40px 40px 40px 20px;
+    overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+  }
+  .options-side h1 { font-size: 20px; font-weight: 700; }
+  .options-side .sub { font-size: 13px; color: #64748b; margin-top: -8px; }
+
+  .opt-grid { display: flex; flex-direction: column; gap: 12px; }
+  .opt-card {
+    background: #111827; border-radius: 14px; padding: 14px;
+    border: 2px solid #1e293b; cursor: pointer; transition: all 0.15s;
+    display: flex; gap: 16px; align-items: center;
+  }
+  .opt-card:hover { border-color: #334155; background: #1a2234; }
+  .opt-card.active { border-color: #8b5cf6; background: rgba(139,92,246,0.08); }
+  .opt-left { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+  .opt-badge {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; flex-shrink: 0;
+    background: rgba(139,92,246,0.15); color: #a78bfa;
+  }
+  .opt-name { font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .opt-mid { flex: 1; }
+  .opt-desc { font-size: 12px; color: #64748b; line-height: 1.35; }
+
+  /* Mini preview */
+  .mp { background: #1f2937; border-radius: 10px; border: 1px solid rgba(100,116,139,0.2); overflow: hidden; flex: 0 0 280px; }
+  .mp-row { padding: 9px 10px; display: flex; align-items: center; gap: 8px; }
+  .mp-circ {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid rgba(100,116,139,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; color: #94a3b8; flex-shrink: 0;
+  }
+  .mp-name { flex: 1; font-size: 11px; font-weight: 600; color: #f1f5f9; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+  .mp-pill {
+    font-size: 9px; font-weight: 500; padding: 3px 8px; border-radius: 999px;
+    background: rgba(100,116,139,0.25); color: #cbd5e1; border: 1px solid rgba(100,116,139,0.3);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .chev-svg { stroke: #94a3b8; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  .scroll-content {
+    flex: 1; overflow-y: auto; padding: 4px 14px 24px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .p-card { border-radius: 16px; overflow: hidden; }
+  .c-block { border-radius: 16px; background: #1f2937; border: 1px solid rgba(100,116,139,0.1); overflow: hidden; }
+  .c-row { padding: 10px 14px; display: flex; align-items: center; gap: 10px; opacity: 0.7; }
+  .c-row + .c-row { border-top: 1px solid rgba(100,116,139,0.1); }
+  .c-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+
+  .sel-label {
+    text-align: center; padding: 6px 0;
+    font-size: 11px; font-weight: 600; color: #8b5cf6;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    transition: opacity 0.2s;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone-side">
+  <div class="phone-frame">
+    <!-- Status bar -->
+    <div style="height:54px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 28px 8px;">
+      <span style="color:#fff; font-size:15px; font-weight:600;">9:41</span>
+      <div style="display:flex; gap:5px; align-items:center;">
+        <span style="color:#fff; font-size:11px;">▂▄▆█</span>
+        <span style="color:#fff; font-size:13px;">⚡</span>
+      </div>
+    </div>
+    <!-- Top bar -->
+    <div style="height:40px; display:flex; align-items:center; padding:0 16px; gap:8px;">
+      <div style="width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,#3b82f6,#8b5cf6); display:flex; align-items:center; justify-content:center; font-size:12px;">🌀</div>
+      <div style="flex:1; text-align:center; color:#94a3b8; font-size:13px;">0 answered</div>
+      <span style="color:#f59e0b; font-size:13px;">🔥3</span>
+      <div style="width:26px; height:26px; border-radius:50%; border:1.5px dashed #475569; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:12px;">?</div>
+      <span style="color:#64748b; font-size:15px;">☰</span>
+    </div>
+    <!-- Nav -->
+    <div style="height:44px; display:flex; align-items:center; padding:0 16px; gap:10px;">
+      <span style="color:#94a3b8; font-size:18px;">←</span>
+      <span style="font-size:15px;">🕯️</span>
+      <span style="color:#fff; font-size:16px; font-weight:700; flex:1;">Reveal</span>
+      <div style="background:linear-gradient(135deg,#d946ef,#f43f5e); padding:5px 14px; border-radius:999px; font-size:12px; font-weight:600; color:#fff;">Analysis</div>
+    </div>
+    <!-- Tabs -->
+    <div style="display:flex; gap:6px; padding:6px 16px 10px; justify-content:center;">
+      <div style="padding:4px 12px; border-radius:999px; border:1px solid #8b5cf6; color:#8b5cf6; font-size:12px; font-weight:500;">Me</div>
+      <div style="padding:4px 12px; border-radius:999px; color:#64748b; font-size:12px;">DEMO ⓘ</div>
+      <div style="padding:4px 12px; border-radius:999px; border:1px solid #475569; color:#e2e8f0; font-size:12px;">Alex</div>
+      <div style="padding:4px 12px; border-radius:999px; border:1px solid #3b82f6; color:#3b82f6; font-size:12px;">Bob</div>
+      <div style="padding:4px 12px; border-radius:999px; border:1px solid #f43f5e; color:#f43f5e; font-size:12px;">Cindy</div>
+    </div>
+
+    <div class="sel-label" id="selLabel">← Click an option</div>
+
+    <div class="scroll-content">
+      <!-- Personality (hero) -->
+      <div class="p-card" style="background:#1f2937; border:1px solid rgba(139,92,246,0.3); position:relative;">
+        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:1;">
+          <div style="width:220px; height:220px; border-radius:50%; background:radial-gradient(ellipse at center, rgba(139,92,246,0.12) 0%, transparent 70%);"></div>
+        </div>
+        <div style="padding:14px; display:flex; align-items:center; gap:12px; position:relative; z-index:2;">
+          <div style="width:44px; height:44px; flex-shrink:0; position:relative;">
+            <svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(139,92,246,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="47.75 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#a78bfa;">40%</div>
+          </div>
+          <div style="flex:1; font-size:15.5px; font-weight:600; color:#f1f5f9;">Personality</div>
+          <div style="font-size:11.5px; font-weight:500; padding:6px 14px; border-radius:999px; background:rgba(139,92,246,0.25); color:#c4b5fd; border:1px solid rgba(139,92,246,0.3);">Continue →</div>
+        </div>
+      </div>
+
+      <!-- Shadow Self -->
+      <div id="shadow-card" class="p-card" style="background:#1f2937; border:1px solid rgba(100,116,139,0.2);"></div>
+      <!-- Mind -->
+      <div id="mind-card" class="p-card" style="background:#1f2937; border:1px solid rgba(59,130,246,0.2);"></div>
+
+      <!-- Behavior -->
+      <div class="p-card" style="background:#1f2937; border:1px solid rgba(245,158,11,0.2);">
+        <div style="padding:14px; display:flex; align-items:center; gap:12px;">
+          <div style="width:44px; height:44px; flex-shrink:0; position:relative;">
+            <svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(245,158,11,0.15)" stroke-width="3"/></svg>
+            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fbbf24;">15</div>
+          </div>
+          <div style="flex:1; font-size:15.5px; font-weight:600; color:#f1f5f9;">Behavior</div>
+          <div style="font-size:11.5px; font-weight:500; padding:6px 14px; border-radius:999px; background:rgba(245,158,11,0.25); color:#fcd34d; border:1px solid rgba(245,158,11,0.3);">Start →</div>
+        </div>
+      </div>
+
+      <!-- Completed -->
+      <div class="c-block">
+        <div class="c-row"><div class="c-icon" style="background:rgba(59,130,246,0.15);">✨</div><div style="flex:1; font-size:13px; color:#94a3b8;">Quick Profile</div><span style="color:#475569; font-size:14px;">›</span></div>
+        <div class="c-row"><div class="c-icon" style="background:rgba(99,102,241,0.15);">🚀</div><div style="flex:1; font-size:13px; color:#94a3b8;">Starter Pack</div><span style="color:#475569; font-size:14px;">›</span></div>
+        <div class="c-row"><div class="c-icon" style="background:rgba(16,185,129,0.15);">💎</div><div style="flex:1; font-size:13px; color:#94a3b8;">Character</div><span style="color:#475569; font-size:14px;">›</span></div>
+        <div class="c-row"><div class="c-icon" style="background:rgba(217,70,239,0.15);">💚</div><div style="flex:1; font-size:13px; color:#94a3b8;">Relationships</div><span style="color:#475569; font-size:14px;">›</span></div>
+      </div>
+    </div>
+
+    <div style="height:24px; display:flex; align-items:center; justify-content:center;">
+      <div style="width:130px; height:5px; border-radius:3px; background:#333;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="options-side">
+  <h1>B & F Family — Pick Your Caret</h1>
+  <p class="sub">Click any row to see it live on the phone.</p>
+
+  <div class="opt-grid">
+
+    <!-- B: Circle chevron left of pill -->
+    <div class="opt-card" onclick="pick('b')" id="opt-b">
+      <div class="opt-left">
+        <div class="opt-badge">B</div>
+        <div class="opt-name">Circle left of pill</div>
+      </div>
+      <div class="opt-mid">
+        <div class="opt-desc">Chevron in a subtle circle, sitting between name and pill.</div>
+      </div>
+      <div class="mp"><div class="mp-row">
+        <div class="mp-circ">2</div>
+        <div class="mp-name">Shadow Self</div>
+        <div style="width:20px; height:20px; border-radius:50%; background:rgba(100,116,139,0.12); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <svg width="11" height="11" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+        <div class="mp-pill">Continue →</div>
+      </div></div>
+    </div>
+
+    <!-- B2: Bare chevron left of pill (no circle bg) -->
+    <div class="opt-card" onclick="pick('b2')" id="opt-b2">
+      <div class="opt-left">
+        <div class="opt-badge">B2</div>
+        <div class="opt-name">Bare chev left of pill</div>
+      </div>
+      <div class="opt-mid">
+        <div class="opt-desc">Same position, no circle background. Just the chevron floating.</div>
+      </div>
+      <div class="mp"><div class="mp-row">
+        <div class="mp-circ">2</div>
+        <div class="mp-name">Shadow Self</div>
+        <div style="opacity:0.45; display:flex; align-items:center; flex-shrink:0;">
+          <svg width="14" height="14" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+        <div class="mp-pill">Continue →</div>
+      </div></div>
+    </div>
+
+    <!-- B3: Pill-colored chevron left of pill -->
+    <div class="opt-card" onclick="pick('b3')" id="opt-b3">
+      <div class="opt-left">
+        <div class="opt-badge">B3</div>
+        <div class="opt-name">Tinted chev left of pill</div>
+      </div>
+      <div class="opt-mid">
+        <div class="opt-desc">Chevron matches the category color. Ties visually to the card.</div>
+      </div>
+      <div class="mp"><div class="mp-row">
+        <div class="mp-circ">2</div>
+        <div class="mp-name">Shadow Self</div>
+        <div style="opacity:0.6; display:flex; align-items:center; flex-shrink:0;">
+          <svg width="14" height="14" viewBox="0 0 16 16" style="stroke:#94a3b8; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round;"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+        <div class="mp-pill">Continue →</div>
+      </div></div>
+    </div>
+
+    <!-- F: Inline after name, subtle -->
+    <div class="opt-card" onclick="pick('f')" id="opt-f">
+      <div class="opt-left">
+        <div class="opt-badge">F</div>
+        <div class="opt-name">Inline after name</div>
+      </div>
+      <div class="opt-mid">
+        <div class="opt-desc">Chevron right after the name text. Part of the label.</div>
+      </div>
+      <div class="mp"><div class="mp-row">
+        <div class="mp-circ">2</div>
+        <div class="mp-name">Shadow Self <span style="opacity:0.45; display:flex;"><svg width="12" height="12" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg></span></div>
+        <div class="mp-pill">Continue →</div>
+      </div></div>
+    </div>
+
+    <!-- F2: Inline chevron, slightly bigger + circle bg -->
+    <div class="opt-card" onclick="pick('f2')" id="opt-f2">
+      <div class="opt-left">
+        <div class="opt-badge">F2</div>
+        <div class="opt-name">Inline + circle bg</div>
+      </div>
+      <div class="opt-mid">
+        <div class="opt-desc">After name with a small circle background. More tappable looking.</div>
+      </div>
+      <div class="mp"><div class="mp-row">
+        <div class="mp-circ">2</div>
+        <div class="mp-name">Shadow Self <span style="width:18px; height:18px; border-radius:50%; background:rgba(100,116,139,0.12); display:inline-flex; align-items:center; justify-content:center;"><svg width="10" height="10" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg></span></div>
+        <div class="mp-pill">Continue →</div>
+      </div></div>
+    </div>
+
+    <!-- F3: Inline with module count hint -->
+    <div class="opt-card" onclick="pick('f3')" id="opt-f3">
+      <div class="opt-left">
+        <div class="opt-badge">F3</div>
+        <div class="opt-name">Name + count + chev</div>
+      </div>
+      <div class="opt-mid">
+        <div class="opt-desc">"Shadow Self · 3" then chevron. Shows module count inline.</div>
+      </div>
+      <div class="mp"><div class="mp-row">
+        <div class="mp-circ">2</div>
+        <div class="mp-name">Shadow Self <span style="opacity:0.35; font-weight:400; font-size:10px;">· 3</span> <span style="opacity:0.45; display:flex;"><svg width="11" height="11" viewBox="0 0 16 16" class="chev-svg"><polyline points="4 6 8 10 12 6"/></svg></span></div>
+        <div class="mp-pill">Continue →</div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const chev = (w=14) => `<svg width="${w}" height="${w}" viewBox="0 0 16 16" style="stroke:#94a3b8; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round;"><polyline points="4 6 8 10 12 6"/></svg>`;
+
+function makeCard(name, num, color, pillBg, pillColor, pillBorder, opt) {
+  const isSlate = color === 'slate';
+  const circStroke = isSlate ? '#64748b' : '#3b82f6';
+  const circTrack = isSlate ? 'rgba(100,116,139,0.2)' : 'rgba(59,130,246,0.2)';
+  const numColor = isSlate ? '#94a3b8' : '#60a5fa';
+  const dash = isSlate ? '80' : '20';
+  const modCount = isSlate ? '3' : '6';
+
+  const circle = `<div style="width:44px; height:44px; flex-shrink:0; position:relative;">
+    <svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="${circTrack}" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="${circStroke}" stroke-width="3" stroke-dasharray="${dash} 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+    <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:${numColor};">${num}</div>
+  </div>`;
+
+  const pill = `<div style="font-size:11.5px; font-weight:500; padding:6px 14px; border-radius:999px; background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; white-space:nowrap; flex-shrink:0;">Continue →</div>`;
+
+  let nameHtml, middle = '';
+
+  if (opt === 'b') {
+    nameHtml = `<div style="flex:1; font-size:15.5px; font-weight:600; color:#f1f5f9;">${name}</div>`;
+    middle = `<div style="width:28px; height:28px; border-radius:50%; background:rgba(100,116,139,0.12); display:flex; align-items:center; justify-content:center; flex-shrink:0;">${chev(14)}</div>`;
+  }
+  else if (opt === 'b2') {
+    nameHtml = `<div style="flex:1; font-size:15.5px; font-weight:600; color:#f1f5f9;">${name}</div>`;
+    middle = `<div style="opacity:0.45; display:flex; align-items:center; flex-shrink:0;">${chev(16)}</div>`;
+  }
+  else if (opt === 'b3') {
+    const tint = isSlate ? '#94a3b8' : '#60a5fa';
+    nameHtml = `<div style="flex:1; font-size:15.5px; font-weight:600; color:#f1f5f9;">${name}</div>`;
+    middle = `<div style="opacity:0.6; display:flex; align-items:center; flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 16 16" style="stroke:${tint}; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round;"><polyline points="4 6 8 10 12 6"/></svg></div>`;
+  }
+  else if (opt === 'f') {
+    nameHtml = `<div style="flex:1; font-size:15.5px; font-weight:600; color:#f1f5f9; display:flex; align-items:center; gap:6px;">${name}<span style="opacity:0.45; display:flex; align-items:center;">${chev(14)}</span></div>`;
+  }
+  else if (opt === 'f2') {
+    nameHtml = `<div style="flex:1; font-size:15.5px; font-weight:600; color:#f1f5f9; display:flex; align-items:center; gap:6px;">${name}<span style="width:22px; height:22px; border-radius:50%; background:rgba(100,116,139,0.12); display:inline-flex; align-items:center; justify-content:center;">${chev(12)}</span></div>`;
+  }
+  else if (opt === 'f3') {
+    nameHtml = `<div style="flex:1; font-size:15.5px; font-weight:600; color:#f1f5f9; display:flex; align-items:center; gap:5px;">${name}<span style="opacity:0.35; font-weight:400; font-size:12px;">· ${modCount}</span><span style="opacity:0.45; display:flex; align-items:center;">${chev(13)}</span></div>`;
+  }
+  else {
+    nameHtml = `<div style="flex:1; font-size:15.5px; font-weight:600; color:#f1f5f9;">${name}</div>`;
+  }
+
+  return `<div style="padding:14px; display:flex; align-items:center; gap:12px;">
+    ${circle}${nameHtml}${middle}${pill}
+  </div>`;
+}
+
+function pick(opt) {
+  document.querySelectorAll('.opt-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('opt-' + opt).classList.add('active');
+
+  const names = {b:'B — Circle left of pill', b2:'B2 — Bare chev left of pill', b3:'B3 — Tinted chev left of pill', f:'F — Inline after name', f2:'F2 — Inline + circle bg', f3:'F3 — Name + count + chev'};
+  document.getElementById('selLabel').textContent = names[opt] || opt;
+
+  document.getElementById('shadow-card').innerHTML = makeCard('Shadow Self', '2', 'slate', 'rgba(100,116,139,0.25)', '#cbd5e1', 'rgba(100,116,139,0.3)', opt);
+  document.getElementById('mind-card').innerHTML = makeCard('Mind', '4', 'blue', 'rgba(59,130,246,0.25)', '#93c5fd', 'rgba(59,130,246,0.3)', opt);
+}
+
+// Default render (no caret)
+pick('none');
+document.querySelectorAll('.opt-card').forEach(c => c.classList.remove('active'));
+document.getElementById('selLabel').textContent = '← Click an option';
+</script>
+
+</body>
+</html>

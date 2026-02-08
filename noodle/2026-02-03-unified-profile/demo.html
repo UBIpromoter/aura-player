@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Profile Redesign Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { background: #030712; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef } = React;
+
+    // ==================== ARCHETYPES (from archetypes.js) ====================
+
+    const ARCHETYPES = {
+      'composed-innovator': {
+        name: 'Composed Innovator',
+        tagline: 'Explores new ideas with emotional stability',
+        color: 'violet',
+        pattern: { O: 'high', N: 'low' },
+        description: 'You pursue creative exploration from a place of inner calm.',
+        strengths: [
+          'Stays grounded while exploring unconventional territory',
+          'Takes creative risks without emotional turbulence',
+          'Brings calm energy to brainstorming and innovation'
+        ],
+        watchOuts: [
+          'May underestimate how unsettling change is for others',
+          'Could come across as detached when others need emotional validation'
+        ],
+        tips: [
+          'When leading creative projects, check in on teammates\' stress levels',
+          'Your stability is an asset—use it to hold space for others\' uncertainty',
+          'Seek collaborators who match your experimental energy'
+        ]
+      },
+      'collaborative-connector': {
+        name: 'Collaborative Connector',
+        tagline: 'Energized by bringing people together',
+        color: 'pink',
+        pattern: { E: 'high', A: 'high' },
+        description: 'You naturally create warmth in groups and enjoy building bridges between people.',
+        strengths: [
+          'Creates psychological safety in teams',
+          'Builds diverse networks effortlessly',
+          'Resolves conflicts through understanding'
+        ],
+        watchOuts: [
+          'May avoid necessary conflict to preserve harmony',
+          'Could lose yourself in meeting others\' needs'
+        ],
+        tips: [
+          'Practice saying no gracefully—your energy is finite',
+          'Sometimes the kindest thing is honest feedback',
+          'Protect solo recharge time even when it feels selfish'
+        ]
+      },
+      'methodical-planner': {
+        name: 'Methodical Planner',
+        tagline: 'Consistent execution, measured decisions',
+        color: 'emerald',
+        pattern: { C: 'high', risk: 'low' },
+        description: 'You approach decisions systematically and prefer proven paths.',
+        strengths: [
+          'Delivers consistently without supervision',
+          'Catches risks others overlook',
+          'Builds robust systems that last'
+        ],
+        watchOuts: [
+          'May miss opportunities that require quick action',
+          'Could frustrate risk-tolerant teammates'
+        ],
+        tips: [
+          'Set "decision deadlines" to avoid analysis paralysis',
+          'Trust your preparation—you\'ve done the work',
+          'Pair with a bold thinker for balanced decision-making'
+        ]
+      },
+      'sensitive-visionary': {
+        name: 'Sensitive Visionary',
+        tagline: 'Emotional intensity fuels rich imagination',
+        color: 'violet',
+        pattern: { N: 'high', O: 'high' },
+        description: 'Your emotional depth and openness combine to create profound creative capacity.',
+        strengths: [
+          'Creates deeply resonant art and ideas',
+          'Notices nuances others overlook',
+          'Brings emotional depth to intellectual work'
+        ],
+        watchOuts: [
+          'Vulnerable to creative blocks during emotional lows',
+          'May need more recovery time after intense projects'
+        ],
+        tips: [
+          'Build sustainable creative practices',
+          'Track your patterns to anticipate vulnerable periods',
+          'Your sensitivity is your superpower—structure your life to support it'
+        ]
+      }
+    };
+
+    const calculateArchetype = (completed) => {
+      if (!completed) return null;
+
+      const bigFive = {};
+      ['E', 'A', 'C', 'N', 'O'].forEach(trait => {
+        const test = completed[`bigfive-${trait}`];
+        if (test?.score !== undefined) bigFive[trait] = test.score;
+      });
+
+      const risk = completed.risk?.score;
+
+      const isHigh = (value, threshold = 60) => value !== undefined && value > threshold;
+      const isLow = (value, threshold = 40) => value !== undefined && value < threshold;
+
+      const scored = [];
+
+      for (const [id, archetype] of Object.entries(ARCHETYPES)) {
+        let score = 0;
+        let maxScore = 0;
+        const pattern = archetype.pattern;
+
+        ['E', 'A', 'C', 'N', 'O'].forEach(trait => {
+          if (pattern[trait]) {
+            maxScore += 2;
+            if (pattern[trait] === 'high' && isHigh(bigFive[trait])) score += 2;
+            else if (pattern[trait] === 'low' && isLow(bigFive[trait])) score += 2;
+            else if (pattern[trait] === 'high' && bigFive[trait] > 50) score += 1;
+            else if (pattern[trait] === 'low' && bigFive[trait] < 50) score += 1;
+          }
+        });
+
+        if (pattern.risk) {
+          maxScore += 2;
+          if (pattern.risk === 'high' && isHigh(risk)) score += 2;
+          else if (pattern.risk === 'low' && isLow(risk)) score += 2;
+        }
+
+        if (maxScore > 0) {
+          const matchPercentage = (score / maxScore) * 100;
+          if (matchPercentage >= 70) {
+            scored.push({ id, ...archetype, score, maxScore, matchPercentage });
+          }
+        }
+      }
+
+      scored.sort((a, b) => b.matchPercentage - a.matchPercentage);
+      if (scored.length === 0) return null;
+
+      return {
+        primary: scored[0],
+        secondary: scored.slice(1, 4),
+        all: scored
+      };
+    };
+
+    const generateInsights = (profile) => {
+      if (!profile) return [];
+      const insights = [];
+      const { bigFive, assessments } = profile;
+
+      if (bigFive.O?.score > 60 && bigFive.N?.score < 40) {
+        insights.push({
+          icon: '🧭',
+          text: 'High curiosity paired with emotional stability lets you explore new ideas without anxiety derailing your process.'
+        });
+      }
+
+      if (bigFive.E?.score < 40 && bigFive.O?.score > 60) {
+        insights.push({
+          icon: '📚',
+          text: 'Your introversion and openness suggest a rich inner world—you may prefer deep exploration over broad socialization.'
+        });
+      }
+
+      if (bigFive.C?.score > 70 && bigFive.N?.score < 40) {
+        insights.push({
+          icon: '⚓',
+          text: 'High discipline combined with emotional stability makes you exceptionally reliable under pressure.'
+        });
+      }
+
+      if (assessments?.risk?.score > 60 && bigFive.O?.score > 60) {
+        insights.push({
+          icon: '🎯',
+          text: 'High openness + risk tolerance suggests you\'re drawn to pioneering roles where you can explore uncharted territory.'
+        });
+      }
+
+      return insights.slice(0, 5);
+    };
+
+    const calculateProfile = (completed) => {
+      if (!completed) return null;
+
+      const bigFive = {};
+      ['E', 'A', 'C', 'N', 'O'].forEach(trait => {
+        const test = completed[`bigfive-${trait}`];
+        if (test?.score !== undefined) {
+          bigFive[trait] = {
+            score: test.score,
+            label: test.score > 60 ? 'High' : test.score < 40 ? 'Low' : 'Moderate'
+          };
+        }
+      });
+
+      const archetype = calculateArchetype(completed);
+
+      const coreAssessments = ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'];
+      const extendedAssessments = ['adhd', 'cognitive', 'attachment', 'risk', 'integrity', 'chronotype'];
+      const shadowAssessments = ['shadow-M', 'shadow-N', 'shadow-P'];
+
+      const coreComplete = coreAssessments.filter(id => completed[id]).length;
+      const extendedComplete = extendedAssessments.filter(id => completed[id]).length;
+      const shadowComplete = shadowAssessments.filter(id => completed[id]).length;
+
+      const completeness = {
+        core: Math.round((coreComplete / coreAssessments.length) * 100),
+        extended: Math.round((extendedComplete / extendedAssessments.length) * 100),
+        shadow: Math.round((shadowComplete / shadowAssessments.length) * 100),
+        overall: Math.round(((coreComplete + extendedComplete + shadowComplete) /
+          (coreAssessments.length + extendedAssessments.length + shadowAssessments.length)) * 100)
+      };
+
+      const strengths = [];
+      const watchOuts = [];
+
+      if (archetype?.primary) {
+        strengths.push(...archetype.primary.strengths.slice(0, 2));
+        watchOuts.push(...archetype.primary.watchOuts.slice(0, 2));
+      }
+
+      if (bigFive.O?.score > 60) strengths.push('Intellectual curiosity drives continuous learning');
+      if (bigFive.C?.score > 70) strengths.push('Reliable follow-through on commitments');
+
+      return {
+        bigFive,
+        archetype,
+        completeness,
+        strengths: [...new Set(strengths)].slice(0, 4),
+        watchOuts: [...new Set(watchOuts)].slice(0, 3),
+        assessments: {
+          risk: completed.risk,
+          attachment: completed.attachment,
+          chronotype: completed.chronotype
+        }
+      };
+    };
+
+    // ==================== RADAR CHART ====================
+
+    const RadarChart = ({ traits = {}, size = 280, darkMode = true, animated = true, onTraitTap = null, color = 'violet' }) => {
+      const [animationProgress, setAnimationProgress] = useState(animated ? 0 : 1);
+
+      useEffect(() => {
+        if (!animated) return;
+        const duration = 800;
+        const start = performance.now();
+        const animate = (now) => {
+          const elapsed = now - start;
+          const progress = Math.min(elapsed / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          setAnimationProgress(eased);
+          if (progress < 1) requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+      }, [animated, traits]);
+
+      const traitConfig = [
+        { key: 'O', label: 'Openness', short: 'O' },
+        { key: 'C', label: 'Conscientiousness', short: 'C' },
+        { key: 'E', label: 'Extraversion', short: 'E' },
+        { key: 'A', label: 'Agreeableness', short: 'A' },
+        { key: 'N', label: 'Neuroticism', short: 'N' },
+      ];
+
+      const center = size / 2;
+      const maxRadius = (size / 2) - 40;
+      const angleStep = (2 * Math.PI) / 5;
+      const startAngle = -Math.PI / 2;
+
+      const getPoint = (index, value) => {
+        const angle = startAngle + (index * angleStep);
+        const radius = (value / 100) * maxRadius * animationProgress;
+        return {
+          x: center + radius * Math.cos(angle),
+          y: center + radius * Math.sin(angle)
+        };
+      };
+
+      const axisLines = traitConfig.map((_, i) => {
+        const angle = startAngle + (i * angleStep);
+        return {
+          x1: center, y1: center,
+          x2: center + maxRadius * Math.cos(angle),
+          y2: center + maxRadius * Math.sin(angle)
+        };
+      });
+
+      const rings = [0.25, 0.5, 0.75, 1].map(scale => {
+        const points = traitConfig.map((_, i) => {
+          const angle = startAngle + (i * angleStep);
+          const radius = maxRadius * scale;
+          return `${center + radius * Math.cos(angle)},${center + radius * Math.sin(angle)}`;
+        });
+        return points.join(' ');
+      });
+
+      const hasData = Object.keys(traits).length > 0;
+      const dataPoints = hasData
+        ? traitConfig.map((t, i) => {
+            const value = traits[t.key] ?? 50;
+            const pt = getPoint(i, value);
+            return `${pt.x},${pt.y}`;
+          }).join(' ')
+        : null;
+
+      const labelPositions = traitConfig.map((t, i) => {
+        const angle = startAngle + (i * angleStep);
+        const labelRadius = maxRadius + 28;
+        return {
+          x: center + labelRadius * Math.cos(angle),
+          y: center + labelRadius * Math.sin(angle),
+          trait: t,
+          value: traits[t.key]
+        };
+      });
+
+      // Colors aligned with TOKENS.md
+      const gradients = {
+        violet: { from: '#8b5cf6', to: '#a78bfa' },
+        blue: { from: '#3b82f6', to: '#60a5fa' },
+        emerald: { from: '#10b981', to: '#34d399' },
+        pink: { from: '#d946ef', to: '#e879f9' }, // fuchsia-500 per TOKENS.md
+        amber: { from: '#f59e0b', to: '#fbbf24' },
+        indigo: { from: '#6366f1', to: '#818cf8' },
+        teal: { from: '#14b8a6', to: '#2dd4bf' },
+        slate: { from: '#64748b', to: '#94a3b8' },
+      };
+
+      const grad = gradients[color] || gradients.violet;
+      const gridColor = darkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(100, 116, 139, 0.15)';
+      const axisColor = darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(100, 116, 139, 0.25)';
+      const textColor = darkMode ? '#e2e8f0' : '#334155';
+      const subtleText = darkMode ? '#94a3b8' : '#64748b';
+
+      // Build aria-label for accessibility
+      const ariaLabel = hasData
+        ? `Personality radar chart showing: ${traitConfig.map(t => `${t.label}: ${traits[t.key] ?? 50}%`).join(', ')}`
+        : 'Personality radar chart - no data yet';
+
+      return (
+        <div className="relative" style={{ width: size, height: size }}>
+          <svg width={size} height={size} className="overflow-visible" role="img" aria-label={ariaLabel}>
+            <defs>
+              <linearGradient id="radar-fill-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={grad.from} stopOpacity="0.3" />
+                <stop offset="100%" stopColor={grad.to} stopOpacity="0.1" />
+              </linearGradient>
+              <linearGradient id="radar-stroke-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={grad.from} />
+                <stop offset="100%" stopColor={grad.to} />
+              </linearGradient>
+              <filter id="radar-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            {rings.map((points, i) => (
+              <polygon key={`ring-${i}`} points={points} fill="none" stroke={gridColor} strokeWidth={1} />
+            ))}
+
+            {axisLines.map((line, i) => (
+              <line key={`axis-${i}`} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={axisColor} strokeWidth={1} />
+            ))}
+
+            {dataPoints && (
+              <g filter="url(#radar-glow)">
+                <polygon points={dataPoints} fill="url(#radar-fill-gradient)" stroke="url(#radar-stroke-gradient)" strokeWidth={2.5} strokeLinejoin="round" />
+              </g>
+            )}
+
+            {hasData && traitConfig.map((t, i) => {
+              const value = traits[t.key] ?? 50;
+              const pt = getPoint(i, value);
+              return (
+                <g key={`point-${t.key}`}>
+                  {/* Invisible larger tap target (44px minimum) */}
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={22}
+                    fill="transparent"
+                    className={onTraitTap ? 'cursor-pointer' : ''}
+                    onClick={() => onTraitTap?.(t.key, value)}
+                    role={onTraitTap ? 'button' : undefined}
+                    aria-label={onTraitTap ? `${t.label}: ${value}%. Tap for details.` : undefined}
+                  />
+                  {/* Visible data point */}
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={5}
+                    fill={grad.from}
+                    stroke="#fff"
+                    strokeWidth={2}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+
+          {labelPositions.map(({ x, y, trait, value }) => {
+            const hasValue = value !== undefined;
+            return (
+              <div
+                key={trait.key}
+                className={`absolute transform -translate-x-1/2 -translate-y-1/2 text-center ${
+                  onTraitTap ? 'cursor-pointer hover:scale-110 transition-transform' : ''
+                }`}
+                style={{ left: x, top: y }}
+                onClick={() => onTraitTap?.(trait.key, value)}
+              >
+                <div className="text-xs font-semibold" style={{ color: hasValue ? textColor : subtleText }}>
+                  {trait.short}
+                </div>
+                {hasValue && (
+                  <div className="text-xs font-medium" style={{ color: grad.from }}>
+                    {Math.round(value)}%
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    // ==================== PROFILE COMPONENTS ====================
+
+    const ProfileHeader = ({ archetype, darkMode = true, animated = true }) => {
+      const [revealed, setRevealed] = useState(!animated);
+
+      useEffect(() => {
+        if (animated) {
+          const timer = setTimeout(() => setRevealed(true), 200);
+          return () => clearTimeout(timer);
+        }
+      }, [animated]);
+
+      if (!archetype) return null;
+
+      const gradients = {
+        violet: 'from-violet-900/50 to-purple-900/30',
+        pink: 'from-pink-900/50 to-rose-900/30',
+        emerald: 'from-emerald-900/50 to-teal-900/30',
+      };
+
+      const textColors = {
+        violet: 'text-violet-300',
+        pink: 'text-pink-300',
+        emerald: 'text-emerald-300',
+      };
+
+      const borderColors = {
+        violet: 'border-violet-500/30',
+        pink: 'border-pink-500/30',
+        emerald: 'border-emerald-500/30',
+      };
+
+      const color = archetype.color || 'violet';
+      const gradient = gradients[color] || gradients.violet;
+      const textColor = textColors[color] || textColors.violet;
+      const borderColor = borderColors[color] || borderColors.violet;
+
+      return (
+        <div className={`relative overflow-hidden rounded-2xl border ${borderColor} bg-gradient-to-br ${gradient} p-6 transition-all duration-700 ${
+          revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        }`}>
+          <div className={`absolute inset-0 bg-gradient-to-br ${gradient} blur-2xl opacity-50`} style={{ transform: 'scale(1.5)' }} />
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl">🌀</span>
+              <span className="text-xs uppercase tracking-wider text-gray-400">Your Aura</span>
+            </div>
+            <h2 className={`text-2xl font-bold text-white mb-2 transition-all duration-500 ${revealed ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '200ms' }}>
+              {archetype.name}
+            </h2>
+            <p className={`text-sm ${textColor} mb-4 transition-all duration-500 ${revealed ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '400ms' }}>
+              {archetype.tagline}
+            </p>
+            {archetype.matchPercentage && (
+              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs bg-white/10 text-gray-300 transition-all duration-500 ${revealed ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                {Math.round(archetype.matchPercentage)}% match
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const InsightCards = ({ strengths = [], watchOuts = [], darkMode = true }) => (
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl p-4 bg-gradient-to-br from-emerald-900/30 to-teal-900/20 border border-emerald-500/20">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">✨</span>
+            <span className="text-sm font-semibold text-emerald-300">Strengths</span>
+          </div>
+          <ul className="space-y-2.5">
+            {strengths.slice(0, 3).map((s, i) => (
+              <li key={i} className="text-sm leading-snug text-gray-300">• {s}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-xl p-4 bg-gradient-to-br from-slate-800/50 to-gray-900/30 border border-slate-500/20">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">👁️</span>
+            <span className="text-sm font-semibold text-slate-300">Watch For</span>
+          </div>
+          <ul className="space-y-2.5">
+            {watchOuts.slice(0, 2).map((w, i) => (
+              <li key={i} className="text-sm leading-snug text-gray-400">• {w}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+
+    const PatternInsights = ({ insights = [], darkMode = true }) => {
+      if (insights.length === 0) return null;
+      return (
+        <div className="rounded-xl p-4 bg-gray-800/50 border border-gray-700">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-lg">🔮</span>
+            <span className="text-sm font-semibold text-white">Key Patterns</span>
+          </div>
+          <div className="space-y-3">
+            {insights.slice(0, 3).map((insight, i) => (
+              <div key={i} className="flex gap-3 p-3 rounded-lg bg-gray-900/50">
+                <span className="text-xl">{insight.icon}</span>
+                <p className="text-sm leading-relaxed text-gray-300">{insight.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    const ActionableTips = ({ tips = [], color = 'violet' }) => {
+      if (tips.length === 0) return null;
+      return (
+        <div className="rounded-xl p-4 border border-violet-500/30 bg-gray-800/30">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-lg">💡</span>
+            <span className="text-sm font-semibold text-white">Try This</span>
+          </div>
+          <div className="space-y-2">
+            {tips.slice(0, 3).map((tip, i) => (
+              <div key={i} className="flex items-start gap-3 text-gray-300">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium bg-violet-500/20 text-violet-300">
+                  {i + 1}
+                </span>
+                <p className="text-sm leading-relaxed">{tip}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    const ProfileProgress = ({ completeness = { core: 0, extended: 0, shadow: 0, overall: 0 }, onDeepen = null }) => {
+      const sections = [
+        { key: 'core', label: 'Big Five', pct: completeness.core },
+        { key: 'extended', label: 'Traits', pct: completeness.extended },
+        { key: 'shadow', label: 'Shadow', pct: completeness.shadow },
+      ];
+      const isIncomplete = completeness.overall < 100;
+
+      return (
+        <div className="rounded-xl p-4 bg-gray-800/50">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-white">
+              {isIncomplete ? 'Keep Going' : 'Profile Complete'}
+            </span>
+            <span className="text-xs text-gray-400">{completeness.overall}% mapped</span>
+          </div>
+          <div className="flex gap-2 mb-3">
+            {sections.map(s => (
+              <div key={s.key} className="flex-1">
+                <div className="h-1.5 rounded-full bg-gray-700">
+                  <div className="h-full rounded-full bg-violet-500 transition-all duration-500" style={{ width: `${s.pct}%` }} />
+                </div>
+                <p className="text-xs mt-1 text-gray-500">{s.label}</p>
+              </div>
+            ))}
+          </div>
+          {isIncomplete && onDeepen && (
+            <button
+              onClick={onDeepen}
+              className="w-full py-2 px-4 rounded-lg text-sm font-medium bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 transition-colors"
+            >
+              Deepen your profile →
+            </button>
+          )}
+        </div>
+      );
+    };
+
+    const ProfileTeaser = ({ onUnlock }) => (
+      <div className="rounded-2xl overflow-hidden bg-gray-900 border border-gray-800">
+        <div className="relative p-6 pb-8">
+          <div className="absolute inset-0 bg-gradient-to-br from-violet-900/30 to-indigo-900/20 blur-sm" />
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-2xl">🌀</span>
+              <span className="text-xs uppercase tracking-wider text-gray-400">Your Aura</span>
+            </div>
+            <div className="space-y-2 mb-4">
+              <div className="h-7 w-48 rounded bg-gray-700/50 blur-sm" />
+              <div className="h-4 w-64 rounded bg-gray-700/30 blur-sm" />
+            </div>
+            <p className="text-sm text-gray-400">Your pattern is forming...</p>
+          </div>
+        </div>
+        <div className="px-6 py-4 bg-gray-800/50">
+          <p className="text-xs uppercase tracking-wider mb-3 text-gray-500">We see hints of:</p>
+          <ul className="space-y-2 mb-4">
+            <li className="flex items-center gap-2 text-sm text-gray-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+              Signs of strong curiosity
+            </li>
+            <li className="flex items-center gap-2 text-sm text-gray-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+              An interesting combination taking shape...
+            </li>
+          </ul>
+        </div>
+        <div className="p-4">
+          <button
+            onClick={onUnlock}
+            className="w-full py-3 px-6 rounded-xl font-medium bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-lg shadow-violet-500/25 transition-all"
+          >
+            Complete Starter Pack to see full profile
+          </button>
+          <p className="text-center text-xs mt-2 text-gray-500">5 more questions to reveal your archetype</p>
+        </div>
+      </div>
+    );
+
+    // ==================== DEMO APP ====================
+
+    const Demo = () => {
+      const [view, setView] = useState('full'); // 'teaser', 'full', 'empty'
+      const [key, setKey] = useState(0); // For re-animating
+
+      // Sample data for full profile
+      const sampleCompleted = {
+        'quick-profile': { traits: { E: 45, A: 72, C: 68, N: 32, O: 85 } },
+        'bigfive-E': { score: 45 },
+        'bigfive-A': { score: 72 },
+        'bigfive-C': { score: 68 },
+        'bigfive-N': { score: 32 },
+        'bigfive-O': { score: 85 },
+        'risk': { score: 35 },
+        'attachment': { style: 'Secure' },
+        'chronotype': { type: 'Night Owl' }
+      };
+
+      const profile = view === 'full' ? calculateProfile(sampleCompleted) : null;
+      const insights = profile ? generateInsights(profile) : [];
+
+      const radarTraits = profile ? Object.fromEntries(
+        Object.entries(profile.bigFive).map(([k, v]) => [k, v.score])
+      ) : {};
+
+      return (
+        <div className="min-h-screen bg-gray-950 p-4">
+          {/* View Switcher */}
+          <div className="max-w-md mx-auto mb-4">
+            <div className="flex gap-2 p-1 bg-gray-800 rounded-lg">
+              {['empty', 'teaser', 'full'].map(v => (
+                <button
+                  key={v}
+                  onClick={() => { setView(v); setKey(k => k + 1); }}
+                  className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                    view === v ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {v === 'empty' ? 'No Data' : v === 'teaser' ? 'Quick Profile' : 'Full Profile'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Phone Frame */}
+          <div className="max-w-md mx-auto bg-gray-900 rounded-[40px] p-3 shadow-2xl">
+            <div className="bg-gray-950 rounded-[32px] overflow-hidden h-[700px] flex flex-col">
+              {/* Header */}
+              <div className="h-[44px] flex-shrink-0 flex items-center px-4 border-b border-gray-800">
+                <button className="text-lg text-gray-400">←</button>
+                <span className="flex-1 text-center font-medium text-white">Your Aura</span>
+                <div className="w-6" />
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-auto p-4 pb-8 hide-scrollbar" key={key}>
+                {view === 'empty' ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <span className="text-4xl mb-4">🌀</span>
+                    <h2 className="text-lg font-semibold mb-2 text-white">Discover Your Aura</h2>
+                    <p className="text-sm mb-6 text-gray-400">
+                      Complete Quick Profile to start building your personality map
+                    </p>
+                    <button className="px-6 py-3 rounded-xl font-medium bg-violet-600 hover:bg-violet-500 text-white transition-colors">
+                      Start Quick Profile
+                    </button>
+                  </div>
+                ) : view === 'teaser' ? (
+                  <ProfileTeaser onUnlock={() => setView('full')} />
+                ) : (
+                  <div className="space-y-4">
+                    {profile?.archetype?.primary && (
+                      <ProfileHeader archetype={profile.archetype.primary} animated={true} />
+                    )}
+
+                    <div className="rounded-xl p-4 bg-gray-800/50 flex justify-center">
+                      <RadarChart
+                        traits={radarTraits}
+                        size={260}
+                        color={profile?.archetype?.primary?.color || 'violet'}
+                        onTraitTap={(trait, value) => console.log(`Tapped ${trait}: ${value}`)}
+                      />
+                    </div>
+
+                    {/* Profile depth moved up - show progress while user is engaged */}
+                    {profile?.completeness && profile.completeness.overall < 100 && (
+                      <ProfileProgress completeness={profile.completeness} />
+                    )}
+
+                    <InsightCards
+                      strengths={profile?.strengths || []}
+                      watchOuts={profile?.watchOuts || []}
+                    />
+
+                    {insights.length > 0 && <PatternInsights insights={insights} />}
+
+                    {profile?.archetype?.primary?.tips && (
+                      <ActionableTips tips={profile.archetype.primary.tips} color={profile.archetype.primary.color} />
+                    )}
+
+                    {/* Show completed progress at bottom */}
+                    {profile?.completeness && profile.completeness.overall >= 100 && (
+                      <ProfileProgress completeness={profile.completeness} />
+                    )}
+
+                    {profile?.archetype?.secondary?.length > 0 && (
+                      <div className="rounded-xl p-4 bg-gray-800/30">
+                        <p className="text-xs uppercase tracking-wider mb-3 text-gray-500">You also resonate with</p>
+                        <div className="flex flex-wrap gap-2">
+                          {profile.archetype.secondary.map((a, i) => (
+                            <span key={i} className="px-3 py-1 rounded-full text-xs font-medium bg-violet-900/30 text-violet-300 border border-violet-500/20">
+                              {a.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Debug Info */}
+          {view === 'full' && profile && (
+            <div className="max-w-md mx-auto mt-4 p-4 bg-gray-800 rounded-xl text-xs text-gray-400">
+              <p className="font-semibold mb-2 text-gray-300">Debug: Archetype Match</p>
+              <p>Primary: {profile.archetype?.primary?.name} ({profile.archetype?.primary?.matchPercentage?.toFixed(0)}%)</p>
+              <p>Traits: O={radarTraits.O}, A={radarTraits.A}, C={radarTraits.C}, N={radarTraits.N}, E={radarTraits.E}</p>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

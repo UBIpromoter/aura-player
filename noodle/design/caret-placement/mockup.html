@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caret Placement Options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; padding: 40px; }
+
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; color: #e2e8f0; }
+  p.sub { font-size: 13px; color: #94a3b8; margin-bottom: 32px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    max-width: 1100px;
+  }
+
+  .option {
+    background: #1a1a2e;
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid #334155;
+  }
+  .option-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8b5cf6;
+    margin-bottom: 12px;
+  }
+
+  /* Card simulation */
+  .card {
+    background: #1f2937;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(100,116,139,0.25);
+  }
+  .card-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    position: relative;
+  }
+
+  /* Progress circle */
+  .circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 3px solid rgba(100,116,139,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #94a3b8;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .circle.slate::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-top-color: #64748b;
+    border-right-color: #64748b;
+    transform: rotate(-20deg);
+  }
+
+  .name {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    color: #f1f5f9;
+    min-width: 0;
+  }
+
+  .pill {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(100,116,139,0.25);
+    color: #cbd5e1;
+    border: 1px solid rgba(100,116,139,0.3);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Caret styles */
+  .caret {
+    color: #94a3b8;
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+  }
+  .caret svg {
+    width: 14px;
+    height: 14px;
+    stroke: #94a3b8;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Highlight ring for the caret */
+  .highlight {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(139,92,246,0.15);
+    border: 1.5px dashed rgba(139,92,246,0.5);
+    flex-shrink: 0;
+  }
+  .highlight .caret svg {
+    stroke: #a78bfa;
+  }
+
+  /* Bottom caret bar */
+  .bottom-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0 8px;
+    border-top: 1px solid rgba(100,116,139,0.15);
+  }
+
+  /* Far right column */
+  .far-right {
+    padding-left: 8px;
+    border-left: 1px solid rgba(100,116,139,0.15);
+    margin-left: 4px;
+  }
+
+  .note {
+    font-size: 10px;
+    color: #64748b;
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+<h1>Expand Caret — Placement Options</h1>
+<p class="sub">Multi-test cards (Shadow Self, Mind). Which position feels right?</p>
+
+<div class="grid">
+
+  <!-- Option A: Right of pill -->
+  <div class="option">
+    <div class="option-label">A — Right of Pill</div>
+    <div class="card">
+      <div class="card-row">
+        <div class="circle slate">2</div>
+        <div class="name">Shadow Self</div>
+        <div class="pill">Continue →</div>
+        <div class="highlight">
+          <span class="caret"><svg viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <div class="note">Pill = start test, caret = expand. Clear separation but adds width.</div>
+  </div>
+
+  <!-- Option B: Left of pill -->
+  <div class="option">
+    <div class="option-label">B — Left of Pill</div>
+    <div class="card">
+      <div class="card-row">
+        <div class="circle slate">2</div>
+        <div class="name">Shadow Self</div>
+        <div class="highlight">
+          <span class="caret"><svg viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+        </div>
+        <div class="pill">Continue →</div>
+      </div>
+    </div>
+    <div class="note">Caret sits between name and pill. Reads left-to-right: expand → start.</div>
+  </div>
+
+  <!-- Option C: Below card, centered -->
+  <div class="option">
+    <div class="option-label">C — Bottom Center Bar</div>
+    <div class="card">
+      <div class="card-row">
+        <div class="circle slate">2</div>
+        <div class="name">Shadow Self</div>
+        <div class="pill">Continue →</div>
+      </div>
+      <div class="bottom-bar">
+        <div class="highlight">
+          <span class="caret"><svg viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <div class="note">Card row stays clean. Bottom strip = "there's more." Adds height.</div>
+  </div>
+
+  <!-- Option D: Inside pill -->
+  <div class="option">
+    <div class="option-label">D — Inside Pill (Combo)</div>
+    <div class="card">
+      <div class="card-row">
+        <div class="circle slate">2</div>
+        <div class="name">Shadow Self</div>
+        <div style="display:flex; align-items:center; gap:0; flex-shrink:0;">
+          <div style="font-size:12px; font-weight:500; padding:6px 8px 6px 14px; border-radius:999px 0 0 999px; background:rgba(100,116,139,0.25); color:#cbd5e1; border:1px solid rgba(100,116,139,0.3); border-right:none; white-space:nowrap;">Continue →</div>
+          <div style="padding:6px 10px 6px 6px; border-radius:0 999px 999px 0; background:rgba(139,92,246,0.15); border:1.5px dashed rgba(139,92,246,0.5); border-left:1px solid rgba(100,116,139,0.3); display:flex; align-items:center;">
+            <span class="caret"><svg viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note">Split button: left = start test, right = expand. Compact but slightly complex.</div>
+  </div>
+
+  <!-- Option E: Far right column separator -->
+  <div class="option">
+    <div class="option-label">E — Far Right + Divider</div>
+    <div class="card">
+      <div class="card-row">
+        <div class="circle slate">2</div>
+        <div class="name">Shadow Self</div>
+        <div class="pill">Continue →</div>
+        <div class="far-right">
+          <div class="highlight">
+            <span class="caret"><svg viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note">Subtle vertical divider separates "action" from "expand." Most structured.</div>
+  </div>
+
+  <!-- Option F: Integrated after name, larger -->
+  <div class="option">
+    <div class="option-label">F — After Name (Bigger)</div>
+    <div class="card">
+      <div class="card-row">
+        <div class="circle slate">2</div>
+        <div class="name" style="display:flex; align-items:center; gap:6px;">
+          Shadow Self
+          <div class="highlight" style="width:22px; height:22px;">
+            <span class="caret"><svg viewBox="0 0 16 16" style="width:12px; height:12px;"><polyline points="4 6 8 10 12 6"/></svg></span>
+          </div>
+        </div>
+        <div class="pill">Continue →</div>
+      </div>
+    </div>
+    <div class="note">Current position but bigger + highlighted. Reads as part of the label. Minimal layout change.</div>
+  </div>
+
+</div>
+
+</body>
+</html>

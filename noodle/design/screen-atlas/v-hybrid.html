@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="en" style="scroll-behavior: smooth;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura — Screen Atlas (Hybrid)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --sat: 0px; --sar: 0px; --sab: 0px; --sal: 0px; }
+    html, body, #root { margin: 0; padding: 0; height: 100%; width: 100%; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+    @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    @keyframes celebrateGlow { 0% { transform: scale(0.8); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+    .celebrate-glow { animation: celebrateGlow 0.6s ease-out forwards; }
+
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    .gallery-light {
+      background: linear-gradient(180deg, #f8f7f4 0%, #f0efe9 50%, #e8e6df 100%);
+      color: #1a1a1a;
+    }
+    .gallery-dark {
+      background: linear-gradient(180deg, #050508 0%, #0a0a10 50%, #060610 100%);
+      color: #fafafa;
+    }
+
+    .gallery-row {
+      display: flex; gap: 40px; overflow-x: auto; scroll-snap-type: x mandatory;
+      padding: 0 max(40px, calc((100vw - 1400px) / 2)) 0;
+      -ms-overflow-style: none; scrollbar-width: none;
+    }
+    .gallery-row::-webkit-scrollbar { display: none; }
+
+    .gallery-item {
+      scroll-snap-align: start; flex-shrink: 0; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .gallery-item:hover { transform: translateY(-8px); }
+
+    .gallery-item .screen-label {
+      position: absolute; bottom: -32px; left: 50%; transform: translateX(-50%);
+      opacity: 0; transition: opacity 0.3s ease;
+      white-space: nowrap; font-size: 13px; font-weight: 400; letter-spacing: 0.02em;
+    }
+    .gallery-item:hover .screen-label { opacity: 1; }
+
+    .phone-shadow-dark {
+      filter: drop-shadow(0 20px 60px rgba(0,0,0,0.5)) drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+    }
+    .phone-shadow-light {
+      filter: drop-shadow(0 12px 40px rgba(0,0,0,0.08)) drop-shadow(0 4px 16px rgba(0,0,0,0.05));
+    }
+
+    .section-title { font-weight: 200; letter-spacing: -0.02em; line-height: 1.1; }
+
+    /* Responsive text scaling — --ts set per device width (reference: iPhone 15 @ 393px) */
+    .phone-content { --ts: 1; }
+    .phone-content .text-xs   { font-size: calc(0.75rem * var(--ts)) !important; line-height: calc(1rem * var(--ts)); }
+    .phone-content .text-sm   { font-size: calc(0.875rem * var(--ts)) !important; line-height: calc(1.25rem * var(--ts)); }
+    .phone-content .text-base { font-size: calc(1rem * var(--ts)) !important; line-height: calc(1.5rem * var(--ts)); }
+    .phone-content .text-lg   { font-size: calc(1.125rem * var(--ts)) !important; line-height: calc(1.75rem * var(--ts)); }
+    .phone-content .text-xl   { font-size: calc(1.25rem * var(--ts)) !important; line-height: calc(1.75rem * var(--ts)); }
+    .phone-content .text-2xl  { font-size: calc(1.5rem * var(--ts)) !important; line-height: calc(2rem * var(--ts)); }
+    .phone-content .text-3xl  { font-size: calc(1.875rem * var(--ts)) !important; line-height: calc(2.25rem * var(--ts)); }
+    .phone-content .text-4xl  { font-size: calc(2.25rem * var(--ts)) !important; line-height: calc(2.5rem * var(--ts)); }
+    .phone-content .text-5xl  { font-size: calc(3rem * var(--ts)) !important; line-height: calc(1 * var(--ts)); }
+    /* Scale gap/padding/rounding proportionally for visual harmony */
+    .phone-content .py-3  { padding-top: calc(0.75rem * var(--ts)) !important; padding-bottom: calc(0.75rem * var(--ts)) !important; }
+    .phone-content .px-4  { padding-left: calc(1rem * var(--ts)) !important; padding-right: calc(1rem * var(--ts)) !important; }
+    .phone-content .px-6  { padding-left: calc(1.5rem * var(--ts)) !important; padding-right: calc(1.5rem * var(--ts)) !important; }
+    .phone-content .gap-2 { gap: calc(0.5rem * var(--ts)) !important; }
+    .phone-content .gap-3 { gap: calc(0.75rem * var(--ts)) !important; }
+    .phone-content .mb-2  { margin-bottom: calc(0.5rem * var(--ts)) !important; }
+    .phone-content .mb-3  { margin-bottom: calc(0.75rem * var(--ts)) !important; }
+    .phone-content .mb-5  { margin-bottom: calc(1.25rem * var(--ts)) !important; }
+
+    .expanded-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(20px);
+      animation: fadeIn 0.3s ease;
+    }
+    .expanded-overlay.light-overlay {
+      background: rgba(240,239,233,0.95); backdrop-filter: blur(20px);
+    }
+    .expanded-phone { animation: scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    .close-btn {
+      position: absolute; top: 32px; right: 32px; z-index: 210;
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; cursor: pointer; transition: all 0.2s ease;
+      border: none; outline: none;
+    }
+    .close-btn-dark { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
+    .close-btn-dark:hover { background: rgba(255,255,255,0.2); color: white; }
+    .close-btn-light { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.4); }
+    .close-btn-light:hover { background: rgba(0,0,0,0.12); color: rgba(0,0,0,0.7); }
+
+    .nav-pill {
+      padding: 6px 16px; border-radius: 100px; font-size: 13px; font-weight: 400;
+      cursor: pointer; transition: all 0.25s ease; border: none; outline: none;
+      letter-spacing: 0.01em;
+    }
+
+    .toggle-track {
+      width: 44px; height: 24px; border-radius: 12px; cursor: pointer;
+      position: relative; transition: background 0.3s ease; border: none; outline: none;
+    }
+    .toggle-thumb {
+      position: absolute; top: 2px; width: 20px; height: 20px; border-radius: 50%;
+      background: white; transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    .screen-counter {
+      font-size: 12px; font-weight: 300; letter-spacing: 0.05em; text-transform: uppercase;
+    }
+
+    .expanded-meta {
+      position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+      text-align: center; animation: fadeIn 0.4s ease 0.2s both;
+    }
+
+    .nav-arrows {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s ease;
+      border: none; outline: none; font-size: 18px; z-index: 210;
+    }
+
+    .sticky-header {
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid;
+    }
+
+    .shine-card { position: relative; }
+    .shine-card::before {
+      content: ''; position: absolute; inset: -1px; border-radius: inherit;
+      background: linear-gradient(180deg, var(--accent-bright, rgba(255,255,255,0.5)) 0%, var(--accent-color, rgba(255,255,255,0.2)) 5%, transparent 15%, transparent 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude;
+      padding: 2px; pointer-events: none; z-index: 20; opacity: 0; transition: opacity 0.3s ease;
+    }
+    .shine-card:hover::before { opacity: 1; }
+    .shine-blue { --accent-color: rgba(59, 130, 246, 0.3); --accent-bright: rgba(147, 197, 253, 0.6); }
+    .shine-amber { --accent-color: rgba(251, 191, 36, 0.2); --accent-bright: rgba(253, 224, 71, 0.45); }
+    .shine-violet { --accent-color: rgba(139, 92, 246, 0.25); --accent-bright: rgba(196, 181, 253, 0.55); }
+    .shine-teal { --accent-color: rgba(45, 212, 191, 0.2); --accent-bright: rgba(153, 246, 228, 0.5); }
+    .shine-emerald { --accent-color: rgba(16, 185, 129, 0.25); --accent-bright: rgba(110, 231, 183, 0.55); }
+    .shine-rose { --accent-color: rgba(244, 63, 94, 0.25); --accent-bright: rgba(251, 113, 133, 0.55); }
+    .shine-gray { --accent-color: rgba(156, 163, 175, 0.2); --accent-bright: rgba(209, 213, 219, 0.45); }
+    .glow-amber { box-shadow: 0 0 15px rgba(251, 191, 36, 0.12), 0 0 35px rgba(251, 191, 36, 0.08); }
+    .glow-violet { box-shadow: 0 0 18px rgba(139, 92, 246, 0.2), 0 0 40px rgba(139, 92, 246, 0.12); }
+    .glow-teal { box-shadow: 0 0 18px rgba(45, 212, 191, 0.16), 0 0 40px rgba(45, 212, 191, 0.1); }
+    .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2), 0 0 45px rgba(59, 130, 246, 0.12); }
+    .glow-emerald { box-shadow: 0 0 18px rgba(16, 185, 129, 0.16), 0 0 40px rgba(16, 185, 129, 0.1); }
+    .glow-rose { box-shadow: 0 0 18px rgba(244, 63, 94, 0.16), 0 0 40px rgba(244, 63, 94, 0.1); }
+
+    .starry-bg { background: linear-gradient(135deg, rgba(30, 20, 10, 0.9) 0%, rgba(50, 30, 15, 0.8) 100%); position: relative; }
+    .starry-bg::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: radial-gradient(1px 1px at 20px 30px, white, transparent),
+        radial-gradient(1px 1px at 40px 70px, rgba(255,255,255,0.8), transparent),
+        radial-gradient(1px 1px at 90px 40px, rgba(255,255,255,0.7), transparent),
+        radial-gradient(1px 1px at 130px 55px, white, transparent),
+        radial-gradient(1.5px 1.5px at 200px 50px, rgba(255,255,255,0.9), transparent);
+      opacity: 0.7; border-radius: inherit;
+    }
+
+    .question-text { font-size: clamp(14px, 4vw, 20px); line-height: 1.35; text-wrap: balance; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+const _warn = console.warn;
+console.warn = (...args) => { if (typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return; _warn.apply(console, args); };
+  </script>
+  <script type="text/babel">
+const { useState, useCallback, useEffect, useRef } = React;
+
+// ==================== SHARED TOKENS ====================
+const DEVICES = [
+  { id: 'se', name: 'iPhone SE', width: 375, height: 667, dynamicIsland: false },
+  { id: 'iphone15', name: 'iPhone 15', width: 393, height: 852, dynamicIsland: true },
+  { id: 'promax', name: 'iPhone Pro Max', width: 430, height: 932, dynamicIsland: true },
+  { id: 'pixel', name: 'Pixel', width: 412, height: 915, dynamicIsland: false },
+  { id: 'compact', name: 'Android Compact', width: 360, height: 800, dynamicIsland: false },
+];
+
+// Fixed gallery slot — largest device determines the cell, phones center inside it. Nothing moves.
+const THUMB_W = 280;
+const THUMB_BEZEL = 8;
+const SLOT_W = THUMB_W + THUMB_BEZEL * 2; // 296
+const SLOT_H = Math.max(...DEVICES.map(d => Math.round(d.height * THUMB_W / d.width))) + THUMB_BEZEL * 2; // ~638
+
+const COLOR_HEX = {
+  violet:  { base: '#8b5cf6', light: '#a78bfa', rgb: '139, 92, 246' },
+  blue:    { base: '#3b82f6', light: '#60a5fa', rgb: '59, 130, 246' },
+  teal:    { base: '#14b8a6', light: '#2dd4bf', rgb: '20, 184, 166' },
+  rose:    { base: '#f43f5e', light: '#fb7185', rgb: '244, 63, 94' },
+  pink:    { base: '#d946ef', light: '#e879f9', rgb: '217, 70, 239' },
+  emerald: { base: '#10b981', light: '#34d399', rgb: '16, 185, 129' },
+  slate:   { base: '#64748b', light: '#94a3b8', rgb: '100, 116, 139' },
+  amber:   { base: '#f59e0b', light: '#fbbf24', rgb: '245, 158, 11' },
+  indigo:  { base: '#6366f1', light: '#818cf8', rgb: '99, 102, 241' },
+  cyan:    { base: '#06b6d4', light: '#67e8f9', rgb: '6, 182, 212' },
+  gray:    { base: '#6b7280', light: '#9ca3af', rgb: '107, 114, 128' },
+};
+
+const PROGRESS_GRADIENTS = Object.fromEntries(
+  Object.entries(COLOR_HEX).map(([c, hex]) => [c, { from: hex.base, to: hex.light }])
+);
+
+const SECTION_COLORS = {
+  Auth:        { color: COLOR_HEX.violet.base, shine: 'shine-violet', glow: 'glow-violet' },
+  Onboarding:  { color: COLOR_HEX.teal.base, shine: 'shine-teal', glow: 'glow-teal' },
+  Main:        { color: COLOR_HEX.blue.base, shine: 'shine-blue', glow: 'glow-blue' },
+  Questions:   { color: COLOR_HEX.amber.base, shine: 'shine-amber', glow: 'glow-amber' },
+  Settings:    { color: COLOR_HEX.slate.base, shine: 'shine-gray', glow: '' },
+  Assessments: { color: COLOR_HEX.emerald.base, shine: 'shine-emerald', glow: 'glow-emerald' },
+  Modals:      { color: COLOR_HEX.rose.base, shine: 'shine-rose', glow: 'glow-rose' },
+};
+
+const TH = (token, dark) => ({
+  'text-primary': dark ? 'text-white' : 'text-gray-900',
+  'text-secondary': dark ? 'text-gray-300' : 'text-gray-700',
+  'text-muted': dark ? 'text-gray-400' : 'text-gray-500',
+  'text-subtle': dark ? 'text-gray-500' : 'text-gray-400',
+  'text-faint': dark ? 'text-gray-600' : 'text-gray-400',
+  'bg-main': dark ? 'bg-gray-950' : 'bg-gray-50',
+  'bg-card': dark ? 'bg-gray-900 border border-gray-800' : 'bg-white border border-gray-200/80',
+  'border-base': dark ? 'border-gray-800' : 'border-gray-200',
+  'text-violet': dark ? 'text-violet-400' : 'text-violet-600',
+  'text-emerald': dark ? 'text-emerald-400' : 'text-emerald-600',
+  'text-rose': dark ? 'text-rose-400' : 'text-rose-600',
+  'text-sky': dark ? 'text-sky-300' : 'text-sky-500',
+  'text-dim': dark ? 'text-gray-400' : 'text-gray-500',
+  'text-bright': dark ? 'text-gray-100' : 'text-gray-900',
+}[token] || '');
+
+// ==================== STATUS BAR ICONS (SVG) ====================
+const StatusBarIcons = ({ dark, scale = 1 }) => (
+  <div style={{ display: 'flex', gap: 5 * scale, alignItems: 'center' }}>
+    <svg width={17 * scale} height={12 * scale} viewBox="0 0 16 12" fill="currentColor" opacity="0.9">
+      <rect x="0" y="8" width="3" height="4" rx="0.5"/>
+      <rect x="4.5" y="5" width="3" height="7" rx="0.5"/>
+      <rect x="9" y="2" width="3" height="10" rx="0.5"/>
+      <rect x="13" y="0" width="3" height="12" rx="0.5"/>
+    </svg>
+    <svg width={16 * scale} height={12 * scale} viewBox="0 0 16 12" fill="currentColor" opacity="0.9">
+      <path d="M8 2C5.5 2 3.2 3 1.5 4.7L0 3.2C2.1 1.2 4.9 0 8 0s5.9 1.2 8 3.2L14.5 4.7C12.8 3 10.5 2 8 2z"/>
+      <path d="M8 6C6.3 6 4.8 6.7 3.7 7.8L2.2 6.3C3.7 4.8 5.7 4 8 4s4.3.8 5.8 2.3L12.3 7.8C11.2 6.7 9.7 6 8 6z"/>
+      <circle cx="8" cy="11" r="1.5"/>
+    </svg>
+    <svg width={24 * scale} height={12 * scale} viewBox="0 0 25 12" fill="currentColor" opacity="0.9">
+      <rect x="0" y="1" width="21" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1"/>
+      <rect x="22" y="4" width="2" height="4" rx="0.5" opacity="0.4"/>
+      <rect x="1.5" y="2.5" width="14" height="7" rx="1" fill="currentColor"/>
+    </svg>
+  </div>
+);
+
+// ==================== PHONE FRAME with Dynamic Island ====================
+const PhoneFrame = ({ children, darkMode, device, expanded = false, onClick, className = '', sectionColor }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Calculate dimensions
+  const thumbScale = 280 / device.width;
+  const isThumb = !expanded;
+
+  const displayW = isThumb ? Math.round(device.width * thumbScale) : device.width;
+  const displayH = isThumb ? Math.round(device.height * thumbScale) : device.height;
+
+  const bezel = expanded ? 12 : 8;
+  const outerRadius = expanded ? 55 : 40;
+  const innerRadius = expanded ? 44 : 33;
+
+  // Status bar dimensions based on device type and scale
+  const statusH = device.dynamicIsland ? (expanded ? 54 : Math.round(54 * thumbScale)) : (expanded ? 44 : Math.round(44 * thumbScale));
+  const statusHDevice = device.dynamicIsland ? 54 : 44; // device-actual size for content
+
+  // Dynamic Island / Notch dimensions
+  const diW = expanded ? 126 : Math.round(126 * thumbScale);
+  const diH = expanded ? 37 : Math.round(37 * thumbScale);
+  const diTop = expanded ? 12 : Math.round(12 * thumbScale);
+
+  // Simple notch for non-Dynamic-Island phones
+  const notchW = expanded ? 140 : Math.round(140 * thumbScale);
+  const notchH = expanded ? 26 : Math.round(26 * thumbScale);
+  const notchTop = 0;
+
+  const homeW = expanded ? 134 : Math.round(134 * thumbScale);
+
+  const bezelBg = darkMode
+    ? 'linear-gradient(145deg, #2a2a2e, #1a1a1c)'
+    : 'linear-gradient(145deg, #d4d2cc, #c0beb8)';
+
+  const bezelShadow = darkMode
+    ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(0,0,0,0.3)'
+    : 'inset 0 1px 0 rgba(255,255,255,0.8), 0 0 0 1px rgba(0,0,0,0.06)';
+
+  const glowStyle = isHovered && sectionColor
+    ? { boxShadow: `0 0 20px ${sectionColor}40, 0 0 40px ${sectionColor}20` }
+    : {};
+
+  const iconScale = expanded ? 1 : 0.75;
+  const timeSize = expanded ? 14 : 10;
+  const sidePad = expanded ? 32 : Math.round(32 * thumbScale);
+
+  return (
+    <div
+      className={`relative ${className}`}
+      style={{
+        width: displayW + bezel * 2,
+        height: displayH + bezel * 2,
+        borderRadius: outerRadius,
+        padding: bezel,
+        flexShrink: 0,
+        background: bezelBg,
+        boxShadow: bezelShadow,
+        transition: 'box-shadow 0.3s ease',
+        ...glowStyle,
+      }}
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div style={{
+        width: displayW, height: displayH, borderRadius: innerRadius,
+        overflow: 'hidden', position: 'relative', background: darkMode ? '#000' : '#fff',
+      }}>
+        {/* Dynamic Island or Simple Notch */}
+        {device.dynamicIsland ? (
+          <div style={{
+            position: 'absolute', top: diTop, left: '50%', transform: 'translateX(-50%)',
+            width: diW, height: diH,
+            background: '#000', borderRadius: 9999, zIndex: 30,
+          }} />
+        ) : (
+          <div style={{
+            position: 'absolute', top: notchTop, left: '50%', transform: 'translateX(-50%)',
+            width: notchW, height: notchH,
+            background: darkMode ? '#000' : '#fff',
+            borderBottomLeftRadius: expanded ? 18 : Math.round(18 * thumbScale),
+            borderBottomRightRadius: expanded ? 18 : Math.round(18 * thumbScale),
+            zIndex: 30,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: expanded ? 8 : Math.round(8 * thumbScale),
+          }}>
+            {/* Speaker slit */}
+            <div style={{
+              width: expanded ? 40 : Math.round(40 * thumbScale),
+              height: expanded ? 4 : Math.round(4 * thumbScale),
+              background: darkMode ? '#1a1a1a' : '#e5e5e5',
+              borderRadius: 999,
+            }} />
+            {/* Camera dot */}
+            <div style={{
+              width: expanded ? 8 : Math.round(8 * thumbScale),
+              height: expanded ? 8 : Math.round(8 * thumbScale),
+              background: darkMode ? '#1a1a1a' : '#d0d0d0',
+              borderRadius: '50%',
+            }} />
+          </div>
+        )}
+
+        {/* Status Bar */}
+        <div style={{
+          height: statusH, position: 'relative', zIndex: 20,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+          padding: `0 ${sidePad}px ${expanded ? 8 : Math.round(8 * thumbScale)}px`,
+          fontSize: timeSize, fontWeight: 600,
+          color: darkMode ? '#fff' : '#000',
+        }}>
+          <span>9:41</span>
+          <StatusBarIcons dark={darkMode} scale={iconScale} />
+        </div>
+
+        {/* Content wrapper with scaling — --ts drives responsive text sizing */}
+        {isThumb ? (
+          <div style={{ position: 'absolute', top: 0, left: 0, width: displayW, height: displayH, overflow: 'hidden' }}>
+            <div className="phone-content" style={{
+              '--ts': device.width / 393,
+              width: device.width,
+              height: device.height,
+              transform: `scale(${thumbScale})`,
+              transformOrigin: 'top left',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              <div style={{ height: statusHDevice, flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {children}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="phone-content" style={{ '--ts': device.width / 393, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ height: statusHDevice, flexShrink: 0 }} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {children}
+            </div>
+          </div>
+        )}
+
+        {/* Home indicator */}
+        <div style={{
+          position: 'absolute', bottom: expanded ? 8 : Math.round(8 * thumbScale), left: '50%', transform: 'translateX(-50%)',
+          width: homeW, height: expanded ? 5 : Math.round(5 * thumbScale), borderRadius: 9999, zIndex: 20, opacity: 0.3,
+          background: darkMode ? '#fff' : '#000',
+        }} />
+      </div>
+    </div>
+  );
+};
+
+// ==================== SCREEN COMPONENTS ====================
+const ScreenWelcome = ({ darkMode }) => (
+  <div className="flex-1 flex flex-col items-center justify-center px-6" style={{ backgroundColor: darkMode ? '#030712' : '#fafaf8' }}>
+    <div className="text-5xl mb-5">&#127744;</div>
+    <h1 className="text-2xl font-bold mb-2" style={{ color: darkMode ? '#fff' : '#1a1a1a' }}>Aura</h1>
+    <p className="text-sm mb-10 text-center leading-relaxed" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+      Discover yourself, one<br/>question at a time
+    </p>
+    <div className="w-full max-w-[200px] space-y-3">
+      <div className="w-full py-3 px-4 rounded-xl font-semibold text-base text-center bg-violet-500 text-white">
+        Let's Go
+      </div>
+    </div>
+    <div className="mt-6 text-xs" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>Sign In</div>
+  </div>
+);
+
+const ScreenSignIn = ({ darkMode }) => (
+  <div className="flex-1 flex flex-col items-center justify-center px-6" style={{ backgroundColor: darkMode ? '#030712' : '#fafaf8' }}>
+    <div className="text-4xl mb-3">&#128273;</div>
+    <h1 className="text-xl font-bold mb-5" style={{ color: darkMode ? '#fff' : '#1a1a1a' }}>Sign In</h1>
+    <div className="w-full max-w-[220px] space-y-2.5">
+      <div className={`w-full px-3 py-2.5 rounded-xl text-sm ${darkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-400'}`}>
+        Email
+      </div>
+      <div className={`w-full px-3 py-2.5 rounded-xl text-sm ${darkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-400'}`}>
+        PIN (4+ digits)
+      </div>
+      <div className="w-full py-2.5 px-4 rounded-xl font-medium text-sm text-center bg-violet-500 text-white">
+        Sign In
+      </div>
+      <div className="text-center pt-1">
+        <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>&larr; Back</span>
+      </div>
+      <div className={`text-[10px] text-center pt-1 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+        No account? <span className={darkMode ? 'text-violet-400' : 'text-violet-500'}>Create one</span>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenOnboarding = ({ darkMode }) => {
+  const violetShade = darkMode ? ['#5b21b6', '#7c3aed'] : ['#7c3aed', '#8b5cf6'];
+  return (
+    <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      <div className="flex items-center justify-between px-4 pt-2 pb-1">
+        <span className="text-lg">&#127744;</span>
+        <span className={`text-base ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>&#9776;</span>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-5">
+        <div className={`text-xs font-medium mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          3 of 10
+        </div>
+        <h2 className={`text-base text-center font-medium mb-6 leading-snug ${TH('text-primary', darkMode)}`}>
+          Is a hot dog a sandwich?
+        </h2>
+        <div className="w-full max-w-[200px] space-y-2">
+          <div className="rounded-xl py-3 text-center font-bold text-white text-sm"
+               style={{ background: `linear-gradient(135deg, ${violetShade[0]}, ${violetShade[1]})` }}>
+            Yes, obviously
+          </div>
+          <div className={`rounded-xl py-3 text-center font-bold text-sm ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-600 border border-gray-200'}`}>
+            No way
+          </div>
+        </div>
+        <div className="flex gap-1 mt-6">
+          {[...Array(10)].map((_, i) => (
+            <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < 3 ? 'bg-violet-500' : i === 3 ? 'bg-violet-400' : darkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenPathChoice = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-950' : 'bg-gray-50'}`}>
+    <div className="flex items-center justify-between px-4 pt-2 pb-1">
+      <span className="text-lg">&#127744;</span>
+      <span className={`text-base ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>&#9776;</span>
+    </div>
+    <div className="flex-1 flex flex-col items-center justify-center px-5">
+      <div className="text-center mb-6">
+        <div className="text-4xl mb-3">&#127881;</div>
+        <h1 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Nice! 10 down</h1>
+        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>You're on a roll. What next?</p>
+      </div>
+      <div className="w-full max-w-[240px] space-y-3">
+        <div className={`w-full p-4 rounded-xl text-left border ${
+          darkMode ? 'border-violet-500/30 bg-violet-900/20' : 'border-violet-200 bg-violet-50'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">&#129695;</span>
+            <div className="flex-1 min-w-0">
+              <div className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Learn About Yourself</div>
+              <div className={`text-[10px] truncate ${darkMode ? 'text-violet-400/80' : 'text-violet-600'}`}>Take a quick personality quiz</div>
+            </div>
+            <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>&rarr;</span>
+          </div>
+        </div>
+        <div className={`w-full p-4 rounded-xl text-left border ${
+          darkMode ? 'border-teal-500/30 bg-teal-900/20' : 'border-teal-200 bg-teal-50'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">&#129517;</span>
+            <div className="flex-1 min-w-0">
+              <div className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Explore Topics</div>
+              <div className={`text-[10px] truncate ${darkMode ? 'text-teal-400/80' : 'text-teal-600'}`}>Answer about things you care about</div>
+            </div>
+            <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>&rarr;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenCategories = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col relative ${TH('bg-main', darkMode)}`}>
+    <div className="flex items-center justify-between px-4 pt-2 pb-1">
+      <div className="flex items-center gap-2">
+        <span className="text-xl">&#127744;</span>
+        <div className="flex items-center gap-1">
+          <span className={`text-[10px] font-bold ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Lv.3</span>
+          <span className={`text-[9px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>145 XP</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-orange-400 font-medium">&#128293;5</span>
+        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>P</div>
+      </div>
+    </div>
+    <div className="flex-1 overflow-y-auto px-4 pt-1 pb-6 space-y-3 hide-scrollbar">
+      <div className={`w-full rounded-xl p-3 text-center border ${
+        darkMode ? 'bg-blue-900/30 border-blue-500/30' : 'bg-blue-50 border-blue-200'
+      }`}>
+        <div className={`font-medium text-[10px] mb-1 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>&#127744; Question of the Day</div>
+        <p className={`text-sm font-semibold leading-snug ${TH('text-primary', darkMode)}`}>
+          Should AI identify itself?
+        </p>
+      </div>
+      <h1 className={`text-xl font-bold text-center ${TH('text-primary', darkMode)}`}>What's on your mind?</h1>
+      <div className="space-y-2.5">
+        <div className={`w-full py-3 px-4 rounded-xl text-left border overflow-hidden ${
+          darkMode ? 'starry-bg border-amber-500/30' : 'bg-amber-50 border-amber-200'
+        }`}>
+          <div className="flex items-center gap-3 relative z-10">
+            <span className="text-xl">&#9728;&#65039;</span>
+            <div className="min-w-0">
+              <div className={`text-base font-semibold truncate ${TH('text-primary', darkMode)}`}>Predict</div>
+              <div className={`text-[10px] truncate ${darkMode ? 'text-amber-400/80' : 'text-amber-600'}`}>What will happen?</div>
+            </div>
+          </div>
+        </div>
+        <div className={`w-full py-3 px-4 rounded-xl text-left border ${
+          darkMode ? 'border-violet-500/30 bg-violet-900/20' : 'border-violet-200 bg-violet-50'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-lg">&#129504;</span>
+            <div className="min-w-0">
+              <div className={`text-sm font-semibold truncate ${TH('text-primary', darkMode)}`}>Think</div>
+              <div className={`text-[10px] truncate ${darkMode ? 'text-violet-400/80' : 'text-violet-600'}`}>Logic puzzles &amp; analysis</div>
+            </div>
+          </div>
+        </div>
+        <div className={`w-full py-3 px-4 rounded-xl text-left border ${
+          darkMode ? 'border-emerald-500/30 bg-emerald-900/20' : 'border-emerald-200 bg-emerald-50'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-lg">&#9878;&#65039;</span>
+            <div className="min-w-0">
+              <div className={`text-sm font-semibold truncate ${TH('text-primary', darkMode)}`}>Judge</div>
+              <div className={`text-[10px] truncate ${darkMode ? 'text-emerald-400/80' : 'text-emerald-600'}`}>Ethics &amp; opinions</div>
+            </div>
+          </div>
+        </div>
+        <div className={`w-full py-3 px-4 rounded-xl text-left border ${
+          darkMode ? 'border-rose-500/30 bg-rose-900/20' : 'border-rose-200 bg-rose-50'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-lg">&#10024;</span>
+            <div className="min-w-0">
+              <div className={`text-sm font-semibold truncate ${TH('text-primary', darkMode)}`}>Surprise me</div>
+              <div className={`text-[10px] truncate ${darkMode ? 'text-rose-400/80' : 'text-rose-500'}`}>Something unexpected</div>
+            </div>
+          </div>
+        </div>
+        <div className={`w-full py-3 px-4 rounded-xl text-left border ${
+          darkMode ? 'border-sky-500/30 bg-sky-900/20' : 'border-sky-200 bg-sky-50'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-lg">&#129695;</span>
+            <div className="min-w-0">
+              <div className={`text-sm font-semibold truncate ${TH('text-primary', darkMode)}`}>Reveal</div>
+              <div className={`text-[10px] truncate ${darkMode ? 'text-sky-400/80' : 'text-sky-600'}`}>Discover yourself</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenBinaryQuestion = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+    <div className={`flex items-center justify-between px-3 py-1.5 ${darkMode ? 'border-b border-white/5' : 'border-b border-gray-200/50'}`}>
+      <span className="text-base">&#127744;</span>
+      <span className={`text-[10px] ${TH('text-muted', darkMode)}`}>42 answered</span>
+      <span className={`text-base ${TH('text-muted', darkMode)}`}>&#9776;</span>
+    </div>
+    <div className="flex-1 flex flex-col justify-center px-4 space-y-3">
+      <div className="space-y-1.5 p-3 rounded-xl">
+        <div className="flex justify-center">
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${darkMode ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
+            &#9728;&#65039; Predictions
+          </span>
+        </div>
+        <h2 className={`text-base text-center font-medium leading-snug ${TH('text-primary', darkMode)}`}>
+          Will humans live on Mars by 2050?
+        </h2>
+      </div>
+      <div className="flex items-center gap-1.5 px-2">
+        <div className="flex-1 h-[44px] rounded-xl font-bold overflow-hidden flex items-center justify-center"
+             style={{ background: 'linear-gradient(135deg, #047857, #10b981)', color: 'white' }}>
+          <span className="text-lg font-bold">YES</span>
+          <span className="text-[10px] font-medium opacity-60 ml-1">&#9733;&#9733;</span>
+        </div>
+        <div className="w-8 h-[44px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5">
+          <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>&#10005;</div>
+          <div className="w-6 h-6 rounded-full text-white shadow-lg flex items-center justify-center text-xs bg-emerald-500">&#10003;</div>
+        </div>
+        <div className={`flex-1 h-[44px] rounded-xl font-bold overflow-hidden flex items-center justify-center ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-rose-600 border border-rose-200'}`}>
+          <span className="text-lg font-bold">NO</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenMCQuestion = ({ darkMode }) => {
+  const MC_COLORS = [
+    { hex: '#3b82f6', shades: ['#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'], rgb: '59, 130, 246' },
+    { hex: '#8b5cf6', shades: ['#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed'], rgb: '139, 92, 246' },
+    { hex: '#14b8a6', shades: ['#5eead4', '#2dd4bf', '#14b8a6', '#0d9488'], rgb: '20, 184, 166' },
+    { hex: '#06b6d4', shades: ['#67e8f9', '#22d3ee', '#06b6d4', '#0891b2'], rgb: '6, 182, 212' },
+  ];
+  const options = ['Utility vs duty', 'Action vs inaction', 'Individual vs group', 'Intuition vs logic'];
+  const selectedIdx = 1;
+  const tapCount = 2;
+
+  return (
+    <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 ${darkMode ? 'border-b border-white/5' : 'border-b border-gray-200/50'}`}>
+        <span className="text-base">&#127744;</span>
+        <span className={`text-[10px] ${TH('text-muted', darkMode)}`}>42 answered</span>
+        <span className={`text-base ${TH('text-muted', darkMode)}`}>&#9776;</span>
+      </div>
+      <div className="flex-1 flex flex-col justify-center px-3 space-y-3">
+        <div className="space-y-1.5 p-3 rounded-xl">
+          <div className="flex justify-center">
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-700'}`}>
+              &#129504; Reasoning
+            </span>
+          </div>
+          <h2 className={`text-sm text-center font-medium leading-snug ${TH('text-primary', darkMode)}`}>
+            The trolley problem is fundamentally about...
+          </h2>
+        </div>
+        <div className="px-1 space-y-1">
+          {options.map((opt, i) => {
+            const color = MC_COLORS[i];
+            const isSelected = i === selectedIdx;
+            const style = isSelected
+              ? { background: `linear-gradient(135deg, ${color.shades[1]}, ${color.shades[2]})`, color: 'white', border: `2px solid ${color.hex}` }
+              : { background: darkMode ? 'rgb(31,41,55)' : 'rgb(255,255,255)', color: darkMode ? 'rgb(209,213,219)' : 'rgb(55,65,81)', border: darkMode ? '2px solid transparent' : '2px solid rgb(229,231,235)' };
+            return (
+              <div key={i} className="flex items-center gap-1">
+                <div className="flex-1 h-[34px] px-2.5 rounded-lg text-left text-xs overflow-hidden relative flex items-center" style={style}>
+                  <span className="font-medium mr-1 opacity-50 text-[10px]">{String.fromCharCode(65 + i)}.</span>
+                  <span className="truncate">{opt}</span>
+                  {isSelected && (
+                    <span className="absolute top-1/2 right-1.5 -translate-y-1/2 text-[9px] font-bold bg-white/30 w-4 h-4 rounded-full flex items-center justify-center">
+                      {tapCount}
+                    </span>
+                  )}
+                </div>
+                <div className="w-7 h-[34px] flex-shrink-0 flex flex-col items-center justify-center">
+                  {isSelected && (
+                    <>
+                      <div className={`w-3 h-3 rounded-full flex items-center justify-center text-[7px] ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>&#10005;</div>
+                      <div className="w-5 h-5 rounded-full text-white shadow flex items-center justify-center text-[10px]"
+                           style={{ backgroundColor: color.hex }}>&#10003;</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenResults = ({ darkMode }) => {
+  const yesColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'];
+  const noColors = ['#f43f5e', '#fb7185', '#fda4af', '#fecaca'];
+  const yesByConf = [38, 28, 18, 8];
+  const noByConf = [15, 12, 8, 5];
+  const maxCount = 38;
+  const highlightColor = darkMode ? 'white' : '#6b7280';
+
+  const buildSegments = (byConf, colors) => {
+    const segs = [];
+    for (let i = 0; i < 4; i++) {
+      if (byConf[i] > 0) segs.push({ width: (byConf[i] / maxCount) * 100, color: colors[i], conf: 3 - i });
+    }
+    return segs;
+  };
+
+  const rows = [
+    { label: 'Yes', pct: '69%', byConf: yesByConf, colors: yesColors, isUser: true, userConf: 2 },
+    { label: 'No', pct: '31%', byConf: noByConf, colors: noColors, isUser: false, userConf: null },
+  ];
+
+  return (
+    <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 ${darkMode ? 'border-b border-white/5' : 'border-b border-gray-200/50'}`}>
+        <span className="text-base">&#127744;</span>
+        <span className={`text-[10px] ${TH('text-muted', darkMode)}`}>43 answered</span>
+        <span className={`text-base ${TH('text-muted', darkMode)}`}>&#9776;</span>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+        <div className={`w-full px-3 py-2.5 rounded-lg text-left ${darkMode ? 'bg-gray-900/80 shine-card glow-emerald' : 'bg-white border border-gray-200/80'}`}>
+          <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            Will humans live on Mars by 2050?
+          </div>
+          <div className="space-y-1.5">
+            {rows.map((row, ri) => {
+              const segments = buildSegments(row.byConf, row.colors);
+              const totalWidth = segments.reduce((a, s) => a + s.width, 0);
+              const emptyWidth = 100 - totalWidth;
+              return (
+                <div key={ri} className="flex items-center gap-1.5">
+                  <span className={`text-[10px] w-7 font-semibold ${row.isUser ? 'px-1 py-0.5 rounded-full border' : ''}`}
+                    style={{ color: row.colors[0], borderColor: row.isUser ? highlightColor : 'transparent' }}>
+                    {row.label}
+                  </span>
+                  <span className="text-[10px] w-5" style={{ color: row.colors[0] }}>{row.pct}</span>
+                  <div className={`flex-1 h-3 rounded-full overflow-hidden ${darkMode ? 'bg-black' : 'bg-gray-200'}`}>
+                    <div className="h-full flex">
+                      {segments.map((s, i) => {
+                        const isUserSeg = row.isUser && s.conf === row.userConf;
+                        const isFirst = i === 0;
+                        const isLast = i === segments.length - 1 && emptyWidth <= 0;
+                        return (
+                          <div key={i} className={`h-full relative flex items-center justify-center ${isFirst ? 'rounded-l-full' : ''} ${isLast ? 'rounded-r-full' : ''}`}
+                            style={{ width: `${s.width}%`, backgroundColor: s.color }}>
+                            {isUserSeg && (
+                              <>
+                                <span className="text-[7px] font-black relative z-10" style={{ color: s.conf <= 1 ? '#374151' : 'white' }}>&#10003;</span>
+                                <div className="absolute inset-0 pointer-events-none" style={{
+                                  borderRadius: isFirst && isLast ? '9999px' : isFirst ? '9999px 0 0 9999px' : isLast ? '0 9999px 9999px 0' : '0',
+                                  boxShadow: `inset 0 0 0 1.5px ${highlightColor}`,
+                                }} />
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {emptyWidth > 0 && (
+                        <div className="h-full rounded-r-full" style={{ width: `${emptyWidth}%`, border: `1px solid ${row.colors[3]}`, borderLeft: 'none' }} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className={`text-[10px] text-right mt-1.5 ${TH('text-faint', darkMode)}`}>1,847 responses &rarr;</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenSettings = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col overflow-hidden ${TH('bg-main', darkMode)}`}>
+    <div className={`flex items-center justify-between px-3 py-2 border-b ${TH('border-base', darkMode)}`}>
+      <span className={`text-xs ${TH('text-violet', darkMode)}`}>&larr; Back</span>
+      <h1 className={`text-sm font-semibold ${TH('text-primary', darkMode)}`}>Settings</h1>
+      <div className="w-10" />
+    </div>
+    <div className="flex-1 overflow-y-auto p-3 space-y-2 hide-scrollbar">
+      <div className={`rounded-lg p-2.5 ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200/80'}`}>
+        <div className="flex items-center justify-between">
+          <div className={`text-xs font-medium ${TH('text-primary', darkMode)}`}>Theme</div>
+          <div className={`relative w-10 h-5 rounded-full ${darkMode ? 'bg-violet-600' : 'bg-gray-200'}`}>
+            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow text-[8px] flex items-center justify-center ${darkMode ? 'translate-x-5' : 'translate-x-0.5'}`}>
+              {darkMode ? '\u{1F319}' : '\u{2600}'}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className={`rounded-lg p-2.5 ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200/80'}`}>
+        <div className="flex items-center justify-between mb-1.5">
+          <div className={`text-xs font-medium ${TH('text-primary', darkMode)}`}>Undo Delay</div>
+          <span className={`text-xs font-bold ${TH('text-violet', darkMode)}`}>2s</span>
+        </div>
+        <div className={`w-full h-1 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+          <div className="h-full rounded-lg bg-violet-500" style={{ width: '66%' }} />
+        </div>
+      </div>
+      {[
+        { label: 'Require Submit', sub: 'Off = auto-submit', on: true },
+        { label: 'Show Tips', sub: 'Gesture hints', on: true },
+        { label: 'Streak Counter', sub: 'Show during play', on: true },
+        { label: 'Demo Profiles', sub: 'Sample data', on: false },
+      ].map((item, i) => (
+        <div key={i} className={`rounded-lg p-2.5 ${darkMode ? 'bg-gray-900' : 'bg-white border border-gray-200/80'}`}>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1 mr-2">
+              <div className={`text-xs font-medium truncate ${TH('text-primary', darkMode)}`}>{item.label}</div>
+              <div className={`text-[10px] truncate ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{item.sub}</div>
+            </div>
+            <div className={`relative w-9 h-5 rounded-full flex-shrink-0 ${item.on ? 'bg-violet-600' : darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow ${item.on ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const ScreenAssessments = ({ darkMode }) => {
+  const Circle = ({ progress, size, sw, color, children, id }) => {
+    const r = (size - sw) / 2;
+    const circ = 2 * Math.PI * r;
+    const grad = PROGRESS_GRADIENTS[color] || PROGRESS_GRADIENTS.violet;
+    const gId = id || `ac-${size}-${color}-${progress}`;
+    return (
+      <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="absolute">
+          <defs>
+            <linearGradient id={gId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={progress > 0 ? grad.from : (darkMode ? '#374151' : '#d1d5db')} />
+              <stop offset="100%" stopColor={progress > 0 ? grad.to : (darkMode ? '#4b5563' : '#e5e7eb')} />
+            </linearGradient>
+          </defs>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={darkMode ? '#1f2937' : '#e5e7eb'} strokeWidth={sw} />
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={`url(#${gId})`} strokeWidth={sw} strokeLinecap="round"
+            strokeDasharray={circ} strokeDashoffset={circ * (1 - progress / 100)}
+            transform={`rotate(-90 ${size/2} ${size/2})`} />
+        </svg>
+        <span className="relative z-10 flex items-center justify-center" style={{ lineHeight: 1 }}>{children}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+      <div className={`h-[36px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+        <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>&larr;</span>
+        <span className="text-lg select-none">&#129695;</span>
+        <span className={`text-xs font-semibold flex-1 ${TH('text-primary', darkMode)}`}>Reveal</span>
+        <span className="px-2 py-1 rounded-full text-[10px] font-medium bg-violet-600 text-white">Analysis</span>
+      </div>
+      <div className="flex-1 overflow-auto p-3 pb-16 hide-scrollbar">
+        <div className="space-y-2 mb-4">
+          <div className={`w-full p-3 rounded-xl ${TH('bg-card', darkMode)} flex items-center gap-3`}>
+            <Circle progress={40} size={40} sw={3} color="blue" id="pick-qp">
+              <span className="text-[10px] font-medium" style={{ color: PROGRESS_GRADIENTS.blue.to }}>10</span>
+            </Circle>
+            <div className="flex-1 min-w-0">
+              <div className={`text-xs font-semibold truncate ${TH('text-primary', darkMode)}`}>Quick Profile</div>
+              <div className={`text-[10px] ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>40% done</div>
+            </div>
+            <span className={`text-[10px] font-medium px-2 py-1 rounded-full flex-shrink-0 ${darkMode ? 'bg-blue-600/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>Continue</span>
+          </div>
+
+          <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)}`}>
+            <div className="w-full p-3 text-left flex items-center gap-2">
+              <Circle progress={33} size={36} sw={3} color="indigo" id="pick-starter">
+                <span className="text-[9px] font-medium" style={{ color: PROGRESS_GRADIENTS.indigo.to }}>2</span>
+              </Circle>
+              <div className="flex-1 min-w-0">
+                <div className={`text-xs font-semibold truncate ${TH('text-primary', darkMode)}`}>Starter Pack</div>
+                <div className={`text-[10px] ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>2 left</div>
+              </div>
+              <div className="flex gap-0.5 items-center">
+                {[['&#127917;',100],['&#128293;',62],['&#128161;',0]].map(([icon, pct], j) => (
+                  <Circle key={j} progress={pct} size={20} sw={2} color="indigo" id={`mod-ring-${j}`}>
+                    <span className="text-[8px]" dangerouslySetInnerHTML={{__html: icon}} />
+                  </Circle>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className={`w-full p-3 rounded-xl ${TH('bg-card', darkMode)} flex items-center gap-3 opacity-60`}>
+            <Circle progress={0} size={40} sw={3} color="violet" id="pick-deep">
+              <span className="text-[10px] font-medium" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>40</span>
+            </Circle>
+            <div className="flex-1 min-w-0">
+              <div className={`text-xs font-semibold truncate ${TH('text-primary', darkMode)}`}>Personality Deep</div>
+              <div className={`text-[10px] ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>40 questions</div>
+            </div>
+            <span className={`text-[10px] font-medium px-2 py-1 rounded-full flex-shrink-0 ${darkMode ? 'bg-violet-600/20 text-violet-400' : 'bg-violet-100 text-violet-600'}`}>Start</span>
+          </div>
+        </div>
+
+        <div className="mt-2">
+          <div className={`text-[9px] font-medium uppercase tracking-wide mb-1.5 px-1 ${TH('text-dim', darkMode)}`}>
+            Completed
+          </div>
+          <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)}`}>
+            <div className="w-full px-3 py-2 flex items-center gap-2">
+              <Circle progress={100} size={28} sw={2} color="emerald" id="pick-char">
+                <span className="text-[10px]">&#128737;&#65039;</span>
+              </Circle>
+              <span className={`flex-1 text-left text-[10px] font-medium ${TH('text-primary', darkMode)}`}>Character</span>
+              <span className={`text-[9px] ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>View &rarr;</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenAssessmentTaking = ({ darkMode }) => {
+  const scaleLabels = [
+    { v: 1, l: 'Not like me' },
+    { v: 2, l: 'A little unlike me' },
+    { v: 3, l: 'Neutral' },
+    { v: 4, l: 'A little like me' },
+    { v: 5, l: 'Very like me' },
+  ];
+  const totalQ = 10;
+  const currentIdx = 3;
+  const selectedAnswer = 4;
+
+  const gradientTints = darkMode
+    ? ['bg-blue-950/30 border-blue-800/40', 'bg-blue-950/50 border-blue-700/50', 'bg-blue-900/40 border-blue-600/50', 'bg-blue-900/60 border-blue-500/60', 'bg-blue-800/70 border-blue-400/70']
+    : ['bg-blue-50/60 border-blue-200', 'bg-blue-50 border-blue-200', 'bg-blue-100/70 border-blue-300', 'bg-blue-100 border-blue-300', 'bg-blue-200/80 border-blue-400'];
+
+  const segments = Array.from({ length: totalQ }, (_, i) => ({
+    isAnswered: i < currentIdx,
+    isCurrent: i === currentIdx,
+  }));
+
+  return (
+    <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+      <div className={`h-[36px] flex-shrink-0 flex items-center gap-1.5 px-2.5 border-b ${TH('border-base', darkMode)}`}>
+        <span className={`text-[10px] font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Save</span>
+        <span className={`text-base font-bold w-6 h-6 flex items-center justify-center ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>&#9664;</span>
+        <div className="flex-1 text-center">
+          <div className={`text-[9px] ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Quick Profile</div>
+          <div className={`text-[10px] font-medium ${TH('text-primary', darkMode)}`}>{currentIdx + 1} / {totalQ}</div>
+        </div>
+        <span className={`text-base font-bold w-6 h-6 flex items-center justify-center ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>&#9654;</span>
+        <span className={`text-[10px] font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Exit</span>
+      </div>
+      <div className={`flex h-1.5 gap-px px-1 py-0.5 ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+        {segments.map((seg, i) => (
+          <div key={i} className={`flex-1 rounded-sm ${
+            seg.isAnswered ? 'bg-blue-500'
+            : seg.isCurrent ? (darkMode ? 'bg-white' : 'bg-gray-900')
+            : (darkMode ? 'bg-gray-800' : 'bg-gray-300')
+          }`} />
+        ))}
+      </div>
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col justify-center px-3 pb-2">
+          <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-900 border border-gray-800' : 'bg-white border border-gray-200/80'}`}>
+            <h2 className={`text-sm font-medium text-center leading-relaxed ${TH('text-primary', darkMode)}`}>
+              I enjoy being the center of attention
+            </h2>
+          </div>
+        </div>
+        <div className="flex-shrink-0 px-3 pb-3 space-y-1.5">
+          {scaleLabels.map((option, i) => {
+            const isSelected = option.v === selectedAnswer;
+            return (
+              <div key={option.v} className={`w-full py-2.5 px-3 rounded-lg flex items-center justify-between border relative overflow-hidden text-xs ${
+                isSelected
+                  ? `bg-blue-600 border-blue-400 text-white ring-2 ring-blue-400 ring-offset-1 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-white'}`
+                  : `${gradientTints[i]} ${darkMode ? 'text-gray-200' : 'text-gray-700'}`
+              }`}>
+                <span className="text-left truncate">{option.l}</span>
+                <span className={`text-[10px] font-medium flex-shrink-0 ml-1 ${isSelected ? 'text-white/70' : (darkMode ? 'text-blue-400/70' : 'text-blue-500/70')}`}>{option.v}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenAssessmentResults = ({ darkMode }) => {
+  const traits = [
+    { name: 'Extraversion', low: 'Reserved', high: 'Outgoing', score: 35, colorL: '#3b82f6', colorR: '#f59e0b' },
+    { name: 'Agreeableness', low: 'Analytical', high: 'Empathetic', score: 72, colorL: '#8b5cf6', colorR: '#10b981' },
+    { name: 'Conscientiousness', low: 'Flexible', high: 'Organized', score: 58, colorL: '#f43f5e', colorR: '#14b8a6' },
+    { name: 'Neuroticism', low: 'Calm', high: 'Sensitive', score: 45, colorL: '#10b981', colorR: '#f59e0b' },
+    { name: 'Openness', low: 'Practical', high: 'Curious', score: 81, colorL: '#6366f1', colorR: '#06b6d4' },
+  ];
+
+  const TraitSpectrum = ({ name, score, low, high, colorL, colorR, idx }) => (
+    <div className="py-1">
+      {name && <div className={`text-[9px] font-medium mb-0.5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{name}</div>}
+      <div className="flex justify-between text-[8px] mb-0.5">
+        <span style={{ color: colorL }}>{low}</span>
+        <span style={{ color: colorR }}>{high}</span>
+      </div>
+      <div className="h-2.5 rounded-full relative" style={{ background: `linear-gradient(to right, ${colorL}, ${colorR})` }}>
+        <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white"
+          style={{ left: `${Math.max(5, Math.min(95, score))}%`, marginLeft: -7, boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+      <div className={`h-[36px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+        <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>&larr;</span>
+        <span className={`text-xs font-semibold flex-1 text-center ${TH('text-primary', darkMode)}`}>Quick Profile</span>
+        <div className="w-4" />
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 hide-scrollbar">
+        <div className={`rounded-xl overflow-hidden ${darkMode ? 'bg-gray-900/80 border border-gray-800' : 'bg-white border border-gray-200/80'}`}>
+          <div className="p-4 bg-gradient-to-br from-violet-600 to-violet-400">
+            <div className="text-center">
+              <span className="text-3xl">&#9889;</span>
+              <h2 className="text-white text-base font-bold mt-1">Quick Profile</h2>
+              <p className="text-white/70 text-[10px] mt-0.5">Based on 10 responses</p>
+            </div>
+          </div>
+          <div className="p-3 space-y-1.5">
+            {traits.map((t, i) => (
+              <TraitSpectrum key={i} idx={i} name={t.name} score={t.score} low={t.low} high={t.high} colorL={t.colorL} colorR={t.colorR} />
+            ))}
+            <div className="flex gap-2 pt-2">
+              <span className="text-sm">&#128170;</span>
+              <div className="flex-1 min-w-0">
+                <div className={`text-[9px] font-medium uppercase tracking-wide ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Strength</div>
+                <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Deep thinker who recharges through reflection</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-sm">&#128161;</span>
+              <div className="flex-1 min-w-0">
+                <div className={`text-[9px] font-medium uppercase tracking-wide ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Growth</div>
+                <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Prepare starters before events</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenSaveModal = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+    <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: darkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.08)' }}>
+      <div className={`w-full max-w-[220px] rounded-xl p-5 ${darkMode ? 'bg-gray-900' : 'bg-white shadow-xl'}`}>
+        <div className="text-3xl text-center mb-2">&#127881;</div>
+        <h2 className={`text-base font-bold text-center mb-1.5 ${darkMode ? 'text-white' : 'text-gray-900'}`}>20 responses!</h2>
+        <p className={`text-[10px] text-center mb-4 leading-relaxed ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          Save your progress?<br/>Sync across devices.
+        </p>
+        <div className="space-y-1.5">
+          <div className="w-full py-2.5 rounded-lg font-medium text-xs text-center bg-violet-500 text-white">Create Account</div>
+          <div className={`w-full py-2.5 rounded-lg font-medium text-xs text-center ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>Later</div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenLevelUp = ({ darkMode }) => (
+  <div className={`flex-1 flex flex-col ${TH('bg-main', darkMode)}`}>
+    <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: darkMode ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.08)' }}>
+      <div className={`w-full max-w-[220px] rounded-xl p-6 text-center ${darkMode ? 'bg-gray-900' : 'bg-white shadow-xl'}`}>
+        <div className="relative inline-block mb-4">
+          <div className="absolute inset-0 flex items-center justify-center" style={{ margin: '-8px' }}>
+            <div className="w-16 h-16 rounded-full animate-pulse" style={{
+              background: darkMode
+                ? 'radial-gradient(circle, rgba(139,92,246,0.25), rgba(251,191,36,0.15), transparent)'
+                : 'radial-gradient(circle, rgba(139,92,246,0.15), rgba(251,191,36,0.08), transparent)'
+            }} />
+          </div>
+          <div className="relative z-10 text-4xl celebrate-glow">&#127881;</div>
+        </div>
+        <h2 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Level Up!</h2>
+        <div className={`text-4xl font-bold mb-1 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>5</div>
+        <p className={`text-sm font-medium mb-4 ${darkMode ? 'text-violet-300' : 'text-violet-500'}`}>Thinker</p>
+        <div className="w-full py-2.5 rounded-lg font-medium text-sm bg-violet-500 text-white">Continue</div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenProfile = ({ darkMode }) => {
+  const auraStyle = {
+    boxShadow: '0 0 12px 3px rgba(139,92,246,0.3), 0 0 20px 6px rgba(16,185,129,0.2)',
+    border: '2px solid rgba(139,92,246,0.5)'
+  };
+
+  return (
+    <div className={`flex-1 flex flex-col overflow-hidden ${darkMode ? 'text-white bg-gray-950' : 'text-gray-900 bg-gray-50'}`}>
+      <div className={`h-[36px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+        <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>&larr;</span>
+        <span className="text-xs font-medium flex-1">Profile</span>
+      </div>
+      <div className="flex-1 p-3 overflow-y-auto space-y-3 hide-scrollbar">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center font-bold text-base text-white"
+            style={auraStyle}>P</div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-sm truncate">philip@aura.app</h2>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`text-[10px] ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Lv.3</span>
+              <span className="text-[10px] text-orange-400">&#128293;5</span>
+              <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>145 XP</span>
+            </div>
+          </div>
+        </div>
+
+        <div className={`w-full rounded-xl overflow-hidden text-left ${
+          darkMode ? 'bg-gradient-to-br from-violet-950/50 to-indigo-950/60 border border-violet-700/40'
+                   : 'bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200'
+        }`}>
+          <div className="flex items-stretch min-h-[70px]">
+            <div className={`w-[70px] flex-shrink-0 flex items-center justify-center overflow-hidden ${darkMode ? 'bg-gray-950/40' : 'bg-white/50'}`}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{
+                background: 'radial-gradient(circle, rgba(139,92,246,0.4), rgba(99,102,241,0.2), transparent)',
+                boxShadow: '0 0 20px rgba(139,92,246,0.3)'
+              }}>
+                <span className="text-xl">&#127744;</span>
+              </div>
+            </div>
+            <div className="flex-1 py-2 px-3 flex flex-col justify-center min-w-0">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className={`text-xs font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>The Quiet Strategist</span>
+                <span className={`text-[10px] flex-shrink-0 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>&rarr;</span>
+              </div>
+              <p className={`text-[10px] truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Thoughtful planner, big picture</p>
+              <div className="flex items-center gap-1 mt-1">
+                {[1,2,3,4].map(s => (
+                  <div key={s} className={`w-1.5 h-1.5 rounded-full ${s <= 2 ? (darkMode ? 'bg-violet-400' : 'bg-violet-500') : (darkMode ? 'bg-gray-700' : 'bg-gray-300')}`} />
+                ))}
+                <span className={`text-[8px] ml-0.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Stage 2</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={`rounded-xl p-3 ${darkMode ? 'bg-gray-900/40 border border-gray-800/40' : 'bg-white border border-gray-200/80'}`}>
+          <div className={`text-[9px] font-semibold uppercase tracking-wide mb-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Activity</div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center">
+              <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>42</div>
+              <div className={`text-[9px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Answered</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>2.8</div>
+              <div className={`text-[9px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Avg Conf</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>3</div>
+              <div className={`text-[9px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Tests</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScreenQotD = ({ darkMode }) => {
+  const bgStyle = {
+    background: darkMode
+      ? 'radial-gradient(ellipse at center, rgba(59,130,246,0.15) 0%, transparent 70%), #030712'
+      : 'radial-gradient(ellipse at center, rgba(59,130,246,0.06) 0%, transparent 70%), #fafaf8'
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={bgStyle}>
+      <div className={`h-[28px] flex-shrink-0 flex items-center justify-center gap-2 ${darkMode ? 'bg-blue-900/15' : 'bg-blue-50/60'}`}>
+        <span className={`text-[10px] font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Question of the Day</span>
+        <span className={`text-[9px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Day 12</span>
+      </div>
+      <div className="flex-1 flex flex-col justify-center px-5">
+        <h2 className={`text-base text-center font-medium leading-relaxed ${TH('text-primary', darkMode)}`}>
+          Should AI systems be required to identify themselves?
+        </h2>
+      </div>
+      <div className="flex-shrink-0 px-4 pb-4">
+        <div className="flex items-center gap-2">
+          <div className={`flex-1 h-[48px] rounded-xl font-bold flex items-center justify-center transition-colors ${
+            darkMode ? 'bg-emerald-900/30 border border-emerald-700/40 text-emerald-400' : 'bg-emerald-50 border border-emerald-200 text-emerald-600'
+          }`}>
+            <span className="text-lg font-bold">YES</span>
+          </div>
+          <div className={`flex-1 h-[48px] rounded-xl font-bold flex items-center justify-center transition-colors ${
+            darkMode ? 'bg-rose-900/30 border border-rose-700/40 text-rose-400' : 'bg-rose-50 border border-rose-200 text-rose-600'
+          }`}>
+            <span className="text-lg font-bold">NO</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== SCREENS REGISTRY ====================
+const SCREENS = [
+  { id: 'welcome',       name: 'Welcome',            section: 'Auth',        component: ScreenWelcome },
+  { id: 'sign-in',       name: 'Sign In',             section: 'Auth',        component: ScreenSignIn },
+  { id: 'onboarding',    name: 'Onboarding',          section: 'Onboarding',  component: ScreenOnboarding },
+  { id: 'path-choice',   name: 'Path Choice',         section: 'Onboarding',  component: ScreenPathChoice },
+  { id: 'categories',    name: 'Categories',          section: 'Onboarding',  component: ScreenCategories },
+  { id: 'profile',       name: 'Profile',             section: 'Main',        component: ScreenProfile },
+  { id: 'qotd',          name: 'Question of the Day', section: 'Main',        component: ScreenQotD },
+  { id: 'binary',        name: 'Binary Question',     section: 'Questions',   component: ScreenBinaryQuestion },
+  { id: 'mc',            name: 'Multiple Choice',     section: 'Questions',   component: ScreenMCQuestion },
+  { id: 'results',       name: 'Results',             section: 'Questions',   component: ScreenResults },
+  { id: 'settings',      name: 'Settings',            section: 'Settings',    component: ScreenSettings },
+  { id: 'assessments',   name: 'Assessments',         section: 'Assessments', component: ScreenAssessments },
+  { id: 'assess-taking', name: 'Assessment Taking',   section: 'Assessments', component: ScreenAssessmentTaking },
+  { id: 'assess-results',name: 'Assessment Results',  section: 'Assessments', component: ScreenAssessmentResults },
+  { id: 'save-modal',    name: 'Save Modal',          section: 'Modals',      component: ScreenSaveModal },
+  { id: 'level-up',      name: 'Level Up',            section: 'Modals',      component: ScreenLevelUp },
+];
+
+const SECTION_ORDER = ['Auth', 'Onboarding', 'Main', 'Questions', 'Settings', 'Assessments', 'Modals'];
+
+// ==================== SCROLL ROW ====================
+const ScrollRow = ({ children, darkMode }) => {
+  const rowRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 10);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
+  }, []);
+
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener('resize', checkScroll);
+    return () => { el.removeEventListener('scroll', checkScroll); window.removeEventListener('resize', checkScroll); };
+  }, [checkScroll]);
+
+  const scroll = (dir) => {
+    const el = rowRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * 340, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="relative group">
+      <div ref={rowRef} className="gallery-row" style={{ paddingBottom: 48 }}>
+        {children}
+      </div>
+      {canScrollLeft && (
+        <button onClick={() => scroll(-1)} className="nav-arrows opacity-0 group-hover:opacity-100"
+          style={{ left: 12, background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', color: darkMode ? 'white' : '#333', backdropFilter: 'blur(8px)' }}>
+          &#8249;
+        </button>
+      )}
+      {canScrollRight && (
+        <button onClick={() => scroll(1)} className="nav-arrows opacity-0 group-hover:opacity-100"
+          style={{ right: 12, background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', color: darkMode ? 'white' : '#333', backdropFilter: 'blur(8px)' }}>
+          &#8250;
+        </button>
+      )}
+    </div>
+  );
+};
+
+// ==================== APP ====================
+const App = () => {
+  const [darkMode, setDarkMode] = useState(true);
+  const [expanded, setExpanded] = useState(null);
+  const [filter, setFilter] = useState('All');
+  const [device, setDevice] = useState(DEVICES[1]); // Default to iPhone 15
+
+  useEffect(() => {
+    if (!expanded) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') { setExpanded(null); return; }
+      const flat = filteredScreens();
+      const idx = flat.findIndex(s => s.id === expanded.id);
+      if (e.key === 'ArrowRight' && idx < flat.length - 1) setExpanded(flat[idx + 1]);
+      if (e.key === 'ArrowLeft' && idx > 0) setExpanded(flat[idx - 1]);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [expanded, filter]);
+
+  useEffect(() => {
+    document.body.style.overflow = expanded ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [expanded]);
+
+  const filteredScreens = () => {
+    if (filter === 'All') return SCREENS;
+    return SCREENS.filter(s => s.section === filter);
+  };
+
+  const groupedBySection = () => {
+    const screens = filteredScreens();
+    const groups = {};
+    SECTION_ORDER.forEach(sec => {
+      const items = screens.filter(s => s.section === sec);
+      if (items.length > 0) groups[sec] = items;
+    });
+    return groups;
+  };
+
+  const bg = darkMode ? 'gallery-dark' : 'gallery-light';
+  const textMuted = darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(120,110,95,0.6)';
+  const textSecondary = darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(80,70,55,0.7)';
+  const totalScreens = filteredScreens().length;
+
+  return (
+    <div className={bg} style={{ minHeight: '100vh', transition: 'background 0.4s ease, color 0.4s ease' }}>
+
+      {/* ===== STICKY HEADER ===== */}
+      <header className="sticky-header" style={{
+        padding: '16px max(40px, calc((100vw - 1400px) / 2))',
+        background: darkMode ? 'rgba(5,5,8,0.85)' : 'rgba(248,247,244,0.8)',
+        borderBottomColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(60,50,40,0.08)',
+      }}>
+        <div className="flex items-center justify-between gap-4 mb-3">
+          <h1 className="section-title" style={{ fontSize: 24, color: darkMode ? '#fafafa' : '#2a2520', margin: 0 }}>
+            Screen Atlas
+          </h1>
+
+          <button className="toggle-track"
+            style={{ background: darkMode ? '#6366f1' : '#c0beb8' }}
+            onClick={() => setDarkMode(!darkMode)}>
+            <div className="toggle-thumb" style={{ left: darkMode ? 22 : 2 }} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {/* Section filters */}
+          <nav className="flex items-center gap-2 flex-wrap">
+            {['All', ...SECTION_ORDER].map(sec => {
+              const active = filter === sec;
+              return (
+                <button key={sec} className="nav-pill"
+                  style={{
+                    background: active
+                      ? (darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(60,50,40,0.08)')
+                      : 'transparent',
+                    color: active
+                      ? (darkMode ? '#fff' : '#2a2520')
+                      : (darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(120,110,95,0.6)'),
+                    fontWeight: active ? 500 : 400,
+                  }}
+                  onClick={() => {
+                    setFilter(sec);
+                    if (sec !== 'All') {
+                      setTimeout(() => {
+                        const el = document.getElementById(`section-${sec}`);
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 50);
+                    }
+                  }}>
+                  {sec}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Device selector */}
+          <nav className="flex items-center gap-2 flex-wrap">
+            {DEVICES.map(dev => {
+              const active = device.id === dev.id;
+              return (
+                <button key={dev.id} className="nav-pill"
+                  style={{
+                    background: active
+                      ? (darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(60,50,40,0.08)')
+                      : 'transparent',
+                    color: active
+                      ? (darkMode ? '#fff' : '#2a2520')
+                      : (darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(120,110,95,0.6)'),
+                    fontWeight: active ? 500 : 400,
+                  }}
+                  onClick={() => setDevice(dev)}>
+                  {dev.name}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      </header>
+
+      {/* ===== SECTIONS ===== */}
+      <main style={{ paddingTop: 60, paddingBottom: 120 }}>
+        {Object.entries(groupedBySection()).map(([section, screens]) => {
+          const sectionData = SECTION_COLORS[section] || { color: '#666' };
+          return (
+            <section key={section} id={`section-${section}`} style={{ marginTop: 56 }}>
+              <div style={{ padding: '0 max(40px, calc((100vw - 1400px) / 2))', marginBottom: 32 }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full" style={{ background: sectionData.color }} />
+                  <h2 className="section-title" style={{
+                    fontSize: 32,
+                    color: darkMode ? 'rgba(255,255,255,0.85)' : 'rgba(42,37,32,0.85)',
+                    margin: 0,
+                  }}>
+                    {section}
+                  </h2>
+                </div>
+                <p style={{
+                  fontSize: 13, fontWeight: 300, marginTop: 4,
+                  color: textMuted, letterSpacing: '0.03em',
+                }}>
+                  {screens.length} {screens.length === 1 ? 'screen' : 'screens'}
+                </p>
+              </div>
+
+              <ScrollRow darkMode={darkMode}>
+                {screens.map(screen => {
+                  const Comp = screen.component;
+                  const sectionColor = SECTION_COLORS[screen.section]?.color;
+                  return (
+                    <div key={screen.id} className="gallery-item" style={{ cursor: 'pointer', width: SLOT_W, height: SLOT_H }}>
+                      <div className={darkMode ? 'phone-shadow-dark' : 'phone-shadow-light'}>
+                        <PhoneFrame darkMode={darkMode} device={device} expanded={false} sectionColor={sectionColor} onClick={() => setExpanded(screen)}>
+                          <Comp darkMode={darkMode} />
+                        </PhoneFrame>
+                      </div>
+                      <div className="screen-label" style={{ color: textSecondary }}>
+                        {screen.name}
+                      </div>
+                    </div>
+                  );
+                })}
+              </ScrollRow>
+            </section>
+          );
+        })}
+      </main>
+
+      {/* ===== EXPANDED VIEW ===== */}
+      {expanded && (() => {
+        const Comp = expanded.component;
+        const flat = filteredScreens();
+        const idx = flat.findIndex(s => s.id === expanded.id);
+        const hasPrev = idx > 0;
+        const hasNext = idx < flat.length - 1;
+
+        return (
+          <div className={`expanded-overlay ${!darkMode ? 'light-overlay' : ''}`}
+            onClick={(e) => { if (e.target === e.currentTarget) setExpanded(null); }}>
+
+            <button className={`close-btn ${darkMode ? 'close-btn-dark' : 'close-btn-light'}`}
+              onClick={() => setExpanded(null)}>
+              &#10005;
+            </button>
+
+            {hasPrev && (
+              <button className="nav-arrows" style={{
+                left: 24,
+                background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                color: darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)',
+              }} onClick={() => setExpanded(flat[idx - 1])}>&#8249;</button>
+            )}
+
+            <div className="expanded-phone" style={{ position: 'relative' }}>
+              <div className={darkMode ? 'phone-shadow-dark' : 'phone-shadow-light'}>
+                <PhoneFrame darkMode={darkMode} device={device} expanded={true}>
+                  <Comp darkMode={darkMode} />
+                </PhoneFrame>
+              </div>
+            </div>
+
+            {hasNext && (
+              <button className="nav-arrows" style={{
+                right: 24,
+                background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                color: darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)',
+              }} onClick={() => setExpanded(flat[idx + 1])}>&#8250;</button>
+            )}
+
+            <div className="expanded-meta">
+              <p style={{
+                fontSize: 15, fontWeight: 400, letterSpacing: '0.01em',
+                color: darkMode ? 'rgba(255,255,255,0.7)' : 'rgba(42,37,32,0.6)',
+              }}>
+                {expanded.name}
+              </p>
+              <p style={{
+                fontSize: 12, fontWeight: 300, marginTop: 4, letterSpacing: '0.05em',
+                color: darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(42,37,32,0.35)',
+                textTransform: 'uppercase',
+              }}>
+                {expanded.section} &middot; {idx + 1} / {flat.length}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+};
+
+// ==================== RENDER ====================
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+  </script>
+</body>
+</html>

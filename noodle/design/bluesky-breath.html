@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick Profile — Breath Pattern</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    transition: background 0.5s ease;
+    overflow-x: hidden;
+  }
+
+  .phone { transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease; }
+  .card { transition: background 0.5s ease, border-color 0.5s ease; }
+
+  /* The Breath Container */
+  .breath-container {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* The Living Breath */
+  .breath-blob {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    transition: filter 0.3s ease;
+  }
+
+  .breath-blob svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* Outer glow layer */
+  .breath-glow {
+    position: absolute;
+    width: 140%;
+    height: 140%;
+    filter: blur(40px);
+    opacity: 0.6;
+    pointer-events: none;
+    transition: transform 0.1s ease-out;
+  }
+
+  /* Inner core — the bright center */
+  .breath-core {
+    position: absolute;
+    width: 40%;
+    height: 40%;
+    border-radius: 50%;
+    filter: blur(15px);
+    opacity: 0.8;
+    pointer-events: none;
+    transition: opacity 0.1s ease-out;
+  }
+
+  /* Ambient ring */
+  .ambient-ring {
+    position: absolute;
+    width: 110%;
+    height: 110%;
+    border-radius: 50%;
+    border: 1px solid;
+    opacity: 0.15;
+    pointer-events: none;
+  }
+
+  /* Pulse ring animation */
+  @keyframes pulse-ring {
+    0%, 100% { transform: scale(1); opacity: 0.25; }
+    50% { transform: scale(1.2); opacity: 0; }
+  }
+
+  .pulse-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    animation: pulse-ring 3s ease-out infinite;
+    pointer-events: none;
+  }
+
+  /* Trait badge styling */
+  .trait-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+  }
+
+  .trait-badge .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    transition: background 0.3s ease;
+  }
+
+  /* Summary text */
+  .summary-text {
+    transition: color 0.3s ease;
+    line-height: 1.5;
+  }
+
+  .summary-text em {
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  /* Shuffle animation */
+  @keyframes morph-transition {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.95); }
+    100% { transform: scale(1); }
+  }
+
+  .morphing {
+    animation: morph-transition 0.4s ease;
+  }
+
+  /* Light mode specific blob adjustments */
+  .light-mode .breath-blob {
+    filter: saturate(1.2) brightness(0.95);
+  }
+
+  /* Floating particles (subtle) */
+  @keyframes float {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.5; }
+    50% { transform: translateY(-8px) scale(1.1); opacity: 0.8; }
+  }
+
+  .particle {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: float 3s ease-in-out infinite;
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 gap-5" style="background: #08080c;">
+
+  <!-- Controls -->
+  <div class="flex gap-3 items-center flex-wrap justify-center">
+    <button onclick="setMode('dark')" id="btn-dark" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-blue-500 transition-all">Dark</button>
+    <button onclick="setMode('light')" id="btn-light" class="px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 border-gray-300 transition-all">Light</button>
+    <div class="w-px h-6 bg-gray-600"></div>
+    <button onclick="shuffle()" id="shuffle-btn" class="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-all active:scale-95">Shuffle</button>
+  </div>
+
+  <!-- Phone Frame -->
+  <div id="phone" class="phone w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl" style="background: #0a0a12; border: 2px solid #1a1a24;">
+    <div class="p-4 pt-10 pb-5">
+      <!-- ResultCard -->
+      <div id="card" class="card rounded-2xl overflow-hidden" style="background: rgba(10, 10, 18, 0.95); border: 1px solid rgba(59, 130, 246, 0.15);">
+
+        <!-- Header -->
+        <div class="p-4 pb-2 text-center">
+          <div class="text-xl mb-0.5">✨</div>
+          <div id="title" class="text-base font-semibold text-white">Quick Profile</div>
+          <div id="subtitle" class="text-[11px] text-gray-500 tracking-wide">Your personality snapshot</div>
+        </div>
+
+        <!-- The Breath Visualization -->
+        <div class="flex justify-center py-2 relative">
+          <div class="breath-container" id="breath-container">
+            <!-- Glow Layer -->
+            <div class="breath-glow" id="breath-glow"></div>
+
+            <!-- Ambient ring -->
+            <div class="ambient-ring" id="ambient-ring" style="border-color: #3b82f6;"></div>
+
+            <!-- Pulse Rings -->
+            <div class="pulse-ring" id="pulse-ring-1" style="color: #3b82f6;"></div>
+            <div class="pulse-ring" id="pulse-ring-2" style="color: #3b82f6; animation-delay: -1.5s;"></div>
+
+            <!-- Main Blob -->
+            <div class="breath-blob" id="breath-blob">
+              <svg viewBox="0 0 200 200" id="breath-svg">
+                <defs>
+                  <!-- Main gradient with more depth -->
+                  <radialGradient id="blob-gradient" cx="35%" cy="35%" r="65%">
+                    <stop offset="0%" id="grad-inner" stop-color="#93c5fd" />
+                    <stop offset="40%" id="grad-mid" stop-color="#3b82f6" />
+                    <stop offset="100%" id="grad-outer" stop-color="#1e3a8a" stop-opacity="0.9" />
+                  </radialGradient>
+                  <!-- Highlight for glass effect -->
+                  <radialGradient id="highlight-gradient" cx="30%" cy="25%" r="40%">
+                    <stop offset="0%" stop-color="white" stop-opacity="0.3" />
+                    <stop offset="100%" stop-color="white" stop-opacity="0" />
+                  </radialGradient>
+                  <!-- Soft glow filter -->
+                  <filter id="blob-glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                <path id="blob-path" fill="url(#blob-gradient)" filter="url(#blob-glow)" />
+                <path id="blob-highlight" fill="url(#highlight-gradient)" />
+              </svg>
+            </div>
+
+            <!-- Inner Core -->
+            <div class="breath-core" id="breath-core"></div>
+
+            <!-- Floating particles -->
+            <div class="particle" id="p1" style="top: 20%; left: 15%;"></div>
+            <div class="particle" id="p2" style="top: 70%; right: 20%; animation-delay: -1s;"></div>
+            <div class="particle" id="p3" style="bottom: 25%; left: 25%; animation-delay: -2s;"></div>
+          </div>
+        </div>
+
+        <!-- Trait Badges -->
+        <div class="px-4 py-2">
+          <div id="trait-badges" class="flex justify-center gap-2 flex-wrap"></div>
+        </div>
+
+        <!-- Summary Line -->
+        <div class="px-5 py-2">
+          <p id="summary" class="summary-text text-[13px] text-center text-gray-300"></p>
+        </div>
+
+        <!-- CTA -->
+        <div class="px-4 pb-4 pt-1">
+          <div id="cta" class="p-3 rounded-xl text-center" style="background: rgba(59, 130, 246, 0.08);">
+            <div id="cta-sub" class="text-[10px] text-gray-500 tracking-wide">Based on 10 questions</div>
+            <div id="cta-main" class="text-[13px] font-medium mt-0.5 text-blue-400">Starter Pack adds 40 more →</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interpretation Guide -->
+  <div id="guide" class="text-center max-w-xs text-gray-600 text-[11px] leading-relaxed mt-1">
+    <span class="text-gray-400">Watch the breath:</span> Speed reveals energy. Size reveals openness. Shape reveals thinking style.
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// TEAM BREATH — "My personality has a pulse"
+// ═══════════════════════════════════════════════════════════════
+
+// Personality traits (0-100 scale)
+let traits = {
+  energy: 72,      // Low = calm/reserved, High = energetic/outgoing
+  openness: 85,    // Low = practical/focused, High = curious/imaginative
+  feeling: 65,     // Low = analytical/direct, High = empathetic/warm
+};
+
+let isDark = true;
+let animationFrame;
+let time = 0;
+let targetTraits = { ...traits };
+let isTransitioning = false;
+
+// Color palettes from TOKENS.md — each creates a distinct mood
+const palettes = {
+  energetic: {
+    inner: '#f9a8d4', mid: '#ec4899', outer: '#9d174d',
+    core: '#fdf2f8', glow: '#ec4899',
+    name: 'Radiant'
+  },
+  balanced: {
+    inner: '#93c5fd', mid: '#3b82f6', outer: '#1e3a8a',
+    core: '#dbeafe', glow: '#3b82f6',
+    name: 'Centered'
+  },
+  calm: {
+    inner: '#5eead4', mid: '#14b8a6', outer: '#134e4a',
+    core: '#ccfbf1', glow: '#14b8a6',
+    name: 'Serene'
+  },
+  curious: {
+    inner: '#c4b5fd', mid: '#8b5cf6', outer: '#4c1d95',
+    core: '#ede9fe', glow: '#8b5cf6',
+    name: 'Imaginative'
+  },
+  grounded: {
+    inner: '#6ee7b7', mid: '#10b981', outer: '#064e3b',
+    core: '#d1fae5', glow: '#10b981',
+    name: 'Grounded'
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// BREATH DYNAMICS — How personality shapes the breath
+// ═══════════════════════════════════════════════════════════════
+
+function getBreathParams() {
+  // Speed: calm personalities breathe slowly, energetic ones pulse faster
+  const speedMultiplier = 0.4 + (traits.energy / 100) * 1.2;
+
+  // Amplitude: open people expand more, reserved stay contained
+  const amplitude = 0.5 + (traits.openness / 100) * 0.5;
+
+  // Organicness: feeling types have softer, more organic shapes
+  // Thinking types have more geometric, angular shapes
+  const organicness = 4 + (traits.feeling / 100) * 4; // 4-8 points
+
+  // Complexity: more open = more variation in the movement
+  const complexity = 0.2 + (traits.openness / 100) * 0.5;
+
+  return { speedMultiplier, amplitude, organicness, complexity };
+}
+
+function getPalette() {
+  // Choose palette based on trait combination
+  if (traits.energy > 65 && traits.openness > 55) return palettes.energetic;
+  if (traits.energy < 40 && traits.feeling > 50) return palettes.calm;
+  if (traits.openness > 70) return palettes.curious;
+  if (traits.feeling > 65 && traits.energy < 60) return palettes.grounded;
+  return palettes.balanced;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BLOB GENERATION — The living shape
+// ═══════════════════════════════════════════════════════════════
+
+function generateBlobPath(t, params, scale = 1) {
+  const { amplitude, organicness, complexity, speedMultiplier } = params;
+  const cx = 100, cy = 100;
+
+  // Primary breathing rhythm — smooth sine wave
+  const breathPhase = (Math.sin(t * speedMultiplier) + 1) / 2; // 0 to 1
+  const baseRadius = (40 + breathPhase * 30 * amplitude) * scale;
+
+  // Number of control points determines shape character
+  const numPoints = Math.round(organicness + 2);
+  const points = [];
+
+  for (let i = 0; i < numPoints; i++) {
+    const angle = (i / numPoints) * Math.PI * 2 - Math.PI / 2; // Start from top
+
+    // Layered oscillations for organic feel
+    const wave1 = Math.sin(t * speedMultiplier * 0.6 + i * 1.1) * 10 * complexity;
+    const wave2 = Math.sin(t * speedMultiplier * 1.1 + i * 0.7) * 6 * complexity;
+    const wave3 = Math.cos(t * speedMultiplier * 0.4 + i * 1.5) * 4 * complexity;
+
+    // Slight asymmetry makes it feel more alive
+    const asymmetry = Math.sin(i * 2.5) * 3 * complexity;
+
+    const r = baseRadius + wave1 + wave2 + wave3 + asymmetry;
+
+    points.push({
+      x: cx + Math.cos(angle) * r,
+      y: cy + Math.sin(angle) * r
+    });
+  }
+
+  return createSmoothPath(points);
+}
+
+function createSmoothPath(points) {
+  if (points.length < 3) return '';
+
+  const n = points.length;
+  let path = `M ${points[0].x} ${points[0].y}`;
+
+  for (let i = 0; i < n; i++) {
+    const p0 = points[(i - 1 + n) % n];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % n];
+    const p3 = points[(i + 2) % n];
+
+    // Catmull-Rom to Bezier — tension controls smoothness
+    const tension = 0.35;
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+
+  return path + ' Z';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════════════════════
+
+function animate() {
+  time += 0.016; // ~60fps timing
+
+  // Smooth transition between trait states
+  if (isTransitioning) {
+    const lerp = 0.08;
+    traits.energy += (targetTraits.energy - traits.energy) * lerp;
+    traits.openness += (targetTraits.openness - traits.openness) * lerp;
+    traits.feeling += (targetTraits.feeling - traits.feeling) * lerp;
+
+    // Check if close enough to stop transitioning
+    const diff = Math.abs(traits.energy - targetTraits.energy) +
+                 Math.abs(traits.openness - targetTraits.openness) +
+                 Math.abs(traits.feeling - targetTraits.feeling);
+    if (diff < 0.5) {
+      traits = { ...targetTraits };
+      isTransitioning = false;
+      render(); // Final render with exact values
+    }
+  }
+
+  const params = getBreathParams();
+  const palette = getPalette();
+
+  // Update blob path
+  const path = generateBlobPath(time, params);
+  document.getElementById('blob-path').setAttribute('d', path);
+
+  // Smaller highlight blob for glass effect
+  const highlightPath = generateBlobPath(time, { ...params, amplitude: params.amplitude * 0.6 }, 0.5);
+  document.getElementById('blob-highlight').setAttribute('d', highlightPath);
+
+  // Breathing phase for synchronized effects
+  const breathPhase = (Math.sin(time * params.speedMultiplier) + 1) / 2;
+
+  // Update gradients
+  document.getElementById('grad-inner').setAttribute('stop-color', palette.inner);
+  document.getElementById('grad-mid').setAttribute('stop-color', palette.mid);
+  document.getElementById('grad-outer').setAttribute('stop-color', palette.outer);
+
+  // Update glow — breathes with the blob
+  const glow = document.getElementById('breath-glow');
+  const glowIntensity = isDark ? 0.5 + breathPhase * 0.3 : 0.3 + breathPhase * 0.2;
+  glow.style.background = `radial-gradient(circle, ${palette.glow}${isDark ? '70' : '40'} 0%, transparent 65%)`;
+  glow.style.transform = `scale(${0.85 + breathPhase * 0.25})`;
+  glow.style.opacity = glowIntensity;
+
+  // Update core — pulses brighter on inhale
+  const core = document.getElementById('breath-core');
+  const coreOpacity = isDark ? 0.4 + breathPhase * 0.4 : 0.2 + breathPhase * 0.3;
+  core.style.background = `radial-gradient(circle, ${palette.core} 0%, ${palette.inner}60 100%)`;
+  core.style.opacity = coreOpacity;
+  core.style.transform = `scale(${0.9 + breathPhase * 0.2})`;
+
+  // Update ambient ring
+  const ambientRing = document.getElementById('ambient-ring');
+  ambientRing.style.borderColor = palette.mid;
+  ambientRing.style.opacity = isDark ? 0.15 : 0.1;
+
+  // Update pulse rings
+  const ringColor = palette.mid;
+  document.getElementById('pulse-ring-1').style.color = ringColor;
+  document.getElementById('pulse-ring-2').style.color = ringColor;
+
+  // Pulse ring speed matches energy
+  const pulseDuration = 4.5 - (traits.energy / 100) * 2.5; // 2-4.5 seconds
+  document.getElementById('pulse-ring-1').style.animationDuration = `${pulseDuration}s`;
+  document.getElementById('pulse-ring-2').style.animationDuration = `${pulseDuration}s`;
+
+  // Update particles
+  ['p1', 'p2', 'p3'].forEach(id => {
+    const p = document.getElementById(id);
+    p.style.background = palette.inner;
+    p.style.opacity = isDark ? 0.6 : 0.4;
+  });
+
+  animationFrame = requestAnimationFrame(animate);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI RENDERING
+// ═══════════════════════════════════════════════════════════════
+
+function render() {
+  const palette = getPalette();
+
+  // Trait badges
+  const badges = document.getElementById('trait-badges');
+  const traitData = [
+    { key: 'energy', lowLabel: 'Calm', highLabel: 'Energetic', value: traits.energy },
+    { key: 'openness', lowLabel: 'Focused', highLabel: 'Curious', value: traits.openness },
+    { key: 'feeling', lowLabel: 'Analytical', highLabel: 'Empathetic', value: traits.feeling },
+  ];
+
+  badges.innerHTML = traitData.map(t => {
+    const label = t.value > 50 ? t.highLabel : t.lowLabel;
+    const isStrong = t.value > 65 || t.value < 35;
+    const bgColor = isDark
+      ? (isStrong ? `${palette.mid}25` : 'rgba(255,255,255,0.05)')
+      : (isStrong ? `${palette.mid}15` : 'rgba(0,0,0,0.04)');
+    const textColor = isDark
+      ? (isStrong ? palette.inner : 'rgba(255,255,255,0.6)')
+      : (isStrong ? palette.outer : 'rgba(0,0,0,0.5)');
+    const dotColor = isStrong ? palette.mid : (isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)');
+
+    return `<div class="trait-badge" style="background: ${bgColor}; color: ${textColor};">
+      <span class="dot" style="background: ${dotColor};"></span>
+      ${label}
+    </div>`;
+  }).join('');
+
+  // Generate poetic summary
+  const summary = generateSummary();
+  const summaryEl = document.getElementById('summary');
+  summaryEl.innerHTML = summary;
+  summaryEl.className = `summary-text text-[13px] text-center ${isDark ? 'text-gray-300' : 'text-gray-600'}`;
+
+  // Theme the card border to match palette
+  const card = document.getElementById('card');
+  card.style.borderColor = `${palette.mid}${isDark ? '20' : '15'}`;
+
+  applyTheme();
+}
+
+function generateSummary() {
+  // Create evocative, personal descriptions
+  const energyDesc = traits.energy > 70 ? 'pulses with vibrant energy'
+    : traits.energy > 50 ? 'moves at a steady rhythm'
+    : traits.energy > 30 ? 'flows with quiet strength'
+    : 'rests in stillness';
+
+  const openDesc = traits.openness > 70 ? 'reaching toward possibility'
+    : traits.openness > 50 ? 'balanced between depth and breadth'
+    : 'anchored in what matters';
+
+  const feelDesc = traits.feeling > 70 ? 'warm and attuned to others'
+    : traits.feeling > 50 ? 'thoughtfully present'
+    : 'clear and considered';
+
+  // Combine into a flowing sentence
+  return `Your presence <em>${energyDesc}</em>, <em>${openDesc}</em>, <em>${feelDesc}</em>.`;
+}
+
+function applyTheme() {
+  const palette = getPalette();
+
+  const phone = document.getElementById('phone');
+  const card = document.getElementById('card');
+  const title = document.getElementById('title');
+  const subtitle = document.getElementById('subtitle');
+  const cta = document.getElementById('cta');
+  const ctaSub = document.getElementById('cta-sub');
+  const ctaMain = document.getElementById('cta-main');
+  const guide = document.getElementById('guide');
+  const body = document.body;
+
+  if (isDark) {
+    body.style.background = '#06060a';
+    body.classList.remove('light-mode');
+    phone.style.background = '#0a0a12';
+    phone.style.borderColor = '#1a1a28';
+    phone.style.boxShadow = `0 25px 50px -12px rgba(0,0,0,0.8), 0 0 0 1px ${palette.mid}10`;
+    card.style.background = 'rgba(8, 8, 16, 0.95)';
+    title.className = 'text-base font-semibold text-white';
+    subtitle.className = 'text-[11px] text-gray-500 tracking-wide';
+    cta.style.background = `${palette.mid}12`;
+    ctaSub.className = 'text-[10px] text-gray-500 tracking-wide';
+    ctaMain.className = 'text-[13px] font-medium mt-0.5';
+    ctaMain.style.color = palette.inner;
+    guide.className = 'text-center max-w-xs text-gray-600 text-[11px] leading-relaxed mt-1';
+  } else {
+    body.style.background = '#f8fafc';
+    body.classList.add('light-mode');
+    phone.style.background = '#ffffff';
+    phone.style.borderColor = '#e2e8f0';
+    phone.style.boxShadow = `0 25px 50px -12px rgba(0,0,0,0.15), 0 0 0 1px ${palette.mid}10`;
+    card.style.background = 'rgba(255, 255, 255, 0.98)';
+    title.className = 'text-base font-semibold text-gray-900';
+    subtitle.className = 'text-[11px] text-gray-500 tracking-wide';
+    cta.style.background = `${palette.mid}08`;
+    ctaSub.className = 'text-[10px] text-gray-500 tracking-wide';
+    ctaMain.className = 'text-[13px] font-semibold mt-0.5';
+    ctaMain.style.color = palette.outer;
+    guide.className = 'text-center max-w-xs text-gray-400 text-[11px] leading-relaxed mt-1';
+  }
+}
+
+function setMode(mode) {
+  isDark = mode === 'dark';
+  document.getElementById('btn-dark').className = `px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 transition-all ${isDark ? 'border-blue-500' : 'border-gray-600'}`;
+  document.getElementById('btn-light').className = `px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 transition-all ${!isDark ? 'border-blue-500' : 'border-gray-300'}`;
+  render();
+}
+
+function shuffle() {
+  // Visual feedback
+  const container = document.getElementById('breath-container');
+  container.classList.add('morphing');
+  setTimeout(() => container.classList.remove('morphing'), 400);
+
+  // Generate new personality with interesting distributions
+  const randomTrait = () => {
+    const r = Math.random();
+    // Bias toward more distinctive values (not all 50%)
+    if (r < 0.35) return 20 + Math.random() * 20;   // Low: 20-40
+    if (r > 0.65) return 65 + Math.random() * 30;   // High: 65-95
+    return 40 + Math.random() * 25;                  // Mid: 40-65
+  };
+
+  targetTraits = {
+    energy: randomTrait(),
+    openness: randomTrait(),
+    feeling: randomTrait(),
+  };
+
+  isTransitioning = true;
+  render(); // Immediate UI update
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════
+
+render();
+animate();
+
+// Handle visibility changes for performance
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    cancelAnimationFrame(animationFrame);
+  } else {
+    animate();
+  }
+});
+</script>
+</body>
+</html>

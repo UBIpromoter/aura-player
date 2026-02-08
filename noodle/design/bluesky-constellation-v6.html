@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constellation V6 — Star Chart</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #030712;
+    color: white;
+    overflow-x: hidden;
+    transition: background 0.6s ease, color 0.6s ease;
+  }
+
+  /* ── Scrollbar ── */
+  * { scrollbar-width: thin; scrollbar-color: rgba(139, 92, 246, 0.3) transparent; }
+  *::-webkit-scrollbar { width: 4px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 2px; }
+
+  /* ── Phone Frame ── */
+  .phone-outer {
+    width: calc(393px + 16px);
+    height: calc(852px + 16px);
+    border-radius: 55px;
+    padding: 8px;
+    background: linear-gradient(145deg, #2a2a2e, #1a1a1c);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(0,0,0,0.3);
+    transition: background 0.6s ease;
+  }
+
+  .phone-inner {
+    width: 393px;
+    height: 852px;
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    background: #030712;
+    transition: background 0.6s ease;
+  }
+
+  .dynamic-island {
+    width: 126px;
+    height: 37px;
+    border-radius: 20px;
+    background: #000;
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+  }
+
+  /* ── Status Bar ── */
+  .status-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 54px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 28px 6px;
+    z-index: 40;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .status-bar .time { letter-spacing: 0.02em; }
+  .status-icons { display: flex; align-items: center; gap: 5px; }
+
+  /* ── Animations ── */
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.12; }
+    50% { opacity: 0.55; }
+  }
+
+  @keyframes starBreathe {
+    0%, 100% {
+      filter: brightness(1);
+      transform: scale(1);
+    }
+    50% {
+      filter: brightness(1.2);
+      transform: scale(1.06);
+    }
+  }
+
+  @keyframes starEnter {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes nebulaBreathe {
+    0%, 100% { opacity: 0.25; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.04); }
+  }
+
+  @keyframes particleDrift {
+    0% { transform: translate(0, 0); opacity: 0; }
+    10% { opacity: 0.4; }
+    90% { opacity: 0.4; }
+    100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.6; }
+  }
+
+  .ambient-star {
+    position: absolute;
+    border-radius: 50%;
+    background: white;
+    pointer-events: none;
+  }
+
+  .drifting-particle {
+    position: absolute;
+    border-radius: 50%;
+    background: white;
+    pointer-events: none;
+    animation: particleDrift var(--duration) linear var(--delay) infinite;
+  }
+
+  .trait-star {
+    animation: starBreathe 5s ease-in-out infinite;
+    cursor: default;
+    transition: transform 0.4s ease, filter 0.4s ease;
+  }
+
+  .trait-star:hover {
+    transform: scale(1.15) !important;
+  }
+
+  .star-enter {
+    animation: starEnter 0.6s ease-out forwards;
+  }
+
+  .nebula-glow {
+    animation: nebulaBreathe 8s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  /* ── Spectrum Bar ── */
+  .spectrum-bar {
+    height: 3px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .spectrum-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ── Controls ── */
+  .shuffle-btn {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 8px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    background: rgba(139, 92, 246, 0.08);
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+
+  .shuffle-btn:hover {
+    background: rgba(139, 92, 246, 0.18);
+    border-color: rgba(139, 92, 246, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .mode-toggle {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+
+  .mode-toggle:hover {
+    color: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  /* ── Light Mode ── */
+  body.light-mode {
+    background: #f0f0f4;
+    color: #1e293b;
+  }
+
+  .light-mode .phone-outer {
+    background: linear-gradient(145deg, #d8d8dc, #c0c0c4);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 0 0 1px rgba(0,0,0,0.08);
+  }
+
+  .light-mode .phone-inner {
+    background: #f9fafb;
+  }
+
+  .light-mode .dynamic-island {
+    background: #1a1a1c;
+  }
+
+  .light-mode .status-bar {
+    color: #1e293b;
+  }
+
+  .light-mode .sky-bg {
+    background: radial-gradient(ellipse at 50% 40%, #e0e7ff 0%, #c7d2fe 40%, #ddd6fe 100%) !important;
+  }
+
+  .light-mode .ambient-star {
+    background: rgba(99, 102, 241, 0.45);
+  }
+
+  .light-mode .drifting-particle {
+    background: rgba(99, 102, 241, 0.3);
+  }
+
+  .light-mode .shuffle-btn {
+    color: rgba(99, 102, 241, 0.7);
+    border-color: rgba(99, 102, 241, 0.25);
+    background: rgba(99, 102, 241, 0.06);
+  }
+
+  .light-mode .shuffle-btn:hover {
+    background: rgba(99, 102, 241, 0.14);
+    border-color: rgba(99, 102, 241, 0.45);
+    color: rgba(99, 102, 241, 1);
+  }
+
+  .light-mode .mode-toggle {
+    color: rgba(71, 85, 105, 0.5);
+    border-color: rgba(99, 102, 241, 0.15);
+  }
+
+  .light-mode .mode-toggle:hover {
+    color: rgba(71, 85, 105, 0.8);
+    border-color: rgba(99, 102, 241, 0.3);
+  }
+
+  .light-mode .spectrum-bar {
+    background: rgba(0,0,0,0.06);
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 gap-5">
+
+  <!-- Controls (outside phone frame) -->
+  <div class="flex gap-3 items-center">
+    <button onclick="shuffleProfile()" class="shuffle-btn">Shuffle Profile</button>
+    <button onclick="toggleMode()" class="mode-toggle" id="mode-btn">Light</button>
+  </div>
+
+  <!-- Phone Frame -->
+  <div class="phone-outer">
+    <div class="phone-inner" id="phone-inner">
+
+      <!-- Dynamic Island -->
+      <div class="dynamic-island"></div>
+
+      <!-- Status Bar -->
+      <div class="status-bar" id="status-bar">
+        <span class="time">9:41</span>
+        <span class="status-icons">
+          <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity="0.4"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity="0.6"/><rect x="9" y="0.5" width="3" height="11.5" rx="1" fill="currentColor" opacity="0.8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M8 2.4C5.6 2.4 3.4 3.4 1.8 5L0 3.2C2.1 1.2 4.9 0 8 0s5.9 1.2 8 3.2L14.2 5C12.6 3.4 10.4 2.4 8 2.4z" fill="currentColor" opacity="0.3"/><path d="M8 5.6C6.4 5.6 4.9 6.2 3.8 7.2L2 5.4C3.5 4 5.6 3.2 8 3.2s4.5.8 6 2.2l-1.8 1.8C11.1 6.2 9.6 5.6 8 5.6z" fill="currentColor" opacity="0.6"/><path d="M8 8.8c-1 0-1.8.4-2.4 1L8 12l2.4-2.2C9.8 9.2 9 8.8 8 8.8z" fill="currentColor"/></svg>
+          <svg width="27" height="12" viewBox="0 0 27 12" fill="none"><rect x="0" y="1" width="23" height="10" rx="2.5" stroke="currentColor" stroke-width="1" opacity="0.35"/><rect x="24" y="3.5" width="2.5" height="5" rx="1" fill="currentColor" opacity="0.3"/><rect x="1.5" y="2.5" width="16" height="7" rx="1.5" fill="currentColor"/></svg>
+        </span>
+      </div>
+
+      <!-- App Content -->
+      <div class="absolute inset-0 flex flex-col" style="padding-top: 56px;">
+
+        <!-- Header -->
+        <div style="padding: 8px 20px 0;">
+          <div class="flex items-center gap-2 mb-1">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            <span style="font-size: 13px; opacity: 0.45; font-weight: 500;">Analysis</span>
+          </div>
+          <div class="text-center" style="margin-top: -2px;">
+            <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; font-weight: 500; opacity: 0.35; margin-bottom: 3px;" class="subtitle-text">Your Aura</div>
+            <div id="constellation-name" style="font-size: 20px; font-weight: 600; letter-spacing: 0.02em; opacity: 0.92;"></div>
+          </div>
+        </div>
+
+        <!-- Sky / Constellation -->
+        <div class="relative flex-shrink-0 mx-3 mt-3 rounded-2xl overflow-hidden" style="height: 420px;" id="sky-container">
+          <div class="sky-bg absolute inset-0" style="background: radial-gradient(ellipse at 50% 35%, #0f1129 0%, #080b1a 55%, #050710 100%);">
+
+            <!-- Nebula glow layer -->
+            <div id="nebula-layer" class="absolute inset-0" style="overflow: hidden;"></div>
+
+            <!-- Ambient twinkle stars -->
+            <div id="ambient-stars"></div>
+
+            <!-- Drifting particle field -->
+            <div id="particle-field"></div>
+
+            <!-- Constellation SVG -->
+            <svg id="constellation-svg" class="absolute inset-0 w-full h-full" viewBox="0 0 367 420" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <filter id="glow-soft" x="-200%" y="-200%" width="500%" height="500%">
+                  <feGaussianBlur stdDeviation="4" result="blur1"/>
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur2"/>
+                  <feMerge>
+                    <feMergeNode in="blur1"/>
+                    <feMergeNode in="blur2"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <filter id="glow-halo" x="-300%" y="-300%" width="700%" height="700%">
+                  <feGaussianBlur stdDeviation="10" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+
+              <!-- Connection lines -->
+              <g id="connection-lines"></g>
+
+              <!-- Stars -->
+              <g id="trait-stars"></g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Bottom Section: Summary + Spectrum Bars -->
+        <div class="flex-1 overflow-auto" style="padding: 16px 24px 28px;">
+
+          <!-- Summary text -->
+          <p id="summary-text" style="font-size: 13px; line-height: 1.55; font-weight: 300; opacity: 0.55; margin-bottom: 18px; text-align: center;"></p>
+
+          <!-- Spectrum bars -->
+          <div id="spectrum-bars" class="flex flex-col gap-3"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// CONSTELLATION V6 — STAR CHART
+// Premium, rich, calm. Phone-framed. Nebula + particles + halos.
+// ════════════════════════════════════════════════════════════════════
+
+const COLORS = {
+  violet:  '#8b5cf6',
+  blue:    '#3b82f6',
+  emerald: '#10b981',
+  fuchsia: '#d946ef',
+  cyan:    '#06b6d4'
+};
+
+// Extended traits — 10 for visual richness
+// Primary 5 are OCEAN, secondary 5 are facets/sub-traits
+const TRAITS = [
+  { key: 'O',  name: 'Openness',         color: COLORS.violet,  word: { high: 'Imaginative', mid: 'Curious',    low: 'Grounded' },   primary: true },
+  { key: 'C',  name: 'Conscientiousness', color: COLORS.emerald, word: { high: 'Disciplined', mid: 'Steady',     low: 'Flexible' },   primary: true },
+  { key: 'E',  name: 'Extraversion',      color: COLORS.fuchsia, word: { high: 'Outgoing',    mid: 'Ambivert',   low: 'Reflective' }, primary: true },
+  { key: 'A',  name: 'Agreeableness',     color: COLORS.blue,    word: { high: 'Warm',        mid: 'Balanced',   low: 'Direct' },     primary: true },
+  { key: 'N',  name: 'Composure',         color: COLORS.cyan,    word: { high: 'Steady',      mid: 'Responsive', low: 'Sensitive' },  primary: true },
+  { key: 'Cu', name: 'Curiosity',         color: COLORS.violet,  word: { high: 'Seeker',      mid: 'Engaged',    low: 'Focused' },    primary: false },
+  { key: 'Em', name: 'Empathy',           color: COLORS.blue,    word: { high: 'Attuned',     mid: 'Perceptive', low: 'Detached' },   primary: false },
+  { key: 'Dr', name: 'Drive',             color: COLORS.emerald, word: { high: 'Relentless',  mid: 'Motivated',  low: 'Unhurried' },  primary: false },
+  { key: 'Cr', name: 'Creativity',        color: COLORS.fuchsia, word: { high: 'Visionary',   mid: 'Inventive',  low: 'Practical' },  primary: false },
+  { key: 'Rs', name: 'Resilience',        color: COLORS.cyan,    word: { high: 'Unshakable',  mid: 'Adaptive',   low: 'Tender' },     primary: false }
+];
+
+let scores = { O: 82, C: 65, E: 45, A: 71, N: 58, Cu: 76, Em: 68, Dr: 54, Cr: 88, Rs: 42 };
+let isDark = true;
+
+// ────────────────────────────────────────────────────
+// Positions: 10 stars spread organically in the sky
+// viewBox is 367 x 420
+// ────────────────────────────────────────────────────
+
+const CX = 183, CY = 200;
+
+const BASE_POSITIONS = [
+  { x: 183, y: 72  },  // O — top center
+  { x: 296, y: 128 },  // C — upper right
+  { x: 318, y: 260 },  // E — right
+  { x: 256, y: 355 },  // A — lower right
+  { x: 142, y: 338 },  // N — lower left
+  { x: 120, y: 148 },  // Cu — upper left (facet of O)
+  { x: 68,  y: 245 },  // Em — left (facet of A)
+  { x: 218, y: 180 },  // Dr — inner right
+  { x: 148, y: 205 },  // Cr — inner left
+  { x: 183, y: 290 },  // Rs — lower center
+];
+
+// ────────────────────────────────────────────────────
+// Constellation name generator
+// ────────────────────────────────────────────────────
+
+const PREFIXES = {
+  O: { high: 'Nova',    low: 'Terra' },
+  C: { high: 'Ordo',    low: 'Libera' },
+  E: { high: 'Solaris', low: 'Lunara' },
+  A: { high: 'Cordis',  low: 'Acuta' },
+  N: { high: 'Firma',   low: 'Vela' }
+};
+
+const SUFFIXES = ['Minor', 'Rising', 'Major', 'Prime', 'Ascendant'];
+
+function generateName() {
+  const primary = TRAITS.filter(t => t.primary);
+  const ranked = primary
+    .map(t => ({ key: t.key, dist: Math.abs(scores[t.key] - 50) }))
+    .sort((a, b) => b.dist - a.dist);
+
+  const top = ranked[0];
+  const prefix = scores[top.key] >= 50 ? PREFIXES[top.key].high : PREFIXES[top.key].low;
+  const si = Math.min(Math.floor(top.dist / 12), SUFFIXES.length - 1);
+  return `${prefix} ${SUFFIXES[si]}`;
+}
+
+// ────────────────────────────────────────────────────
+// Summary text generator
+// ────────────────────────────────────────────────────
+
+function generateSummary() {
+  const primary = TRAITS.filter(t => t.primary);
+  const sorted = primary
+    .map(t => ({ ...t, score: scores[t.key] }))
+    .sort((a, b) => Math.abs(b.score - 50) - Math.abs(a.score - 50));
+
+  const top = sorted[0];
+  const topLevel = getScoreLevel(top.score);
+  const topWord = top.word[topLevel].toLowerCase();
+
+  const second = sorted[1];
+  const secLevel = getScoreLevel(second.score);
+  const secWord = second.word[secLevel].toLowerCase();
+
+  return `A constellation shaped by ${topWord} ${top.name.toLowerCase()} and ${secWord} ${second.name.toLowerCase()} — your signature pattern in the stars.`;
+}
+
+// ────────────────────────────────────────────────────
+// Star position: base + radial shift from score
+// ────────────────────────────────────────────────────
+
+function getStarPosition(index) {
+  const base = BASE_POSITIONS[index];
+  const trait = TRAITS[index];
+  const score = scores[trait.key];
+
+  const dx = base.x - CX;
+  const dy = base.y - CY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist === 0) return { x: base.x, y: base.y };
+
+  const shift = ((score - 50) / 50) * 18;
+  const nx = dx / dist;
+  const ny = dy / dist;
+
+  return {
+    x: base.x + nx * shift,
+    y: base.y + ny * shift
+  };
+}
+
+function getStarSize(score, isPrimary) {
+  const deviation = Math.abs(score - 50) / 50;
+  if (isPrimary) {
+    return 6 + deviation * 8; // 6-14
+  }
+  return 3 + deviation * 5; // 3-8 (smaller for secondary)
+}
+
+function getScoreLevel(score) {
+  if (score >= 62) return 'high';
+  if (score <= 38) return 'low';
+  return 'mid';
+}
+
+// ────────────────────────────────────────────────────
+// Ambient background sparkle stars (fixed, twinkling)
+// ────────────────────────────────────────────────────
+
+function renderAmbientStars() {
+  const container = document.getElementById('ambient-stars');
+  container.innerHTML = '';
+
+  const count = 35;
+  for (let i = 0; i < count; i++) {
+    const star = document.createElement('div');
+    const size = 0.6 + Math.random() * 1.3;
+    const delay = Math.random() * 8;
+    const duration = 3 + Math.random() * 5;
+
+    star.className = 'ambient-star';
+    star.style.cssText = `
+      width: ${size}px;
+      height: ${size}px;
+      left: ${3 + Math.random() * 94}%;
+      top: ${3 + Math.random() * 94}%;
+      opacity: ${0.08 + Math.random() * 0.2};
+      animation: twinkle ${duration}s ease-in-out ${delay}s infinite;
+    `;
+    container.appendChild(star);
+  }
+}
+
+// ────────────────────────────────────────────────────
+// Drifting particle field (separate from fixed stars)
+// ────────────────────────────────────────────────────
+
+function renderParticleField() {
+  const container = document.getElementById('particle-field');
+  container.innerHTML = '';
+
+  const count = 20;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    const size = 0.5 + Math.random() * 0.8;
+    const duration = 15 + Math.random() * 25;
+    const delay = Math.random() * duration;
+    const startX = Math.random() * 100;
+    const startY = Math.random() * 100;
+    const dx = (Math.random() - 0.5) * 80;
+    const dy = (Math.random() - 0.5) * 60;
+
+    p.className = 'drifting-particle';
+    p.style.cssText = `
+      width: ${size}px;
+      height: ${size}px;
+      left: ${startX}%;
+      top: ${startY}%;
+      --dx: ${dx}px;
+      --dy: ${dy}px;
+      --duration: ${duration}s;
+      --delay: ${delay}s;
+      opacity: 0;
+    `;
+    container.appendChild(p);
+  }
+}
+
+// ────────────────────────────────────────────────────
+// Nebula glow — radial gradients using trait colors
+// ────────────────────────────────────────────────────
+
+function renderNebula() {
+  const container = document.getElementById('nebula-layer');
+  container.innerHTML = '';
+
+  if (!isDark) {
+    // Light mode: very subtle tinted wash
+    const wash = document.createElement('div');
+    wash.className = 'nebula-glow';
+    wash.style.cssText = `
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at 50% 40%, rgba(99,102,241,0.08) 0%, transparent 70%);
+    `;
+    container.appendChild(wash);
+    return;
+  }
+
+  // Get the top 3 most extreme traits for the nebula colors
+  const primary = TRAITS.filter(t => t.primary);
+  const sorted = primary
+    .map(t => ({ color: t.color, score: scores[t.key], deviation: Math.abs(scores[t.key] - 50) }))
+    .sort((a, b) => b.deviation - a.deviation);
+
+  const nebulaColors = sorted.slice(0, 3);
+
+  // Create overlapping radial gradients
+  const positions = [
+    { x: '40%', y: '35%', rx: '55%', ry: '50%' },
+    { x: '62%', y: '55%', rx: '45%', ry: '55%' },
+    { x: '35%', y: '65%', rx: '50%', ry: '40%' }
+  ];
+
+  nebulaColors.forEach((nc, i) => {
+    const pos = positions[i];
+    const glow = document.createElement('div');
+    glow.className = 'nebula-glow';
+    const alpha = 0.06 + (nc.deviation / 50) * 0.06; // 0.06-0.12 based on how extreme
+    glow.style.cssText = `
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at ${pos.x} ${pos.y}, ${nc.color}${Math.round(alpha * 255).toString(16).padStart(2, '0')} 0%, transparent ${pos.rx});
+      animation-delay: ${i * 2.5}s;
+      animation-duration: ${7 + i * 2}s;
+    `;
+    container.appendChild(glow);
+  });
+}
+
+// ────────────────────────────────────────────────────
+// Render the constellation
+// ────────────────────────────────────────────────────
+
+function renderConstellation() {
+  const linesGroup = document.getElementById('connection-lines');
+  const starsGroup = document.getElementById('trait-stars');
+  linesGroup.innerHTML = '';
+  starsGroup.innerHTML = '';
+
+  // Calculate positions for all stars
+  const positions = TRAITS.map((trait, i) => ({
+    ...trait,
+    ...getStarPosition(i),
+    size: getStarSize(scores[trait.key], trait.primary),
+    score: scores[trait.key],
+    index: i
+  }));
+
+  // ── Connection lines ──
+  // More connections = richer feel, but still subtle
+  const lineOpacity = isDark ? 0.07 : 0.1;
+  const thinOpacity = isDark ? 0.04 : 0.06;
+
+  // Primary ring (the 5 main stars)
+  const primaryIdx = [0, 1, 2, 3, 4];
+  for (let i = 0; i < primaryIdx.length; i++) {
+    const ai = primaryIdx[i];
+    const bi = primaryIdx[(i + 1) % primaryIdx.length];
+    drawLine(linesGroup, positions[ai], positions[bi], lineOpacity, 0.8);
+  }
+
+  // Cross-connections between primary stars
+  const crossPairs = [[0, 2], [0, 3], [1, 4], [1, 3]];
+  crossPairs.forEach(([ai, bi]) => {
+    drawLine(linesGroup, positions[ai], positions[bi], thinOpacity, 0.5);
+  });
+
+  // Secondary stars connect to their parent primary
+  const secondaryLinks = [
+    [5, 0],  // Curiosity → Openness
+    [6, 3],  // Empathy → Agreeableness
+    [7, 1],  // Drive → Conscientiousness
+    [8, 2],  // Creativity → Extraversion
+    [9, 4],  // Resilience → Composure
+  ];
+  secondaryLinks.forEach(([si, pi]) => {
+    drawLine(linesGroup, positions[si], positions[pi], thinOpacity * 1.2, 0.4);
+  });
+
+  // A few secondary-to-secondary for extra weaving
+  const secCross = [[5, 8], [6, 9], [7, 9]];
+  secCross.forEach(([ai, bi]) => {
+    drawLine(linesGroup, positions[ai], positions[bi], thinOpacity * 0.7, 0.3);
+  });
+
+  // ── Stars ──
+  positions.forEach((pos, i) => {
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+    group.style.setProperty('--star-color', pos.color);
+
+    if (pos.primary) {
+      // Primary stars get the full halo treatment
+
+      // Outer halo (wide, very soft)
+      const outerHalo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      outerHalo.setAttribute('r', pos.size * 4);
+      outerHalo.setAttribute('fill', pos.color);
+      outerHalo.setAttribute('opacity', isDark ? '0.035' : '0.04');
+      group.appendChild(outerHalo);
+
+      // Mid halo
+      const midHalo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      midHalo.setAttribute('r', pos.size * 2.5);
+      midHalo.setAttribute('fill', pos.color);
+      midHalo.setAttribute('opacity', isDark ? '0.08' : '0.09');
+      group.appendChild(midHalo);
+
+      // Inner glow
+      const innerGlow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      innerGlow.setAttribute('r', pos.size * 1.5);
+      innerGlow.setAttribute('fill', pos.color);
+      innerGlow.setAttribute('opacity', isDark ? '0.15' : '0.16');
+      group.appendChild(innerGlow);
+
+      // Star body
+      const star = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      star.setAttribute('r', pos.size);
+      star.setAttribute('fill', pos.color);
+      star.setAttribute('filter', 'url(#glow-soft)');
+      star.setAttribute('class', 'trait-star star-enter');
+      star.style.setProperty('--star-color', pos.color);
+      star.style.animationDelay = `${i * 0.4}s`;
+      star.style.transformOrigin = 'center';
+      group.appendChild(star);
+
+      // Bright core
+      const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      core.setAttribute('r', pos.size * 0.28);
+      core.setAttribute('fill', 'white');
+      core.setAttribute('opacity', isDark ? '0.85' : '0.9');
+      group.appendChild(core);
+
+      // Tiny label below star
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('y', pos.size + 14);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('fill', isDark ? 'rgba(255,255,255,0.25)' : 'rgba(30,41,59,0.3)');
+      label.setAttribute('font-size', '8');
+      label.setAttribute('font-weight', '500');
+      label.setAttribute('font-family', 'Inter, sans-serif');
+      label.setAttribute('letter-spacing', '0.08em');
+      label.textContent = pos.name.substring(0, 3).toUpperCase();
+      group.appendChild(label);
+    } else {
+      // Secondary stars: smaller, simpler halos
+
+      const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      halo.setAttribute('r', pos.size * 2.5);
+      halo.setAttribute('fill', pos.color);
+      halo.setAttribute('opacity', isDark ? '0.05' : '0.06');
+      group.appendChild(halo);
+
+      const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      glow.setAttribute('r', pos.size * 1.4);
+      glow.setAttribute('fill', pos.color);
+      glow.setAttribute('opacity', isDark ? '0.1' : '0.12');
+      group.appendChild(glow);
+
+      const star = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      star.setAttribute('r', pos.size);
+      star.setAttribute('fill', pos.color);
+      star.setAttribute('filter', 'url(#glow-soft)');
+      star.setAttribute('class', 'trait-star star-enter');
+      star.style.setProperty('--star-color', pos.color);
+      star.style.animationDelay = `${i * 0.3 + 0.5}s`;
+      star.style.transformOrigin = 'center';
+      group.appendChild(star);
+
+      // Tiny core
+      const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      core.setAttribute('r', pos.size * 0.25);
+      core.setAttribute('fill', 'white');
+      core.setAttribute('opacity', isDark ? '0.7' : '0.8');
+      group.appendChild(core);
+    }
+
+    starsGroup.appendChild(group);
+  });
+
+  // Update name
+  document.getElementById('constellation-name').textContent = generateName();
+
+  // Update summary
+  document.getElementById('summary-text').textContent = generateSummary();
+
+  // Update spectrum bars (primary traits only)
+  renderSpectrumBars();
+
+  // Update nebula
+  renderNebula();
+}
+
+function drawLine(container, a, b, opacity, width) {
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', a.x);
+  line.setAttribute('y1', a.y);
+  line.setAttribute('x2', b.x);
+  line.setAttribute('y2', b.y);
+  line.setAttribute('stroke', isDark ? `rgba(255,255,255,${opacity})` : `rgba(99,102,241,${opacity + 0.03})`);
+  line.setAttribute('stroke-width', width);
+  line.setAttribute('stroke-linecap', 'round');
+  container.appendChild(line);
+}
+
+// ────────────────────────────────────────────────────
+// Spectrum bars: compact, below the constellation
+// ────────────────────────────────────────────────────
+
+function renderSpectrumBars() {
+  const container = document.getElementById('spectrum-bars');
+  container.innerHTML = '';
+
+  const primary = TRAITS.filter(t => t.primary);
+
+  primary.forEach(trait => {
+    const score = scores[trait.key];
+    const level = getScoreLevel(score);
+    const word = trait.word[level];
+
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-3';
+
+    // Dot
+    const dot = document.createElement('div');
+    dot.style.cssText = `
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: ${trait.color};
+      box-shadow: 0 0 6px ${trait.color}80;
+      flex-shrink: 0;
+    `;
+
+    // Label
+    const label = document.createElement('div');
+    label.style.cssText = `font-size: 11px; font-weight: 500; opacity: 0.65; min-width: 48px;`;
+    label.textContent = trait.name.substring(0, 4);
+
+    // Bar wrapper
+    const barWrap = document.createElement('div');
+    barWrap.className = 'spectrum-bar flex-1';
+
+    const fill = document.createElement('div');
+    fill.className = 'spectrum-fill';
+    fill.style.cssText = `width: ${score}%; background: ${trait.color};`;
+    barWrap.appendChild(fill);
+
+    // Word
+    const wordEl = document.createElement('div');
+    wordEl.style.cssText = `font-size: 10px; font-weight: 300; opacity: 0.4; min-width: 58px; text-align: right;`;
+    wordEl.textContent = word;
+
+    row.appendChild(dot);
+    row.appendChild(label);
+    row.appendChild(barWrap);
+    row.appendChild(wordEl);
+    container.appendChild(row);
+  });
+}
+
+// ────────────────────────────────────────────────────
+// Theme
+// ────────────────────────────────────────────────────
+
+function applyTheme() {
+  document.body.classList.toggle('light-mode', !isDark);
+
+  const phoneInner = document.getElementById('phone-inner');
+  const nameEl = document.getElementById('constellation-name');
+  const statusBar = document.getElementById('status-bar');
+  const btn = document.getElementById('mode-btn');
+
+  if (isDark) {
+    phoneInner.style.background = '#030712';
+    nameEl.style.color = 'rgba(255, 255, 255, 0.92)';
+    statusBar.style.color = 'white';
+    btn.textContent = 'Light';
+  } else {
+    phoneInner.style.background = '#f9fafb';
+    nameEl.style.color = '#1e293b';
+    statusBar.style.color = '#1e293b';
+    btn.textContent = 'Dark';
+  }
+}
+
+function toggleMode() {
+  isDark = !isDark;
+  applyTheme();
+  renderAmbientStars();
+  renderParticleField();
+  renderConstellation();
+}
+
+// ────────────────────────────────────────────────────
+// Shuffle
+// ────────────────────────────────────────────────────
+
+function shuffleProfile() {
+  TRAITS.forEach(t => {
+    const r = Math.random();
+    if (r < 0.3) {
+      scores[t.key] = Math.round(18 + Math.random() * 20);
+    } else if (r > 0.7) {
+      scores[t.key] = Math.round(62 + Math.random() * 32);
+    } else {
+      scores[t.key] = Math.round(38 + Math.random() * 24);
+    }
+  });
+
+  renderConstellation();
+}
+
+// ────────────────────────────────────────────────────
+// Init
+// ────────────────────────────────────────────────────
+
+renderAmbientStars();
+renderParticleField();
+renderConstellation();
+applyTheme();
+</script>
+</body>
+</html>

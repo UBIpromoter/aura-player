@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Glow V5 — Force-Directed Graph</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  body { font-family: 'Inter', sans-serif; }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     SKY BACKDROP
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .sky-backdrop {
+    position: relative;
+    overflow: hidden;
+    border-radius: 20px;
+    background: linear-gradient(180deg,
+      #050510 0%,
+      #0a0a1a 30%,
+      #0d0d20 60%,
+      #10101a 100%
+    );
+  }
+
+  .star-field {
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 60px 70px, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 100px 20px, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1.5px 1.5px at 150px 80px, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 200px 40px, rgba(255,255,255,0.25), transparent),
+      radial-gradient(1px 1px at 250px 90px, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 80px 110px, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1px 1px at 180px 130px, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 30px 140px, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1.5px 1.5px at 280px 60px, rgba(255,255,255,0.45), transparent);
+    opacity: 0.6;
+    animation: starTwinkle 8s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes starTwinkle {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.7; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     CENTRAL AURA GLOW
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .aura-glow-layer {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .aura-pulse {
+    animation: auraPulse 4s ease-in-out infinite;
+  }
+
+  @keyframes auraPulse {
+    0%, 100% { transform: scale(1); opacity: var(--base-opacity, 0.7); }
+    50% { transform: scale(1.08); opacity: calc(var(--base-opacity, 0.7) * 1.2); }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     FORCE GRAPH CANVAS
+     ═══════════════════════════════════════════════════════════════════ */
+
+  #graph-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+  }
+
+  .graph-node {
+    position: absolute;
+    border-radius: 50%;
+    cursor: grab;
+    transition: box-shadow 0.2s ease;
+    z-index: 20;
+  }
+
+  .graph-node:hover {
+    box-shadow: 0 0 20px var(--node-color), 0 0 40px var(--node-color);
+  }
+
+  .graph-node.dragging {
+    cursor: grabbing;
+    z-index: 100;
+  }
+
+  .graph-node.fixed {
+    cursor: default;
+  }
+
+  .trait-node {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 10px;
+    font-weight: 600;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    white-space: nowrap;
+    z-index: 25;
+  }
+
+  .trait-node .value {
+    font-weight: 700;
+    margin-left: 5px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     SVG EDGES
+     ═══════════════════════════════════════════════════════════════════ */
+
+  #edges-svg {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .edge-line {
+    stroke-linecap: round;
+    transition: stroke-opacity 0.3s ease;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     SHIMMER OVERLAY
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .shimmer-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.015) 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.015) 75%,
+      transparent 100%
+    );
+    background-size: 200% 200%;
+    animation: shimmer 10s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 0% 0%; }
+    50% { background-position: 100% 100%; }
+    100% { background-position: 0% 0%; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     UI COMPONENTS
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .aura-name {
+    text-align: center;
+    padding: 4px 0;
+  }
+
+  .aura-name-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  .aura-name-value {
+    font-size: 16px;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--name-color-1, #8b5cf6), var(--name-color-2, #3b82f6));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .narration {
+    text-align: center;
+    font-style: italic;
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 0 8px;
+  }
+
+  .legend-card {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .legend-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .legend-item:first-child { padding-top: 0; }
+
+  .legend-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    margin: 0 -8px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-radius: 8px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  .legend-content { flex: 1; min-width: 0; }
+
+  .legend-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .legend-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .legend-value {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend-desc {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-top: 2px;
+  }
+
+  .trait-bar {
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    margin-top: 8px;
+    overflow: hidden;
+  }
+
+  .trait-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .hint-text {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    text-align: center;
+    padding: 6px 0 0;
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-8 gap-6" style="background: #030712;">
+
+  <!-- Controls -->
+  <div class="flex gap-3 items-center flex-wrap justify-center">
+    <button onclick="randomize()" class="px-4 py-2 rounded-xl text-sm font-medium bg-violet-600 text-white hover:bg-violet-500 transition-colors">Shuffle</button>
+    <button onclick="resetPositions()" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-gray-600 hover:border-violet-500 transition-colors">Reset Layout</button>
+  </div>
+
+  <!-- Phone frame -->
+  <div id="phone" class="w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl" style="background: #0a0a12; border: 2px solid rgba(255,255,255,0.08);">
+    <div class="p-5 pt-8 pb-6">
+
+      <!-- Card -->
+      <div class="rounded-2xl overflow-hidden" style="background: rgba(12, 12, 22, 0.9); border: 1px solid rgba(139, 92, 246, 0.15);">
+
+        <!-- Header -->
+        <div class="p-4 pb-2">
+          <div class="aura-name">
+            <div class="aura-name-label">Your Aura</div>
+            <div id="aura-name-value" class="aura-name-value">Radiant Explorer</div>
+          </div>
+        </div>
+
+        <!-- Aura Visualization -->
+        <div class="px-4 py-2">
+          <div id="aura-canvas" class="sky-backdrop w-full h-64 relative">
+            <div class="star-field"></div>
+            <!-- Aura glow layers -->
+            <div id="aura-glow-container"></div>
+            <!-- SVG for edges -->
+            <svg id="edges-svg"></svg>
+            <!-- Nodes container -->
+            <div id="nodes-container"></div>
+            <!-- Shimmer -->
+            <div class="shimmer-overlay"></div>
+          </div>
+          <div class="hint-text">Drag nodes to see connections</div>
+        </div>
+
+        <!-- Narration -->
+        <div class="px-5 py-3">
+          <p id="narration" class="narration">"A luminous presence that draws others in with warmth and curiosity."</p>
+        </div>
+
+        <!-- Legend -->
+        <div class="px-4 pb-4">
+          <div class="legend-card">
+            <div class="legend-item" data-trait="openness">
+              <div class="legend-dot" style="background: #3b82f6; color: #3b82f6;"></div>
+              <div class="legend-content">
+                <div class="legend-row">
+                  <span class="legend-name">Openness</span>
+                  <span id="legend-openness" class="legend-value text-blue-400">72%</span>
+                </div>
+                <div class="legend-desc">Curiosity and imagination</div>
+                <div class="trait-bar">
+                  <div id="bar-openness" class="trait-bar-fill bg-blue-500" style="width: 72%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="legend-item" data-trait="warmth">
+              <div class="legend-dot" style="background: #f59e0b; color: #f59e0b;"></div>
+              <div class="legend-content">
+                <div class="legend-row">
+                  <span class="legend-name">Warmth</span>
+                  <span id="legend-warmth" class="legend-value text-amber-400">78%</span>
+                </div>
+                <div class="legend-desc">Empathy and connection</div>
+                <div class="trait-bar">
+                  <div id="bar-warmth" class="trait-bar-fill bg-amber-500" style="width: 78%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="legend-item" data-trait="energy">
+              <div class="legend-dot" style="background: #10b981; color: #10b981;"></div>
+              <div class="legend-content">
+                <div class="legend-row">
+                  <span class="legend-name">Energy</span>
+                  <span id="legend-energy" class="legend-value text-emerald-400">65%</span>
+                </div>
+                <div class="legend-desc">Vitality and drive</div>
+                <div class="trait-bar">
+                  <div id="bar-energy" class="trait-bar-fill bg-emerald-500" style="width: 65%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Info -->
+  <div class="max-w-md text-center text-gray-500 text-xs mt-2">
+    <p><strong class="text-gray-400">V5 Force Graph:</strong> Drag any node - connected nodes follow via spring physics</p>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AURA GLOW V5 — Force-Directed Graph
+// Nodes connected by edges, spring physics, draggable
+// ═══════════════════════════════════════════════════════════════════════════
+
+const COLORS = {
+  violet: { base: '#8b5cf6', light: '#a78bfa', rgb: '139, 92, 246' },
+  blue: { base: '#3b82f6', light: '#60a5fa', rgb: '59, 130, 246' },
+  emerald: { base: '#10b981', light: '#34d399', rgb: '16, 185, 129' },
+  amber: { base: '#f59e0b', light: '#fbbf24', rgb: '245, 158, 11' },
+  pink: { base: '#ec4899', light: '#f472b6', rgb: '236, 72, 153' },
+  cyan: { base: '#06b6d4', light: '#22d3ee', rgb: '6, 182, 212' },
+};
+
+const TRAIT_COLORS = {
+  openness: COLORS.blue,
+  warmth: COLORS.amber,
+  energy: COLORS.emerald,
+};
+
+let traits = {
+  openness: 72,
+  warmth: 78,
+  energy: 65
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FORCE-DIRECTED GRAPH STATE
+// ═══════════════════════════════════════════════════════════════════════════
+
+let nodes = [];
+let edges = [];
+let canvasWidth = 0;
+let canvasHeight = 0;
+let centerX = 0;
+let centerY = 0;
+let animationId = null;
+let draggedNode = null;
+let dragOffset = { x: 0, y: 0 };
+
+// Physics parameters - TUNED FOR SLOW, GENTLE MOVEMENT
+const PHYSICS = {
+  springStrength: 0.008,    // How strongly connected nodes pull together (lower = slower)
+  springLength: 55,         // Natural length of springs
+  repulsionStrength: 150,   // How strongly nodes push apart
+  damping: 0.92,            // Velocity damping (higher = slower settling)
+  centerPull: 0.002,        // Pull toward canvas center (very gentle)
+  maxVelocity: 1.5,         // Cap velocity for gentle movement
+  minVelocity: 0.01,        // Below this, snap to 0
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NODE TYPES
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Node: { id, x, y, vx, vy, type, fixed, radius, color, label?, trait? }
+// Edge: { source: nodeId, target: nodeId, strength }
+
+function createNodes() {
+  nodes = [];
+  edges = [];
+
+  // Central aura node (FIXED)
+  nodes.push({
+    id: 'center',
+    x: centerX,
+    y: centerY,
+    vx: 0,
+    vy: 0,
+    type: 'center',
+    fixed: true,
+    radius: 18,
+    color: COLORS.violet
+  });
+
+  // Trait nodes (labels) - positioned around center
+  const traitList = ['openness', 'warmth', 'energy'];
+  const traitAngles = [-Math.PI/2 - 0.3, -Math.PI/2 + 0.3, Math.PI/2]; // Top-left, top-right, bottom
+
+  traitList.forEach((trait, i) => {
+    const angle = traitAngles[i];
+    const dist = 70 + Math.random() * 10;
+    nodes.push({
+      id: `trait-${trait}`,
+      x: centerX + Math.cos(angle) * dist,
+      y: centerY + Math.sin(angle) * dist,
+      vx: 0,
+      vy: 0,
+      type: 'trait',
+      fixed: false,
+      radius: 20,
+      color: TRAIT_COLORS[trait],
+      label: trait.charAt(0).toUpperCase() + trait.slice(1),
+      trait: trait
+    });
+
+    // Edge from center to trait
+    edges.push({
+      source: 'center',
+      target: `trait-${trait}`,
+      strength: 1.2
+    });
+  });
+
+  // Orbiting particles - connected to traits and each other
+  const particleCount = 12;
+  const particleColors = [COLORS.blue, COLORS.amber, COLORS.emerald, COLORS.violet, COLORS.pink, COLORS.cyan];
+
+  for (let i = 0; i < particleCount; i++) {
+    const angle = (i / particleCount) * Math.PI * 2 + Math.random() * 0.3;
+    const dist = 40 + Math.random() * 50;
+    const color = particleColors[i % particleColors.length];
+
+    nodes.push({
+      id: `particle-${i}`,
+      x: centerX + Math.cos(angle) * dist,
+      y: centerY + Math.sin(angle) * dist,
+      vx: (Math.random() - 0.5) * 0.3, // Small initial velocity
+      vy: (Math.random() - 0.5) * 0.3,
+      type: 'particle',
+      fixed: false,
+      radius: 3 + Math.random() * 3,
+      color: color
+    });
+
+    // Connect to center
+    edges.push({
+      source: 'center',
+      target: `particle-${i}`,
+      strength: 0.5
+    });
+
+    // Connect some particles to traits
+    if (i < 4) {
+      edges.push({
+        source: `trait-${traitList[i % 3]}`,
+        target: `particle-${i}`,
+        strength: 0.8
+      });
+    }
+
+    // Connect particles to neighbors (create web)
+    if (i > 0) {
+      edges.push({
+        source: `particle-${i}`,
+        target: `particle-${i - 1}`,
+        strength: 0.6
+      });
+    }
+  }
+
+  // Close the particle loop
+  edges.push({
+    source: `particle-0`,
+    target: `particle-${particleCount - 1}`,
+    strength: 0.6
+  });
+
+  // Add some cross-connections for more web-like feel
+  edges.push({ source: 'particle-0', target: 'particle-4', strength: 0.4 });
+  edges.push({ source: 'particle-2', target: 'particle-6', strength: 0.4 });
+  edges.push({ source: 'particle-3', target: 'particle-8', strength: 0.4 });
+  edges.push({ source: 'particle-5', target: 'particle-10', strength: 0.4 });
+  edges.push({ source: 'particle-7', target: 'particle-11', strength: 0.4 });
+
+  // Connect traits to each other
+  edges.push({ source: 'trait-openness', target: 'trait-warmth', strength: 0.7 });
+  edges.push({ source: 'trait-warmth', target: 'trait-energy', strength: 0.7 });
+  edges.push({ source: 'trait-energy', target: 'trait-openness', strength: 0.7 });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FORCE SIMULATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function simulate() {
+  // Apply forces
+  nodes.forEach(node => {
+    if (node.fixed || node === draggedNode) return;
+
+    let fx = 0;
+    let fy = 0;
+
+    // 1. Spring forces from edges
+    edges.forEach(edge => {
+      let other = null;
+      let isSource = false;
+
+      if (edge.source === node.id) {
+        other = nodes.find(n => n.id === edge.target);
+        isSource = true;
+      } else if (edge.target === node.id) {
+        other = nodes.find(n => n.id === edge.source);
+      }
+
+      if (other) {
+        const dx = other.x - node.x;
+        const dy = other.y - node.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const idealDist = PHYSICS.springLength * edge.strength;
+        const diff = dist - idealDist;
+        const force = diff * PHYSICS.springStrength * edge.strength;
+
+        fx += (dx / dist) * force;
+        fy += (dy / dist) * force;
+      }
+    });
+
+    // 2. Repulsion from other nodes
+    nodes.forEach(other => {
+      if (other.id === node.id) return;
+
+      const dx = node.x - other.x;
+      const dy = node.y - other.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+      if (dist < 120) { // Only repel nearby nodes
+        const force = PHYSICS.repulsionStrength / (dist * dist);
+        fx += (dx / dist) * force;
+        fy += (dy / dist) * force;
+      }
+    });
+
+    // 3. Gentle pull toward center (keeps things from drifting)
+    const dcx = centerX - node.x;
+    const dcy = centerY - node.y;
+    fx += dcx * PHYSICS.centerPull;
+    fy += dcy * PHYSICS.centerPull;
+
+    // Apply forces to velocity
+    node.vx += fx;
+    node.vy += fy;
+
+    // Damping
+    node.vx *= PHYSICS.damping;
+    node.vy *= PHYSICS.damping;
+
+    // Clamp velocity
+    const vel = Math.sqrt(node.vx * node.vx + node.vy * node.vy);
+    if (vel > PHYSICS.maxVelocity) {
+      node.vx = (node.vx / vel) * PHYSICS.maxVelocity;
+      node.vy = (node.vy / vel) * PHYSICS.maxVelocity;
+    }
+    if (vel < PHYSICS.minVelocity) {
+      node.vx = 0;
+      node.vy = 0;
+    }
+  });
+
+  // Update positions
+  nodes.forEach(node => {
+    if (node.fixed || node === draggedNode) return;
+
+    node.x += node.vx;
+    node.y += node.vy;
+
+    // Keep in bounds (with padding)
+    const padding = node.type === 'trait' ? 40 : 15;
+    node.x = Math.max(padding, Math.min(canvasWidth - padding, node.x));
+    node.y = Math.max(padding, Math.min(canvasHeight - padding, node.y));
+  });
+
+  // Render
+  renderGraph();
+
+  // Continue animation
+  animationId = requestAnimationFrame(simulate);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderAuraGlow() {
+  const container = document.getElementById('aura-glow-container');
+  const avgIntensity = (traits.openness + traits.warmth + traits.energy) / 300;
+
+  // Get dominant colors
+  const traitWeights = [
+    { weight: traits.openness, color: COLORS.blue },
+    { weight: traits.warmth, color: COLORS.amber },
+    { weight: traits.energy, color: COLORS.emerald }
+  ].sort((a, b) => b.weight - a.weight);
+
+  const primary = traitWeights[0].color;
+  const secondary = traitWeights[1].color;
+
+  const glowSize = 50 + avgIntensity * 40;
+  const outerGlow = 80 + avgIntensity * 50;
+
+  container.innerHTML = `
+    <!-- Outer glow -->
+    <div class="aura-glow-layer aura-pulse" style="
+      left: ${centerX - outerGlow}px;
+      top: ${centerY - outerGlow}px;
+      width: ${outerGlow * 2}px;
+      height: ${outerGlow * 2}px;
+      background: radial-gradient(circle,
+        ${secondary.base}20 0%,
+        ${secondary.base}08 40%,
+        transparent 70%
+      );
+      filter: blur(15px);
+      --base-opacity: 0.5;
+    "></div>
+
+    <!-- Middle glow -->
+    <div class="aura-glow-layer aura-pulse" style="
+      left: ${centerX - glowSize}px;
+      top: ${centerY - glowSize}px;
+      width: ${glowSize * 2}px;
+      height: ${glowSize * 2}px;
+      background: radial-gradient(circle,
+        ${primary.base}35 0%,
+        ${primary.base}15 50%,
+        transparent 75%
+      );
+      filter: blur(8px);
+      --base-opacity: 0.7;
+      animation-delay: -1s;
+    "></div>
+
+    <!-- Core glow -->
+    <div class="aura-glow-layer" style="
+      left: ${centerX - 25}px;
+      top: ${centerY - 25}px;
+      width: 50px;
+      height: 50px;
+      background: radial-gradient(circle,
+        rgba(255,255,255,0.8) 0%,
+        ${primary.light}70 40%,
+        ${primary.base}40 70%,
+        transparent 100%
+      );
+      filter: blur(3px);
+      box-shadow: 0 0 30px ${primary.base}60;
+    "></div>
+  `;
+
+  // Update name colors
+  document.getElementById('aura-name-value').style.setProperty('--name-color-1', primary.base);
+  document.getElementById('aura-name-value').style.setProperty('--name-color-2', secondary.base);
+}
+
+function renderGraph() {
+  const svg = document.getElementById('edges-svg');
+  const nodesContainer = document.getElementById('nodes-container');
+
+  // Render edges
+  let edgesHtml = '';
+  edges.forEach(edge => {
+    const source = nodes.find(n => n.id === edge.source);
+    const target = nodes.find(n => n.id === edge.target);
+    if (!source || !target) return;
+
+    // Calculate edge color (blend of source and target)
+    const color = source.color.base;
+    const opacity = 0.15 + edge.strength * 0.15;
+
+    edgesHtml += `
+      <line class="edge-line"
+        x1="${source.x}" y1="${source.y}"
+        x2="${target.x}" y2="${target.y}"
+        stroke="${color}"
+        stroke-width="${0.5 + edge.strength * 0.5}"
+        stroke-opacity="${opacity}"
+      />
+    `;
+  });
+  svg.innerHTML = edgesHtml;
+
+  // Render nodes
+  let nodesHtml = '';
+  nodes.forEach(node => {
+    if (node.type === 'center') {
+      // Center node is just a small anchor (glow is rendered separately)
+      nodesHtml += `
+        <div class="graph-node fixed"
+          data-id="${node.id}"
+          style="
+            left: ${node.x - 8}px;
+            top: ${node.y - 8}px;
+            width: 16px;
+            height: 16px;
+            background: radial-gradient(circle, rgba(255,255,255,0.9), ${node.color.light}80);
+            box-shadow: 0 0 15px ${node.color.base};
+            --node-color: ${node.color.base};
+          "
+        ></div>
+      `;
+    } else if (node.type === 'trait') {
+      // Trait label node
+      const value = traits[node.trait];
+      nodesHtml += `
+        <div class="graph-node trait-node ${node === draggedNode ? 'dragging' : ''}"
+          data-id="${node.id}"
+          style="
+            left: ${node.x}px;
+            top: ${node.y}px;
+            transform: translate(-50%, -50%);
+            background: rgba(${node.color.rgb}, 0.15);
+            border-color: rgba(${node.color.rgb}, 0.3);
+            color: ${node.color.light};
+            box-shadow: 0 0 12px ${node.color.base}40;
+            --node-color: ${node.color.base};
+          "
+        >
+          ${node.label}
+          <span class="value">${value}%</span>
+        </div>
+      `;
+    } else {
+      // Particle node
+      nodesHtml += `
+        <div class="graph-node ${node === draggedNode ? 'dragging' : ''}"
+          data-id="${node.id}"
+          style="
+            left: ${node.x - node.radius}px;
+            top: ${node.y - node.radius}px;
+            width: ${node.radius * 2}px;
+            height: ${node.radius * 2}px;
+            background: ${node.color.light};
+            box-shadow: 0 0 ${node.radius * 2}px ${node.color.base}80;
+            --node-color: ${node.color.base};
+          "
+        ></div>
+      `;
+    }
+  });
+  nodesContainer.innerHTML = nodesHtml;
+
+  // Re-attach drag listeners
+  attachDragListeners();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DRAG INTERACTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function attachDragListeners() {
+  const nodeElements = document.querySelectorAll('.graph-node:not(.fixed)');
+
+  nodeElements.forEach(el => {
+    el.addEventListener('mousedown', startDrag);
+    el.addEventListener('touchstart', startDrag, { passive: false });
+  });
+}
+
+function startDrag(e) {
+  e.preventDefault();
+  const nodeId = e.target.closest('.graph-node').dataset.id;
+  draggedNode = nodes.find(n => n.id === nodeId);
+  if (!draggedNode || draggedNode.fixed) {
+    draggedNode = null;
+    return;
+  }
+
+  const canvas = document.getElementById('aura-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+  dragOffset.x = draggedNode.x - (clientX - rect.left);
+  dragOffset.y = draggedNode.y - (clientY - rect.top);
+
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchmove', onDrag, { passive: false });
+  document.addEventListener('touchend', endDrag);
+}
+
+function onDrag(e) {
+  if (!draggedNode) return;
+  e.preventDefault();
+
+  const canvas = document.getElementById('aura-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+  const x = clientX - rect.left + dragOffset.x;
+  const y = clientY - rect.top + dragOffset.y;
+
+  // Keep in bounds
+  const padding = draggedNode.type === 'trait' ? 40 : 15;
+  draggedNode.x = Math.max(padding, Math.min(canvasWidth - padding, x));
+  draggedNode.y = Math.max(padding, Math.min(canvasHeight - padding, y));
+
+  // Reset velocity when dragging
+  draggedNode.vx = 0;
+  draggedNode.vy = 0;
+}
+
+function endDrag() {
+  if (draggedNode) {
+    // Give a tiny nudge to help settle
+    draggedNode.vx = 0;
+    draggedNode.vy = 0;
+  }
+  draggedNode = null;
+  document.removeEventListener('mousemove', onDrag);
+  document.removeEventListener('mouseup', endDrag);
+  document.removeEventListener('touchmove', onDrag);
+  document.removeEventListener('touchend', endDrag);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NAME & NARRATION GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function generateAuraName() {
+  const o = traits.openness;
+  const w = traits.warmth;
+  const e = traits.energy;
+
+  const intensity = (o + w + e) / 3;
+  const adjectives = intensity > 70
+    ? ['Radiant', 'Luminous', 'Brilliant', 'Vibrant']
+    : intensity > 50
+    ? ['Gentle', 'Steady', 'Balanced', 'Grounded']
+    : ['Deep', 'Quiet', 'Subtle', 'Mysterious'];
+
+  const dominant = o >= w && o >= e ? 'openness'
+    : w >= o && w >= e ? 'warmth'
+    : 'energy';
+
+  const nouns = {
+    openness: ['Explorer', 'Dreamer', 'Seeker', 'Voyager'],
+    warmth: ['Healer', 'Guardian', 'Nurturer', 'Beacon'],
+    energy: ['Catalyst', 'Spark', 'Force', 'Pulse']
+  };
+
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[dominant][Math.floor(Math.random() * nouns[dominant].length)];
+
+  return `${adj} ${noun}`;
+}
+
+function generateNarration() {
+  const o = traits.openness;
+  const w = traits.warmth;
+  const e = traits.energy;
+
+  const deviations = [
+    { name: 'openness', val: o, dev: Math.abs(o - 50) },
+    { name: 'warmth', val: w, dev: Math.abs(w - 50) },
+    { name: 'energy', val: e, dev: Math.abs(e - 50) }
+  ].sort((a, b) => b.dev - a.dev);
+
+  const primary = deviations[0];
+
+  const narratives = {
+    openness: {
+      high: "A curious spirit that sees possibility everywhere. Your mind reaches toward horizons others haven't imagined.",
+      low: "A focused presence with depth. You know the value of what's proven and real."
+    },
+    warmth: {
+      high: "A luminous presence that draws others in. People feel safe in your glow.",
+      low: "A clear-eyed observer. You see what others miss because you look without bias."
+    },
+    energy: {
+      high: "A dynamic force that moves through the world. Your vitality is contagious.",
+      low: "A grounded anchor. Your stillness creates space for others to find their footing."
+    }
+  };
+
+  const direction = primary.val > 50 ? 'high' : 'low';
+  return `"${narratives[primary.name][direction]}"`;
+}
+
+function updateLegend() {
+  Object.keys(traits).forEach(trait => {
+    const value = traits[trait];
+    document.getElementById(`legend-${trait}`).textContent = `${value}%`;
+    document.getElementById(`bar-${trait}`).style.width = `${value}%`;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function randomize() {
+  const patterns = [
+    { openness: 85, warmth: 70, energy: 75 },
+    { openness: 65, warmth: 88, energy: 55 },
+    { openness: 45, warmth: 55, energy: 82 },
+    { openness: 78, warmth: 45, energy: 68 },
+    { openness: 35, warmth: 72, energy: 40 },
+    { openness: 55, warmth: 55, energy: 55 },
+  ];
+
+  const base = patterns[Math.floor(Math.random() * patterns.length)];
+  traits.openness = Math.round(Math.max(15, Math.min(95, base.openness + (Math.random() * 20 - 10))));
+  traits.warmth = Math.round(Math.max(15, Math.min(95, base.warmth + (Math.random() * 20 - 10))));
+  traits.energy = Math.round(Math.max(15, Math.min(95, base.energy + (Math.random() * 20 - 10))));
+
+  document.getElementById('aura-name-value').textContent = generateAuraName();
+  document.getElementById('narration').textContent = generateNarration();
+  updateLegend();
+  renderAuraGlow();
+
+  // Update trait node labels
+  nodes.filter(n => n.type === 'trait').forEach(node => {
+    node.label = node.trait.charAt(0).toUpperCase() + node.trait.slice(1);
+  });
+}
+
+function resetPositions() {
+  // Stop simulation
+  if (animationId) {
+    cancelAnimationFrame(animationId);
+  }
+
+  // Recreate nodes at default positions
+  createNodes();
+
+  // Restart simulation
+  simulate();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function init() {
+  const canvas = document.getElementById('aura-canvas');
+  canvasWidth = canvas.offsetWidth;
+  canvasHeight = canvas.offsetHeight;
+  centerX = canvasWidth / 2;
+  centerY = canvasHeight / 2;
+
+  createNodes();
+  renderAuraGlow();
+  updateLegend();
+
+  document.getElementById('aura-name-value').textContent = generateAuraName();
+  document.getElementById('narration').textContent = generateNarration();
+
+  // Start simulation
+  simulate();
+}
+
+// Handle resize
+window.addEventListener('resize', () => {
+  const canvas = document.getElementById('aura-canvas');
+  const oldCenterX = centerX;
+  const oldCenterY = centerY;
+
+  canvasWidth = canvas.offsetWidth;
+  canvasHeight = canvas.offsetHeight;
+  centerX = canvasWidth / 2;
+  centerY = canvasHeight / 2;
+
+  // Shift all nodes relative to new center
+  const dx = centerX - oldCenterX;
+  const dy = centerY - oldCenterY;
+
+  nodes.forEach(node => {
+    node.x += dx;
+    node.y += dy;
+  });
+
+  renderAuraGlow();
+});
+
+// Start when DOM ready
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

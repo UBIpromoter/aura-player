@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caret Placement — Visual Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; padding: 40px; }
+
+  h1 { color: #f1f5f9; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 32px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 1050px;
+  }
+
+  .option {
+    background: #111827;
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid #1e293b;
+  }
+  .option-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .option-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .option-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+  }
+  .option-desc {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 10px;
+    line-height: 1.4;
+  }
+
+  /* Card simulation */
+  .card {
+    background: #1f2937;
+    border-radius: 14px;
+    border: 1px solid rgba(100,116,139,0.2);
+    overflow: hidden;
+  }
+  .card-inner {
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* Circle */
+  .prog-circle {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .prog-circle svg { width: 44px; height: 44px; }
+  .prog-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #94a3b8;
+  }
+
+  .card-name {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: #f1f5f9;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .pill {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: rgba(100,116,139,0.25);
+    color: #cbd5e1;
+    border: 1px solid rgba(100,116,139,0.3);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Caret chevron */
+  .chev {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #94a3b8;
+  }
+  .chev svg {
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Bottom bar for option C */
+  .bottom-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 0 8px;
+    border-top: 1px solid rgba(100,116,139,0.12);
+  }
+</style>
+</head>
+<body>
+
+<h1>Where should the expand caret go?</h1>
+<p class="sub">Only on multi-test cards (Shadow Self, Mind). Tapping it expands to show modules.</p>
+
+<div class="grid">
+
+  <!-- A: Right of pill -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-badge" style="background:rgba(239,68,68,0.15); color:#f87171;">A</div>
+      <div class="option-title">Right of pill</div>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+        <div class="prog-circle">
+          <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(100,116,139,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#64748b" stroke-width="3" stroke-dasharray="80 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+          <div class="prog-num">2</div>
+        </div>
+        <div class="card-name">Shadow Self</div>
+        <div class="pill">Continue →</div>
+        <div class="chev" style="width:28px; height:28px; background:rgba(100,116,139,0.12); border-radius:50%;">
+          <svg width="16" height="16" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="option-desc">Pill starts test. Circle expands card. Two distinct targets.</div>
+  </div>
+
+  <!-- B: Left of pill -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-badge" style="background:rgba(245,158,11,0.15); color:#fbbf24;">B</div>
+      <div class="option-title">Left of pill</div>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+        <div class="prog-circle">
+          <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(100,116,139,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#64748b" stroke-width="3" stroke-dasharray="80 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+          <div class="prog-num">2</div>
+        </div>
+        <div class="card-name">Shadow Self</div>
+        <div class="chev" style="width:28px; height:28px; background:rgba(100,116,139,0.12); border-radius:50%;">
+          <svg width="16" height="16" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+        <div class="pill">Continue →</div>
+      </div>
+    </div>
+    <div class="option-desc">Expand is secondary, pill gets the edge. L→R: info → expand → action.</div>
+  </div>
+
+  <!-- C: Bottom center -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-badge" style="background:rgba(16,185,129,0.15); color:#34d399;">C</div>
+      <div class="option-title">Bottom strip</div>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+        <div class="prog-circle">
+          <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(100,116,139,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#64748b" stroke-width="3" stroke-dasharray="80 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+          <div class="prog-num">2</div>
+        </div>
+        <div class="card-name">Shadow Self</div>
+        <div class="pill">Continue →</div>
+      </div>
+      <div class="bottom-strip">
+        <div class="chev">
+          <svg width="16" height="16" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="option-desc">Main row stays clean. Bottom hint says "expandable." Adds ~20px height.</div>
+  </div>
+
+  <!-- D: Split pill -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-badge" style="background:rgba(59,130,246,0.15); color:#60a5fa;">D</div>
+      <div class="option-title">Split pill</div>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+        <div class="prog-circle">
+          <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(100,116,139,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#64748b" stroke-width="3" stroke-dasharray="80 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+          <div class="prog-num">2</div>
+        </div>
+        <div class="card-name">Shadow Self</div>
+        <div style="display:flex; align-items:stretch; flex-shrink:0; border-radius:999px; overflow:hidden; border:1px solid rgba(100,116,139,0.3);">
+          <div style="font-size:11px; font-weight:500; padding:5px 10px 5px 12px; background:rgba(100,116,139,0.25); color:#cbd5e1; white-space:nowrap;">Continue →</div>
+          <div style="padding:0 8px; background:rgba(100,116,139,0.15); display:flex; align-items:center; border-left:1px solid rgba(100,116,139,0.3);">
+            <div class="chev"><svg width="12" height="12" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="option-desc">One unit, two zones. Left = start test, right = expand. Compact.</div>
+  </div>
+
+  <!-- E: Bare chevron, no circle -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-badge" style="background:rgba(217,70,239,0.15); color:#e879f9;">E</div>
+      <div class="option-title">Bare chevron (right edge)</div>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+        <div class="prog-circle">
+          <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(100,116,139,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#64748b" stroke-width="3" stroke-dasharray="80 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+          <div class="prog-num">2</div>
+        </div>
+        <div class="card-name">Shadow Self</div>
+        <div class="pill">Continue →</div>
+        <div class="chev" style="margin-left:-4px; opacity:0.5;">
+          <svg width="18" height="18" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="option-desc">Just a bare ˅ at the edge, no background. Lightweight. Whole card taps to expand.</div>
+  </div>
+
+  <!-- F: After name, inline text -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-badge" style="background:rgba(6,182,212,0.15); color:#22d3ee;">F</div>
+      <div class="option-title">Inline after name</div>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+        <div class="prog-circle">
+          <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="rgba(100,116,139,0.2)" stroke-width="3"/><circle cx="22" cy="22" r="19" fill="none" stroke="#64748b" stroke-width="3" stroke-dasharray="80 119.38" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg>
+          <div class="prog-num">2</div>
+        </div>
+        <div class="card-name" style="display:flex; align-items:center; gap:6px;">
+          Shadow Self
+          <div class="chev" style="opacity:0.5;">
+            <svg width="14" height="14" viewBox="0 0 16 16"><polyline points="4 6 8 10 12 6"/></svg>
+          </div>
+        </div>
+        <div class="pill">Continue →</div>
+      </div>
+    </div>
+    <div class="option-desc">Part of the label. Current approach but bigger. Rotates on expand.</div>
+  </div>
+
+</div>
+
+</body>
+</html>

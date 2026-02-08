@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Weather V8 — Living Neural Orb</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     THEME VARIABLES
+     ═══════════════════════════════════════════════════════════════════ */
+
+  :root {
+    --bg-main: #030712;
+    --bg-card: #0a0a14;
+    --bg-card-secondary: rgba(255, 255, 255, 0.04);
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --text-tertiary: rgba(255, 255, 255, 0.35);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --graph-bg: linear-gradient(180deg, #060610 0%, #0a0a18 40%, #080814 100%);
+    --node-glow-mult: 1;
+    --line-opacity: 0.3;
+  }
+
+  [data-theme="light"] {
+    --bg-main: #f9fafb;
+    --bg-card: #ffffff;
+    --bg-card-secondary: rgba(0, 0, 0, 0.03);
+    --text-primary: #111827;
+    --text-secondary: rgba(0, 0, 0, 0.55);
+    --text-tertiary: rgba(0, 0, 0, 0.35);
+    --border-color: rgba(0, 0, 0, 0.08);
+    --graph-bg: linear-gradient(180deg, #f0f1f5 0%, #e8eaf0 40%, #f0f1f5 100%);
+    --node-glow-mult: 0.6;
+    --line-opacity: 0.2;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     GRADIENT HEADER TEXT
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .gradient-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 40%, #06b6d4 70%, #10b981 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-subtitle {
+    font-size: 13px;
+    font-weight: 400;
+    background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #f59e0b 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    opacity: 0.8;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     GRAPH CONTAINER — FILLS VIEWPORT
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .graph-container {
+    position: relative;
+    width: 100%;
+    border-radius: 20px;
+    overflow: hidden;
+    background: var(--graph-bg);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     ORB GLOW — Single centered radial, NOT scattered patches
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .orb-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .orb-layer {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  @keyframes orbBreathe {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: var(--orb-opacity); }
+    50% { transform: translate(-50%, -50%) scale(1.06); opacity: calc(var(--orb-opacity) * 1.15); }
+  }
+
+  @keyframes orbBreatheSlow {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: var(--orb-opacity); }
+    50% { transform: translate(-50%, -50%) scale(1.04); opacity: calc(var(--orb-opacity) * 1.1); }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     SVG GRAPH LAYER
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .graph-svg {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+  }
+
+  .graph-line {
+    stroke-linecap: round;
+  }
+
+  .graph-node {
+    cursor: default;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     LEGEND (Below graph)
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: var(--bg-card-secondary);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .legend-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .legend-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     CONTROLS
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .btn {
+    padding: 8px 18px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    color: white;
+    box-shadow: 0 2px 12px rgba(139, 92, 246, 0.3);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4);
+  }
+
+  .btn-secondary {
+    background: var(--bg-card-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .btn-secondary:hover {
+    border-color: #8b5cf6;
+  }
+</style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center p-4 gap-4" style="background: var(--bg-main);">
+
+  <!-- Controls row -->
+  <div class="flex gap-3 items-center flex-wrap justify-center pt-2">
+    <button onclick="shuffleProfile()" class="btn btn-primary">Shuffle Profile</button>
+    <button onclick="toggleTheme()" id="theme-toggle" class="btn btn-secondary">Light Mode</button>
+  </div>
+
+  <!-- Main container -->
+  <div id="main-container" class="w-full max-w-2xl flex flex-col gap-4">
+
+    <!-- Header with gradient text -->
+    <div class="text-center px-4">
+      <div class="gradient-title" id="aura-title">Radiant Explorer</div>
+      <div class="gradient-subtitle mt-1" id="aura-subtitle">Your unique neural pattern</div>
+    </div>
+
+    <!-- Graph — BIG, fills most of viewport -->
+    <div id="graph-container" class="graph-container" style="height: calc(100vh - 260px); min-height: 400px; max-height: 720px;">
+      <!-- Orb glow layers (behind the graph) -->
+      <div id="orb-glow" class="orb-glow"></div>
+      <!-- SVG neural graph -->
+      <svg id="graph-svg" class="graph-svg"></svg>
+    </div>
+
+    <!-- Legend below — compact, horizontal -->
+    <div id="legend" class="flex flex-wrap gap-2 justify-center px-2"></div>
+
+  </div>
+
+  <!-- Version label -->
+  <div class="text-center text-xs mt-1" style="color: var(--text-tertiary);">
+    <strong style="opacity: 0.7;">V8</strong> Neural orb — v6 pattern + proper glow + organic drift
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AURA WEATHER V8 — Living Neural Orb
+//
+// v6 neural pattern (the star) + centered orb glow (not scattered patches)
+// + organic node drift + gradient text header + big viewport graph
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────
+// TRAIT SYSTEM — Uses production TOKENS.md colors
+// ─────────────────────────────────────────────────────────────────────────
+
+const TRAITS = {
+  curiosity:  { hex: '#3b82f6', rgb: '59, 130, 246', label: 'Curiosity' },
+  warmth:     { hex: '#10b981', rgb: '16, 185, 129', label: 'Warmth' },
+  intensity:  { hex: '#d946ef', rgb: '217, 70, 239', label: 'Intensity' },
+  steadiness: { hex: '#f59e0b', rgb: '245, 158, 11', label: 'Steadiness' },
+  depth:      { hex: '#8b5cf6', rgb: '139, 92, 246', label: 'Depth' }
+};
+
+// Orb glow composed from these trait colors + accent
+const ORB_COLORS = {
+  violet: { hex: '#8b5cf6', rgb: '139, 92, 246' },
+  blue:   { hex: '#3b82f6', rgb: '59, 130, 246' },
+  emerald:{ hex: '#10b981', rgb: '16, 185, 129' },
+  fuchsia:{ hex: '#d946ef', rgb: '217, 70, 239' },
+  cyan:   { hex: '#06b6d4', rgb: '6, 182, 212' },
+  teal:   { hex: '#14b8a6', rgb: '20, 184, 166' },
+  amber:  { hex: '#f59e0b', rgb: '245, 158, 11' }
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// PROFILE ARCHETYPES (for shuffle)
+// ─────────────────────────────────────────────────────────────────────────
+
+const PROFILES = [
+  {
+    name: 'Radiant Explorer',
+    subtitle: 'Curiosity illuminates everything you touch',
+    traits: ['curiosity', 'warmth', 'depth'],
+    weights: { curiosity: 0.9, warmth: 0.8, depth: 0.7 },
+    orbColors: ['violet', 'blue', 'cyan']
+  },
+  {
+    name: 'Quiet Storm',
+    subtitle: 'Still waters, powerful currents',
+    traits: ['depth', 'intensity', 'steadiness'],
+    weights: { depth: 0.95, intensity: 0.8, steadiness: 0.7 },
+    orbColors: ['violet', 'fuchsia', 'amber']
+  },
+  {
+    name: 'Warm Signal',
+    subtitle: 'People feel safe in your frequency',
+    traits: ['warmth', 'steadiness', 'curiosity'],
+    weights: { warmth: 0.95, steadiness: 0.8, curiosity: 0.65 },
+    orbColors: ['emerald', 'teal', 'blue']
+  },
+  {
+    name: 'Electric Mind',
+    subtitle: 'Your thoughts move faster than most can follow',
+    traits: ['curiosity', 'intensity', 'depth'],
+    weights: { curiosity: 0.85, intensity: 0.9, depth: 0.8 },
+    orbColors: ['cyan', 'fuchsia', 'violet']
+  },
+  {
+    name: 'Gentle Force',
+    subtitle: 'Strength wrapped in softness',
+    traits: ['warmth', 'depth', 'steadiness'],
+    weights: { warmth: 0.8, depth: 0.85, steadiness: 0.9 },
+    orbColors: ['emerald', 'violet', 'amber']
+  },
+  {
+    name: 'Wild Light',
+    subtitle: 'You burn bright and refuse to dim',
+    traits: ['intensity', 'curiosity', 'warmth'],
+    weights: { intensity: 0.95, curiosity: 0.8, warmth: 0.7 },
+    orbColors: ['fuchsia', 'amber', 'cyan']
+  }
+];
+
+// ─────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────
+
+let isDarkMode = true;
+let currentProfile = PROFILES[0];
+let nodes = [];
+let edges = [];
+let animFrameId = null;
+let graphDims = { width: 0, height: 0, cx: 0, cy: 0 };
+
+// ─────────────────────────────────────────────────────────────────────────
+// GRAPH GENERATION — v6's neural pattern approach
+// Each trait gets a cluster of 4-5 nodes arranged organically
+// Cross-cluster connections create the web
+// ─────────────────────────────────────────────────────────────────────────
+
+function generateGraph(profile) {
+  nodes = [];
+  edges = [];
+
+  const container = document.getElementById('graph-container');
+  const width = container.offsetWidth;
+  const height = container.offsetHeight;
+  const cx = width / 2;
+  const cy = height / 2;
+  const baseRadius = Math.min(width, height) * 0.34;
+
+  graphDims = { width, height, cx, cy, baseRadius };
+
+  const traitList = profile.traits;
+  const traitCount = traitList.length;
+
+  // Distribute trait clusters evenly around circle
+  traitList.forEach((trait, ti) => {
+    const clusterAngle = (ti / traitCount) * Math.PI * 2 - Math.PI / 2;
+    const weight = profile.weights[trait] || 0.7;
+    const nodesPerCluster = Math.round(3 + weight * 3); // 3-6 nodes based on trait weight
+
+    for (let ni = 0; ni < nodesPerCluster; ni++) {
+      // Spread nodes within the cluster zone
+      const spreadAngle = clusterAngle + (Math.random() - 0.5) * 1.2;
+      const spreadRadius = baseRadius * (0.3 + Math.random() * 0.6) * (0.7 + weight * 0.4);
+
+      const x = cx + Math.cos(spreadAngle) * spreadRadius;
+      const y = cy + Math.sin(spreadAngle) * spreadRadius;
+
+      nodes.push({
+        id: `${trait}-${ni}`,
+        trait,
+        x,
+        y,
+        baseX: x,
+        baseY: y,
+        // Drift parameters — each node has its own phase and speed
+        driftPhaseX: Math.random() * Math.PI * 2,
+        driftPhaseY: Math.random() * Math.PI * 2,
+        driftSpeedX: 0.3 + Math.random() * 0.5,
+        driftSpeedY: 0.3 + Math.random() * 0.5,
+        driftAmplitudeX: 2 + Math.random() * 4,
+        driftAmplitudeY: 2 + Math.random() * 4,
+        size: 3 + weight * 4 + Math.random() * 2 // Weighted node size
+      });
+    }
+  });
+
+  // ── Intra-cluster edges (connect nearby nodes within same trait) ──
+  traitList.forEach(trait => {
+    const cluster = nodes.filter(n => n.trait === trait);
+    for (let i = 0; i < cluster.length; i++) {
+      for (let j = i + 1; j < cluster.length; j++) {
+        const dx = cluster[i].x - cluster[j].x;
+        const dy = cluster[i].y - cluster[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        // Connect if close enough (most within-cluster will connect)
+        if (dist < baseRadius * 0.9) {
+          edges.push([cluster[i].id, cluster[j].id]);
+        }
+      }
+    }
+  });
+
+  // ── Cross-cluster edges (sparse, connecting the web) ──
+  for (let ti = 0; ti < traitList.length; ti++) {
+    const nextTi = (ti + 1) % traitList.length;
+    const clusterA = nodes.filter(n => n.trait === traitList[ti]);
+    const clusterB = nodes.filter(n => n.trait === traitList[nextTi]);
+
+    // Find closest pair between clusters and connect 1-2 bridges
+    let closest = [];
+    clusterA.forEach(a => {
+      clusterB.forEach(b => {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        closest.push({ a: a.id, b: b.id, dist: Math.sqrt(dx * dx + dy * dy) });
+      });
+    });
+    closest.sort((a, b) => a.dist - b.dist);
+    // Add 2 cross-connections
+    const bridgeCount = Math.min(2, closest.length);
+    for (let i = 0; i < bridgeCount; i++) {
+      edges.push([closest[i].a, closest[i].b]);
+    }
+  }
+
+  // ── Optional: one or two long-range connections for visual interest ──
+  if (traitList.length >= 3) {
+    const clusterFirst = nodes.filter(n => n.trait === traitList[0]);
+    const clusterLast = nodes.filter(n => n.trait === traitList[traitList.length - 1]);
+    if (clusterFirst.length && clusterLast.length) {
+      edges.push([
+        clusterFirst[Math.floor(Math.random() * clusterFirst.length)].id,
+        clusterLast[Math.floor(Math.random() * clusterLast.length)].id
+      ]);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ORB GLOW RENDERER — Proper centered radial orb, not scattered patches
+// ─────────────────────────────────────────────────────────────────────────
+
+function renderOrb(profile) {
+  const container = document.getElementById('orb-glow');
+  const { width, height, cx, cy } = graphDims;
+  const orbSize = Math.min(width, height) * 0.85;
+  const isDark = isDarkMode;
+
+  // Build layered orb from profile's colors
+  const colors = profile.orbColors;
+  let html = '';
+
+  // ── Core layer: large, soft, primary color ──
+  const coreColor = ORB_COLORS[colors[0]];
+  const coreOpacity = isDark ? 0.35 : 0.2;
+  html += `
+    <div class="orb-layer" style="
+      left: ${cx}px; top: ${cy}px;
+      width: ${orbSize}px; height: ${orbSize}px;
+      background: radial-gradient(circle,
+        rgba(${coreColor.rgb}, ${coreOpacity}) 0%,
+        rgba(${coreColor.rgb}, ${coreOpacity * 0.6}) 30%,
+        rgba(${coreColor.rgb}, ${coreOpacity * 0.2}) 55%,
+        rgba(${coreColor.rgb}, 0) 75%
+      );
+      --orb-opacity: 1;
+      animation: orbBreathe 7s ease-in-out infinite;
+    "></div>
+  `;
+
+  // ── Secondary layer: offset slightly, second color ──
+  if (colors.length > 1) {
+    const secColor = ORB_COLORS[colors[1]];
+    const secOpacity = isDark ? 0.25 : 0.15;
+    const secSize = orbSize * 0.8;
+    html += `
+      <div class="orb-layer" style="
+        left: ${cx + orbSize * 0.05}px; top: ${cy - orbSize * 0.03}px;
+        width: ${secSize}px; height: ${secSize}px;
+        background: radial-gradient(circle,
+          rgba(${secColor.rgb}, ${secOpacity}) 0%,
+          rgba(${secColor.rgb}, ${secOpacity * 0.5}) 35%,
+          rgba(${secColor.rgb}, 0) 70%
+        );
+        --orb-opacity: 1;
+        animation: orbBreatheSlow 9s ease-in-out infinite;
+        animation-delay: -2s;
+      "></div>
+    `;
+  }
+
+  // ── Tertiary layer: smaller accent, third color ──
+  if (colors.length > 2) {
+    const terColor = ORB_COLORS[colors[2]];
+    const terOpacity = isDark ? 0.2 : 0.12;
+    const terSize = orbSize * 0.65;
+    html += `
+      <div class="orb-layer" style="
+        left: ${cx - orbSize * 0.04}px; top: ${cy + orbSize * 0.04}px;
+        width: ${terSize}px; height: ${terSize}px;
+        background: radial-gradient(circle,
+          rgba(${terColor.rgb}, ${terOpacity}) 0%,
+          rgba(${terColor.rgb}, ${terOpacity * 0.4}) 40%,
+          rgba(${terColor.rgb}, 0) 65%
+        );
+        --orb-opacity: 1;
+        animation: orbBreathe 11s ease-in-out infinite;
+        animation-delay: -4s;
+      "></div>
+    `;
+  }
+
+  // ── Inner core: bright white/color nucleus ──
+  const nucleusSize = orbSize * 0.25;
+  const nucleusOpacity = isDark ? 0.12 : 0.08;
+  html += `
+    <div class="orb-layer" style="
+      left: ${cx}px; top: ${cy}px;
+      width: ${nucleusSize}px; height: ${nucleusSize}px;
+      background: radial-gradient(circle,
+        rgba(255, 255, 255, ${nucleusOpacity}) 0%,
+        rgba(${coreColor.rgb}, ${nucleusOpacity * 0.6}) 40%,
+        transparent 70%
+      );
+      --orb-opacity: 1;
+      animation: orbBreatheSlow 5s ease-in-out infinite;
+      animation-delay: -1s;
+    "></div>
+  `;
+
+  container.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SVG GRAPH RENDERER
+// ─────────────────────────────────────────────────────────────────────────
+
+function renderGraphSVG() {
+  const svg = document.getElementById('graph-svg');
+  const { width, height } = graphDims;
+  const isDark = isDarkMode;
+
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+  let html = '';
+
+  // ── Define SVG filters for node glow ──
+  html += `
+    <defs>
+      ${Object.entries(TRAITS).map(([key, trait]) => `
+        <filter id="glow-${key}" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feFlood flood-color="${trait.hex}" flood-opacity="${isDark ? 0.5 : 0.3}" result="color"/>
+          <feComposite in="color" in2="blur" operator="in" result="shadow"/>
+          <feMerge>
+            <feMergeNode in="shadow"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      `).join('')}
+    </defs>
+  `;
+
+  // ── Draw edges (thin, low opacity) ──
+  edges.forEach(([srcId, tgtId]) => {
+    const src = nodes.find(n => n.id === srcId);
+    const tgt = nodes.find(n => n.id === tgtId);
+    if (!src || !tgt) return;
+
+    // Blend color between traits if cross-cluster
+    const color = TRAITS[src.trait].hex;
+    const lineOpacity = isDark ? 0.18 : 0.12;
+
+    html += `
+      <line
+        class="graph-line"
+        data-src="${srcId}" data-tgt="${tgtId}"
+        x1="${src.x.toFixed(1)}" y1="${src.y.toFixed(1)}"
+        x2="${tgt.x.toFixed(1)}" y2="${tgt.y.toFixed(1)}"
+        stroke="${color}"
+        stroke-width="1"
+        stroke-opacity="${lineOpacity}"
+      />
+    `;
+  });
+
+  // ── Draw nodes ──
+  nodes.forEach(node => {
+    const trait = TRAITS[node.trait];
+    html += `
+      <circle
+        class="graph-node"
+        data-id="${node.id}"
+        cx="${node.x.toFixed(1)}" cy="${node.y.toFixed(1)}"
+        r="${node.size.toFixed(1)}"
+        fill="${trait.hex}"
+        filter="url(#glow-${node.trait})"
+        opacity="${isDark ? 0.9 : 0.75}"
+      />
+    `;
+  });
+
+  svg.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ANIMATION LOOP — Organic drift (nodes wiggle gently)
+// ─────────────────────────────────────────────────────────────────────────
+
+let startTime = null;
+
+function animateLoop(timestamp) {
+  if (!startTime) startTime = timestamp;
+  const elapsed = (timestamp - startTime) / 1000; // seconds
+
+  const svg = document.getElementById('graph-svg');
+  if (!svg) return;
+
+  // Update node positions with drift
+  nodes.forEach(node => {
+    node.x = node.baseX + Math.sin(elapsed * node.driftSpeedX + node.driftPhaseX) * node.driftAmplitudeX;
+    node.y = node.baseY + Math.cos(elapsed * node.driftSpeedY + node.driftPhaseY) * node.driftAmplitudeY;
+  });
+
+  // Update SVG elements in place (fast path — no innerHTML rebuild)
+  const circles = svg.querySelectorAll('.graph-node');
+  circles.forEach(circle => {
+    const id = circle.dataset.id;
+    const node = nodes.find(n => n.id === id);
+    if (node) {
+      circle.setAttribute('cx', node.x.toFixed(1));
+      circle.setAttribute('cy', node.y.toFixed(1));
+    }
+  });
+
+  const lines = svg.querySelectorAll('.graph-line');
+  lines.forEach(line => {
+    const src = nodes.find(n => n.id === line.dataset.src);
+    const tgt = nodes.find(n => n.id === line.dataset.tgt);
+    if (src && tgt) {
+      line.setAttribute('x1', src.x.toFixed(1));
+      line.setAttribute('y1', src.y.toFixed(1));
+      line.setAttribute('x2', tgt.x.toFixed(1));
+      line.setAttribute('y2', tgt.y.toFixed(1));
+    }
+  });
+
+  animFrameId = requestAnimationFrame(animateLoop);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// LEGEND
+// ─────────────────────────────────────────────────────────────────────────
+
+function renderLegend(profile) {
+  const container = document.getElementById('legend');
+  const traitDescriptions = {
+    curiosity:  'Seeks new ideas',
+    warmth:     'Creates ease',
+    intensity:  'Burns bright',
+    steadiness: 'Stays grounded',
+    depth:      'Sees beneath'
+  };
+
+  container.innerHTML = profile.traits.map(trait => {
+    const t = TRAITS[trait];
+    return `
+      <div class="legend-item">
+        <div class="legend-dot" style="background: ${t.hex}; box-shadow: 0 0 6px ${t.hex}40;"></div>
+        <div>
+          <div class="legend-label">${t.label}</div>
+          <div class="legend-desc">${traitDescriptions[trait]}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SHUFFLE — Randomize profile and regenerate everything
+// ─────────────────────────────────────────────────────────────────────────
+
+function shuffleProfile() {
+  // Pick a random profile different from current
+  let next;
+  do {
+    next = PROFILES[Math.floor(Math.random() * PROFILES.length)];
+  } while (next === currentProfile && PROFILES.length > 1);
+
+  currentProfile = next;
+  buildVisualization();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// THEME TOGGLE
+// ─────────────────────────────────────────────────────────────────────────
+
+function toggleTheme() {
+  isDarkMode = !isDarkMode;
+  document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+  document.body.style.background = isDarkMode ? '#030712' : '#f9fafb';
+  document.getElementById('theme-toggle').textContent = isDarkMode ? 'Light Mode' : 'Dark Mode';
+
+  // Rebuild to update colors
+  renderOrb(currentProfile);
+  renderGraphSVG();
+  renderLegend(currentProfile);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BUILD — Full pipeline
+// ─────────────────────────────────────────────────────────────────────────
+
+function buildVisualization() {
+  // Cancel running animation
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  startTime = null;
+
+  // Update header
+  document.getElementById('aura-title').textContent = currentProfile.name;
+  document.getElementById('aura-subtitle').textContent = currentProfile.subtitle;
+
+  // Generate graph data
+  generateGraph(currentProfile);
+
+  // Render layers
+  renderOrb(currentProfile);
+  renderGraphSVG();
+  renderLegend(currentProfile);
+
+  // Start animation
+  animFrameId = requestAnimationFrame(animateLoop);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildVisualization();
+});
+
+window.addEventListener('resize', () => {
+  buildVisualization();
+});
+</script>
+</body>
+</html>
+

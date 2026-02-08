@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Pulse — Energy Signature</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #030712;
+    color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
+  }
+
+  .container {
+    display: flex;
+    gap: 40px;
+    max-width: 960px;
+    width: 100%;
+    padding: 32px;
+    align-items: flex-start;
+  }
+
+  /* ── Left panel: Questions ── */
+  .questions-panel {
+    flex: 1;
+    min-width: 280px;
+    max-width: 380px;
+  }
+
+  .questions-panel h2 {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    margin-bottom: 16px;
+  }
+
+  .question-block {
+    margin-bottom: 12px;
+  }
+
+  .question-label {
+    font-size: 13px;
+    color: #9ca3af;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .question-label .q-num {
+    font-size: 11px;
+    color: #4b5563;
+    font-weight: 600;
+    min-width: 18px;
+  }
+
+  .options {
+    display: flex;
+    gap: 6px;
+  }
+
+  .option-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    background: #111827;
+    color: #9ca3af;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .option-btn:hover {
+    border-color: #6b7280;
+    color: #e5e7eb;
+    background: #1f2937;
+  }
+
+  .option-btn.selected {
+    border-color: #8b5cf6;
+    color: #fff;
+    background: rgba(139, 92, 246, 0.15);
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.15);
+  }
+
+  .reset-btn {
+    margin-top: 16px;
+    padding: 8px 20px;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    background: transparent;
+    color: #6b7280;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .reset-btn:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+
+  /* ── Right panel: Visualization ── */
+  .viz-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    width: 400px;
+    height: 400px;
+  }
+
+  .canvas-wrap canvas {
+    display: block;
+    border-radius: 16px;
+  }
+
+  .viz-label {
+    font-size: 13px;
+    color: #6b7280;
+    letter-spacing: 0.06em;
+    text-align: center;
+  }
+
+  .viz-label strong {
+    color: #9ca3af;
+    font-weight: 600;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 800px) {
+    .container {
+      flex-direction: column-reverse;
+      align-items: center;
+      padding: 20px;
+      gap: 24px;
+    }
+    .questions-panel {
+      max-width: 100%;
+    }
+    .canvas-wrap {
+      width: 320px;
+      height: 320px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Questions -->
+  <div class="questions-panel">
+    <h2>10 Questions</h2>
+    <div id="questions"></div>
+    <button class="reset-btn" id="resetBtn">Reset All</button>
+  </div>
+
+  <!-- Visualization -->
+  <div class="viz-panel">
+    <div class="canvas-wrap">
+      <canvas id="pulseCanvas" width="400" height="400"></canvas>
+    </div>
+    <div class="viz-label"><strong>Team Pulse</strong> &mdash; Energy Signature</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════
+const QUESTIONS = [
+  { q: "Which came first?",                     a: ["The chicken", "The egg"] },
+  { q: "Better pizza topping:",                  a: ["Pepperoni", "Pineapple"] },
+  { q: "In 10 years, most people will...",       a: ["Still drive cars themselves", "Use self-driving cars"] },
+  { q: "Is a hot dog a sandwich?",               a: ["Yes, obviously", "No way"] },
+  { q: "Will humans live on Mars by 2050?",      a: ["Yes", "No"] },
+  { q: "Better superpower:",                     a: ["Flight", "Invisibility"] },
+  { q: "Coffee in the morning?",                 a: ["Yes please", "Not for me"] },
+  { q: "Dogs or cats?",                          a: ["Dogs", "Cats"] },
+  { q: "Will AI replace most jobs?",             a: ["Yes, big changes coming", "No, jobs will adapt"] },
+  { q: "Is water wet?",                          a: ["Yes", "No"] },
+];
+
+// answers[i] = 0 (option A), 1 (option B), or null (unanswered)
+const answers = new Array(10).fill(null);
+
+// ═══════════════════════════════════════════════════════
+// QUESTIONS UI
+// ═══════════════════════════════════════════════════════
+const questionsEl = document.getElementById('questions');
+
+function buildQuestions() {
+  questionsEl.innerHTML = '';
+  QUESTIONS.forEach((item, qi) => {
+    const block = document.createElement('div');
+    block.className = 'question-block';
+
+    const label = document.createElement('div');
+    label.className = 'question-label';
+    label.innerHTML = `<span class="q-num">${qi + 1}.</span> ${item.q}`;
+    block.appendChild(label);
+
+    const opts = document.createElement('div');
+    opts.className = 'options';
+
+    item.a.forEach((text, oi) => {
+      const btn = document.createElement('button');
+      btn.className = 'option-btn';
+      btn.textContent = text;
+      if (answers[qi] === oi) btn.classList.add('selected');
+      btn.addEventListener('click', () => {
+        answers[qi] = oi;
+        refreshButtons(qi);
+      });
+      opts.appendChild(btn);
+    });
+
+    block.appendChild(opts);
+    questionsEl.appendChild(block);
+  });
+}
+
+function refreshButtons(qi) {
+  const block = questionsEl.children[qi];
+  const btns = block.querySelectorAll('.option-btn');
+  btns.forEach((b, oi) => {
+    b.classList.toggle('selected', answers[qi] === oi);
+  });
+}
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  answers.fill(null);
+  buildQuestions();
+});
+
+buildQuestions();
+
+// ═══════════════════════════════════════════════════════
+// VISUALIZATION STATE (smoothly interpolated)
+// ═══════════════════════════════════════════════════════
+
+// Current (rendered) values — we lerp toward targets
+const state = {
+  // Q1: primary ring color (r,g,b)
+  primaryR: 0.4, primaryG: 0.4, primaryB: 0.6,   // neutral gray-blue
+  // Q2: ring spacing  (0 = tight, 1 = wide)
+  ringSpacing: 0.5,
+  // Q3: pulse speed (seconds per cycle)
+  pulseSpeed: 2.0,
+  // Q4: ring count
+  ringCount: 4,
+  // Q5: ripple direction (-1 inward, 0 neutral, +1 outward)
+  rippleDir: 0,
+  // Q6: amplitude (0..1)
+  amplitude: 0.5,
+  // Q7: particle mode (0=none, 1=warm, 2=cool) — we blend via separate opacity channels
+  warmParticles: 0,
+  coolParticles: 0,
+  // Q8: secondary color (r,g,b)
+  secondaryR: 0.5, secondaryG: 0.3, secondaryB: 0.6,
+  // Q9: asymmetry (0 = sync, 1 = full async)
+  asymmetry: 0,
+  // Q10: rotation speed (0 = static, 1 = spinning)
+  rotation: 0,
+};
+
+function getTargets() {
+  const t = {};
+
+  // Q1: primary color
+  if (answers[0] === null) { t.primaryR = 0.40; t.primaryG = 0.40; t.primaryB = 0.60; }
+  else if (answers[0] === 0) { // violet #8b5cf6
+    t.primaryR = 0.545; t.primaryG = 0.361; t.primaryB = 0.965;
+  } else { // blue #3b82f6
+    t.primaryR = 0.231; t.primaryG = 0.510; t.primaryB = 0.965;
+  }
+
+  // Q2: ring spacing
+  t.ringSpacing = answers[1] === null ? 0.5 : (answers[1] === 0 ? 0.25 : 0.85);
+
+  // Q3: pulse speed (seconds)
+  t.pulseSpeed = answers[2] === null ? 2.0 : (answers[2] === 0 ? 3.0 : 1.0);
+
+  // Q4: ring count
+  t.ringCount = answers[3] === null ? 4 : (answers[3] === 0 ? 7 : 2.5);
+
+  // Q5: ripple direction
+  t.rippleDir = answers[4] === null ? 0 : (answers[4] === 0 ? 1 : -1);
+
+  // Q6: amplitude
+  t.amplitude = answers[5] === null ? 0.5 : (answers[5] === 0 ? 1.0 : 0.2);
+
+  // Q7: particles
+  if (answers[6] === null) { t.warmParticles = 0; t.coolParticles = 0; }
+  else if (answers[6] === 0) { t.warmParticles = 1; t.coolParticles = 0; }
+  else { t.warmParticles = 0; t.coolParticles = 1; }
+
+  // Q8: secondary color
+  if (answers[7] === null) { t.secondaryR = 0.50; t.secondaryG = 0.30; t.secondaryB = 0.60; }
+  else if (answers[7] === 0) { // pink #d946ef
+    t.secondaryR = 0.851; t.secondaryG = 0.275; t.secondaryB = 0.937;
+  } else { // indigo #6366f1
+    t.secondaryR = 0.388; t.secondaryG = 0.400; t.secondaryB = 0.945;
+  }
+
+  // Q9: asymmetry
+  t.asymmetry = answers[8] === null ? 0 : (answers[8] === 0 ? 1 : 0);
+
+  // Q10: rotation
+  t.rotation = answers[9] === null ? 0 : (answers[9] === 0 ? 1 : 0);
+
+  return t;
+}
+
+function lerpState(dt) {
+  const targets = getTargets();
+  const speed = 3.0; // convergence speed
+  const k = 1 - Math.exp(-speed * dt);
+  for (const key in targets) {
+    state[key] += (targets[key] - state[key]) * k;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// PARTICLES
+// ═══════════════════════════════════════════════════════
+const MAX_PARTICLES = 60;
+const particles = [];
+
+function spawnParticle(warm) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 30 + Math.random() * 100;
+  return {
+    x: Math.cos(angle) * dist,
+    y: Math.sin(angle) * dist,
+    vx: (Math.random() - 0.5) * 30,
+    vy: (Math.random() - 0.5) * 30,
+    life: 1.0,
+    decay: 0.3 + Math.random() * 0.5,
+    size: 1.5 + Math.random() * 2.5,
+    warm: warm,
+  };
+}
+
+function tickParticles(dt) {
+  // desired count based on current state
+  const warmCount = Math.round(state.warmParticles * 30);
+  const coolCount = Math.round(state.coolParticles * 30);
+  const totalDesired = warmCount + coolCount;
+
+  // spawn
+  if (particles.length < totalDesired && Math.random() < dt * 20) {
+    // decide warm or cool
+    const spawnWarm = warmCount > 0 && (coolCount === 0 || Math.random() < warmCount / (warmCount + coolCount));
+    particles.push(spawnParticle(spawnWarm));
+  }
+
+  // update
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= p.decay * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    // gentle pull toward center
+    p.vx -= p.x * 0.3 * dt;
+    p.vy -= p.y * 0.3 * dt;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+    }
+  }
+
+  // fade out excess
+  if (totalDesired === 0) {
+    for (const p of particles) p.decay = 2.0;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// CANVAS RENDERING
+// ═══════════════════════════════════════════════════════
+const canvas = document.getElementById('pulseCanvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+const CX = W / 2;
+const CY = H / 2;
+
+let lastTime = performance.now() / 1000;
+let elapsedTime = 0;
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return [r, g, b];
+}
+
+function colorStr(r, g, b, a) {
+  return `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a.toFixed(3)})`;
+}
+
+function draw() {
+  const now = performance.now() / 1000;
+  const dt = Math.min(now - lastTime, 0.1);
+  lastTime = now;
+  elapsedTime += dt;
+
+  lerpState(dt);
+  tickParticles(dt);
+
+  // Clear
+  ctx.clearRect(0, 0, W, H);
+
+  // Background glow
+  const bgGrad = ctx.createRadialGradient(CX, CY, 0, CX, CY, 200);
+  const glowR = (state.primaryR + state.secondaryR) * 0.5;
+  const glowG = (state.primaryG + state.secondaryG) * 0.5;
+  const glowB = (state.primaryB + state.secondaryB) * 0.5;
+  bgGrad.addColorStop(0, colorStr(glowR, glowG, glowB, 0.08));
+  bgGrad.addColorStop(0.5, colorStr(glowR, glowG, glowB, 0.03));
+  bgGrad.addColorStop(1, 'rgba(3,7,18,0)');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Compute ring parameters ──
+  const ringCount = Math.round(state.ringCount);
+  const baseSpacing = 15 + state.ringSpacing * 40; // 15..55 px between rings
+  const pulsePhase = (elapsedTime / state.pulseSpeed) * Math.PI * 2;
+  const amp = 5 + state.amplitude * 18; // pixel amplitude of breathing
+
+  // Rotation angle
+  const rotAngle = state.rotation * elapsedTime * 0.3;
+
+  ctx.save();
+  ctx.translate(CX, CY);
+  ctx.rotate(rotAngle);
+
+  // ── Draw rings ──
+  for (let i = 0; i < ringCount; i++) {
+    const t = ringCount > 1 ? i / (ringCount - 1) : 0; // 0..1
+
+    // Color blend: primary → secondary across rings
+    const cr = state.primaryR + (state.secondaryR - state.primaryR) * t;
+    const cg = state.primaryG + (state.secondaryG - state.primaryG) * t;
+    const cb = state.primaryB + (state.secondaryB - state.primaryB) * t;
+
+    // Per-ring phase offset (asymmetry)
+    const phaseOffset = state.asymmetry * (i * 0.7);
+
+    // Pulse value
+    const pulse = Math.sin(pulsePhase + phaseOffset);
+
+    // Base radius
+    let baseR = 30 + i * baseSpacing;
+
+    // Ripple: outward = rings drift outward over time, inward = contract
+    const rippleOffset = state.rippleDir * Math.sin(pulsePhase * 0.5 + i * 0.5) * 12;
+    baseR += rippleOffset;
+
+    // Breathing
+    const radius = baseR + pulse * amp;
+
+    if (radius < 5) continue;
+
+    // Draw soft ring: multiple strokes at decreasing opacity
+    const layers = 4;
+    for (let l = 0; l < layers; l++) {
+      const lf = l / layers;
+      const lineW = 2.5 - l * 0.5;
+      const alpha = (0.6 - lf * 0.15) * (0.5 + 0.5 * (1 - t * 0.3));
+      const spread = l * 2;
+
+      ctx.beginPath();
+      ctx.arc(0, 0, radius + spread, 0, Math.PI * 2);
+      ctx.strokeStyle = colorStr(cr, cg, cb, alpha);
+      ctx.lineWidth = lineW;
+      ctx.stroke();
+
+      if (spread > 0) {
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(5, radius - spread), 0, Math.PI * 2);
+        ctx.strokeStyle = colorStr(cr, cg, cb, alpha * 0.6);
+        ctx.lineWidth = lineW * 0.7;
+        ctx.stroke();
+      }
+    }
+
+    // Inner glow fill for innermost ring
+    if (i === 0) {
+      const innerGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+      innerGrad.addColorStop(0, colorStr(cr, cg, cb, 0.12 + pulse * 0.04));
+      innerGrad.addColorStop(0.7, colorStr(cr, cg, cb, 0.04));
+      innerGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = innerGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+
+  // ── Draw particles ──
+  for (const p of particles) {
+    const px = CX + p.x;
+    const py = CY + p.y;
+    const alpha = Math.max(0, p.life) * 0.8;
+    let pr, pg, pb;
+    if (p.warm) {
+      // emerald #10b981
+      pr = 0.063; pg = 0.725; pb = 0.506;
+    } else {
+      // cyan #06b6d4
+      pr = 0.024; pg = 0.714; pb = 0.831;
+    }
+
+    // Glow
+    const glowSize = p.size * 4;
+    const pGrad = ctx.createRadialGradient(px, py, 0, px, py, glowSize);
+    pGrad.addColorStop(0, colorStr(pr, pg, pb, alpha * 0.6));
+    pGrad.addColorStop(0.4, colorStr(pr, pg, pb, alpha * 0.2));
+    pGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = pGrad;
+    ctx.fillRect(px - glowSize, py - glowSize, glowSize * 2, glowSize * 2);
+
+    // Core
+    ctx.beginPath();
+    ctx.arc(px, py, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = colorStr(pr, pg, pb, alpha);
+    ctx.fill();
+  }
+
+  // ── Subtle background stars (static tiny dots) ──
+  // Seed once
+  if (!draw.stars) {
+    draw.stars = [];
+    for (let i = 0; i < 40; i++) {
+      draw.stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        size: 0.5 + Math.random() * 1,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.5 + Math.random() * 1.5,
+      });
+    }
+  }
+  for (const s of draw.stars) {
+    const twinkle = 0.15 + 0.15 * Math.sin(elapsedTime * s.speed + s.phase);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${twinkle.toFixed(3)})`;
+    ctx.fill();
+  }
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+
+</body>
+</html>

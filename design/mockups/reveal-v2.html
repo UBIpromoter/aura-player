@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Reveal v2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .glow { box-shadow: 0 0 30px rgba(139, 92, 246, 0.3); }
+    .glow-amber { box-shadow: 0 0 30px rgba(245, 158, 11, 0.3); }
+    .glow-teal { box-shadow: 0 0 30px rgba(20, 184, 166, 0.3); }
+    .glow-rose { box-shadow: 0 0 30px rgba(244, 63, 94, 0.3); }
+    .glow-emerald { box-shadow: 0 0 30px rgba(16, 185, 129, 0.3); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // ============ SCALE TYPES - Match labels to question meaning ============
+    const SCALES = {
+      frequency: [
+        { value: 1, label: 'Never', short: 'Never' },
+        { value: 2, label: 'Rarely', short: 'Rarely' },
+        { value: 3, label: 'Sometimes', short: 'Sometimes' },
+        { value: 4, label: 'Often', short: 'Often' },
+        { value: 5, label: 'Usually', short: 'Usually' },
+        { value: 6, label: 'Very Often', short: 'Very Often' },
+        { value: 7, label: 'Always', short: 'Always' },
+      ],
+      agreement: [
+        { value: 1, label: 'Strongly Disagree', short: 'Strongly Disagree' },
+        { value: 2, label: 'Disagree', short: 'Disagree' },
+        { value: 3, label: 'Slightly Disagree', short: 'Slightly Disagree' },
+        { value: 4, label: 'Neutral', short: 'Neutral' },
+        { value: 5, label: 'Slightly Agree', short: 'Slightly Agree' },
+        { value: 6, label: 'Agree', short: 'Agree' },
+        { value: 7, label: 'Strongly Agree', short: 'Strongly Agree' },
+      ],
+      likeme: [
+        { value: 1, label: 'Not at all like me', short: 'Not me' },
+        { value: 2, label: 'Not like me', short: 'Unlike me' },
+        { value: 3, label: 'A little unlike me', short: 'Bit unlike' },
+        { value: 4, label: 'Neutral', short: 'Neutral' },
+        { value: 5, label: 'A little like me', short: 'Bit like' },
+        { value: 6, label: 'Like me', short: 'Like me' },
+        { value: 7, label: 'Very much like me', short: 'Very me' },
+      ],
+      likelihood: [
+        { value: 1, label: 'Would never do', short: 'Never' },
+        { value: 2, label: 'Very unlikely', short: 'Very unlikely' },
+        { value: 3, label: 'Unlikely', short: 'Unlikely' },
+        { value: 4, label: 'Maybe', short: 'Maybe' },
+        { value: 5, label: 'Likely', short: 'Likely' },
+        { value: 6, label: 'Very likely', short: 'Very likely' },
+        { value: 7, label: 'Definitely would', short: 'Definitely' },
+      ],
+    };
+
+    // ============ QUESTION BANKS ============
+    const QUESTIONS = {
+      bigfive: {
+        name: 'Big Five Personality',
+        icon: '🎭',
+        color: 'violet',
+        glow: 'glow',
+        gradient: 'from-violet-600 to-purple-700',
+        desc: 'Discover your core personality traits',
+        time: '8 min',
+        scaleType: 'likeme',
+        scalePrompt: 'How well does this describe you?',
+        traits: ['Extraversion', 'Agreeableness', 'Conscientiousness', 'Neuroticism', 'Openness'],
+        items: [
+          { text: "I am the life of the party", trait: 'Extraversion', key: '+' },
+          { text: "I feel comfortable around people", trait: 'Extraversion', key: '+' },
+          { text: "I start conversations", trait: 'Extraversion', key: '+' },
+          { text: "I talk to a lot of different people at parties", trait: 'Extraversion', key: '+' },
+          { text: "I don't mind being the center of attention", trait: 'Extraversion', key: '+' },
+          { text: "I don't talk a lot", trait: 'Extraversion', key: '-' },
+          { text: "I keep in the background", trait: 'Extraversion', key: '-' },
+          { text: "I have little to say", trait: 'Extraversion', key: '-' },
+          { text: "I don't like to draw attention to myself", trait: 'Extraversion', key: '-' },
+          { text: "I am quiet around strangers", trait: 'Extraversion', key: '-' },
+          { text: "I sympathize with others' feelings", trait: 'Agreeableness', key: '+' },
+          { text: "I am interested in people", trait: 'Agreeableness', key: '+' },
+          { text: "I take time out for others", trait: 'Agreeableness', key: '+' },
+          { text: "I feel others' emotions", trait: 'Agreeableness', key: '+' },
+          { text: "I make people feel at ease", trait: 'Agreeableness', key: '+' },
+          { text: "I am not really interested in others", trait: 'Agreeableness', key: '-' },
+          { text: "I insult people", trait: 'Agreeableness', key: '-' },
+          { text: "I am not interested in other people's problems", trait: 'Agreeableness', key: '-' },
+          { text: "I feel little concern for others", trait: 'Agreeableness', key: '-' },
+          { text: "I am hard to get to know", trait: 'Agreeableness', key: '-' },
+          { text: "I am always prepared", trait: 'Conscientiousness', key: '+' },
+          { text: "I pay attention to details", trait: 'Conscientiousness', key: '+' },
+          { text: "I get chores done right away", trait: 'Conscientiousness', key: '+' },
+          { text: "I like order", trait: 'Conscientiousness', key: '+' },
+          { text: "I follow a schedule", trait: 'Conscientiousness', key: '+' },
+          { text: "I leave my belongings around", trait: 'Conscientiousness', key: '-' },
+          { text: "I make a mess of things", trait: 'Conscientiousness', key: '-' },
+          { text: "I often forget to put things back in their proper place", trait: 'Conscientiousness', key: '-' },
+          { text: "I shirk my duties", trait: 'Conscientiousness', key: '-' },
+          { text: "I neglect my responsibilities", trait: 'Conscientiousness', key: '-' },
+          { text: "I get stressed out easily", trait: 'Neuroticism', key: '+' },
+          { text: "I worry about things", trait: 'Neuroticism', key: '+' },
+          { text: "I am easily disturbed", trait: 'Neuroticism', key: '+' },
+          { text: "I get upset easily", trait: 'Neuroticism', key: '+' },
+          { text: "I change my mood a lot", trait: 'Neuroticism', key: '+' },
+          { text: "I am relaxed most of the time", trait: 'Neuroticism', key: '-' },
+          { text: "I seldom feel blue", trait: 'Neuroticism', key: '-' },
+          { text: "I am not easily bothered by things", trait: 'Neuroticism', key: '-' },
+          { text: "I rarely get irritated", trait: 'Neuroticism', key: '-' },
+          { text: "I keep my emotions under control", trait: 'Neuroticism', key: '-' },
+          { text: "I have a vivid imagination", trait: 'Openness', key: '+' },
+          { text: "I have excellent ideas", trait: 'Openness', key: '+' },
+          { text: "I am quick to understand things", trait: 'Openness', key: '+' },
+          { text: "I use difficult words", trait: 'Openness', key: '+' },
+          { text: "I spend time reflecting on things", trait: 'Openness', key: '+' },
+          { text: "I am not interested in abstract ideas", trait: 'Openness', key: '-' },
+          { text: "I do not have a good imagination", trait: 'Openness', key: '-' },
+          { text: "I have difficulty understanding abstract ideas", trait: 'Openness', key: '-' },
+          { text: "I am not interested in theoretical discussions", trait: 'Openness', key: '-' },
+          { text: "I avoid philosophical discussions", trait: 'Openness', key: '-' },
+        ]
+      },
+
+      adhd: {
+        name: 'ADHD Screen',
+        icon: '⚡',
+        color: 'amber',
+        glow: 'glow-amber',
+        gradient: 'from-amber-500 to-orange-600',
+        desc: 'Explore your attention patterns',
+        time: '2 min',
+        scaleType: 'frequency',
+        scalePrompt: 'How often does this happen?',
+        items: [
+          { text: "I have trouble wrapping up the final details of a project, once the challenging parts have been done" },
+          { text: "I have difficulty getting things in order when I have to do a task that requires organization" },
+          { text: "I have problems remembering appointments or obligations" },
+          { text: "When I have a task that requires a lot of thought, I avoid or delay getting started" },
+          { text: "I fidget or squirm with my hands or feet when I have to sit down for a long time" },
+          { text: "I feel overly active and compelled to do things, like I'm driven by a motor" },
+        ]
+      },
+
+      cognitive: {
+        name: 'Cognitive Style',
+        icon: '🧩',
+        color: 'teal',
+        glow: 'glow-teal',
+        gradient: 'from-teal-500 to-cyan-600',
+        desc: 'Understand how you process information',
+        time: '3 min',
+        scaleType: 'agreement',
+        scalePrompt: 'How much do you agree?',
+        categories: ['Detail Processing', 'Cognitive Flexibility', 'Social Processing', 'Reading Others', 'Systematizing'],
+        items: [
+          { text: "I notice things others seem to miss—small changes, background sounds, subtle patterns", category: 'Detail Processing' },
+          { text: "When looking at something, I'm drawn to specific details before seeing the overall picture", category: 'Detail Processing' },
+          { text: "Switching between tasks quickly feels uncomfortable or draining", category: 'Cognitive Flexibility' },
+          { text: "When interrupted, getting back into what I was doing takes significant effort", category: 'Cognitive Flexibility' },
+          { text: "I often take what people say literally, then realize later they meant something else", category: 'Social Processing' },
+          { text: "Figuring out if someone wants to end a conversation doesn't come naturally to me", category: 'Social Processing' },
+          { text: "I rely on what people explicitly say rather than their tone or facial expressions", category: 'Reading Others' },
+          { text: "Understanding why characters in movies make certain decisions often puzzles me", category: 'Reading Others' },
+          { text: "I enjoy organizing information into categories, lists, or systems", category: 'Systematizing' },
+          { text: "Learning the rules or patterns behind how something works is deeply satisfying", category: 'Systematizing' },
+        ]
+      },
+
+      attachment: {
+        name: 'Attachment Style',
+        icon: '💝',
+        color: 'rose',
+        glow: 'glow-rose',
+        gradient: 'from-rose-500 to-pink-600',
+        desc: 'Discover your relationship patterns',
+        time: '4 min',
+        scaleType: 'agreement',
+        scalePrompt: 'How much do you agree?',
+        dimensions: ['Anxiety', 'Avoidance'],
+        items: [
+          { text: "When I don't hear from someone I care about, I tend to assume something is wrong", dimension: 'Anxiety' },
+          { text: "I find myself looking for signs that a partner might be losing interest", dimension: 'Anxiety' },
+          { text: "Feeling truly secure in a relationship is rare for me", dimension: 'Anxiety' },
+          { text: "I need more reassurance than most people that I'm valued", dimension: 'Anxiety' },
+          { text: "The possibility of being left weighs on me more than it probably should", dimension: 'Anxiety' },
+          { text: "I sometimes push for closeness in ways that feel desperate afterward", dimension: 'Anxiety' },
+          { text: "I feel most comfortable when I don't have to depend on anyone", dimension: 'Avoidance' },
+          { text: "Opening up emotionally makes me feel exposed in a bad way", dimension: 'Avoidance' },
+          { text: "When relationships get too close, I start wanting more space", dimension: 'Avoidance' },
+          { text: "I'd rather solve my problems alone than ask a partner for help", dimension: 'Avoidance' },
+          { text: "Keeping some emotional distance feels safer than full vulnerability", dimension: 'Avoidance' },
+          { text: "I've been told I'm hard to read or emotionally unavailable", dimension: 'Avoidance' },
+        ]
+      },
+
+      risk: {
+        name: 'Risk Tolerance',
+        icon: '🎲',
+        color: 'emerald',
+        glow: 'glow-emerald',
+        gradient: 'from-emerald-500 to-green-600',
+        desc: 'See where you take chances',
+        time: '5 min',
+        scaleType: 'likelihood',
+        scalePrompt: 'How likely would you do this?',
+        domains: ['Financial', 'Social', 'Physical', 'Career', 'Ethical'],
+        items: [
+          { text: "Invest 20% of my savings in a high-risk/high-reward opportunity", domain: 'Financial' },
+          { text: "Quit a stable job to start my own business", domain: 'Financial' },
+          { text: "Lend a significant amount of money to a friend", domain: 'Financial' },
+          { text: "Share an unpopular opinion publicly, even if it might upset people", domain: 'Social' },
+          { text: "Confront a friend directly about something bothering me", domain: 'Social' },
+          { text: "Introduce myself to a complete stranger at an event", domain: 'Social' },
+          { text: "Try an extreme sport like skydiving or bungee jumping", domain: 'Physical' },
+          { text: "Travel solo to an unfamiliar country where I don't speak the language", domain: 'Physical' },
+          { text: "Eat food from a street vendor in a foreign country", domain: 'Physical' },
+          { text: "Take a job in a completely new field I know nothing about", domain: 'Career' },
+          { text: "Speak up in a meeting to challenge my boss's idea", domain: 'Career' },
+          { text: "Negotiate aggressively for a much higher salary", domain: 'Career' },
+          { text: "Bend the rules slightly if it helps someone I care about", domain: 'Ethical' },
+          { text: "Keep extra change if a cashier makes a mistake in my favor", domain: 'Ethical' },
+          { text: "Tell a white lie to avoid hurting someone's feelings", domain: 'Ethical' },
+        ]
+      }
+    };
+
+    // ============ MAIN APP ============
+    function RevealApp() {
+      const [view, setView] = useState('picker');
+      const [selectedTest, setSelectedTest] = useState(null);
+      const [questionIndex, setQuestionIndex] = useState(0);
+      const [answers, setAnswers] = useState({});
+      const [completedTests, setCompletedTests] = useState({});
+      const [savedProgress, setSavedProgress] = useState({});
+      const [currentAnswer, setCurrentAnswer] = useState(null);
+
+      // Load saved data on mount
+      useEffect(() => {
+        const saved = localStorage.getItem('aura-reveal-progress');
+        if (saved) {
+          const data = JSON.parse(saved);
+          setCompletedTests(data.completedTests || {});
+          setSavedProgress(data.savedProgress || {});
+        }
+      }, []);
+
+      // Save to localStorage
+      const saveToStorage = (completed, progress) => {
+        localStorage.setItem('aura-reveal-progress', JSON.stringify({
+          completedTests: completed,
+          savedProgress: progress,
+        }));
+      };
+
+      const startTest = (testId) => {
+        setSelectedTest(testId);
+        // Resume if there's saved progress
+        if (savedProgress[testId]) {
+          setQuestionIndex(savedProgress[testId].questionIndex);
+          setAnswers(savedProgress[testId].answers);
+        } else {
+          setQuestionIndex(0);
+          setAnswers({});
+        }
+        setCurrentAnswer(null);
+        setView('question');
+      };
+
+      const saveAndExit = () => {
+        const newProgress = {
+          ...savedProgress,
+          [selectedTest]: { questionIndex, answers }
+        };
+        setSavedProgress(newProgress);
+        saveToStorage(completedTests, newProgress);
+        setView('picker');
+      };
+
+      const submitAnswer = () => {
+        if (currentAnswer === null) return;
+        const newAnswers = { ...answers, [questionIndex]: currentAnswer };
+        setAnswers(newAnswers);
+
+        const test = QUESTIONS[selectedTest];
+        if (questionIndex < test.items.length - 1) {
+          setQuestionIndex(questionIndex + 1);
+          setCurrentAnswer(null);
+          // Auto-save progress
+          const newProgress = {
+            ...savedProgress,
+            [selectedTest]: { questionIndex: questionIndex + 1, answers: newAnswers }
+          };
+          setSavedProgress(newProgress);
+          saveToStorage(completedTests, newProgress);
+        } else {
+          // Complete test
+          const results = calculateResults(selectedTest, newAnswers);
+          const newCompleted = { ...completedTests, [selectedTest]: results };
+          setCompletedTests(newCompleted);
+          // Clear saved progress for this test
+          const { [selectedTest]: _, ...remainingProgress } = savedProgress;
+          setSavedProgress(remainingProgress);
+          saveToStorage(newCompleted, remainingProgress);
+          setView('results');
+        }
+      };
+
+      const calculateResults = (testId, ans) => {
+        const test = QUESTIONS[testId];
+        const scores = {};
+
+        if (testId === 'bigfive') {
+          test.traits.forEach(trait => { scores[trait] = { total: 0, count: 0 }; });
+          test.items.forEach((item, i) => {
+            if (ans[i] !== undefined) {
+              let score = ans[i];
+              if (item.key === '-') score = 8 - score;
+              scores[item.trait].total += score;
+              scores[item.trait].count++;
+            }
+          });
+          Object.keys(scores).forEach(trait => {
+            scores[trait] = Math.round((scores[trait].total / (scores[trait].count * 7)) * 100);
+          });
+        } else if (testId === 'adhd') {
+          let total = 0;
+          Object.values(ans).forEach(v => { total += v; });
+          scores.total = total;
+          scores.average = (total / 6).toFixed(1);
+          scores.indicatorCount = Object.values(ans).filter(v => v >= 5).length;
+        } else if (testId === 'cognitive') {
+          test.categories.forEach(cat => { scores[cat] = { total: 0, count: 0 }; });
+          test.items.forEach((item, i) => {
+            if (ans[i] !== undefined) {
+              scores[item.category].total += ans[i];
+              scores[item.category].count++;
+            }
+          });
+          Object.keys(scores).forEach(cat => {
+            scores[cat] = Math.round((scores[cat].total / (scores[cat].count * 7)) * 100);
+          });
+          scores.overall = Math.round(Object.values(scores).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) / 5);
+        } else if (testId === 'attachment') {
+          scores.Anxiety = { total: 0, count: 0 };
+          scores.Avoidance = { total: 0, count: 0 };
+          test.items.forEach((item, i) => {
+            if (ans[i] !== undefined) {
+              scores[item.dimension].total += ans[i];
+              scores[item.dimension].count++;
+            }
+          });
+          scores.Anxiety = (scores.Anxiety.total / scores.Anxiety.count).toFixed(1);
+          scores.Avoidance = (scores.Avoidance.total / scores.Avoidance.count).toFixed(1);
+          const highAnx = scores.Anxiety > 4;
+          const highAvoid = scores.Avoidance > 4;
+          if (!highAnx && !highAvoid) scores.style = 'Secure';
+          else if (highAnx && !highAvoid) scores.style = 'Anxious';
+          else if (!highAnx && highAvoid) scores.style = 'Avoidant';
+          else scores.style = 'Fearful';
+        } else if (testId === 'risk') {
+          test.domains.forEach(dom => { scores[dom] = { total: 0, count: 0 }; });
+          test.items.forEach((item, i) => {
+            if (ans[i] !== undefined) {
+              scores[item.domain].total += ans[i];
+              scores[item.domain].count++;
+            }
+          });
+          Object.keys(scores).forEach(dom => {
+            scores[dom] = Math.round((scores[dom].total / (scores[dom].count * 7)) * 100);
+          });
+          scores.overall = Math.round(Object.values(scores).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) / 5);
+        }
+        return scores;
+      };
+
+      const colorMap = {
+        violet: { bg: 'bg-violet-500', ring: 'ring-violet-400', text: 'text-violet-400', light: 'bg-violet-500/20', gradient: 'from-violet-600 to-purple-700' },
+        amber: { bg: 'bg-amber-500', ring: 'ring-amber-400', text: 'text-amber-400', light: 'bg-amber-500/20', gradient: 'from-amber-500 to-orange-600' },
+        teal: { bg: 'bg-teal-500', ring: 'ring-teal-400', text: 'text-teal-400', light: 'bg-teal-500/20', gradient: 'from-teal-500 to-cyan-600' },
+        rose: { bg: 'bg-rose-500', ring: 'ring-rose-400', text: 'text-rose-400', light: 'bg-rose-500/20', gradient: 'from-rose-500 to-pink-600' },
+        emerald: { bg: 'bg-emerald-500', ring: 'ring-emerald-400', text: 'text-emerald-400', light: 'bg-emerald-500/20', gradient: 'from-emerald-500 to-green-600' },
+      };
+
+      // ============ PICKER VIEW ============
+      const Picker = () => (
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="p-5 text-center border-b border-gray-800/50">
+            <div className="text-4xl mb-2">🪞</div>
+            <h1 className="text-2xl font-bold text-white">Reveal</h1>
+            <p className="text-gray-400 text-sm mt-1">Discover yourself through play</p>
+            {Object.keys(completedTests).length > 0 && (
+              <button
+                onClick={() => setView('profile')}
+                className="mt-3 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 rounded-full text-white text-sm font-medium"
+              >
+                View My Profile →
+              </button>
+            )}
+          </div>
+
+          {/* Disclaimer */}
+          <div className="mx-4 mt-4 px-4 py-2 rounded-xl bg-gray-800/30 border border-gray-700/50">
+            <p className="text-xs text-gray-500 text-center">For fun and self-discovery, not medical advice</p>
+          </div>
+
+          {/* Test Cards */}
+          <div className="flex-1 overflow-auto p-4 space-y-4 hide-scrollbar">
+            {Object.entries(QUESTIONS).map(([id, test]) => {
+              const completed = completedTests[id];
+              const inProgress = savedProgress[id];
+              const c = colorMap[test.color];
+
+              return (
+                <button
+                  key={id}
+                  onClick={() => startTest(id)}
+                  className={`w-full p-5 rounded-2xl text-left transition-all duration-300 hover:scale-[1.02] ${
+                    completed ? `bg-gradient-to-br ${c.gradient} ${test.glow}` : 'bg-gray-900/80 border border-gray-800 hover:border-gray-700'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`text-4xl ${completed ? '' : 'grayscale-[30%]'}`}>{test.icon}</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-lg font-semibold ${completed ? 'text-white' : 'text-white'}`}>{test.name}</span>
+                        {completed && <span className="text-xs px-2 py-0.5 rounded-full bg-white/20 text-white">✓ Complete</span>}
+                        {inProgress && !completed && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-300">In Progress</span>}
+                      </div>
+                      <p className={`text-sm mt-1 ${completed ? 'text-white/80' : 'text-gray-400'}`}>{test.desc}</p>
+                      <div className={`text-xs mt-2 ${completed ? 'text-white/60' : 'text-gray-500'}`}>
+                        {test.items.length} questions · {test.time}
+                        {inProgress && !completed && ` · ${Math.round((inProgress.questionIndex / test.items.length) * 100)}% done`}
+                      </div>
+                    </div>
+                    <span className={completed ? 'text-white/60' : 'text-gray-600'}>→</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+
+      // ============ QUESTION VIEW ============
+      const Question = () => {
+        const test = QUESTIONS[selectedTest];
+        const item = test.items[questionIndex];
+        const progress = ((questionIndex + 1) / test.items.length) * 100;
+        const c = colorMap[test.color];
+        const scale = SCALES[test.scaleType];
+
+        return (
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-800/50">
+              <button onClick={saveAndExit} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+                <span>←</span>
+                <span className="text-sm">Save & Exit</span>
+              </button>
+              <span className="text-white font-medium">{test.name}</span>
+              <span className="text-gray-500 text-sm">{questionIndex + 1} / {test.items.length}</span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="h-1.5 bg-gray-800">
+              <div
+                className={`h-full bg-gradient-to-r ${c.gradient} transition-all duration-500 ease-out`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            {/* Question Content */}
+            <div className="flex-1 flex flex-col p-6">
+              {/* Category Badge */}
+              {(item.trait || item.category || item.dimension || item.domain) && (
+                <div className={`inline-flex self-start px-3 py-1 rounded-full text-xs font-medium ${c.light} ${c.text} mb-4`}>
+                  {item.trait || item.category || item.dimension || item.domain}
+                </div>
+              )}
+
+              {/* Question Text */}
+              <h2 className="text-xl font-medium text-white leading-relaxed mb-8">
+                {item.text}
+              </h2>
+
+              {/* Scale Prompt */}
+              <div className={`text-center mb-4 text-sm font-medium ${c.text}`}>
+                {test.scalePrompt}
+              </div>
+
+              {/* Answer Buttons - Vertical Stack with Labels */}
+              <div className="space-y-2">
+                {scale.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setCurrentAnswer(opt.value)}
+                    className={`w-full py-3 px-4 rounded-xl text-left transition-all duration-200 flex items-center justify-between ${
+                      currentAnswer === opt.value
+                        ? `bg-gradient-to-r ${c.gradient} text-white shadow-lg scale-[1.02] ${test.glow}`
+                        : 'bg-gray-800/50 text-gray-300 hover:bg-gray-800 border border-gray-700/50'
+                    }`}
+                  >
+                    <span className="font-medium">{opt.label}</span>
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                      currentAnswer === opt.value ? 'bg-white/20' : 'bg-gray-700'
+                    }`}>
+                      {opt.value}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Next Button */}
+            <div className="p-4 border-t border-gray-800/50">
+              <button
+                onClick={submitAnswer}
+                disabled={currentAnswer === null}
+                className={`w-full py-4 rounded-xl font-semibold text-lg transition-all duration-300 ${
+                  currentAnswer !== null
+                    ? `bg-gradient-to-r ${c.gradient} text-white shadow-lg hover:shadow-xl hover:scale-[1.01] ${test.glow}`
+                    : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                }`}
+              >
+                {questionIndex < test.items.length - 1 ? 'Next →' : 'See My Results →'}
+              </button>
+            </div>
+          </div>
+        );
+      };
+
+      // ============ RESULTS VIEW ============
+      const Results = () => {
+        const test = QUESTIONS[selectedTest];
+        const results = completedTests[selectedTest];
+        const c = colorMap[test.color];
+
+        const TraitBar = ({ label, value, color }) => {
+          const cc = colorMap[color];
+          return (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-300">{label}</span>
+                <span className="text-white font-semibold">{value}%</span>
+              </div>
+              <div className="h-3 rounded-full bg-gray-800 overflow-hidden">
+                <div
+                  className={`h-full rounded-full bg-gradient-to-r ${cc.gradient} transition-all duration-1000 ease-out`}
+                  style={{ width: `${value}%` }}
+                />
+              </div>
+            </div>
+          );
+        };
+
+        const getSummary = () => {
+          if (selectedTest === 'bigfive') {
+            const traits = Object.entries(results).sort((a, b) => b[1] - a[1]);
+            const highest = traits[0][0];
+            const lowest = traits[traits.length - 1][0];
+            return `Your strongest trait is ${highest}, and you score lower in ${lowest}. This unique combination shapes how you interact with the world and make decisions.`;
+          }
+          if (selectedTest === 'adhd') {
+            if (results.indicatorCount >= 4) return "Your responses show patterns common in people with attention differences. These patterns around focus, organization, and restlessness may be worth exploring further if they affect your daily life.";
+            return "Your responses don't strongly indicate ADHD patterns. Everyone has occasional focus challenges, but yours appear within typical ranges.";
+          }
+          if (selectedTest === 'cognitive') {
+            if (results.overall >= 60) return "Your thinking style has many neurodivergent characteristics. You likely process details deeply, prefer systematic approaches, and may experience social situations differently than others.";
+            if (results.overall >= 40) return "You show a blend of thinking styles, giving you flexibility in how you approach different situations.";
+            return "Your cognitive style leans toward neurotypical patterns. Social navigation likely feels intuitive, and you adapt easily between tasks.";
+          }
+          if (selectedTest === 'attachment') {
+            const summaries = {
+              'Secure': "You're comfortable with emotional intimacy and independence. You can depend on others and let others depend on you without much anxiety.",
+              'Anxious': "You value deep connection and are highly attuned to relationships—sometimes too attuned. Understanding this pattern helps you communicate needs clearly.",
+              'Avoidant': "You prize independence and self-reliance. Emotional vulnerability doesn't come naturally, which can protect you but also limit intimacy.",
+              'Fearful': "You want close relationships but find them anxiety-provoking. Understanding this push-pull pattern is the first step to healthier connections."
+            };
+            return summaries[results.style];
+          }
+          if (selectedTest === 'risk') {
+            const sorted = Object.entries(results).filter(([k]) => k !== 'overall').sort((a, b) => b[1] - a[1]);
+            const highest = sorted[0][0];
+            const lowest = sorted[sorted.length - 1][0];
+            return `You're most willing to take ${highest.toLowerCase()} risks, but more cautious with ${lowest.toLowerCase()} decisions. This profile shapes where you feel bold and where you play it safe.`;
+          }
+          return '';
+        };
+
+        return (
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-800/50">
+              <button onClick={() => setView('picker')} className="text-gray-400 hover:text-white">←</button>
+              <span className="text-white font-medium">Your Results</span>
+              <div className="w-6" />
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 space-y-5 hide-scrollbar">
+              {/* Hero */}
+              <div className={`p-6 rounded-2xl bg-gradient-to-br ${c.gradient} ${test.glow} text-center`}>
+                <span className="text-5xl">{test.icon}</span>
+                <h2 className="text-2xl font-bold text-white mt-3">{test.name}</h2>
+                <p className="text-white/70 text-sm mt-1">Assessment Complete</p>
+              </div>
+
+              {/* Results by Test Type */}
+              {selectedTest === 'bigfive' && (
+                <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800 space-y-4">
+                  <h3 className="text-white font-semibold mb-4">Your Personality Traits</h3>
+                  {Object.entries(results).map(([trait, score]) => (
+                    <TraitBar key={trait} label={trait} value={score} color="violet" />
+                  ))}
+                </div>
+              )}
+
+              {selectedTest === 'adhd' && (
+                <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800 text-center">
+                  <div className="text-6xl font-bold text-amber-400">{results.indicatorCount}</div>
+                  <div className="text-gray-400 mt-1">of 6 indicators present</div>
+                  <div className={`mt-4 p-3 rounded-xl ${results.indicatorCount >= 4 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                    {results.indicatorCount >= 4 ? 'Patterns consistent with ADHD' : 'Below typical screening threshold'}
+                  </div>
+                </div>
+              )}
+
+              {selectedTest === 'cognitive' && (
+                <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800">
+                  <div className="text-center mb-5">
+                    <div className="text-5xl font-bold text-teal-400">{results.overall}%</div>
+                    <div className="text-gray-400 text-sm mt-1">Neurodivergent Pattern Alignment</div>
+                  </div>
+                  <div className="space-y-4">
+                    {Object.entries(results).filter(([k]) => k !== 'overall').map(([cat, score]) => (
+                      <TraitBar key={cat} label={cat} value={score} color="teal" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedTest === 'attachment' && (
+                <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800">
+                  <div className="text-center mb-5">
+                    <div className="text-3xl font-bold text-rose-400">{results.style}</div>
+                    <div className="text-gray-400 text-sm mt-1">Attachment Style</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-rose-500/10 text-center">
+                      <div className="text-3xl font-bold text-rose-400">{results.Anxiety}</div>
+                      <div className="text-xs text-gray-400 mt-1">Anxiety (1-7)</div>
+                    </div>
+                    <div className="p-4 rounded-xl bg-blue-500/10 text-center">
+                      <div className="text-3xl font-bold text-blue-400">{results.Avoidance}</div>
+                      <div className="text-xs text-gray-400 mt-1">Avoidance (1-7)</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedTest === 'risk' && (
+                <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800">
+                  <div className="text-center mb-5">
+                    <div className="text-5xl font-bold text-emerald-400">{results.overall}%</div>
+                    <div className="text-gray-400 text-sm mt-1">Overall Risk Tolerance</div>
+                  </div>
+                  <div className="space-y-4">
+                    {Object.entries(results).filter(([k]) => k !== 'overall').map(([domain, score]) => (
+                      <TraitBar key={domain} label={domain} value={score} color="emerald" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800">
+                <h3 className="text-white font-semibold mb-3">What This Means</h3>
+                <p className="text-gray-300 leading-relaxed">{getSummary()}</p>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-3 pb-4">
+                {Object.keys(completedTests).length >= 2 && (
+                  <button
+                    onClick={() => setView('profile')}
+                    className={`w-full py-4 rounded-xl font-semibold bg-gradient-to-r ${c.gradient} text-white ${test.glow}`}
+                  >
+                    View Full Profile →
+                  </button>
+                )}
+                <button
+                  onClick={() => setView('picker')}
+                  className="w-full py-4 rounded-xl font-semibold bg-gray-800 text-white border border-gray-700"
+                >
+                  Take Another Assessment
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // ============ PROFILE VIEW ============
+      const Profile = () => {
+        const completedCount = Object.keys(completedTests).length;
+        const totalTests = Object.keys(QUESTIONS).length;
+
+        const getCrossInsights = () => {
+          const insights = [];
+
+          if (completedTests.bigfive && completedTests.risk) {
+            const bf = completedTests.bigfive;
+            const risk = completedTests.risk;
+            if (bf.Openness > 60 && risk.Career > 60) insights.push({ emoji: '🚀', text: "High openness + career risk tolerance suggests you're built for entrepreneurship or creative pivots." });
+            if (bf.Neuroticism > 60 && risk.Financial < 40) insights.push({ emoji: '🛡️', text: "Higher emotional sensitivity + financial caution means you protect against worst-case scenarios." });
+            if (bf.Extraversion > 70 && risk.Social > 70) insights.push({ emoji: '🌟', text: "High extraversion + social boldness makes you a natural networker and influencer." });
+          }
+
+          if (completedTests.bigfive && completedTests.attachment) {
+            const bf = completedTests.bigfive;
+            const att = completedTests.attachment;
+            if (bf.Neuroticism > 60 && att.style === 'Anxious') insights.push({ emoji: '💭', text: "Emotional sensitivity + anxious attachment can amplify relationship worries. Mindfulness practices may help." });
+            if (bf.Extraversion < 40 && att.style === 'Avoidant') insights.push({ emoji: '🏠', text: "Lower extraversion + avoidant style means you deeply value your independence and solitude." });
+          }
+
+          if (completedTests.cognitive && completedTests.bigfive) {
+            const cog = completedTests.cognitive;
+            const bf = completedTests.bigfive;
+            if (cog.overall > 50 && bf.Openness > 60) insights.push({ emoji: '💡', text: "Neurodivergent thinking + high openness gives you a unique perspective that sees what others miss." });
+          }
+
+          if (completedTests.adhd && completedTests.risk) {
+            const adhd = completedTests.adhd;
+            const risk = completedTests.risk;
+            if (adhd.indicatorCount >= 4 && risk.overall > 60) insights.push({ emoji: '⚡', text: "ADHD patterns + high risk tolerance means you thrive on novelty but may need guardrails for follow-through." });
+          }
+
+          if (completedTests.adhd && completedTests.cognitive) {
+            const adhd = completedTests.adhd;
+            const cog = completedTests.cognitive;
+            if (adhd.indicatorCount >= 3 && cog.overall > 50) insights.push({ emoji: '🧠', text: "Attention differences + neurodivergent cognition often co-occur. Your brain works differently, not worse." });
+          }
+
+          return insights;
+        };
+
+        const getQuickProfile = () => {
+          const badges = [];
+          if (completedTests.bigfive) {
+            const highest = Object.entries(completedTests.bigfive).sort((a, b) => b[1] - a[1])[0];
+            badges.push({ label: `High ${highest[0]}`, color: 'violet' });
+          }
+          if (completedTests.attachment) {
+            badges.push({ label: `${completedTests.attachment.style} Attachment`, color: 'rose' });
+          }
+          if (completedTests.cognitive) {
+            const level = completedTests.cognitive.overall > 60 ? 'ND-Leaning' : completedTests.cognitive.overall > 40 ? 'Mixed' : 'NT-Leaning';
+            badges.push({ label: level, color: 'teal' });
+          }
+          if (completedTests.adhd && completedTests.adhd.indicatorCount >= 4) {
+            badges.push({ label: 'ADHD Patterns', color: 'amber' });
+          }
+          if (completedTests.risk) {
+            const highest = Object.entries(completedTests.risk).filter(([k]) => k !== 'overall').sort((a, b) => b[1] - a[1])[0];
+            badges.push({ label: `${highest[0]} Risk-Taker`, color: 'emerald' });
+          }
+          return badges;
+        };
+
+        const insights = getCrossInsights();
+        const badges = getQuickProfile();
+
+        return (
+          <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between p-4 border-b border-gray-800/50">
+              <button onClick={() => setView('picker')} className="text-gray-400 hover:text-white">←</button>
+              <span className="text-white font-medium">Your Profile</span>
+              <div className="w-6" />
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 space-y-5 hide-scrollbar">
+              {/* Hero */}
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-pink-600 glow text-center">
+                <div className="text-5xl mb-3">🪞</div>
+                <h2 className="text-2xl font-bold text-white">Your Reveal Profile</h2>
+                <p className="text-white/70 text-sm mt-1">{completedCount} of {totalTests} assessments complete</p>
+                <div className="mt-4 h-2 bg-white/20 rounded-full overflow-hidden">
+                  <div className="h-full bg-white rounded-full" style={{ width: `${(completedCount/totalTests)*100}%` }} />
+                </div>
+              </div>
+
+              {/* Quick Profile Badges */}
+              {badges.length > 0 && (
+                <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800">
+                  <h3 className="text-white font-semibold mb-3">At a Glance</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {badges.map((badge, i) => {
+                      const c = colorMap[badge.color];
+                      return (
+                        <span key={i} className={`px-3 py-1.5 rounded-full text-sm font-medium ${c.light} ${c.text}`}>
+                          {badge.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Cross-Assessment Insights */}
+              {insights.length > 0 && (
+                <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800">
+                  <h3 className="text-white font-semibold mb-4">🔮 Cross-Assessment Insights</h3>
+                  <div className="space-y-3">
+                    {insights.map((insight, i) => (
+                      <div key={i} className="p-4 rounded-xl bg-gray-800/50 border border-gray-700/50">
+                        <span className="text-xl mr-2">{insight.emoji}</span>
+                        <span className="text-gray-300 text-sm">{insight.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Completed Tests */}
+              <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800">
+                <h3 className="text-white font-semibold mb-4">Completed Assessments</h3>
+                <div className="space-y-3">
+                  {Object.entries(completedTests).map(([id, results]) => {
+                    const test = QUESTIONS[id];
+                    const c = colorMap[test.color];
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => { setSelectedTest(id); setView('results'); }}
+                        className={`w-full p-4 rounded-xl text-left flex items-center gap-3 bg-gradient-to-r ${c.gradient} hover:scale-[1.01] transition-transform`}
+                      >
+                        <span className="text-2xl">{test.icon}</span>
+                        <div className="flex-1">
+                          <div className="text-white font-medium">{test.name}</div>
+                          <div className="text-white/60 text-xs">
+                            {id === 'bigfive' && `Top: ${Object.entries(results).sort((a,b)=>b[1]-a[1])[0][0]}`}
+                            {id === 'adhd' && `${results.indicatorCount}/6 indicators`}
+                            {id === 'cognitive' && `${results.overall}% ND alignment`}
+                            {id === 'attachment' && results.style}
+                            {id === 'risk' && `${results.overall}% overall`}
+                          </div>
+                        </div>
+                        <span className="text-white/60">→</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Remaining Tests */}
+              {completedCount < totalTests && (
+                <div className="p-5 rounded-2xl bg-gray-900/80 border border-gray-800">
+                  <h3 className="text-white font-semibold mb-4">Keep Discovering</h3>
+                  <div className="space-y-3">
+                    {Object.entries(QUESTIONS).filter(([id]) => !completedTests[id]).map(([id, test]) => {
+                      const inProgress = savedProgress[id];
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => startTest(id)}
+                          className="w-full p-4 rounded-xl text-left flex items-center gap-3 bg-gray-800/50 border border-gray-700/50 hover:bg-gray-800 transition-colors"
+                        >
+                          <span className="text-2xl grayscale-[30%]">{test.icon}</span>
+                          <div className="flex-1">
+                            <div className="text-gray-300 font-medium">{test.name}</div>
+                            <div className="text-gray-500 text-xs">
+                              {test.items.length} questions · {test.time}
+                              {inProgress && ` · ${Math.round((inProgress.questionIndex / test.items.length) * 100)}% done`}
+                            </div>
+                          </div>
+                          <span className="text-gray-600">+</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="pb-4" />
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="w-full max-w-md mx-auto h-[780px] bg-gray-950 rounded-3xl overflow-hidden shadow-2xl border border-gray-800/50">
+          {view === 'picker' && <Picker />}
+          {view === 'question' && <Question />}
+          {view === 'results' && <Results />}
+          {view === 'profile' && <Profile />}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<RevealApp />, document.getElementById('root'));
+  </script>
+</body>
+</html>

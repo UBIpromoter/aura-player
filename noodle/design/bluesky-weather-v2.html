@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick Profile — Weather System v2</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  body { font-family: 'Inter', sans-serif; }
+
+  .sky-canvas {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+  }
+
+  /* Atmospheric layers */
+  .sky-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* Interactive hover zones - the key teaching tool */
+  .hover-zone {
+    position: absolute;
+    cursor: pointer;
+    z-index: 50;
+    transition: all 0.3s ease;
+  }
+
+  .hover-zone:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .hover-zone:hover .hover-tooltip {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .hover-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 12px 16px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: all 0.25s ease;
+    z-index: 100;
+    min-width: 180px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .hover-tooltip::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.9);
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .tooltip-above::after {
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+  }
+
+  .tooltip-below::after {
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%) rotate(-135deg);
+  }
+
+  .tooltip-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 4px;
+  }
+
+  .tooltip-trait {
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tooltip-percent {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .tooltip-desc {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+
+  /* Clouds with organic shapes */
+  .cloud {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(12px);
+    mix-blend-mode: screen;
+    animation: cloudDrift ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes cloudDrift {
+    0%, 100% { transform: translateX(0) translateY(0) scale(1); }
+    33% { transform: translateX(8px) translateY(-4px) scale(1.02); }
+    66% { transform: translateX(-5px) translateY(2px) scale(0.98); }
+  }
+
+  /* God rays / light beams - MORE VISIBLE */
+  .light-ray {
+    position: absolute;
+    background: linear-gradient(to bottom, var(--ray-color) 0%, transparent 100%);
+    transform-origin: top center;
+    opacity: 0;
+    filter: blur(3px);
+    animation: rayPulse ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes rayPulse {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 0.55; }
+  }
+
+  /* Floating particles - LARGER, more visible */
+  .mote {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: moteFloat ease-in-out infinite;
+    box-shadow: 0 0 6px currentColor;
+  }
+
+  @keyframes moteFloat {
+    0% { transform: translate(0, 0) scale(1); opacity: var(--start-opacity); }
+    25% { transform: translate(var(--drift-x), var(--drift-y1)) scale(1.2); opacity: var(--mid-opacity); }
+    50% { transform: translate(calc(var(--drift-x) * 0.5), var(--drift-y2)) scale(0.85); opacity: var(--end-opacity); }
+    75% { transform: translate(calc(var(--drift-x) * -0.3), var(--drift-y1)) scale(1.15); opacity: var(--mid-opacity); }
+    100% { transform: translate(0, 0) scale(1); opacity: var(--start-opacity); }
+  }
+
+  /* Stars */
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: white;
+    animation: starTwinkle ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes starTwinkle {
+    0%, 100% { opacity: 0.2; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.3); }
+  }
+
+  /* Celestial body glow */
+  .celestial {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(20px);
+    pointer-events: none;
+  }
+
+  .celestial-core {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(2px);
+    pointer-events: none;
+  }
+
+  /* Horizon mist */
+  .horizon-mist {
+    position: absolute;
+    bottom: 0;
+    left: -20%;
+    right: -20%;
+    height: 70%;
+    background: linear-gradient(to top, var(--mist-color) 0%, transparent 100%);
+    filter: blur(8px);
+    opacity: 0.6;
+    animation: mistShift 12s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes mistShift {
+    0%, 100% { transform: translateX(0); opacity: 0.5; }
+    50% { transform: translateX(5%); opacity: 0.7; }
+  }
+
+  /* Atmospheric shimmer */
+  .shimmer-layer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      transparent 0%,
+      rgba(255,255,255,0.02) 25%,
+      transparent 50%,
+      rgba(255,255,255,0.02) 75%,
+      transparent 100%
+    );
+    background-size: 200% 200%;
+    animation: shimmerMove 8s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes shimmerMove {
+    0% { background-position: 0% 0%; }
+    50% { background-position: 100% 100%; }
+    100% { background-position: 0% 0%; }
+  }
+
+  /* Poetic narration styling */
+  .poetic-narration {
+    font-style: italic;
+    line-height: 1.6;
+    letter-spacing: 0.01em;
+  }
+
+  /* Legend card - MUCH bigger and teaching-focused */
+  .legend-card {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .legend-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .legend-item:first-child {
+    padding-top: 0;
+  }
+
+  .legend-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+
+  .legend-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .legend-trait-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+  }
+
+  .legend-trait-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+  }
+
+  .legend-percent {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend-state {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .legend-mapping {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 4px;
+  }
+
+  /* Progress bar for traits */
+  .trait-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    margin-top: 6px;
+    overflow: hidden;
+  }
+
+  .trait-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  /* Transitions */
+  .sky-canvas * {
+    transition: opacity 0.8s ease, background 0.8s ease;
+  }
+
+  /* Ownership header */
+  .ownership-header {
+    text-align: center;
+    padding-bottom: 8px;
+  }
+
+  .ownership-tagline {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    opacity: 0.5;
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-8 gap-6" style="background: #08080c;">
+
+  <!-- Controls -->
+  <div class="flex gap-3 items-center flex-wrap justify-center">
+    <button onclick="setMode('dark')" id="btn-dark" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 border-blue-500">Dark</button>
+    <button onclick="setMode('light')" id="btn-light" class="px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 border-gray-300">Light</button>
+    <div class="w-px h-6 bg-gray-600"></div>
+    <button onclick="randomize()" class="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors">Shuffle</button>
+  </div>
+
+  <!-- Phone frame -->
+  <div id="phone" class="w-[375px] rounded-[2.5rem] overflow-hidden shadow-2xl" style="background: #0a0a12; border: 2px solid #151520;">
+    <div class="p-5 pt-8 pb-6">
+
+      <!-- Weather Card -->
+      <div id="card" class="rounded-2xl overflow-hidden" style="background: rgba(12, 12, 22, 0.85); border: 1px solid rgba(59, 130, 246, 0.2);">
+
+        <!-- Ownership Header - reframed -->
+        <div class="ownership-header p-4 pb-2">
+          <div class="ownership-tagline text-gray-500">The atmosphere you create</div>
+          <div id="title" class="text-lg font-semibold text-white mt-1">Your Inner Weather</div>
+        </div>
+
+        <!-- Weather Visualization with hover zones -->
+        <div class="px-4 py-2">
+          <div id="sky" class="sky-canvas w-full h-48 relative rounded-2xl overflow-hidden">
+            <!-- Dynamic content injected here -->
+          </div>
+        </div>
+
+        <!-- Poetic Narration - about YOU -->
+        <div class="px-5 py-4 text-center">
+          <p id="poetic-narration" class="poetic-narration text-sm text-gray-300 leading-relaxed"></p>
+        </div>
+
+        <!-- EXPANDED Legend - the teaching engine -->
+        <div id="trait-legend" class="px-4 pb-4">
+          <div class="legend-card">
+            <div class="legend-item">
+              <div id="legend-icon-1" class="legend-icon bg-blue-500/20">
+                <span id="legend-emoji-1"></span>
+              </div>
+              <div class="legend-content">
+                <div class="legend-trait-row">
+                  <span class="legend-trait-name">Openness</span>
+                  <span id="legend-percent-1" class="legend-percent text-blue-400">72%</span>
+                </div>
+                <div id="legend-state-1" class="legend-state">Clear skies</div>
+                <div class="trait-bar">
+                  <div id="legend-bar-1" class="trait-bar-fill bg-blue-400" style="width: 72%"></div>
+                </div>
+                <div class="legend-mapping">Clear = outward-focused, Cloudy = reflective depth</div>
+              </div>
+            </div>
+
+            <div class="legend-item">
+              <div id="legend-icon-2" class="legend-icon bg-amber-500/20">
+                <span id="legend-emoji-2"></span>
+              </div>
+              <div class="legend-content">
+                <div class="legend-trait-row">
+                  <span class="legend-trait-name">Warmth</span>
+                  <span id="legend-percent-2" class="legend-percent text-amber-400">78%</span>
+                </div>
+                <div id="legend-state-2" class="legend-state">Golden light</div>
+                <div class="trait-bar">
+                  <div id="legend-bar-2" class="trait-bar-fill bg-amber-400" style="width: 78%"></div>
+                </div>
+                <div class="legend-mapping">Cool = analytical precision, Warm = empathetic connection</div>
+              </div>
+            </div>
+
+            <div class="legend-item">
+              <div id="legend-icon-3" class="legend-icon bg-cyan-500/20">
+                <span id="legend-emoji-3"></span>
+              </div>
+              <div class="legend-content">
+                <div class="legend-trait-row">
+                  <span class="legend-trait-name">Energy</span>
+                  <span id="legend-percent-3" class="legend-percent text-cyan-400">65%</span>
+                </div>
+                <div id="legend-state-3" class="legend-state">Breezy</div>
+                <div class="trait-bar">
+                  <div id="legend-bar-3" class="trait-bar-fill bg-cyan-400" style="width: 65%"></div>
+                </div>
+                <div class="legend-mapping">Still = grounded steadiness, Breezy = dynamic motion</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="px-4 pb-4 pt-1">
+          <div id="cta" class="p-3 rounded-xl text-center" style="background: rgba(59, 130, 246, 0.12);">
+            <div id="cta-sub" class="text-xs text-gray-400">Based on 10 questions</div>
+            <div id="cta-main" class="text-sm font-medium mt-1 text-blue-300">Starter Pack sharpens the picture with 40 more &#8594;</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- How to read hint -->
+  <div id="explainer" class="max-w-md text-center text-gray-500 text-xs mt-2">
+    <p class="text-gray-400"><strong>Point at any element</strong> to see exactly what it means about you.</p>
+  </div>
+
+<script>
+// Trait mappings - REFRAMED for ownership
+// E (Openness): 0 = Deep inner world (cloudy), 100 = Outward-focused (clear)
+// A (Warmth): 0 = Analytical/Cool (twilight), 100 = Empathetic/Warm (golden)
+// N (Energy): 0 = Grounded/Still, 100 = Dynamic/Active
+
+let traits = {
+  E: 72,  // Openness - affects cloud coverage
+  A: 78,  // Warmth - affects light temperature
+  N: 65   // Energy - affects particle movement
+};
+
+let isDark = true;
+
+// Poetic narrations - sentences about YOU, not weather
+const narrations = {
+  clearWarm: [
+    "You radiate warmth that draws others in. Your openness invites connection, your energy sparks possibility.",
+    "You meet the world with arms open and heart ready. People feel safe in your presence.",
+    "Your spirit runs bright and warm — you illuminate rooms and lift the people in them."
+  ],
+  clearCool: [
+    "You see with crystalline clarity. Your mind cuts through noise to find what matters.",
+    "You bring precision and insight wherever you go. Others trust your clear-eyed perspective.",
+    "Your thoughts move like starlight — focused, far-reaching, quietly brilliant."
+  ],
+  cloudyWarm: [
+    "You carry worlds within you. Your rich inner life gives you depth others can only glimpse.",
+    "You feel deeply and think in layers. Your empathy comes from truly understanding complexity.",
+    "Beneath your quiet surface runs a current of warmth that those close to you treasure."
+  ],
+  cloudyCool: [
+    "You notice what others miss. Your contemplative nature reveals patterns hidden in plain sight.",
+    "You think in depths, not surfaces. Your insights come from time spent truly understanding.",
+    "Your still waters run extraordinarily deep. Those who earn your trust find rare wisdom there."
+  ],
+  mixedWarm: [
+    "You balance openness with depth, warmth with wisdom. You hold complexity with grace.",
+    "You adapt to what each moment needs — sometimes reaching out, sometimes turning inward.",
+    "Your versatility is your gift. You can meet people where they are and lift them higher."
+  ],
+  mixedCool: [
+    "You move between engagement and reflection with ease. Both modes serve you well.",
+    "You bring analytical depth to human situations. Your insight comes from understanding systems and souls.",
+    "You hold nuance in a world that loves simplicity. That's rarer than you know."
+  ]
+};
+
+// State descriptors - about YOU, with percentages
+function getStateDescriptors() {
+  const openness = traits.E;
+  const warmth = traits.A;
+  const energy = traits.N;
+
+  return {
+    openness: {
+      percent: openness,
+      state: openness > 70 ? 'Highly open' : openness > 50 ? 'Selectively open' : openness > 30 ? 'Thoughtfully reserved' : 'Deeply private',
+      emoji: openness > 60 ? '☀️' : openness > 40 ? '🌤️' : '☁️',
+      color: openness > 50 ? 'text-blue-400' : 'text-blue-300',
+      barColor: openness > 50 ? 'bg-blue-400' : 'bg-blue-500'
+    },
+    warmth: {
+      percent: warmth,
+      state: warmth > 70 ? 'Deeply empathetic' : warmth > 50 ? 'Warmly balanced' : warmth > 30 ? 'Coolly objective' : 'Analytically precise',
+      emoji: warmth > 60 ? '🌅' : warmth > 40 ? '🌙' : '❄️',
+      color: warmth > 50 ? 'text-amber-400' : 'text-indigo-400',
+      barColor: warmth > 50 ? 'bg-amber-400' : 'bg-indigo-400'
+    },
+    energy: {
+      percent: energy,
+      state: energy > 70 ? 'Highly dynamic' : energy > 50 ? 'Actively engaged' : energy > 30 ? 'Calmly centered' : 'Deeply grounded',
+      emoji: energy > 60 ? '🍃' : energy > 40 ? '🌊' : '🪨',
+      color: energy > 50 ? 'text-cyan-400' : 'text-slate-400',
+      barColor: energy > 50 ? 'bg-cyan-400' : 'bg-slate-500'
+    }
+  };
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function lerpColor(c1, c2, t) {
+  const parse = c => {
+    if (c.startsWith('#')) {
+      return [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)];
+    }
+    const m = c.match(/\d+/g);
+    return m ? m.map(Number) : [0,0,0];
+  };
+  const [r1,g1,b1] = parse(c1);
+  const [r2,g2,b2] = parse(c2);
+  return `rgb(${Math.round(r1+(r2-r1)*t)}, ${Math.round(g1+(g2-g1)*t)}, ${Math.round(b1+(b2-b1)*t)})`;
+}
+
+function getWeatherCategory() {
+  const cloudy = traits.E < 45;
+  const clear = traits.E > 65;
+  const warm = traits.A > 55;
+
+  if (clear && warm) return 'clearWarm';
+  if (clear && !warm) return 'clearCool';
+  if (cloudy && warm) return 'cloudyWarm';
+  if (cloudy && !warm) return 'cloudyCool';
+  if (warm) return 'mixedWarm';
+  return 'mixedCool';
+}
+
+function render() {
+  const sky = document.getElementById('sky');
+  const warmth = traits.A / 100;
+  const cloudiness = 1 - (traits.E / 100);
+  const energy = traits.N / 100;
+
+  // Color palettes
+  const palette = {
+    dark: {
+      coolSky: ['#05051a', '#0a1428', '#1a2a4a'],
+      warmSky: ['#1a0a05', '#2a1508', '#4a2a1a'],
+      coolHorizon: '#1a3a6a',
+      warmHorizon: '#6a3a1a',
+      coolMist: 'rgba(100, 150, 200, 0.3)',
+      warmMist: 'rgba(200, 150, 100, 0.3)',
+      coolCelestial: 'rgba(180, 200, 255, 0.8)',
+      warmCelestial: 'rgba(255, 200, 100, 0.9)',
+    },
+    light: {
+      coolSky: ['#b8d4e8', '#87CEEB', '#6cb4d9'],
+      warmSky: ['#ffecd2', '#FFD89E', '#ffb366'],
+      coolHorizon: '#a8c8e8',
+      warmHorizon: '#ffcc80',
+      coolMist: 'rgba(200, 220, 255, 0.4)',
+      warmMist: 'rgba(255, 220, 180, 0.4)',
+      coolCelestial: 'rgba(255, 255, 255, 0.95)',
+      warmCelestial: 'rgba(255, 220, 150, 0.95)',
+    }
+  };
+
+  const p = isDark ? palette.dark : palette.light;
+
+  // Interpolate sky colors
+  const skyTop = lerpColor(p.coolSky[0], p.warmSky[0], warmth);
+  const skyMid = lerpColor(p.coolSky[1], p.warmSky[1], warmth);
+  const skyBot = lerpColor(p.coolSky[2], p.warmSky[2], warmth);
+  const horizonColor = lerpColor(p.coolHorizon, p.warmHorizon, warmth);
+  const mistColor = lerpColor(p.coolMist, p.warmMist, warmth);
+  const celestialColor = lerpColor(p.coolCelestial, p.warmCelestial, warmth);
+
+  let html = '';
+
+  // Base sky gradient (3 stops for depth)
+  html += `
+    <div class="sky-layer" style="background: linear-gradient(180deg, ${skyTop} 0%, ${skyMid} 50%, ${skyBot} 100%);"></div>
+  `;
+
+  // Horizon mist layer
+  html += `<div class="horizon-mist" style="--mist-color: ${mistColor};"></div>`;
+
+  // Celestial body (sun or moon)
+  const celestialX = 75;
+  const celestialY = 20;
+  const celestialSize = isDark ? lerp(30, 50, warmth) : lerp(40, 70, warmth);
+  const coreSize = celestialSize * 0.4;
+
+  if (warmth > 0.5 || !isDark) {
+    // Sun - larger glow, bright core
+    html += `
+      <div class="celestial" style="
+        width: ${celestialSize * 2}px;
+        height: ${celestialSize * 2}px;
+        right: ${celestialX - celestialSize/2}px;
+        top: ${celestialY - celestialSize/2}px;
+        background: ${celestialColor};
+        opacity: ${0.5 + (1 - cloudiness) * 0.4};
+        filter: blur(${celestialSize * 0.6}px);
+      "></div>
+      <div class="celestial-core" style="
+        width: ${coreSize}px;
+        height: ${coreSize}px;
+        right: ${celestialX + celestialSize/2 - coreSize/2}px;
+        top: ${celestialY + celestialSize/2 - coreSize/2}px;
+        background: ${warmth > 0.5 ? 'rgba(255, 250, 220, 0.9)' : 'rgba(255, 255, 255, 0.9)'};
+        opacity: ${0.6 + (1 - cloudiness) * 0.35};
+      "></div>
+    `;
+
+    // Light rays (god rays) - MORE VISIBLE now
+    if (warmth > 0.35 && cloudiness < 0.75) {
+      const rayCount = Math.round((1 - cloudiness) * 6) + 2;
+      const rayColor = warmth > 0.5
+        ? 'rgba(255, 220, 150, 0.45)'
+        : 'rgba(220, 240, 255, 0.35)';
+
+      for (let i = 0; i < rayCount; i++) {
+        const angle = -25 + (i * 12) + (Math.random() * 8 - 4);
+        const width = 25 + Math.random() * 35;
+        const delay = Math.random() * 4;
+        html += `
+          <div class="light-ray" style="
+            --ray-color: ${rayColor};
+            width: ${width}px;
+            height: 160px;
+            right: ${celestialX + celestialSize/2 - width/2}px;
+            top: ${celestialY + celestialSize/2}px;
+            transform: rotate(${angle}deg);
+            animation-delay: ${delay}s;
+            animation-duration: ${5 + Math.random() * 3}s;
+            opacity: ${0.2 + (1 - cloudiness) * 0.35};
+          "></div>
+        `;
+      }
+    }
+  }
+
+  // Stars (only visible in cool, clear, dark conditions)
+  if (isDark && warmth < 0.5 && cloudiness < 0.5) {
+    const starCount = Math.round((1 - warmth) * (1 - cloudiness) * 20);
+    for (let i = 0; i < starCount; i++) {
+      const x = Math.random() * 90 + 5;
+      const y = Math.random() * 50 + 5;
+      const size = 1 + Math.random() * 2;
+      const delay = Math.random() * 4;
+      html += `
+        <div class="star" style="
+          left: ${x}%;
+          top: ${y}%;
+          width: ${size}px;
+          height: ${size}px;
+          animation-delay: ${delay}s;
+          animation-duration: ${2 + Math.random() * 3}s;
+        "></div>
+      `;
+    }
+  }
+
+  // Clouds - organic, multi-layered
+  const cloudCount = Math.round(cloudiness * 10);
+  const cloudLayers = [
+    { yRange: [5, 30], sizeRange: [80, 140], opacity: 0.3 },
+    { yRange: [20, 50], sizeRange: [50, 100], opacity: 0.4 },
+    { yRange: [35, 65], sizeRange: [60, 120], opacity: 0.5 }
+  ];
+
+  for (let i = 0; i < cloudCount; i++) {
+    const layer = cloudLayers[i % 3];
+    const x = (i * 25 + Math.random() * 30) % 110 - 10;
+    const y = layer.yRange[0] + Math.random() * (layer.yRange[1] - layer.yRange[0]);
+    const w = layer.sizeRange[0] + Math.random() * (layer.sizeRange[1] - layer.sizeRange[0]);
+    const h = w * (0.4 + Math.random() * 0.3);
+    const baseOpacity = layer.opacity * cloudiness;
+    const delay = i * 0.7;
+    const duration = 10 + Math.random() * 8;
+
+    // Cloud color varies with warmth
+    const cloudColor = isDark
+      ? (warmth > 0.5
+        ? `rgba(200, 180, 160, ${baseOpacity})`
+        : `rgba(160, 180, 200, ${baseOpacity})`)
+      : (warmth > 0.5
+        ? `rgba(255, 245, 235, ${baseOpacity * 1.5})`
+        : `rgba(240, 248, 255, ${baseOpacity * 1.5})`);
+
+    html += `
+      <div class="cloud" style="
+        left: ${x}%;
+        top: ${y}%;
+        width: ${w}px;
+        height: ${h}px;
+        background: radial-gradient(ellipse at 50% 60%, ${cloudColor} 0%, transparent 70%);
+        animation-delay: ${delay}s;
+        animation-duration: ${duration}s;
+      "></div>
+    `;
+  }
+
+  // Floating particles/motes - LARGER, more visible
+  const moteCount = Math.round(energy * 20) + 5;
+  for (let i = 0; i < moteCount; i++) {
+    const x = Math.random() * 100;
+    const y = Math.random() * 100;
+    const size = 2 + Math.random() * 4; // Bigger!
+    const delay = Math.random() * 5;
+    const duration = 5 + Math.random() * 5;
+
+    // Mote color matches warmth - brighter
+    const moteColor = warmth > 0.5
+      ? `rgba(255, ${Math.round(200 + Math.random() * 55)}, ${Math.round(100 + Math.random() * 80)}, 0.85)`
+      : `rgba(${Math.round(180 + Math.random() * 40)}, ${Math.round(200 + Math.random() * 40)}, 255, 0.8)`;
+
+    const driftX = (Math.random() * 30 - 15) + 'px';
+    const driftY1 = -(10 + Math.random() * 20) + 'px';
+    const driftY2 = -(20 + Math.random() * 30) + 'px';
+
+    html += `
+      <div class="mote" style="
+        left: ${x}%;
+        top: ${y}%;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${moteColor};
+        color: ${moteColor};
+        --drift-x: ${driftX};
+        --drift-y1: ${driftY1};
+        --drift-y2: ${driftY2};
+        --start-opacity: ${0.4 + Math.random() * 0.3};
+        --mid-opacity: ${0.6 + Math.random() * 0.35};
+        --end-opacity: ${0.3 + Math.random() * 0.3};
+        animation-delay: ${delay}s;
+        animation-duration: ${duration}s;
+        ${energy < 0.25 ? 'animation-play-state: paused; opacity: 0.4;' : ''}
+      "></div>
+    `;
+  }
+
+  // Shimmer layer for atmospheric depth
+  html += `<div class="shimmer-layer"></div>`;
+
+  // HOVER ZONES - the teaching tool
+  const states = getStateDescriptors();
+
+  // Sun/moon zone (warmth)
+  html += `
+    <div class="hover-zone" style="
+      right: 40px;
+      top: 10px;
+      width: 80px;
+      height: 70px;
+      border-radius: 50%;
+    ">
+      <div class="hover-tooltip tooltip-below" style="right: -40px; top: 75px;">
+        <div class="tooltip-label">Your warmth</div>
+        <div class="tooltip-trait">
+          <span class="tooltip-percent ${states.warmth.color}">${states.warmth.percent}%</span>
+          <span>${states.warmth.state}</span>
+        </div>
+        <div class="tooltip-desc">${warmth > 0.5 ? 'You lead with heart over head. Connection comes naturally.' : 'You prioritize clarity over comfort. Your insights are sharp.'}</div>
+      </div>
+    </div>
+  `;
+
+  // Sky/clouds zone (openness)
+  html += `
+    <div class="hover-zone" style="
+      left: 10px;
+      top: 10px;
+      width: 55%;
+      height: 50%;
+      border-radius: 12px;
+    ">
+      <div class="hover-tooltip tooltip-below" style="left: 20px; top: calc(100% + 8px);">
+        <div class="tooltip-label">Your openness</div>
+        <div class="tooltip-trait">
+          <span class="tooltip-percent ${states.openness.color}">${states.openness.percent}%</span>
+          <span>${states.openness.state}</span>
+        </div>
+        <div class="tooltip-desc">${cloudiness < 0.5 ? 'You share yourself freely and invite others in.' : 'You hold a rich inner world. Depth is your superpower.'}</div>
+      </div>
+    </div>
+  `;
+
+  // Lower area for energy/particles
+  html += `
+    <div class="hover-zone" style="
+      left: 10px;
+      bottom: 10px;
+      right: 10px;
+      height: 40%;
+      border-radius: 12px;
+    ">
+      <div class="hover-tooltip tooltip-above" style="left: 50%; transform: translateX(-50%); bottom: calc(100% + 12px);">
+        <div class="tooltip-label">Your energy</div>
+        <div class="tooltip-trait">
+          <span class="tooltip-percent ${states.energy.color}">${states.energy.percent}%</span>
+          <span>${states.energy.state}</span>
+        </div>
+        <div class="tooltip-desc">${energy > 0.5 ? 'Motion is your natural state. You thrive in activity.' : 'Stillness is your strength. You find power in presence.'}</div>
+      </div>
+    </div>
+  `;
+
+  sky.innerHTML = html;
+
+  // Update poetic narration - about YOU
+  const category = getWeatherCategory();
+  const narrationOptions = narrations[category];
+  document.getElementById('poetic-narration').textContent = '"' + narrationOptions[Math.floor(Math.random() * narrationOptions.length)] + '"';
+
+  // Update legend with percentages and states
+  document.getElementById('legend-emoji-1').textContent = states.openness.emoji;
+  document.getElementById('legend-percent-1').textContent = states.openness.percent + '%';
+  document.getElementById('legend-percent-1').className = `legend-percent ${states.openness.color}`;
+  document.getElementById('legend-state-1').textContent = states.openness.state;
+  document.getElementById('legend-bar-1').style.width = states.openness.percent + '%';
+  document.getElementById('legend-bar-1').className = `trait-bar-fill ${states.openness.barColor}`;
+
+  document.getElementById('legend-emoji-2').textContent = states.warmth.emoji;
+  document.getElementById('legend-percent-2').textContent = states.warmth.percent + '%';
+  document.getElementById('legend-percent-2').className = `legend-percent ${states.warmth.color}`;
+  document.getElementById('legend-state-2').textContent = states.warmth.state;
+  document.getElementById('legend-bar-2').style.width = states.warmth.percent + '%';
+  document.getElementById('legend-bar-2').className = `trait-bar-fill ${states.warmth.barColor}`;
+
+  document.getElementById('legend-emoji-3').textContent = states.energy.emoji;
+  document.getElementById('legend-percent-3').textContent = states.energy.percent + '%';
+  document.getElementById('legend-percent-3').className = `legend-percent ${states.energy.color}`;
+  document.getElementById('legend-state-3').textContent = states.energy.state;
+  document.getElementById('legend-bar-3').style.width = states.energy.percent + '%';
+  document.getElementById('legend-bar-3').className = `trait-bar-fill ${states.energy.barColor}`;
+
+  applyTheme();
+}
+
+function applyTheme() {
+  const phone = document.getElementById('phone');
+  const card = document.getElementById('card');
+  const title = document.getElementById('title');
+  const cta = document.getElementById('cta');
+  const ctaSub = document.getElementById('cta-sub');
+  const ctaMain = document.getElementById('cta-main');
+  const poeticNarration = document.getElementById('poetic-narration');
+  const explainer = document.getElementById('explainer');
+  const ownershipTagline = document.querySelector('.ownership-tagline');
+  const legendCard = document.querySelector('.legend-card');
+
+  if (isDark) {
+    document.body.style.background = '#08080c';
+    phone.style.background = '#0a0a12';
+    phone.style.borderColor = '#151520';
+    card.style.background = 'rgba(12, 12, 22, 0.85)';
+    card.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+    title.className = 'text-lg font-semibold text-white mt-1';
+    ownershipTagline.className = 'ownership-tagline text-gray-500';
+    poeticNarration.className = 'poetic-narration text-sm text-gray-300 leading-relaxed';
+    cta.style.background = 'rgba(59, 130, 246, 0.12)';
+    ctaSub.className = 'text-xs text-gray-400';
+    ctaMain.className = 'text-sm font-medium mt-1 text-blue-300';
+    explainer.className = 'max-w-md text-center text-gray-500 text-xs mt-2';
+    legendCard.style.background = 'rgba(0, 0, 0, 0.4)';
+    legendCard.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+  } else {
+    document.body.style.background = '#f3f4f6';
+    phone.style.background = '#ffffff';
+    phone.style.borderColor = '#e5e7eb';
+    card.style.background = 'rgba(255, 255, 255, 0.95)';
+    card.style.borderColor = 'rgba(59, 130, 246, 0.15)';
+    title.className = 'text-lg font-semibold text-gray-900 mt-1';
+    ownershipTagline.className = 'ownership-tagline text-gray-400';
+    poeticNarration.className = 'poetic-narration text-sm text-gray-600 leading-relaxed';
+    cta.style.background = '#eef2ff';
+    ctaSub.className = 'text-xs text-gray-500';
+    ctaMain.className = 'text-sm font-semibold mt-1 text-blue-600';
+    explainer.className = 'max-w-md text-center text-gray-600 text-xs mt-2';
+    legendCard.style.background = 'rgba(255, 255, 255, 0.8)';
+    legendCard.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+  }
+}
+
+function setMode(mode) {
+  isDark = mode === 'dark';
+  document.getElementById('btn-dark').className = `px-4 py-2 rounded-xl text-sm font-medium bg-gray-800 text-white border-2 ${isDark ? 'border-blue-500' : 'border-gray-600'}`;
+  document.getElementById('btn-light').className = `px-4 py-2 rounded-xl text-sm font-medium bg-white text-gray-800 border-2 ${!isDark ? 'border-blue-500' : 'border-gray-300'}`;
+  render();
+}
+
+function randomize() {
+  // Generate diverse personalities
+  const patterns = [
+    { E: 85, A: 75, N: 70 }, // Clear, warm, breezy - sunny extrovert
+    { E: 20, A: 80, N: 30 }, // Cloudy, warm, still - dreamy introvert
+    { E: 75, A: 25, N: 60 }, // Clear, cool, breezy - sharp analyst
+    { E: 30, A: 30, N: 20 }, // Cloudy, cool, still - deep thinker
+    { E: 50, A: 60, N: 45 }, // Mixed, warm, gentle - balanced
+    { E: 60, A: 40, N: 80 }, // Partial, cool, windy - restless mind
+  ];
+
+  // Random with some structure
+  if (Math.random() > 0.3) {
+    const base = patterns[Math.floor(Math.random() * patterns.length)];
+    traits.E = Math.max(10, Math.min(90, base.E + (Math.random() * 30 - 15)));
+    traits.A = Math.max(10, Math.min(90, base.A + (Math.random() * 30 - 15)));
+    traits.N = Math.max(10, Math.min(90, base.N + (Math.random() * 30 - 15)));
+  } else {
+    // Fully random
+    traits.E = Math.round(10 + Math.random() * 80);
+    traits.A = Math.round(10 + Math.random() * 80);
+    traits.N = Math.round(10 + Math.random() * 80);
+  }
+
+  render();
+}
+
+// Initial render
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Breath V6 — Multi-Color Nebula Core</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #030712;
+    overflow-x: hidden;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     AURA BREATH V6 — Multi-Color Nebula Core
+     The orb IS the personality — different trait colors blend together
+     Waves carry the colors outward from their source regions
+     ══════════════════════════════════════════════════════════════ */
+
+  .aura-container {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Deep ambient background glow — reflects the multi-color orb */
+  .aura-ambient {
+    position: absolute;
+    width: 400%;
+    height: 400%;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(139, 92, 246, 0.12) 0%,
+      rgba(244, 114, 182, 0.08) 15%,
+      rgba(45, 212, 191, 0.06) 30%,
+      transparent 50%
+    );
+    pointer-events: none;
+    z-index: 0;
+    animation: ambient-breathe 12s ease-in-out infinite;
+  }
+
+  @keyframes ambient-breathe {
+    0%, 100% {
+      transform: scale(0.9);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 1;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     THE NEBULA ORB — Multi-color patches representing traits
+     This is the DOMINANT feature — 50% of total space (160px in 320px)
+     ══════════════════════════════════════════════════════════════ */
+
+  .nebula-orb {
+    position: absolute;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    z-index: 20;
+    overflow: hidden;
+    animation: orb-breathe 10s ease-in-out infinite;
+  }
+
+  @keyframes orb-breathe {
+    0%, 100% {
+      transform: scale(0.92);
+    }
+    50% {
+      transform: scale(1.08);
+    }
+  }
+
+  /* SVG filter for the nebula blend effect */
+  .nebula-svg {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Trait color patches — positioned around the orb */
+  .trait-patch {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(25px);
+    mix-blend-mode: screen;
+    animation: patch-pulse 8s ease-in-out infinite;
+  }
+
+  @keyframes patch-pulse {
+    0%, 100% {
+      opacity: 0.7;
+      transform: scale(0.95);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+  }
+
+  /* Energy patch — pink/rose (top-left region) */
+  .patch-energy {
+    width: 100px;
+    height: 100px;
+    top: -10%;
+    left: -5%;
+    background: radial-gradient(circle,
+      rgba(244, 114, 182, 0.9) 0%,
+      rgba(244, 114, 182, 0.6) 40%,
+      rgba(244, 114, 182, 0.2) 70%,
+      transparent 100%
+    );
+    animation-delay: 0s;
+  }
+
+  /* Openness patch — teal/cyan (bottom-right region) */
+  .patch-openness {
+    width: 110px;
+    height: 110px;
+    bottom: -10%;
+    right: -10%;
+    background: radial-gradient(circle,
+      rgba(45, 212, 191, 0.9) 0%,
+      rgba(45, 212, 191, 0.6) 40%,
+      rgba(45, 212, 191, 0.2) 70%,
+      transparent 100%
+    );
+    animation-delay: -2.5s;
+  }
+
+  /* Feeling patch — purple/violet (center-bottom region) */
+  .patch-feeling {
+    width: 100px;
+    height: 100px;
+    bottom: 5%;
+    left: 15%;
+    background: radial-gradient(circle,
+      rgba(167, 139, 250, 0.95) 0%,
+      rgba(139, 92, 246, 0.7) 40%,
+      rgba(139, 92, 246, 0.3) 70%,
+      transparent 100%
+    );
+    animation-delay: -5s;
+  }
+
+  /* Core glow layer — soft white center for luminosity */
+  .nebula-core-glow {
+    position: absolute;
+    width: 60%;
+    height: 60%;
+    top: 20%;
+    left: 20%;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(255, 255, 255, 0.4) 0%,
+      rgba(255, 255, 255, 0.15) 40%,
+      transparent 70%
+    );
+    filter: blur(15px);
+    z-index: 5;
+    animation: core-glow-pulse 10s ease-in-out infinite;
+  }
+
+  @keyframes core-glow-pulse {
+    0%, 100% {
+      opacity: 0.8;
+      transform: scale(0.9);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+  }
+
+  /* Outer glow halo around the entire orb */
+  .nebula-halo {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    z-index: 15;
+    pointer-events: none;
+    background: transparent;
+    box-shadow:
+      0 0 40px rgba(244, 114, 182, 0.3),
+      0 0 60px rgba(45, 212, 191, 0.25),
+      0 0 80px rgba(139, 92, 246, 0.3),
+      0 0 120px rgba(139, 92, 246, 0.15);
+    animation: halo-breathe 10s ease-in-out infinite;
+  }
+
+  @keyframes halo-breathe {
+    0%, 100% {
+      transform: scale(0.9);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 1;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     ENERGY WAVES — Carry colors from their source regions
+     ══════════════════════════════════════════════════════════════ */
+
+  .energy-wave {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    background: transparent;
+    opacity: 0;
+  }
+
+  /* Wave animation — slow drift outward */
+  @keyframes wave-expand {
+    0% {
+      transform: scale(0.5) rotate(var(--wave-rotation, 0deg));
+      opacity: 0;
+    }
+    10% {
+      opacity: var(--wave-opacity, 0.5);
+    }
+    70% {
+      opacity: calc(var(--wave-opacity, 0.5) * 0.3);
+    }
+    100% {
+      transform: scale(var(--max-scale, 1.4)) rotate(var(--wave-rotation, 0deg));
+      opacity: 0;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     TRAIT LEGEND
+     ══════════════════════════════════════════════════════════════ */
+
+  .legend-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .legend-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .legend-item:first-child {
+    padding-top: 0;
+  }
+
+  .legend-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+  }
+
+  .legend-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .legend-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .legend-trait-name {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .legend-percent {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend-mapping {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.5;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLS
+     ══════════════════════════════════════════════════════════════ */
+
+  .control-btn {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+  }
+
+  .control-btn.primary {
+    background: #8b5cf6;
+    color: white;
+  }
+
+  .control-btn.primary:hover {
+    background: #7c3aed;
+    transform: translateY(-1px);
+  }
+
+  .control-btn.secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .control-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  .control-btn:active {
+    transform: scale(0.97);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     SECTION STYLING
+     ══════════════════════════════════════════════════════════════ */
+
+  .section-header {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 10px;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     INSIGHT CARD
+     ══════════════════════════════════════════════════════════════ */
+
+  .insight-card {
+    text-align: center;
+    padding: 14px;
+    background: rgba(139, 92, 246, 0.05);
+    border-radius: 14px;
+    border: 1px solid rgba(139, 92, 246, 0.1);
+  }
+
+  .insight-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 6px;
+  }
+
+  .insight-text {
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .insight-text strong {
+    font-weight: 500;
+  }
+
+  .insight-text .energy-highlight { color: #f472b6; }
+  .insight-text .openness-highlight { color: #2dd4bf; }
+  .insight-text .feeling-highlight { color: #a78bfa; }
+</style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start p-6 gap-5">
+
+  <!-- Header -->
+  <div class="text-center">
+    <div class="text-xl font-semibold mb-1 text-white">Your Aura Breath</div>
+    <div class="text-xs text-gray-500 uppercase tracking-widest">V6 — Multi-Color Nebula Core</div>
+  </div>
+
+  <!-- Main Visualization -->
+  <div class="aura-container" id="aura-container">
+    <!-- Deep ambient background glow -->
+    <div class="aura-ambient" id="aura-ambient"></div>
+
+    <!-- Outer halo glow -->
+    <div class="nebula-halo" id="nebula-halo"></div>
+
+    <!-- THE NEBULA ORB — Multi-color patches -->
+    <div class="nebula-orb" id="nebula-orb">
+      <!-- Energy patch (pink/rose) — top-left -->
+      <div class="trait-patch patch-energy" id="patch-energy"></div>
+
+      <!-- Openness patch (teal) — bottom-right -->
+      <div class="trait-patch patch-openness" id="patch-openness"></div>
+
+      <!-- Feeling patch (purple) — center-bottom -->
+      <div class="trait-patch patch-feeling" id="patch-feeling"></div>
+
+      <!-- Core luminosity -->
+      <div class="nebula-core-glow" id="nebula-core-glow"></div>
+    </div>
+
+    <!-- Energy waves will be generated by JS -->
+  </div>
+
+  <!-- Trait Legend -->
+  <div class="w-full max-w-sm">
+    <div class="section-header">Nebula Composition</div>
+    <div class="legend-card">
+      <!-- Energy → Pink region + wave speed -->
+      <div class="legend-item">
+        <div class="legend-icon" style="background: rgba(244, 114, 182, 0.15);">
+          <span style="color: #f472b6;">~</span>
+        </div>
+        <div class="legend-content">
+          <div class="legend-header">
+            <span class="legend-trait-name" style="color: #f472b6;">Energy</span>
+            <span class="legend-percent" id="energy-pct" style="color: #f472b6;">72%</span>
+          </div>
+          <div class="legend-mapping">Pink region intensity. Controls breath rhythm and wave speed.</div>
+        </div>
+      </div>
+
+      <!-- Openness → Teal region + wave reach -->
+      <div class="legend-item">
+        <div class="legend-icon" style="background: rgba(45, 212, 191, 0.15);">
+          <span style="color: #2dd4bf;">&#10687;</span>
+        </div>
+        <div class="legend-content">
+          <div class="legend-header">
+            <span class="legend-trait-name" style="color: #2dd4bf;">Openness</span>
+            <span class="legend-percent" id="openness-pct" style="color: #2dd4bf;">85%</span>
+          </div>
+          <div class="legend-mapping">Teal region intensity. Controls how far energy expands outward.</div>
+        </div>
+      </div>
+
+      <!-- Feeling → Purple region + glow intensity -->
+      <div class="legend-item">
+        <div class="legend-icon" style="background: rgba(167, 139, 250, 0.15);">
+          <span style="color: #a78bfa;">&#9672;</span>
+        </div>
+        <div class="legend-content">
+          <div class="legend-header">
+            <span class="legend-trait-name" style="color: #a78bfa;">Feeling</span>
+            <span class="legend-percent" id="feeling-pct" style="color: #a78bfa;">65%</span>
+          </div>
+          <div class="legend-mapping">Purple region intensity. Controls overall luminosity and depth.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Personality Insight -->
+  <div class="insight-card w-full max-w-sm" id="insight-card">
+    <div class="insight-label">Your Nebula Signature</div>
+    <p class="insight-text" id="insight-text">
+      Your aura blends <strong class="energy-highlight">vibrant energy</strong>,
+      <strong class="openness-highlight">expansive openness</strong>, and
+      <strong class="feeling-highlight">emotional depth</strong> into a unique presence.
+    </p>
+  </div>
+
+  <!-- Controls -->
+  <div class="flex gap-3">
+    <button onclick="shuffle()" class="control-btn primary">Shuffle Profile</button>
+    <button onclick="resetToDefault()" class="control-btn secondary">Reset</button>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AURA BREATH V6 — Multi-Color Nebula Core
+// The orb IS the personality — different trait colors blend together
+// Waves carry the colors outward from their source regions
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Core state
+let traits = {
+  energy: 72,    // Controls pink patch + breath speed
+  openness: 85,  // Controls teal patch + wave reach
+  feeling: 65,   // Controls purple patch + overall glow
+};
+
+// Trait colors — each trait has its own color
+const TRAIT_COLORS = {
+  energy: {
+    primary: [244, 114, 182],    // Pink/rose
+    glow: 'rgba(244, 114, 182, ',
+    angle: -45,  // Top-left direction for waves
+  },
+  openness: {
+    primary: [45, 212, 191],     // Teal/cyan
+    glow: 'rgba(45, 212, 191, ',
+    angle: 135,  // Bottom-right direction for waves
+  },
+  feeling: {
+    primary: [167, 139, 250],    // Purple/violet
+    glow: 'rgba(167, 139, 250, ',
+    angle: 90,   // Bottom direction for waves
+  },
+};
+
+// Container reference
+const container = document.getElementById('aura-container');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WAVE PARAMETERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getWaveParams() {
+  const e = traits.energy;
+  const o = traits.openness;
+  const f = traits.feeling;
+
+  return {
+    // Spawn interval: 3s (high energy) to 10s (low energy)
+    spawnInterval: 10000 - (e / 100) * 7000,
+
+    // Wave duration: 12s (high energy) to 25s (low energy)
+    duration: 25 - (e / 100) * 13,
+
+    // Max scale: 0.9 (low openness) to 1.5 (high openness)
+    maxScale: 0.9 + (o / 100) * 0.6,
+
+    // Wave count per spawn per trait: 1-2
+    waveCountPerTrait: Math.ceil(1 + (f / 100) * 1),
+
+    // Glow thickness
+    thickness: 2 + (f / 100) * 4,
+
+    // Opacity
+    opacity: 0.25 + (f / 100) * 0.35,
+
+    // Blur amount
+    blur: 6 + (f / 100) * 10,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WAVE CREATION — Waves carry colors from their source trait regions
+// ═══════════════════════════════════════════════════════════════════════════
+
+function createWave(traitKey, delay = 0, waveIndex = 0) {
+  const params = getWaveParams();
+  const traitColor = TRAIT_COLORS[traitKey];
+  const traitValue = traits[traitKey];
+
+  // Stronger traits emit more visible waves
+  const traitIntensity = traitValue / 100;
+
+  const wave = document.createElement('div');
+  wave.className = 'energy-wave';
+  wave.dataset.trait = traitKey;
+
+  // Size based on container
+  const size = 320;
+  wave.style.width = `${size}px`;
+  wave.style.height = `${size}px`;
+
+  // Color based on trait
+  const [r, g, b] = traitColor.primary;
+  const thickness = params.thickness * traitIntensity;
+  const blur = params.blur;
+  const opacity = params.opacity * traitIntensity;
+
+  // Soft glowing ring with trait color
+  wave.style.boxShadow = `
+    inset 0 0 0 ${thickness}px rgba(${r}, ${g}, ${b}, ${opacity * 0.8}),
+    inset 0 0 ${blur * 2}px ${thickness * 2}px rgba(${r}, ${g}, ${b}, ${opacity * 0.4}),
+    0 0 ${blur}px ${thickness}px rgba(${r}, ${g}, ${b}, ${opacity * 0.3})
+  `;
+
+  wave.style.setProperty('--wave-opacity', opacity);
+  wave.style.setProperty('--max-scale', params.maxScale);
+
+  // Slight rotation based on trait angle for directional feel
+  const rotationVariance = (Math.random() - 0.5) * 30;
+  wave.style.setProperty('--wave-rotation', `${traitColor.angle + rotationVariance}deg`);
+
+  // Animation duration with variance
+  const durationVariance = waveIndex * 1.5 + Math.random() * 2;
+  const duration = params.duration + durationVariance;
+
+  wave.style.animation = `wave-expand ${duration}s ease-out forwards`;
+  wave.style.animationDelay = `${delay}ms`;
+  wave.style.transformOrigin = 'center center';
+  wave.style.filter = `blur(${blur / 2}px)`;
+
+  container.appendChild(wave);
+
+  // Remove wave after animation
+  setTimeout(() => {
+    wave.remove();
+  }, (duration * 1000) + delay + 500);
+
+  return wave;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SPAWN LOOP — Each trait spawns its own colored waves
+// ═══════════════════════════════════════════════════════════════════════════
+
+function spawnWaveSet() {
+  const params = getWaveParams();
+  const traitKeys = ['energy', 'openness', 'feeling'];
+
+  // Each trait spawns waves based on its intensity
+  traitKeys.forEach((traitKey, traitIndex) => {
+    const traitValue = traits[traitKey];
+
+    // Only spawn if trait is significant enough
+    if (traitValue > 20) {
+      const waveCount = params.waveCountPerTrait;
+
+      for (let i = 0; i < waveCount; i++) {
+        // Stagger by trait and by wave within trait
+        const stagger = (traitIndex * 600) + (i * 800);
+        createWave(traitKey, stagger, i);
+      }
+    }
+  });
+}
+
+let spawnInterval;
+
+function startBreathing() {
+  spawnWaveSet();
+
+  const tick = () => {
+    const params = getWaveParams();
+    spawnWaveSet();
+    spawnInterval = setTimeout(tick, params.spawnInterval);
+  };
+
+  const params = getWaveParams();
+  spawnInterval = setTimeout(tick, params.spawnInterval);
+}
+
+function stopBreathing() {
+  if (spawnInterval) {
+    clearTimeout(spawnInterval);
+  }
+}
+
+function restartBreathing() {
+  stopBreathing();
+  container.querySelectorAll('.energy-wave').forEach(w => w.remove());
+  startBreathing();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NEBULA ORB — Update patch intensities based on traits
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateNebulaOrb() {
+  const orb = document.getElementById('nebula-orb');
+  const halo = document.getElementById('nebula-halo');
+  const coreGlow = document.getElementById('nebula-core-glow');
+  const ambient = document.getElementById('aura-ambient');
+
+  const patchEnergy = document.getElementById('patch-energy');
+  const patchOpenness = document.getElementById('patch-openness');
+  const patchFeeling = document.getElementById('patch-feeling');
+
+  // Normalize trait values
+  const e = traits.energy / 100;
+  const o = traits.openness / 100;
+  const f = traits.feeling / 100;
+
+  // Update patch sizes based on trait values
+  // Higher trait = bigger, more prominent patch
+  const baseSize = 80;
+  const maxExtra = 40;
+
+  const energySize = baseSize + (e * maxExtra);
+  const opennessSize = baseSize + (o * maxExtra);
+  const feelingSize = baseSize + (f * maxExtra);
+
+  patchEnergy.style.width = `${energySize}px`;
+  patchEnergy.style.height = `${energySize}px`;
+  patchEnergy.style.opacity = 0.5 + (e * 0.5);
+
+  patchOpenness.style.width = `${opennessSize}px`;
+  patchOpenness.style.height = `${opennessSize}px`;
+  patchOpenness.style.opacity = 0.5 + (o * 0.5);
+
+  patchFeeling.style.width = `${feelingSize}px`;
+  patchFeeling.style.height = `${feelingSize}px`;
+  patchFeeling.style.opacity = 0.5 + (f * 0.5);
+
+  // Update halo glow based on all traits
+  const haloIntensity = (e + o + f) / 3;
+  halo.style.boxShadow = `
+    0 0 ${40 * haloIntensity}px rgba(244, 114, 182, ${0.2 + e * 0.2}),
+    0 0 ${60 * haloIntensity}px rgba(45, 212, 191, ${0.15 + o * 0.2}),
+    0 0 ${80 * haloIntensity}px rgba(139, 92, 246, ${0.2 + f * 0.25}),
+    0 0 ${120 * haloIntensity}px rgba(139, 92, 246, ${0.1 + f * 0.15})
+  `;
+
+  // Update core glow luminosity
+  const coreIntensity = 0.3 + (f * 0.5);
+  coreGlow.style.background = `radial-gradient(circle,
+    rgba(255, 255, 255, ${coreIntensity}) 0%,
+    rgba(255, 255, 255, ${coreIntensity * 0.4}) 40%,
+    transparent 70%
+  )`;
+
+  // Update ambient based on dominant traits
+  ambient.style.background = `radial-gradient(circle,
+    rgba(139, 92, 246, ${0.08 + f * 0.08}) 0%,
+    rgba(244, 114, 182, ${0.04 + e * 0.06}) 15%,
+    rgba(45, 212, 191, ${0.03 + o * 0.05}) 30%,
+    transparent 50%
+  )`;
+
+  // Breath animation speed based on energy
+  const breathDuration = 8 + ((1 - e) * 8); // 8-16s
+  orb.style.animationDuration = `${breathDuration}s`;
+  halo.style.animationDuration = `${breathDuration}s`;
+  coreGlow.style.animationDuration = `${breathDuration}s`;
+  ambient.style.animationDuration = `${breathDuration * 1.2}s`;
+
+  // Patch pulse timing variance
+  patchEnergy.style.animationDuration = `${breathDuration * 0.9}s`;
+  patchOpenness.style.animationDuration = `${breathDuration * 1.1}s`;
+  patchFeeling.style.animationDuration = `${breathDuration}s`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UI UPDATES
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateUI() {
+  // Update percentages
+  document.getElementById('energy-pct').textContent = traits.energy + '%';
+  document.getElementById('openness-pct').textContent = traits.openness + '%';
+  document.getElementById('feeling-pct').textContent = traits.feeling + '%';
+
+  // Update insight text with trait-colored highlights
+  const e = traits.energy;
+  const o = traits.openness;
+  const f = traits.feeling;
+
+  const energyPhrase = e > 70 ? 'vibrant energy'
+    : e > 50 ? 'steady energy'
+    : e > 30 ? 'calm energy'
+    : 'deep stillness';
+
+  const openPhrase = o > 70 ? 'expansive openness'
+    : o > 50 ? 'balanced openness'
+    : o > 30 ? 'focused presence'
+    : 'centered depth';
+
+  const feelPhrase = f > 70 ? 'rich emotional depth'
+    : f > 50 ? 'warm feeling'
+    : f > 30 ? 'subtle emotion'
+    : 'quiet clarity';
+
+  document.getElementById('insight-text').innerHTML =
+    `Your aura blends <strong class="energy-highlight">${energyPhrase}</strong>,
+     <strong class="openness-highlight">${openPhrase}</strong>, and
+     <strong class="feeling-highlight">${feelPhrase}</strong> into a unique presence.`;
+
+  // Update nebula orb
+  updateNebulaOrb();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function shuffle() {
+  const randomTrait = () => {
+    const r = Math.random();
+    if (r < 0.35) return 15 + Math.random() * 25;
+    if (r > 0.65) return 60 + Math.random() * 35;
+    return 35 + Math.random() * 30;
+  };
+
+  traits = {
+    energy: Math.round(randomTrait()),
+    openness: Math.round(randomTrait()),
+    feeling: Math.round(randomTrait()),
+  };
+
+  updateUI();
+  restartBreathing();
+}
+
+function resetToDefault() {
+  traits = { energy: 72, openness: 85, feeling: 65 };
+  updateUI();
+  restartBreathing();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+updateUI();
+startBreathing();
+
+// Pause when hidden
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopBreathing();
+  } else {
+    restartBreathing();
+  }
+});
+</script>
+</body>
+</html>
