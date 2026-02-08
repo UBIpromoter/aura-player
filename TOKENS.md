@@ -24,7 +24,7 @@ These are the **only** colors. Using anything else requires adding it here first
 | violet | violet-500 | `#8b5cf6` | Primary accent, onboarding |
 | blue | blue-500 | `#3b82f6` | Quick Profile, Mind category |
 | teal | teal-500 | `#14b8a6` | Chill/laid-back profiles |
-| rose | rose-500 | `#f43f5e` | Errors, "No" responses |
+| rose | rose-500 | `#f43f5e` | Personality category, errors, "No" responses |
 | pink/fuchsia | fuchsia-500 | `#d946ef` | Relationships, energetic profiles |
 | emerald | emerald-500 | `#10b981` | Success, "Yes" responses, Character |
 | amber | amber-500 | `#f59e0b` | Behavior category |
@@ -37,7 +37,7 @@ These are the **only** colors. Using anything else requires adding it here first
 |----------|-------|------|
 | Quick Profile | blue | ✨ |
 | Starter Pack | indigo | 🚀 |
-| Personality | violet | 🎭 |
+| Personality | rose | 🎭 |
 | Character | emerald | 💎 |
 | Shadow Self | slate | 🌑 |
 | Mind | blue | 🧠 |
