@@ -7825,6 +7825,172 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
   </div>
 );
 
+// ==================== SCREEN COMPONENTS ====================
+
+// HistoryScreen - Shows all answered questions with filter and community results
+const HistoryScreen = ({ darkMode, questions, responses, communityResults, questionFlags, answerExplanations, onBack }) => {
+  const [historyFilter, setHistoryFilter] = useState('all');
+  const [expandedId, setExpandedId] = useState(null);
+
+  const answeredQuestions = questions
+    .filter(q => responses[q.id])
+    .map(q => ({ ...q, response: responses[q.id], community: communityResults[q.id] }))
+    .sort((a, b) => (b.response.timestamp || 0) - (a.response.timestamp || 0));
+  const filteredQuestions = answeredQuestions.filter(q => {
+    if (historyFilter === 'all') return true;
+    if (historyFilter === 'binary') return q.type === 'binary';
+    if (historyFilter === 'multiple') return q.type === 'multiple';
+    if (historyFilter === 'flagged') return questionFlags[q.id] || answerExplanations[q.id];
+    return q.category === historyFilter;
+  });
+  const getAnswerLabel = (q) => {
+    if (q.type === 'binary') return q.response.answer === 0 ? 'YES' : 'NO';
+    return q.options?.[q.response.answer] || '?';
+  };
+  return (
+    <div className={`flex-1 flex flex-col ${darkMode ? 'text-white bg-gray-950' : 'text-gray-900 bg-gray-50'}`}>
+      <ScreenHeader title="History" onBack={onBack} darkMode={darkMode}
+        right={<span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{answeredQuestions.length} answered</span>} />
+      <div className="flex flex-wrap gap-1 p-2">
+        {[{ id: 'all', label: 'All' }, { id: 'binary', label: 'Y/N' }, { id: 'multiple', label: 'MC' }, { id: 'flagged', label: '⚑' }, ...CATEGORIES.map(c => ({ id: c.id, label: c.icon }))].map(f => (
+          <button key={f.id} onClick={() => setHistoryFilter(f.id)}
+            className={`px-2.5 py-1 rounded-lg text-sm whitespace-nowrap transition-colors ${historyFilter === f.id ? 'bg-violet-600 text-white' : darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-white text-gray-600 border border-gray-200'}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {filteredQuestions.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
+            <div className="text-3xl mb-2">📋</div>
+            <p className="text-gray-500 text-sm">No questions match this filter</p>
+          </div>
+        ) : filteredQuestions.map(q => {
+          const catInfo = CATEGORIES.find(c => c.id === q.category);
+          const isExpanded = expandedId === `history-${q.id}`;
+          return (
+            <div key={q.id} className={`rounded-lg p-3 ${TH('bg-card-simple', darkMode)}`}>
+              <div className="flex items-start gap-2">
+                <span className="text-sm">{catInfo?.icon || '★'}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm leading-snug line-clamp-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{q.text}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className={`text-sm font-medium ${q.type === 'binary' ? (q.response.answer === 0 ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-rose-400' : 'text-rose-600')) : (darkMode ? 'text-violet-400' : 'text-violet-600')}`}>
+                      {getAnswerLabel(q)}
+                    </span>
+                    <span className="flex gap-0.5">{[1,2,3,4].map(i => <span key={i} className={`w-1.5 h-1.5 rounded-full ${i <= q.response.confidence ? (darkMode ? 'bg-violet-400' : 'bg-violet-500') : (darkMode ? 'bg-gray-700' : 'bg-gray-300')}`} />)}</span>
+                    <span className="text-sm text-gray-500">{CONFIDENCE_LABELS[q.response.confidence]}</span>
+                    {questionFlags[q.id] && <span className="text-sm text-rose-400">⚑</span>}
+                    {answerExplanations[q.id] && <span className="text-sm text-amber-400">✎</span>}
+                  </div>
+                </div>
+              </div>
+              {q.community && (
+                <button onClick={() => setExpandedId(isExpanded ? null : `history-${q.id}`)} className="w-full mt-2 text-left">
+                  <div className={`flex items-center justify-between text-sm ${darkMode ? 'text-gray-600' : 'text-gray-500'}`}>
+                    <span>{q.community.evaluators?.length || 0} responses</span>
+                    <span>{isExpanded ? '▲' : '▼'}</span>
+                  </div>
+                  {isExpanded && (
+                    <div className="mt-2">
+                      {q.type === 'binary' ? <BinaryChart evaluators={q.community.evaluators} userResponse={q.response} darkMode={darkMode} /> : <MultipleChoiceChart evaluators={q.community.evaluators} userResponse={q.response} options={q.options} darkMode={darkMode} />}
+                    </div>
+                  )}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// QotdScreen - Question of the Day with blue glow, reuses Q&A components
+const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTapCount, onTap, onSubmit, onClear, onBack, onGoToQuestions }) => {
+  const qotdQuestion = {
+    id: qotdData.id,
+    text: qotdData.text,
+    type: qotdData.type,
+    category: 'qotd',
+    options: qotdData.options || []
+  };
+  const qotdCommunityResults = qotdDistributionToEvaluators(qotdData);
+  const isBinary = qotdData.type === 'binary';
+  const hasAnswered = qotdResponse !== null;
+
+  const blueGlowStyle = {
+    background: darkMode
+      ? 'radial-gradient(ellipse at center top, rgba(59, 130, 246, 0.25) 0%, rgba(59, 130, 246, 0.12) 35%, rgba(59, 130, 246, 0.04) 60%, transparent 80%), #030712'
+      : 'radial-gradient(ellipse at center top, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 35%, rgba(59, 130, 246, 0.02) 60%, transparent 80%), #f9fafb'
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={blueGlowStyle}>
+      {/* QotD Nav + Badge — single compact row */}
+      <div className={`h-[40px] flex-shrink-0 flex items-center gap-2 px-3 ${darkMode ? 'bg-blue-900/20 border-b border-blue-900/30' : 'bg-blue-50 border-b border-blue-100'}`}>
+        <button onClick={onBack} className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${TH('btn-ghost', darkMode)}`}>◀</button>
+        <div className="flex-1 flex items-center justify-center gap-2">
+          <span className="text-sm">☀️</span>
+          <span className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Question of the Day</span>
+          <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Day {qotdData.day} · {getQotdTimeRemaining()}</span>
+          {!hasAnswered && <span className="text-amber-500 text-xs font-medium">+{qotdData.reward}</span>}
+        </div>
+        <button onClick={onGoToQuestions} className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${TH('btn-ghost', darkMode)}`}>▶</button>
+      </div>
+
+      {/* ANSWERED VIEW - tap anywhere to return to menu */}
+      {hasAnswered ? (
+        <div className="flex-1 flex flex-col overflow-y-auto px-4 py-3 cursor-pointer" onClick={onBack}>
+          <h2 className={`question-text text-center font-medium mb-4 ${TH('text-primary', darkMode)}`}>{qotdData.text}</h2>
+          <div className={`p-3 rounded-lg mb-4 ${TH('bg-overlay', darkMode)}`}>
+            <div className={`text-sm text-center ${TH('text-muted', darkMode)}`}>
+              Your answer: <span className={`font-bold ${isBinary ? (qotdResponse.answer === 0 ? 'text-emerald-400' : 'text-rose-400') : ''}`} style={!isBinary ? { color: MC_COLORS[qotdResponse.answer % MC_COLORS.length].hex } : undefined}>
+                {CONFIDENCE_LABELS[qotdResponse.confidence]} {isBinary ? (qotdResponse.answer === 0 ? 'Yes' : 'No') : qotdData.options?.[qotdResponse.answer]}
+              </span>
+            </div>
+          </div>
+          <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`text-sm font-medium ${TH('text-secondary', darkMode)}`}>Community Results</span>
+              <span className={`text-xs ${TH('text-subtle', darkMode)}`}>{qotdCommunityResults.evaluators.length.toLocaleString()} responses</span>
+            </div>
+            <CommunityResultsRows question={qotdQuestion} results={qotdCommunityResults} userResponse={qotdResponse} darkMode={darkMode} options={qotdData.options} />
+          </div>
+          <div className={`flex items-center justify-center gap-2 mt-4 p-2 rounded-lg ${darkMode ? 'bg-gray-900/30' : 'bg-gray-50'}`}>
+            <span className="text-sm">{qotdData.sponsor.avatar}</span>
+            <span className={`text-sm ${darkMode ? 'text-gray-600' : 'text-gray-500'}`}>Sponsored by {qotdData.sponsor.name}</span>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-y-auto">
+            <QuestionCard question={qotdQuestion} darkMode={darkMode} evidenceExpanded={false} onToggleEvidence={() => {}} />
+            <div className={`flex items-center justify-center gap-2 mt-3 ${darkMode ? 'text-gray-600' : 'text-gray-500'}`}>
+              <span className="text-sm">{qotdData.sponsor.avatar}</span>
+              <span className="text-sm">Sponsored by {qotdData.sponsor.name}</span>
+            </div>
+          </div>
+          <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-800 bg-gray-950/80' : 'border-gray-200 bg-white/80'}`}>
+            <div className={`px-4 pt-3 ${isBinary ? 'h-[93px]' : ''}`}>
+              {isBinary ? (
+                <BinaryButtons darkMode={darkMode} tappedAnswer={qotdTappedAnswer} tapCount={qotdTapCount}
+                  isAnswered={false} currentResponse={null} onTap={onTap} onRightClick={() => {}}
+                  pendingSubmit={null} requireConfirmation={true} onSubmit={onSubmit} onClear={onClear} />
+              ) : (
+                <MCButtons options={qotdData.options || []} darkMode={darkMode} tappedAnswer={qotdTappedAnswer} tapCount={qotdTapCount}
+                  isAnswered={false} currentResponse={null} onTap={onTap} onRightClick={() => {}}
+                  pendingSubmit={null} requireConfirmation={true} onSubmit={onSubmit} onClear={onClear} />
+              )}
+            </div>
+            <div className="h-3" />
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 // Helper to determine initial screen based on login state
 const getInitialScreen = () => {
@@ -7949,7 +8115,6 @@ function App() {
 
   // --- Profile & History ---
   const [showStreak, setShowStreak] = useState(true);
-  const [historyFilter, setHistoryFilter] = useState('all');
   const [showCantAnswerModal, setShowCantAnswerModal] = useState(null);
   const [showNoneOptionModal, setShowNoneOptionModal] = useState(false);
   const [sessionAnsweredCategories, setSessionAnsweredCategories] = useState(new Set()); // Categories user has answered in this session
@@ -9012,222 +9177,24 @@ function App() {
       );
     }
 
-    // History screen
-    if (screen === 'history') {
-      const answeredQuestions = questions
-        .filter(q => responses[q.id])
-        .map(q => ({ ...q, response: responses[q.id], community: communityResults[q.id] }))
-        .sort((a, b) => (b.response.timestamp || 0) - (a.response.timestamp || 0));
-      const filteredQuestions = answeredQuestions.filter(q => {
-        if (historyFilter === 'all') return true;
-        if (historyFilter === 'binary') return q.type === 'binary';
-        if (historyFilter === 'multiple') return q.type === 'multiple';
-        if (historyFilter === 'flagged') return questionFlags[q.id] || answerExplanations[q.id];
-        return q.category === historyFilter;
-      });
-      const getAnswerLabel = (q) => {
-        if (q.type === 'binary') return q.response.answer === 0 ? 'YES' : 'NO';
-        return q.options?.[q.response.answer] || '?';
-      };
-      return (
-        <div className={`flex-1 flex flex-col ${darkMode ? 'text-white bg-gray-950' : 'text-gray-900 bg-gray-50'}`}>
-          <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
-            <button onClick={() => setScreen('settings')} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
-            <span className="font-medium flex-1">History</span>
-            <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{answeredQuestions.length} answered</span>
-          </div>
-          <div className="flex flex-wrap gap-1 p-2">
-            {[{ id: 'all', label: 'All' }, { id: 'binary', label: 'Y/N' }, { id: 'multiple', label: 'MC' }, { id: 'flagged', label: '⚑' }, ...CATEGORIES.map(c => ({ id: c.id, label: c.icon }))].map(f => (
-              <button key={f.id} onClick={() => setHistoryFilter(f.id)}
-                className={`px-2.5 py-1 rounded-lg text-sm whitespace-nowrap transition-colors ${historyFilter === f.id ? 'bg-violet-600 text-white' : darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-white text-gray-600 border border-gray-200'}`}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {filteredQuestions.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
-                <div className="text-3xl mb-2">📋</div>
-                <p className="text-gray-500 text-sm">No questions match this filter</p>
-              </div>
-            ) : filteredQuestions.map(q => {
-              const catInfo = CATEGORIES.find(c => c.id === q.category);
-              const isExpanded = evidenceExpanded === `history-${q.id}`;
-              return (
-                <div key={q.id} className={`rounded-lg p-3 ${TH('bg-card-simple', darkMode)}`}>
-                  <div className="flex items-start gap-2">
-                    <span className="text-sm">{catInfo?.icon || '★'}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm leading-snug line-clamp-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{q.text}</p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className={`text-sm font-medium ${q.type === 'binary' ? (q.response.answer === 0 ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-rose-400' : 'text-rose-600')) : (darkMode ? 'text-violet-400' : 'text-violet-600')}`}>
-                          {getAnswerLabel(q)}
-                        </span>
-                        <span className="flex gap-0.5">{[1,2,3,4].map(i => <span key={i} className={`w-1.5 h-1.5 rounded-full ${i <= q.response.confidence ? (darkMode ? 'bg-violet-400' : 'bg-violet-500') : (darkMode ? 'bg-gray-700' : 'bg-gray-300')}`} />)}</span>
-                        <span className="text-sm text-gray-500">{CONFIDENCE_LABELS[q.response.confidence]}</span>
-                        {questionFlags[q.id] && <span className="text-sm text-rose-400">⚑</span>}
-                        {answerExplanations[q.id] && <span className="text-sm text-amber-400">✎</span>}
-                      </div>
-                    </div>
-                  </div>
-                  {q.community && (
-                    <button onClick={() => setEvidenceExpanded(isExpanded ? null : `history-${q.id}`)} className="w-full mt-2 text-left">
-                      <div className={`flex items-center justify-between text-sm ${darkMode ? 'text-gray-600' : 'text-gray-500'}`}>
-                        <span>{q.community.evaluators?.length || 0} responses</span>
-                        <span>{isExpanded ? '▲' : '▼'}</span>
-                      </div>
-                      {isExpanded && (
-                        <div className="mt-2">
-                          {q.type === 'binary' ? <BinaryChart evaluators={q.community.evaluators} userResponse={q.response} darkMode={darkMode} /> : <MultipleChoiceChart evaluators={q.community.evaluators} userResponse={q.response} options={q.options} darkMode={darkMode} />}
-                        </div>
-                      )}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
+    if (screen === 'history') return (
+      <HistoryScreen darkMode={darkMode} questions={questions} responses={responses}
+        communityResults={communityResults} questionFlags={questionFlags}
+        answerExplanations={answerExplanations} onBack={() => setScreen('settings')} />
+    );
 
-    // Question of the Day screen - uses SAME components as regular Q&A, just with blue glow
-    if (screen === 'qotd') {
-      // Convert QOD data to question-like format for reusing components
-      const qotdQuestion = {
-        id: qotdData.id,
-        text: qotdData.text,
-        type: qotdData.type,
-        category: 'qotd',
-        options: qotdData.options || []
-      };
-      const qotdCommunityResults = qotdDistributionToEvaluators(qotdData);
-      const isBinary = qotdData.type === 'binary';
-      const hasAnswered = qotdResponse !== null;
-
-      // Blue glow style - pronounced
-      const blueGlowStyle = {
-        background: darkMode
-          ? 'radial-gradient(ellipse at center top, rgba(59, 130, 246, 0.25) 0%, rgba(59, 130, 246, 0.12) 35%, rgba(59, 130, 246, 0.04) 60%, transparent 80%), #030712'
-          : 'radial-gradient(ellipse at center top, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 35%, rgba(59, 130, 246, 0.02) 60%, transparent 80%), #f9fafb'
-      };
-
-      // Go to first unanswered question in regular Q&A
-      const goToQuestions = () => {
-        const firstUnanswered = questions.findIndex(q => !responses[q.id]);
-        if (firstUnanswered >= 0) {
-          setCurrentIndex(firstUnanswered);
-          setScreen('questions');
-        } else {
-          setScreen('categories');
-        }
-      };
-
-      return (
-        <div className="flex-1 flex flex-col overflow-hidden relative" style={blueGlowStyle}>
-          {/* QotD Nav + Badge — single compact row */}
-          <div className={`h-[40px] flex-shrink-0 flex items-center gap-2 px-3 ${darkMode ? 'bg-blue-900/20 border-b border-blue-900/30' : 'bg-blue-50 border-b border-blue-100'}`}>
-            <button onClick={() => setScreen('categories')} className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${TH('btn-ghost', darkMode)}`}>◀</button>
-            <div className="flex-1 flex items-center justify-center gap-2">
-              <span className="text-sm">☀️</span>
-              <span className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Question of the Day</span>
-              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Day {qotdData.day} · {getQotdTimeRemaining()}</span>
-              {!hasAnswered && <span className="text-amber-500 text-xs font-medium">+{qotdData.reward}</span>}
-            </div>
-            <button onClick={goToQuestions} className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${TH('btn-ghost', darkMode)}`}>▶</button>
-          </div>
-
-          {/* ANSWERED VIEW - tap anywhere to return to menu */}
-          {hasAnswered ? (
-            <div className="flex-1 flex flex-col overflow-y-auto px-4 py-3 cursor-pointer" onClick={() => setScreen('categories')}>
-              {/* Question */}
-              <h2 className={`question-text text-center font-medium mb-4 ${TH('text-primary', darkMode)}`}>{qotdData.text}</h2>
-
-              {/* Your answer summary - same as regular results */}
-              <div className={`p-3 rounded-lg mb-4 ${TH('bg-overlay', darkMode)}`}>
-                <div className={`text-sm text-center ${TH('text-muted', darkMode)}`}>
-                  Your answer: <span className={`font-bold ${isBinary ? (qotdResponse.answer === 0 ? 'text-emerald-400' : 'text-rose-400') : ''}`} style={!isBinary ? { color: MC_COLORS[qotdResponse.answer % MC_COLORS.length].hex } : undefined}>
-                    {CONFIDENCE_LABELS[qotdResponse.confidence]} {isBinary ? (qotdResponse.answer === 0 ? 'Yes' : 'No') : qotdData.options?.[qotdResponse.answer]}
-                  </span>
-                </div>
-              </div>
-
-              {/* Community Results - uses shared component */}
-              <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-sm font-medium ${TH('text-secondary', darkMode)}`}>Community Results</span>
-                  <span className={`text-xs ${TH('text-subtle', darkMode)}`}>{qotdCommunityResults.evaluators.length.toLocaleString()} responses</span>
-                </div>
-                <CommunityResultsRows
-                  question={qotdQuestion}
-                  results={qotdCommunityResults}
-                  userResponse={qotdResponse}
-                  darkMode={darkMode}
-                  options={qotdData.options}
-                />
-              </div>
-
-              {/* Sponsor */}
-              <div className={`flex items-center justify-center gap-2 mt-4 p-2 rounded-lg ${darkMode ? 'bg-gray-900/30' : 'bg-gray-50'}`}>
-                <span className="text-sm">{qotdData.sponsor.avatar}</span>
-                <span className={`text-sm ${darkMode ? 'text-gray-600' : 'text-gray-500'}`}>Sponsored by {qotdData.sponsor.name}</span>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* UNANSWERED VIEW - same layout as regular Q&A */}
-              <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-y-auto">
-                <QuestionCard question={qotdQuestion} darkMode={darkMode} evidenceExpanded={false} onToggleEvidence={() => {}} />
-                {/* Sponsor under question */}
-                <div className={`flex items-center justify-center gap-2 mt-3 ${darkMode ? 'text-gray-600' : 'text-gray-500'}`}>
-                  <span className="text-sm">{qotdData.sponsor.avatar}</span>
-                  <span className="text-sm">Sponsored by {qotdData.sponsor.name}</span>
-                </div>
-              </div>
-
-              {/* Fixed Bottom - SAME answer buttons as regular Q&A */}
-              <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-800 bg-gray-950/80' : 'border-gray-200 bg-white/80'}`}>
-                <div className={`px-4 pt-3 ${isBinary ? 'h-[93px]' : ''}`}>
-                  {isBinary ? (
-                    <BinaryButtons
-                      darkMode={darkMode}
-                      tappedAnswer={qotdTappedAnswer}
-                      tapCount={qotdTapCount}
-                      isAnswered={false}
-                      currentResponse={null}
-                      onTap={handleQotdTap}
-                      onRightClick={() => {}}
-                      pendingSubmit={null}
-                      requireConfirmation={true}
-                      onSubmit={submitQotdAnswer}
-                      onClear={() => { setQotdTappedAnswer(null); setQotdTapCount(0); }}
-                    />
-                  ) : (
-                    <MCButtons
-                      options={qotdData.options || []}
-                      darkMode={darkMode}
-                      tappedAnswer={qotdTappedAnswer}
-                      tapCount={qotdTapCount}
-                      isAnswered={false}
-                      currentResponse={null}
-                      onTap={handleQotdTap}
-                      onRightClick={() => {}}
-                      pendingSubmit={null}
-                      requireConfirmation={true}
-                      onSubmit={submitQotdAnswer}
-                      onClear={() => { setQotdTappedAnswer(null); setQotdTapCount(0); }}
-                    />
-                  )}
-                </div>
-
-                {/* Bottom spacer */}
-                <div className="h-3" />
-              </div>
-            </>
-          )}
-        </div>
-      );
-    }
+    if (screen === 'qotd') return (
+      <QotdScreen darkMode={darkMode} qotdData={qotdData} qotdResponse={qotdResponse}
+        qotdTappedAnswer={qotdTappedAnswer} qotdTapCount={qotdTapCount}
+        onTap={handleQotdTap} onSubmit={submitQotdAnswer}
+        onClear={() => { setQotdTappedAnswer(null); setQotdTapCount(0); }}
+        onBack={() => setScreen('categories')}
+        onGoToQuestions={() => {
+          const firstUnanswered = questions.findIndex(q => !responses[q.id]);
+          if (firstUnanswered >= 0) { setCurrentIndex(firstUnanswered); setScreen('questions'); }
+          else { setScreen('categories'); }
+        }} />
+    );
 
     // ==================== ASSESSMENT SCREENS ====================
     // Assessment Picker Screen
