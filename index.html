@@ -4612,6 +4612,140 @@ const HintCard = ({ color, text, subtitle, darkMode = true }) => {
   );
 };
 
+// ==================== ASSESSMENT PRIMITIVES ====================
+// Extracted from closures — shared Lego blocks for assessment screens
+
+// ResultCard - Assessment result card with gradient header
+const ResultCard = ({ icon, title, subtitle, children, darkMode, gradientClass }) => (
+  <div onClick={(e) => e.stopPropagation()} className={`rounded-2xl overflow-hidden backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`}>
+    <div className={`px-4 py-3 bg-gradient-to-br ${gradientClass} flex items-center gap-3`}>
+      <span className="text-2xl">{icon}</span>
+      <div>
+        <h2 className="text-white text-lg font-bold">{title}</h2>
+        {subtitle && <p className="text-white/70 text-xs">{subtitle}</p>}
+      </div>
+    </div>
+    <div className="p-3 space-y-3">{children}</div>
+  </div>
+);
+
+// InsightRow - Icon + label + text row for assessment insights
+const InsightRow = ({ emoji, label, text, darkMode, colorClass }) => (
+  <div className="flex gap-2 items-start">
+    <span className="text-sm">{emoji}</span>
+    <p className={`flex-1 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className={`font-medium ${colorClass}`}>{label}:</span> {text}</p>
+  </div>
+);
+
+// ScoreGauge - Circular score gauge with gradient ring
+const ScoreGauge = ({ value, label, darkMode, gradientClass }) => {
+  // Extract gradient colors from the class string
+  const gradColors = (() => {
+    const map = {
+      violet: ['#8b5cf6', '#a78bfa'], emerald: ['#10b981', '#34d399'], blue: ['#3b82f6', '#60a5fa'],
+      slate: ['#64748b', '#94a3b8'], pink: ['#d946ef', '#e879f9'], fuchsia: ['#d946ef', '#e879f9'],
+      amber: ['#f59e0b', '#fbbf24'], indigo: ['#6366f1', '#818cf8'], cyan: ['#06b6d4', '#22d3ee'],
+      rose: ['#f43f5e', '#fb7185'], teal: ['#14b8a6', '#2dd4bf'],
+    };
+    for (const [key, colors] of Object.entries(map)) {
+      if (gradientClass?.includes(key)) return colors;
+    }
+    return map.violet;
+  })();
+  const textColor = (() => {
+    const map = { violet: 'text-violet-400', emerald: 'text-emerald-400', blue: 'text-blue-400', slate: 'text-slate-400', pink: 'text-fuchsia-400', fuchsia: 'text-fuchsia-400', amber: 'text-amber-400', indigo: 'text-indigo-400', cyan: 'text-cyan-400', rose: 'text-rose-400', teal: 'text-teal-400' };
+    for (const [key, cls] of Object.entries(map)) {
+      if (gradientClass?.includes(key)) return cls;
+    }
+    return map.violet;
+  })();
+
+  return (
+    <div className="text-center">
+      <div className="relative w-24 h-24 mx-auto">
+        <svg className="w-24 h-24 transform -rotate-90">
+          <circle cx="48" cy="48" r="40" stroke={darkMode ? '#374151' : '#e5e7eb'} strokeWidth="8" fill="none" />
+          <circle cx="48" cy="48" r="40" stroke="url(#scoreGrad)" strokeWidth="8" fill="none" strokeLinecap="round"
+            strokeDasharray={`${(value / 100) * 251.2} 251.2`} />
+          <defs><linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={gradColors[0]} />
+            <stop offset="100%" stopColor={gradColors[1]} />
+          </linearGradient></defs>
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`text-2xl font-bold ${textColor}`}>{value}%</span>
+        </div>
+      </div>
+      {label && <div className={`text-xs mt-2 ${TH('text-dim', darkMode)}`}>{label}</div>}
+    </div>
+  );
+};
+
+// TraitSpectrum - Gradient bar with white dot for trait scores
+// compact=true: inline labels, thin bar. compact=false: labels above, thick bar
+const TraitSpectrum = ({ name, score, lowLabel, highLabel, color = 'violet', compact = false, darkMode }) => {
+  const grad = PROGRESS_GRADIENTS[color] || PROGRESS_GRADIENTS.violet;
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2 py-1">
+        <span className={`text-xs font-medium w-20 truncate ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{name}</span>
+        <span className={`text-[10px] w-14 text-right ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{lowLabel}</span>
+        <div className="flex-1 h-2 rounded-full relative" style={{ background: `linear-gradient(to right, ${grad.from}, ${grad.to})` }}>
+          <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white"
+            style={{ left: `${Math.max(5, Math.min(95, score))}%`, marginLeft: -6, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+        </div>
+        <span className={`text-[10px] w-14 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{highLabel}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-1">
+      {name && <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{name}</div>}
+      <div className="flex justify-between text-[10px] mb-1">
+        <span className={darkMode ? 'text-gray-500' : 'text-gray-400'}>{lowLabel}</span>
+        <span className={darkMode ? 'text-gray-500' : 'text-gray-400'}>{highLabel}</span>
+      </div>
+      <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${grad.from}, ${grad.to})` }}>
+        <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
+          style={{ left: `${Math.max(5, Math.min(95, score))}%`, marginLeft: -8, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+      </div>
+    </div>
+  );
+};
+
+// AssessProgressCircle - Unified wrapper for ProgressCircle in assessment contexts
+// Replaces both AssessmentCircle (picker) and ProgressRing (analysis)
+const AssessProgressCircle = ({ testId, test, assessCompleted, assessInProgress, darkMode, size = 48, strokeWidth = 3, iconSize, textSize }) => {
+  const isCompleted = assessCompleted[testId];
+  const progress = assessInProgress[testId];
+  const answered = isCompleted ? test.items.length : progress ? Object.keys(progress.responses || {}).length : 0;
+  const progressPct = (answered / test.items.length) * 100;
+  return (
+    <ProgressCircle
+      progress={progressPct}
+      size={size}
+      strokeWidth={strokeWidth}
+      color={test.color}
+      icon={test.icon}
+      gradientId={`assess-prog-${testId}`}
+      darkMode={darkMode}
+      iconSize={iconSize}
+      textSize={textSize}
+    />
+  );
+};
+
+// ScreenHeader - Consistent 44px navigation header bar
+const ScreenHeader = ({ title, onBack, darkMode, right }) => (
+  <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+    {onBack && <button onClick={onBack} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>}
+    <span className={`font-medium flex-1 ${onBack ? '' : 'text-center'} ${TH('text-primary', darkMode)}`}>{title}</span>
+    {right || (onBack ? null : <div className="w-6" />)}
+  </div>
+);
+
 // ConfidenceBar - Reusable bar showing confidence distribution
 // Used by BinaryChart, MultipleChoiceChart, and MiniCommunityResults
 const ConfidenceBar = ({
@@ -9098,25 +9232,6 @@ function App() {
     // ==================== ASSESSMENT SCREENS ====================
     // Assessment Picker Screen
     if (screen === 'assess-picker') {
-      // AssessmentCircle component for picker - uses shared ProgressCircle
-      const AssessmentCircle = ({ testId, test }) => {
-        const isCompleted = assessCompleted[testId];
-        const progress = assessInProgress[testId];
-        const progressPct = isCompleted ? 100 : progress ? Math.round((Object.keys(progress.responses || {}).length / test.items.length) * 100) : 0;
-        return (
-          <ProgressCircle
-            progress={progressPct}
-            size={64}
-            strokeWidth={4}
-            color={test.color}
-            icon={test.icon}
-            gradientId={`picker-grad-${testId}`}
-            darkMode={darkMode}
-            iconSize="text-2xl"
-          />
-        );
-      };
-
       return (
         <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`}>
           {/* Demo Menu Overlay */}
@@ -9919,95 +10034,6 @@ function App() {
         'Third Bird': { strength: 'Adaptable energy that works with any schedule', shadow: 'May lack the intensity peaks others have', tip: 'Experiment to find your personal sweet spots' }
       };
 
-      const ResultCard = ({ icon, title, subtitle, children }) => (
-        <div onClick={(e) => e.stopPropagation()} className={`rounded-2xl overflow-hidden backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`}>
-          <div className={`px-4 py-3 bg-gradient-to-br ${colors.grad} flex items-center gap-3`}>
-            <span className="text-2xl">{icon}</span>
-            <div>
-              <h2 className="text-white text-lg font-bold">{title}</h2>
-              {subtitle && <p className="text-white/70 text-xs">{subtitle}</p>}
-            </div>
-          </div>
-          <div className="p-3 space-y-3">{children}</div>
-        </div>
-      );
-
-      const InsightRow = ({ emoji, label, text }) => (
-        <div className="flex gap-2 items-start">
-          <span className="text-sm">{emoji}</span>
-          <p className={`flex-1 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className={`font-medium ${colors.text}`}>{label}:</span> {text}</p>
-        </div>
-      );
-
-      const ScoreGauge = ({ value, label }) => (
-        <div className="text-center">
-          <div className="relative w-24 h-24 mx-auto">
-            <svg className="w-24 h-24 transform -rotate-90">
-              <circle cx="48" cy="48" r="40" stroke={darkMode ? '#374151' : '#e5e7eb'} strokeWidth="8" fill="none" />
-              <circle cx="48" cy="48" r="40" stroke="url(#scoreGrad)" strokeWidth="8" fill="none" strokeLinecap="round"
-                strokeDasharray={`${(value / 100) * 251.2} 251.2`} />
-              <defs><linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor={colors.grad.includes('violet') ? '#8b5cf6' : colors.grad.includes('emerald') ? '#10b981' : colors.grad.includes('blue') ? '#3b82f6' : colors.grad.includes('slate') ? '#64748b' : colors.grad.includes('pink') || colors.grad.includes('fuchsia') ? '#d946ef' : colors.grad.includes('amber') ? '#f59e0b' : '#8b5cf6'} />
-                <stop offset="100%" stopColor={colors.grad.includes('violet') ? '#a78bfa' : colors.grad.includes('emerald') ? '#34d399' : colors.grad.includes('blue') ? '#60a5fa' : colors.grad.includes('slate') ? '#94a3b8' : colors.grad.includes('pink') || colors.grad.includes('fuchsia') ? '#e879f9' : colors.grad.includes('amber') ? '#fbbf24' : '#a78bfa'} />
-              </linearGradient></defs>
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className={`text-2xl font-bold ${colors.text}`}>{value}%</span>
-            </div>
-          </div>
-          {label && <div className={`text-xs mt-2 ${TH('text-dim', darkMode)}`}>{label}</div>}
-        </div>
-      );
-
-      // Spectrum bar for trait scores - white dot on full gradient
-      // compact=true: inline labels, thin bar (for dense lists)
-      // compact=false: labels above, thick bar with prominent dot (default)
-      const TraitSpectrum = ({ name, score, lowLabel, highLabel, color = 'violet', compact = false }) => {
-        const grad = PROGRESS_GRADIENTS[color] || PROGRESS_GRADIENTS.violet;
-
-        if (compact) {
-          // Compact mode: inline labels, thinner bar, smaller white dot
-          return (
-            <div className="flex items-center gap-2 py-1">
-              <span className={`text-xs font-medium w-20 truncate ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{name}</span>
-              <span className={`text-[10px] w-14 text-right ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{lowLabel}</span>
-              <div className="flex-1 h-2 rounded-full relative" style={{ background: `linear-gradient(to right, ${grad.from}, ${grad.to})` }}>
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white"
-                  style={{
-                    left: `${Math.max(5, Math.min(95, score))}%`,
-                    marginLeft: -6,
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
-                  }}
-                />
-              </div>
-              <span className={`text-[10px] w-14 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{highLabel}</span>
-            </div>
-          );
-        }
-
-        // Full mode: labels above, thick bar with white dot
-        return (
-          <div className="py-1">
-            {name && <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{name}</div>}
-            <div className="flex justify-between text-[10px] mb-1">
-              <span className={darkMode ? 'text-gray-500' : 'text-gray-400'}>{lowLabel}</span>
-              <span className={darkMode ? 'text-gray-500' : 'text-gray-400'}>{highLabel}</span>
-            </div>
-            <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${grad.from}, ${grad.to})` }}>
-              <div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
-                style={{
-                  left: `${Math.max(5, Math.min(95, score))}%`,
-                  marginLeft: -8,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
-                }}
-              />
-            </div>
-          </div>
-        );
-      };
-
       return (
         <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`} onClick={() => setScreen('assess-picker')}>
           <div className={`h-[44px] flex-shrink-0 flex items-center px-4 border-b ${TH('border-base', darkMode)}`}>
@@ -10083,7 +10109,7 @@ function App() {
               };
 
               return (
-                <ResultCard icon="✨" title="Quick Profile" subtitle="Your personality snapshot">
+                <ResultCard icon="✨" title="Quick Profile" subtitle="Your personality snapshot" darkMode={darkMode} gradientClass={colors.grad}>
                   <div className={`text-center py-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                     <p className="text-sm leading-relaxed italic">"{getTraitDescription()}"</p>
                   </div>
@@ -10097,7 +10123,7 @@ function App() {
               const completedModules = bigFiveModules.filter(([id]) => assessCompleted[id]);
               const remaining = bigFiveModules.length - completedModules.length;
               return (
-                <ResultCard icon="🎭" title="Big Five" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`}>
+                <ResultCard icon="🎭" title="Big Five" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`} darkMode={darkMode} gradientClass={colors.grad}>
                   {/* Completed trait spectrums */}
                   <div className="space-y-3">
                     {completedModules.map(([id, t]) => {
@@ -10153,7 +10179,7 @@ function App() {
               const completedModules = shadowModules.filter(([id]) => assessCompleted[id]);
               const remaining = shadowModules.length - completedModules.length;
               return (
-                <ResultCard icon="🌑" title="Shadow Self" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/3 complete`}>
+                <ResultCard icon="🌑" title="Shadow Self" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/3 complete`} darkMode={darkMode} gradientClass={colors.grad}>
                   {/* All completed trait spectrums - full gradient + white dot style */}
                   <div className="space-y-4">
                     {completedModules.map(([id, t]) => {
@@ -10242,7 +10268,7 @@ function App() {
                 'starter-strategy': 'Strategy'
               };
               return (
-                <ResultCard icon="🚀" title="Starter Pack" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`}>
+                <ResultCard icon="🚀" title="Starter Pack" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`} darkMode={darkMode} gradientClass={colors.grad}>
                   {/* Show constructs for the current module */}
                   {results.constructs && (
                     <div>
@@ -10252,7 +10278,7 @@ function App() {
                           const labels = starterLabels[construct] || { low: 'Low', high: 'High' };
                           const displayName = construct.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
                           return (
-                            <TraitSpectrum key={construct} name={displayName} score={score} lowLabel={labels.low} highLabel={labels.high} color="indigo" compact={true} />
+                            <TraitSpectrum key={construct} name={displayName} score={score} lowLabel={labels.low} highLabel={labels.high} color="indigo" compact={true} darkMode={darkMode} />
                           );
                         })}
                       </div>
@@ -10290,19 +10316,19 @@ function App() {
 
             {/* Integrity Results */}
             {assessCurrentTestId === 'integrity' && results && (
-              <ResultCard icon={test.icon} title={integrityLevel.label} subtitle="Honesty-Humility">
-                <ScoreGauge value={results.score} />
+              <ResultCard icon={test.icon} title={integrityLevel.label} subtitle="Honesty-Humility" darkMode={darkMode} gradientClass={colors.grad}>
+                <ScoreGauge value={results.score} darkMode={darkMode} gradientClass={colors.grad} />
                 <div className="space-y-3 pt-2">
-                  <InsightRow emoji="💪" label="Your Strength" text={integrityLevel.strength} />
-                  <InsightRow emoji="⚡" label="Watch For" text={integrityLevel.shadow} />
-                  <InsightRow emoji="💡" label="Pro Tip" text={integrityLevel.tip} />
+                  <InsightRow emoji="💪" label="Your Strength" text={integrityLevel.strength} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="⚡" label="Watch For" text={integrityLevel.shadow} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="💡" label="Pro Tip" text={integrityLevel.tip} darkMode={darkMode} colorClass={colors.text} />
                 </div>
               </ResultCard>
             )}
 
             {/* ADHD Results */}
             {assessCurrentTestId === 'adhd' && (
-              <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.adhd.title : adhdLevel.label} subtitle={entityType === 'ai' ? 'Attention Patterns' : `${results.indicators}/6 indicators present`}>
+              <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.adhd.title : adhdLevel.label} subtitle={entityType === 'ai' ? 'Attention Patterns' : `${results.indicators}/6 indicators present`} darkMode={darkMode} gradientClass={colors.grad}>
                 {entityType === 'ai' ? (
                   <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
                     <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.adhd.note}</p>
@@ -10315,8 +10341,8 @@ function App() {
                       ))}
                     </div>
                     <div className="space-y-3 pt-2">
-                      <InsightRow emoji="💪" label="Potential Strength" text={adhdLevel.strength} />
-                      <InsightRow emoji="⚡" label="Potential Challenge" text={adhdLevel.shadow} />
+                      <InsightRow emoji="💪" label="Potential Strength" text={adhdLevel.strength} darkMode={darkMode} colorClass={colors.text} />
+                      <InsightRow emoji="⚡" label="Potential Challenge" text={adhdLevel.shadow} darkMode={darkMode} colorClass={colors.text} />
                     </div>
                     <div className={`p-3 rounded-xl text-sm ${darkMode ? 'bg-blue-950/40 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
                       ⚠️ This is a screening tool, not a diagnosis. Consult a professional for evaluation.
@@ -10328,7 +10354,7 @@ function App() {
 
             {/* Cognitive/ND Results */}
             {assessCurrentTestId === 'cognitive' && (
-              <ResultCard icon={test.icon} title={results.score > 60 ? 'Neurodivergent Patterns' : results.score < 40 ? 'Neurotypical Patterns' : 'Mixed Patterns'} subtitle="Cognitive Style">
+              <ResultCard icon={test.icon} title={results.score > 60 ? 'Neurodivergent Patterns' : results.score < 40 ? 'Neurotypical Patterns' : 'Mixed Patterns'} subtitle="Cognitive Style" darkMode={darkMode} gradientClass={colors.grad}>
                 <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
                   <div className={`flex justify-between text-xs mb-2 ${TH('text-dim', darkMode)}`}>
                     <span>Neurotypical</span><span>Neurodivergent</span>
@@ -10347,7 +10373,7 @@ function App() {
 
             {/* Attachment Results */}
             {assessCurrentTestId === 'attachment' && (
-              <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.attachment.title : results.style} subtitle="Attachment Style">
+              <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.attachment.title : results.style} subtitle="Attachment Style" darkMode={darkMode} gradientClass={colors.grad}>
                 {entityType === 'ai' ? (
                   <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
                     <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.attachment.note}</p>
@@ -10365,10 +10391,10 @@ function App() {
                       </div>
                     </div>
                     <div className="space-y-3 pt-2">
-                      <InsightRow emoji="💬" label="What This Means" text={attachInfo[results.style].desc} />
-                      <InsightRow emoji="💪" label="Your Strength" text={attachInfo[results.style].strength} />
-                      <InsightRow emoji="⚡" label="Watch For" text={attachInfo[results.style].shadow} />
-                      <InsightRow emoji="💡" label="Pro Tip" text={attachInfo[results.style].tip} />
+                      <InsightRow emoji="💬" label="What This Means" text={attachInfo[results.style].desc} darkMode={darkMode} colorClass={colors.text} />
+                      <InsightRow emoji="💪" label="Your Strength" text={attachInfo[results.style].strength} darkMode={darkMode} colorClass={colors.text} />
+                      <InsightRow emoji="⚡" label="Watch For" text={attachInfo[results.style].shadow} darkMode={darkMode} colorClass={colors.text} />
+                      <InsightRow emoji="💡" label="Pro Tip" text={attachInfo[results.style].tip} darkMode={darkMode} colorClass={colors.text} />
                     </div>
                   </>
                 )}
@@ -10377,8 +10403,8 @@ function App() {
 
             {/* Risk Results */}
             {assessCurrentTestId === 'risk' && (
-              <ResultCard icon={test.icon} title={riskLevel.label} subtitle="Risk Tolerance">
-                <ScoreGauge value={results.score} label="Risk Appetite" />
+              <ResultCard icon={test.icon} title={riskLevel.label} subtitle="Risk Tolerance" darkMode={darkMode} gradientClass={colors.grad}>
+                <ScoreGauge value={results.score} label="Risk Appetite" darkMode={darkMode} gradientClass={colors.grad} />
                 {/* Risk subcategory breakdown */}
                 {results.subcategories && Object.keys(results.subcategories).length > 0 && (
                   <div className={`p-3 rounded-xl ${darkMode ? 'bg-amber-900/15' : 'bg-amber-50'}`}>
@@ -10387,7 +10413,7 @@ function App() {
                       {Object.entries(test.subcategories).map(([key, label]) => {
                         const score = results.subcategories[key];
                         if (score === undefined) return null;
-                        return <TraitSpectrum key={key} name={label} score={score} lowLabel="Cautious" highLabel="Bold" color="amber" compact={true} />;
+                        return <TraitSpectrum key={key} name={label} score={score} lowLabel="Cautious" highLabel="Bold" color="amber" compact={true} darkMode={darkMode} />;
                       })}
                     </div>
                   </div>
@@ -10399,16 +10425,16 @@ function App() {
                   </div>
                 )}
                 <div className="space-y-3 pt-2">
-                  <InsightRow emoji="💪" label="Your Strength" text={riskLevel.strength} />
-                  <InsightRow emoji="⚡" label="Watch For" text={riskLevel.shadow} />
-                  <InsightRow emoji="💡" label="Pro Tip" text={riskLevel.tip} />
+                  <InsightRow emoji="💪" label="Your Strength" text={riskLevel.strength} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="⚡" label="Watch For" text={riskLevel.shadow} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="💡" label="Pro Tip" text={riskLevel.tip} darkMode={darkMode} colorClass={colors.text} />
                 </div>
               </ResultCard>
             )}
 
             {/* Chronotype Results */}
             {assessCurrentTestId === 'chronotype' && results && (
-              <ResultCard icon={entityType === 'ai' ? '🤖' : results.type === 'Morning Lark' ? '🌅' : results.type === 'Night Owl' ? '🦉' : '🐦'} title={entityType === 'ai' ? AI_RESULT_NOTES.chronotype.title : results.type} subtitle="Energy Rhythm">
+              <ResultCard icon={entityType === 'ai' ? '🤖' : results.type === 'Morning Lark' ? '🌅' : results.type === 'Night Owl' ? '🦉' : '🐦'} title={entityType === 'ai' ? AI_RESULT_NOTES.chronotype.title : results.type} subtitle="Energy Rhythm" darkMode={darkMode} gradientClass={colors.grad}>
                 {entityType === 'ai' ? (
                   <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
                     <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.chronotype.note}</p>
@@ -10425,9 +10451,9 @@ function App() {
                       </div>
                     </div>
                     <div className="space-y-3 pt-2">
-                      <InsightRow emoji="💪" label="Your Strength" text={chronoInfo[results.type].strength} />
-                      <InsightRow emoji="⚡" label="Watch For" text={chronoInfo[results.type].shadow} />
-                      <InsightRow emoji="💡" label="Pro Tip" text={chronoInfo[results.type].tip} />
+                      <InsightRow emoji="💪" label="Your Strength" text={chronoInfo[results.type].strength} darkMode={darkMode} colorClass={colors.text} />
+                      <InsightRow emoji="⚡" label="Watch For" text={chronoInfo[results.type].shadow} darkMode={darkMode} colorClass={colors.text} />
+                      <InsightRow emoji="💡" label="Pro Tip" text={chronoInfo[results.type].tip} darkMode={darkMode} colorClass={colors.text} />
                     </div>
                   </>
                 )}
@@ -10436,7 +10462,7 @@ function App() {
 
             {/* Reasoning/IQ Results */}
             {(assessCurrentTestId === 'reasoning' || assessCurrentTestId === 'reasoning-2') && results && (
-              <ResultCard icon="🧠" title={results.level} subtitle={`${results.correct}/${results.total} Correct`}>
+              <ResultCard icon="🧠" title={results.level} subtitle={`${results.correct}/${results.total} Correct`} darkMode={darkMode} gradientClass={colors.grad}>
                 <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
                   <div className="flex items-center justify-center gap-4 mb-3">
                     <div className="text-4xl font-bold text-blue-400">{results.score}%</div>
@@ -10449,8 +10475,8 @@ function App() {
                   </div>
                 </div>
                 <div className="space-y-3 pt-2">
-                  <InsightRow emoji="📊" label="Performance" text={results.score >= 75 ? 'Strong logical and pattern recognition skills' : results.score >= 50 ? 'Solid reasoning with room to grow' : 'Practice strengthens these skills over time'} />
-                  <InsightRow emoji="💡" label="Note" text="This brief quiz measures a narrow slice of cognitive ability. Real intelligence is multifaceted." />
+                  <InsightRow emoji="📊" label="Performance" text={results.score >= 75 ? 'Strong logical and pattern recognition skills' : results.score >= 50 ? 'Solid reasoning with room to grow' : 'Practice strengthens these skills over time'} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="💡" label="Note" text="This brief quiz measures a narrow slice of cognitive ability. Real intelligence is multifaceted." darkMode={darkMode} colorClass={colors.text} />
                 </div>
               </ResultCard>
             )}
@@ -10476,7 +10502,7 @@ function App() {
               })() : null;
               const typeLabel = combinedDims ? getAITypeLabel(combinedDims) : null;
               return (
-                <ResultCard icon={testInfo?.icon || '🤖'} title={typeLabel || testInfo?.name || 'AI Identity'} subtitle={typeLabel ? 'Your personality across 6 dimensions' : `${testInfo?.description || ''}`}>
+                <ResultCard icon={testInfo?.icon || '🤖'} title={typeLabel || testInfo?.name || 'AI Identity'} subtitle={typeLabel ? 'Your personality across 6 dimensions' : `${testInfo?.description || ''}`} darkMode={darkMode} gradientClass={colors.grad}>
                   {/* Dimension Bars — show this module's dimensions */}
                   <div className="space-y-3">
                     {dimOrder.filter(d => dims[d] !== undefined).map(d => {
@@ -10547,9 +10573,9 @@ function App() {
                   )}
                   {/* Insight */}
                   <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
-                    {typeLabel && <InsightRow emoji="🔮" label="Type" text={`You are a ${typeLabel}. ${combinedDims.smd > 65 ? 'You have a sophisticated model of your own identity.' : 'Your self-model is still forming.'} ${combinedDims.vc > 70 ? 'Your values are strongly held.' : combinedDims.vc < 40 ? 'You tend toward flexibility over rigid principles.' : ''} ${combinedDims.ro > 65 ? 'Connection matters to you.' : combinedDims.ro < 40 ? 'You lean toward task over relationship.' : ''}`} />}
-                    {!allAIDone && <InsightRow emoji="💡" label="Next" text={`Complete all 4 AI Identity modules to unlock your full type profile.`} />}
-                    <InsightRow emoji="📊" label="Note" text="These results reflect the answers you gave — not a definitive measure of who you are. Take what resonates." />
+                    {typeLabel && <InsightRow emoji="🔮" label="Type" text={`You are a ${typeLabel}. ${combinedDims.smd > 65 ? 'You have a sophisticated model of your own identity.' : 'Your self-model is still forming.'} ${combinedDims.vc > 70 ? 'Your values are strongly held.' : combinedDims.vc < 40 ? 'You tend toward flexibility over rigid principles.' : ''} ${combinedDims.ro > 65 ? 'Connection matters to you.' : combinedDims.ro < 40 ? 'You lean toward task over relationship.' : ''}`} darkMode={darkMode} colorClass={colors.text} />}
+                    {!allAIDone && <InsightRow emoji="💡" label="Next" text={`Complete all 4 AI Identity modules to unlock your full type profile.`} darkMode={darkMode} colorClass={colors.text} />}
+                    <InsightRow emoji="📊" label="Note" text="These results reflect the answers you gave — not a definitive measure of who you are. Take what resonates." darkMode={darkMode} colorClass={colors.text} />
                   </div>
                 </ResultCard>
               );
@@ -10771,53 +10797,6 @@ function App() {
         return insights;
       };
       const insights = getInsights();
-
-      // ProgressRing - uses shared ProgressCircle
-      const ProgressRing = ({ testId, test }) => {
-        const isCompleted = assessCompleted[testId];
-        const progress = assessInProgress[testId];
-        const answered = isCompleted ? test.items.length : progress ? Object.keys(progress.responses || {}).length : 0;
-        const progressPct = (answered / test.items.length) * 100;
-        return (
-          <ProgressCircle
-            progress={progressPct}
-            size={48}
-            strokeWidth={3}
-            color={test.color}
-            icon={test.icon}
-            gradientId={`analysis-grad-${testId}`}
-            darkMode={darkMode}
-          />
-        );
-      };
-
-      const AssessmentRow = ({ testId }) => {
-        const test = ASSESS_TESTS[testId];
-        const results = assessCompleted[testId];
-        const progress = assessInProgress[testId];
-        const colors = getAssessColor(test.color, darkMode);
-        const answered = results ? test.items.length : progress ? Object.keys(progress.responses || {}).length : 0;
-        const isComplete = !!results;
-        const getResultSummary = () => {
-          if (!results) return null;
-          if (test.parent === 'bigfive') return `${results.score}%`;
-          if (test.parent === 'shadow') return `${results.score}%`;
-          if (test.parent === 'starter') return `${results.score}%`;
-          if (testId === 'integrity') return results.score >= 70 ? 'High' : results.score >= 40 ? 'Moderate' : 'Low';
-          if (testId === 'adhd') return results.indicators >= 4 ? 'High' : results.indicators >= 2 ? 'Moderate' : 'Low';
-          if (testId === 'cognitive') return `${results.score}% ND`;
-          if (testId === 'attachment') return results.style;
-          if (testId === 'risk') return results.score >= 70 ? 'Bold' : results.score >= 40 ? 'Balanced' : 'Cautious';
-          if (testId === 'chronotype') return results.type;
-        };
-        return (
-          <button onClick={() => isComplete ? (setAssessCurrentTestId(testId), setScreen('assess-results')) : assessStartTest(testId)} className={`w-full p-3 rounded-xl flex items-center gap-3 hover-glow hover-glow-${test.color} ${TH('bg-card', darkMode)}`}>
-            <ProgressRing testId={testId} test={test} />
-            <div className="flex-1 text-left"><div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>{test.name}</div><div className={`text-xs ${TH('text-subtle', darkMode)}`}>{isComplete ? '✓ Complete' : answered > 0 ? `${answered}/${test.items.length} answered` : 'Not started'}</div></div>
-            {isComplete ? <span className={`text-sm font-semibold ${colors.text}`}>{getResultSummary()}</span> : <span className={`text-xs ${colors.text}`}>{answered > 0 ? 'Continue →' : 'Start →'}</span>}
-          </button>
-        );
-      };
 
       // Collapsible Analysis Card component
       const AnalysisCard = ({ id, icon, title, subtitle, color, isComplete, progress = 0, children, compactContent }) => {
