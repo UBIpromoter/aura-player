@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Organism — Macro v5</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  .header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px 10px;
+    background: #0e0e16;
+    border-bottom: 1px solid #1e1e2e;
+    z-index: 10;
+  }
+  .title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #c0c0d0;
+    letter-spacing: 0.5px;
+  }
+  .ctrl-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .btn {
+    padding: 5px 14px;
+    border: 1px solid #2a2a3e;
+    border-radius: 6px;
+    background: transparent;
+    color: #8b8ba0;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .btn:hover { border-color: #6b7280; color: #d1d5db; }
+  .btn.active { border-color: #8b5cf6; color: #fff; background: rgba(139,92,246,0.12); }
+  .ctrl-sep {
+    width: 1px;
+    height: 18px;
+    background: #2a2a3e;
+    margin: 0 4px;
+  }
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 6px;
+    padding: 6px;
+    min-height: 0;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    background: #0a0a0f;
+    border: 1px solid #1a1a2a;
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 0;
+    position: relative;
+  }
+  .card canvas {
+    display: block;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+  }
+  .card-label {
+    text-align: center;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #6a6a80;
+    letter-spacing: 0.3px;
+    background: #0e0e16;
+    border-top: 1px solid #1a1a2a;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="title">Aura Organism — Macro v5</div>
+  <div class="ctrl-row">
+    <button class="btn active" data-tier="0">Seed</button>
+    <button class="btn" data-tier="1">Young</button>
+    <button class="btn" data-tier="2">Full</button>
+    <button class="btn" data-tier="R">Random</button>
+    <div class="ctrl-sep"></div>
+    <button class="btn active" data-mode="human">Human</button>
+    <button class="btn" data-mode="ai">AI</button>
+  </div>
+</div>
+<div class="grid">
+  <div class="card"><canvas id="cA"></canvas><div class="card-label">A — Pure Web</div></div>
+  <div class="card"><canvas id="cB"></canvas><div class="card-label">B — Luminous Tissue</div></div>
+  <div class="card"><canvas id="cC"></canvas><div class="card-label">C — Stellar Web</div></div>
+  <div class="card"><canvas id="cD"></canvas><div class="card-label">D — Deep Web</div></div>
+  <div class="card"><canvas id="cE"></canvas><div class="card-label">E — Living Tissue</div></div>
+  <div class="card"><canvas id="cF"></canvas><div class="card-label">F — Bioluminescent Depth</div></div>
+</div>
+
+<script>
+// ─── Data ────────────────────────────────────────────────────────────────
+const C = {
+  violet: '#8b5cf6', indigo: '#6366f1', cyan: '#06b6d4',
+  rose: '#f43f5e', pink: '#ec4899', emerald: '#10b981', amber: '#f59e0b',
+};
+const SENSITIVE = [false, true, true, false, false];
+const NEURON_MAP = [
+  { colorQ: 'onboard-1', posQ: 'onboard-2', colors: ['#a78bfa', '#c4b5fd'] },
+  { colorQ: 'onboard-3', posQ: 'onboard-4', colors: ['#818cf8', '#a5b4fc'] },
+  { colorQ: 'onboard-5', posQ: 'onboard-6', colors: ['#22d3ee', '#67e8f9'] },
+  { colorQ: 'onboard-7', posQ: 'onboard-8', colors: ['#fb7185', '#fda4af'] },
+  { colorQ: 'onboard-9', posQ: 'onboard-10', colors: ['#34d399', '#6ee7b7'] },
+];
+const HUMAN_CONNS = [[0,1],[1,2],[2,3],[3,4],[4,0],[0,2],[1,3],[2,4],[3,0],[4,1]];
+const AI_CONNS = [[0,1],[0,2],[0,3],[0,4],[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]];
+const ASSESS_MAP = [
+  { ids: ['starter-personality'], name: 'Personality', color: C.violet, tier: 1, nodes: 3, affinities: [0, 1] },
+  { ids: ['starter-motivation'], name: 'Motivation', color: C.amber, tier: 1, nodes: 3, affinities: [4, 0] },
+  { ids: ['starter-thinking'], name: 'Thinking', color: C.cyan, tier: 1, nodes: 4, affinities: [2, 4] },
+  { ids: ['starter-connection'], name: 'Connection', color: C.pink, tier: 1, nodes: 3, affinities: [2, 3] },
+  { ids: ['starter-strategy'], name: 'Strategy', color: C.emerald, tier: 1, nodes: 3, affinities: [1, 4] },
+  { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: C.violet, tier: 2, nodes: 5, affinities: [0, 2, 4] },
+  { ids: ['integrity'], name: 'Character', color: C.emerald, tier: 2, nodes: 3, affinities: [3, 1] },
+  { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: C.indigo, tier: 2, nodes: 4, affinities: [3, 4] },
+  { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: C.cyan, tier: 2, nodes: 4, affinities: [4, 0] },
+  { ids: ['attachment'], name: 'Relationships', color: C.rose, tier: 2, nodes: 3, affinities: [2, 3] },
+  { ids: ['risk'], name: 'Behavior', color: C.amber, tier: 2, nodes: 3, affinities: [1, 4] },
+];
+
+function hexToRGB(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return [r, g, b];
+}
+
+// ─── State ───────────────────────────────────────────────────────────────
+let currentTier = 0;
+let currentMode = 'human';
+let nodes = [];
+let edges = [];
+let triangles = [];
+let edgeSet = new Set();
+let startTime = performance.now() / 1000;
+const SIZE = 400;
+const CX = SIZE / 2, CY = SIZE / 2;
+
+// ─── Build ───────────────────────────────────────────────────────────────
+function buildAllNodes(tier) {
+  nodes = [];
+  edges = [];
+  triangles = [];
+  edgeSet = new Set();
+  startTime = performance.now() / 1000;
+  const now = startTime;
+
+  // Primaries — pentagon layout
+  for (let i = 0; i < 5; i++) {
+    const ang = (i / 5) * Math.PI * 2 - Math.PI / 2;
+    const r = 55 + Math.random() * 15;
+    const baseColor = hexToRGB(NEURON_MAP[i].colors[0]);
+    nodes.push({
+      x: CX + Math.cos(ang) * r,
+      y: CY + Math.sin(ang) * r,
+      vx: 0, vy: 0,
+      fx: 0, fy: 0,
+      color: baseColor,
+      tcolor: baseColor,
+      r: 4, tr: 4,
+      alpha: 0.3, talpha: 1.0,
+      phase: Math.random() * Math.PI * 2,
+      driftSpeed: 0.12 + Math.random() * 0.2,
+      driftAmp: 0.8 + Math.random() * 1.2,
+      phaseX: Math.random() * Math.PI * 2,
+      phaseY: Math.random() * Math.PI * 2,
+      type: 'primary',
+      parent: i,
+      affinities: [],
+      birthTime: now + Math.random() * 0.2,
+      dying: false, deathStart: 0,
+    });
+  }
+
+  // Primary connections
+  const conns = currentMode === 'human' ? HUMAN_CONNS : AI_CONNS;
+  for (const [a, b] of conns) {
+    addEdge(a, b, 0.7, 60 + Math.random() * 20);
+  }
+
+  if (tier >= 1) {
+    // Companions — 2 per primary
+    for (let i = 0; i < 5; i++) {
+      for (let j = 0; j < 2; j++) {
+        const pNode = nodes[i];
+        const ang = Math.atan2(pNode.y - CY, pNode.x - CX) + (j === 0 ? -0.5 : 0.5) + Math.random() * 0.3;
+        const dist = 35 + Math.random() * 15;
+        const baseColor = hexToRGB(NEURON_MAP[i].colors[1]);
+        const idx = nodes.length;
+        nodes.push({
+          x: pNode.x + Math.cos(ang) * dist,
+          y: pNode.y + Math.sin(ang) * dist,
+          vx: 0, vy: 0, fx: 0, fy: 0,
+          color: baseColor, tcolor: baseColor,
+          r: 2.5, tr: 2.5,
+          alpha: 0.3, talpha: 0.85,
+          phase: Math.random() * Math.PI * 2,
+          driftSpeed: 0.12 + Math.random() * 0.2,
+          driftAmp: 0.8 + Math.random() * 1.2,
+          phaseX: Math.random() * Math.PI * 2,
+          phaseY: Math.random() * Math.PI * 2,
+          type: 'companion',
+          parent: i,
+          affinities: [],
+          birthTime: now + 0.1 + Math.random() * 0.2,
+          dying: false, deathStart: 0,
+        });
+        addEdge(i, idx, 0.5, 40 + Math.random() * 15);
+        // Connect to neighbor companion
+        if (j === 1) addEdge(idx - 1, idx, 0.3, 30 + Math.random() * 10);
+      }
+    }
+
+    // Satellites — 1 per primary
+    for (let i = 0; i < 5; i++) {
+      const pNode = nodes[i];
+      const ang = Math.atan2(pNode.y - CY, pNode.x - CX) + (Math.random() - 0.5) * 0.8;
+      const dist = 65 + Math.random() * 20;
+      const baseColor = hexToRGB(NEURON_MAP[i].colors[0]);
+      const dimmed = baseColor.map(c => Math.round(c * 0.6));
+      const idx = nodes.length;
+      nodes.push({
+        x: pNode.x + Math.cos(ang) * dist,
+        y: pNode.y + Math.sin(ang) * dist,
+        vx: 0, vy: 0, fx: 0, fy: 0,
+        color: dimmed, tcolor: dimmed,
+        r: 1.5, tr: 1.5,
+        alpha: 0.3, talpha: 0.6,
+        phase: Math.random() * Math.PI * 2,
+        driftSpeed: 0.12 + Math.random() * 0.2,
+        driftAmp: 0.8 + Math.random() * 1.2,
+        phaseX: Math.random() * Math.PI * 2,
+        phaseY: Math.random() * Math.PI * 2,
+        type: 'satellite',
+        parent: i,
+        affinities: [],
+        birthTime: now + 0.15 + Math.random() * 0.2,
+        dying: false, deathStart: 0,
+      });
+      addEdge(i, idx, 0.3, 70 + Math.random() * 15);
+      // Connect satellite to a companion of same parent
+      const compIdx = 5 + i * 2;
+      if (compIdx < nodes.length) addEdge(compIdx, idx, 0.2, 50 + Math.random() * 15);
+    }
+  }
+
+  if (tier >= 2) {
+    // Assessment nodes
+    for (const assess of ASSESS_MAP) {
+      if (assess.tier > tier) continue;
+      for (let j = 0; j < assess.nodes; j++) {
+        const affIdx = assess.affinities[j % assess.affinities.length];
+        const anchor = nodes[affIdx];
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 80 + Math.random() * 55;
+        const col = hexToRGB(assess.color);
+        const dimmed = col.map(c => Math.round(c * 0.5));
+        const idx = nodes.length;
+        nodes.push({
+          x: anchor.x + Math.cos(ang) * dist,
+          y: anchor.y + Math.sin(ang) * dist,
+          vx: 0, vy: 0, fx: 0, fy: 0,
+          color: dimmed, tcolor: dimmed,
+          r: 2, tr: 2,
+          alpha: 0.3, talpha: 0.5,
+          phase: Math.random() * Math.PI * 2,
+          driftSpeed: 0.12 + Math.random() * 0.2,
+          driftAmp: 0.8 + Math.random() * 1.2,
+          phaseX: Math.random() * Math.PI * 2,
+          phaseY: Math.random() * Math.PI * 2,
+          type: 'assess',
+          parent: affIdx,
+          affinities: assess.affinities,
+          birthTime: startTime + 0.2 + Math.random() * 0.2,
+          dying: false, deathStart: 0,
+        });
+        addEdge(affIdx, idx, 0.15, 90 + Math.random() * 20);
+        // Connect to previous assess node in same cluster
+        if (j > 0) addEdge(idx - 1, idx, 0.1, 30 + Math.random() * 15);
+      }
+    }
+  }
+
+  // Build triangle list
+  buildTriangles();
+}
+
+function addEdge(a, b, strength, restLen) {
+  const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+  if (edgeSet.has(key)) return;
+  edgeSet.add(key);
+  edges.push({
+    a, b, strength, restLen,
+    wigglePhase: Math.random() * Math.PI * 2,
+    wiggleSpeed: 0.3 + Math.random() * 0.5,
+    wiggleAmp: 1 + Math.random() * 2.5,
+  });
+}
+
+function hasEdge(a, b) {
+  const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+  return edgeSet.has(key);
+}
+
+function buildTriangles() {
+  triangles = [];
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      if (!hasEdge(i, j)) continue;
+      for (let k = j + 1; k < nodes.length; k++) {
+        if (hasEdge(i, k) && hasEdge(j, k)) {
+          triangles.push([i, j, k]);
+        }
+      }
+    }
+  }
+}
+
+// ─── Physics ─────────────────────────────────────────────────────────────
+function simulate() {
+  const gravity = 0.07;
+  const damping = 0.96;
+  const maxSpeed = 1.5;
+
+  // Reset forces
+  for (const n of nodes) { n.fx = 0; n.fy = 0; }
+
+  // Center gravity
+  for (const n of nodes) {
+    n.fx += (CX - n.x) * gravity;
+    n.fy += (CY - n.y) * gravity;
+  }
+
+  // Repulsion
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dx = nodes[j].x - nodes[i].x;
+      const dy = nodes[j].y - nodes[i].y;
+      const d2 = dx * dx + dy * dy + 1;
+      const d = Math.sqrt(d2);
+      const force = 120 / d2;
+      const fx = (dx / d) * force;
+      const fy = (dy / d) * force;
+      nodes[i].fx -= fx;
+      nodes[i].fy -= fy;
+      nodes[j].fx += fx;
+      nodes[j].fy += fy;
+    }
+  }
+
+  // Springs
+  for (const e of edges) {
+    const a = nodes[e.a], b = nodes[e.b];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.sqrt(dx * dx + dy * dy) + 0.01;
+    const force = (d - e.restLen) * e.strength * 0.05;
+    const fx = (dx / d) * force;
+    const fy = (dy / d) * force;
+    a.fx += fx; a.fy += fy;
+    b.fx -= fx; b.fy -= fy;
+  }
+
+  // Radial roundness — push toward circular arrangement
+  for (const n of nodes) {
+    const dx = n.x - CX, dy = n.y - CY;
+    const dist = Math.sqrt(dx * dx + dy * dy) + 0.01;
+    const targetDist = n.type === 'primary' ? 70 : n.type === 'companion' ? 100 : n.type === 'satellite' ? 135 : 150;
+    const radialForce = (dist - targetDist) * 0.003;
+    n.fx -= (dx / dist) * radialForce;
+    n.fy -= (dy / dist) * radialForce;
+  }
+
+  // Integrate
+  for (const n of nodes) {
+    n.vx = (n.vx + n.fx) * damping;
+    n.vy = (n.vy + n.fy) * damping;
+    const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+    if (speed > maxSpeed) {
+      n.vx = (n.vx / speed) * maxSpeed;
+      n.vy = (n.vy / speed) * maxSpeed;
+    }
+    n.x += n.vx;
+    n.y += n.vy;
+  }
+
+  // Alpha/radius interpolation (birth)
+  const now = performance.now() / 1000;
+  for (const n of nodes) {
+    const elapsed = now - n.birthTime;
+    const birthMix = Math.min(1, Math.max(0, elapsed / 0.8));
+    const cubic = birthMix * birthMix * (3 - 2 * birthMix);
+    n.alpha = 0.3 + (n.talpha - 0.3) * cubic;
+    n.r = n.tr;
+  }
+}
+
+// ─── Animated positions ──────────────────────────────────────────────────
+function getAnimPos(n, time) {
+  const driftX = Math.sin(time * n.driftSpeed + n.phaseX) * n.driftAmp;
+  const driftY = Math.cos(time * n.driftSpeed * 0.7 + n.phaseY) * n.driftAmp;
+  return { x: n.x + driftX, y: n.y + driftY };
+}
+
+// ─── AI fade helper ──────────────────────────────────────────────────────
+function computeAIFade(positions) {
+  // Compute max distance from center
+  let maxDist = 0;
+  const dists = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const dx = positions[i].x - CX, dy = positions[i].y - CY;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    dists.push(d);
+    if (d > maxDist) maxDist = d;
+  }
+  const threshold = maxDist * 0.6;
+  const renderAlphas = [];
+  for (let i = 0; i < nodes.length; i++) {
+    if (dists[i] > threshold && maxDist > threshold) {
+      const fade = Math.max(0.1, 1 - (dists[i] - threshold) / (maxDist - threshold));
+      renderAlphas.push(nodes[i].alpha * fade);
+    } else {
+      renderAlphas.push(nodes[i].alpha);
+    }
+  }
+  return { dists, renderAlphas, maxDist, threshold };
+}
+
+// ─── Convex Hull ─────────────────────────────────────────────────────────
+function convexHull(points) {
+  if (points.length < 3) return points.slice();
+  points = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (O, A, B) => (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
+  const lower = [];
+  for (const p of points) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = points.length - 1; i >= 0; i--) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], points[i]) <= 0) upper.pop();
+    upper.push(points[i]);
+  }
+  lower.pop(); upper.pop();
+  return lower.concat(upper);
+}
+
+function expandHull(hull, cx, cy, padding) {
+  return hull.map(p => {
+    const dx = p.x - cx, dy = p.y - cy;
+    const d = Math.sqrt(dx * dx + dy * dy) + 0.01;
+    return { x: p.x + (dx / d) * padding, y: p.y + (dy / d) * padding };
+  });
+}
+
+function drawSmoothedHull(ctx, hull) {
+  if (hull.length < 3) return;
+  ctx.beginPath();
+  for (let i = 0; i < hull.length; i++) {
+    const curr = hull[i];
+    const next = hull[(i + 1) % hull.length];
+    const midX = (curr.x + next.x) / 2;
+    const midY = (curr.y + next.y) / 2;
+    if (i === 0) {
+      const prev = hull[hull.length - 1];
+      const startX = (prev.x + curr.x) / 2;
+      const startY = (prev.y + curr.y) / 2;
+      ctx.moveTo(startX, startY);
+    }
+    ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+  }
+  ctx.closePath();
+}
+
+function drawGlowingBubble(ctx, positions, time) {
+  const pts = [];
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].alpha > 0.05) pts.push(positions[i]);
+  }
+  if (pts.length < 3) return;
+
+  const hull = convexHull(pts);
+  const hcx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const hcy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+
+  // Breathing
+  const breathe = 1 + 0.018 * Math.sin(time * 0.4);
+  const breathedHull = hull.map(p => ({
+    x: hcx + (p.x - hcx) * breathe,
+    y: hcy + (p.y - hcy) * breathe,
+  }));
+
+  // Average primary color
+  let ar = 0, ag = 0, ab = 0, count = 0;
+  for (let i = 0; i < Math.min(5, nodes.length); i++) {
+    ar += nodes[i].color[0]; ag += nodes[i].color[1]; ab += nodes[i].color[2];
+    count++;
+  }
+  ar = Math.round(ar / count); ag = Math.round(ag / count); ab = Math.round(ab / count);
+
+  // Outer glow rings (rendered first, behind membrane)
+  const glowRings = [
+    { padding: 35, lineWidth: 20, alpha: 0.015 },
+    { padding: 20, lineWidth: 10, alpha: 0.04 },
+    { padding: 10, lineWidth: 4, alpha: 0.08 },
+  ];
+  for (const ring of glowRings) {
+    const expanded = expandHull(breathedHull, hcx, hcy, ring.padding);
+    ctx.strokeStyle = `rgba(${ar},${ag},${ab},${ring.alpha})`;
+    ctx.lineWidth = ring.lineWidth;
+    drawSmoothedHull(ctx, expanded);
+    ctx.stroke();
+  }
+
+  // Main membrane stroke
+  ctx.strokeStyle = `rgba(${ar},${ag},${ab},0.25)`;
+  ctx.lineWidth = 1.5;
+  drawSmoothedHull(ctx, breathedHull);
+  ctx.stroke();
+}
+
+// ─── Star shape helper ───────────────────────────────────────────────────
+function drawStar(ctx, x, y, outerR, innerR) {
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const ang = (i / 4) * Math.PI * 2 - Math.PI / 2;
+    const angPrev = ang - Math.PI / 4;
+    const angNext = ang + Math.PI / 4;
+    if (i === 0) {
+      ctx.moveTo(x + Math.cos(angPrev) * innerR, y + Math.sin(angPrev) * innerR);
+    }
+    ctx.lineTo(x + Math.cos(ang) * outerR, y + Math.sin(ang) * outerR);
+    ctx.lineTo(x + Math.cos(angNext) * innerR, y + Math.sin(angNext) * innerR);
+  }
+  ctx.closePath();
+}
+
+// ─── Color blend helper ──────────────────────────────────────────────────
+function blendColors(c1, c2, t) {
+  return [
+    Math.round(c1[0] + (c2[0] - c1[0]) * t),
+    Math.round(c1[1] + (c2[1] - c1[1]) * t),
+    Math.round(c1[2] + (c2[2] - c1[2]) * t),
+  ];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CARD RENDERERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── Card A: Pure Web ────────────────────────────────────────────────────
+function renderA(ctx, w, h, time) {
+  const scale = Math.min(w, h) / SIZE;
+  ctx.save();
+  ctx.translate((w - SIZE * scale) / 2, (h - SIZE * scale) / 2);
+  ctx.scale(scale, scale);
+
+  const positions = nodes.map(n => getAnimPos(n, time));
+  const isAI = currentMode === 'ai';
+  let alphas;
+
+  if (isAI) {
+    const fade = computeAIFade(positions);
+    alphas = fade.renderAlphas;
+  } else {
+    alphas = nodes.map(n => n.alpha);
+  }
+
+  // Connections — crisp 1.5px, endpoint color blend
+  for (const e of edges) {
+    const a = positions[e.a], b = positions[e.b];
+    const na = nodes[e.a], nb = nodes[e.b];
+    const edgeAlpha = Math.min(alphas[e.a], alphas[e.b]) * 0.5;
+    if (edgeAlpha < 0.005) continue;
+    const midColor = blendColors(na.color, nb.color, 0.5);
+    ctx.strokeStyle = `rgba(${midColor[0]},${midColor[1]},${midColor[2]},${edgeAlpha})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // Nodes — solid circles
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const p = positions[i];
+    const a = alphas[i];
+    if (a < 0.01) continue;
+    const nr = n.type === 'primary' ? 4 : n.type === 'companion' ? 2.5 : n.type === 'satellite' ? 1.5 : 2;
+    ctx.fillStyle = `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${a})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, nr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Membrane (Human only)
+  if (!isAI) {
+    drawGlowingBubble(ctx, positions, time);
+  }
+
+  ctx.restore();
+}
+
+// ─── Card B: Luminous Tissue ─────────────────────────────────────────────
+function renderB(ctx, w, h, time) {
+  const scale = Math.min(w, h) / SIZE;
+  ctx.save();
+  ctx.translate((w - SIZE * scale) / 2, (h - SIZE * scale) / 2);
+  ctx.scale(scale, scale);
+
+  const positions = nodes.map(n => getAnimPos(n, time));
+  const isAI = currentMode === 'ai';
+  let alphas;
+
+  if (isAI) {
+    const fade = computeAIFade(positions);
+    alphas = fade.renderAlphas;
+  } else {
+    alphas = nodes.map(n => n.alpha);
+  }
+
+  // 1. Bioluminescent glow pools under nodes (source-over)
+  ctx.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const p = positions[i];
+    const a = alphas[i];
+    if (a < 0.01) continue;
+    const glowR = n.type === 'primary' ? 35 : n.type === 'companion' ? 18 : 12;
+    const glowA = n.type === 'primary' ? 0.12 : 0.06;
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+    grad.addColorStop(0, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${glowA * a})`);
+    grad.addColorStop(1, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(p.x - glowR, p.y - glowR, glowR * 2, glowR * 2);
+  }
+
+  // 2. Filled triangles
+  for (const [i, j, k] of triangles) {
+    const pi = positions[i], pj = positions[j], pk = positions[k];
+    const triAlpha = Math.min(alphas[i], alphas[j], alphas[k]);
+    if (triAlpha < 0.01) continue;
+    const avgColor = blendColors(blendColors(nodes[i].color, nodes[j].color, 0.5), nodes[k].color, 0.33);
+    ctx.fillStyle = `rgba(${avgColor[0]},${avgColor[1]},${avgColor[2]},${(0.04 + Math.random() * 0.02) * triAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(pi.x, pi.y);
+    ctx.lineTo(pj.x, pj.y);
+    ctx.lineTo(pk.x, pk.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 3. Thin crisp connections
+  for (const e of edges) {
+    const a = positions[e.a], b = positions[e.b];
+    const na = nodes[e.a], nb = nodes[e.b];
+    const edgeAlpha = Math.min(alphas[e.a], alphas[e.b]) * 0.35;
+    if (edgeAlpha < 0.005) continue;
+    const midColor = blendColors(na.color, nb.color, 0.5);
+    ctx.strokeStyle = `rgba(${midColor[0]},${midColor[1]},${midColor[2]},${edgeAlpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // 4. Small circle nodes on top
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const p = positions[i];
+    const a = alphas[i];
+    if (a < 0.01) continue;
+    const nr = n.type === 'primary' ? 3 : 1.5;
+    ctx.fillStyle = `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${a})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, nr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Membrane (Human only)
+  if (!isAI) {
+    drawGlowingBubble(ctx, positions, time);
+  }
+
+  ctx.restore();
+}
+
+// ─── Card C: Stellar Web ─────────────────────────────────────────────────
+function renderC(ctx, w, h, time) {
+  const scale = Math.min(w, h) / SIZE;
+  ctx.save();
+  ctx.translate((w - SIZE * scale) / 2, (h - SIZE * scale) / 2);
+  ctx.scale(scale, scale);
+
+  const positions = nodes.map(n => getAnimPos(n, time));
+  const isAI = currentMode === 'ai';
+  let alphas;
+
+  if (isAI) {
+    const fade = computeAIFade(positions);
+    alphas = fade.renderAlphas;
+  } else {
+    alphas = nodes.map(n => n.alpha);
+  }
+
+  // Connections — thin (1px, alpha 0.45)
+  for (const e of edges) {
+    const a = positions[e.a], b = positions[e.b];
+    const na = nodes[e.a], nb = nodes[e.b];
+    const edgeAlpha = Math.min(alphas[e.a], alphas[e.b]) * 0.45;
+    if (edgeAlpha < 0.005) continue;
+    const midColor = blendColors(na.color, nb.color, 0.5);
+    ctx.strokeStyle = `rgba(${midColor[0]},${midColor[1]},${midColor[2]},${edgeAlpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // Star nodes with tiny halos
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const p = positions[i];
+    const a = alphas[i];
+    if (a < 0.01) continue;
+
+    // Tiny radial gradient halo
+    const haloR = 10;
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, haloR);
+    grad.addColorStop(0, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${0.06 * a})`);
+    grad.addColorStop(1, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(p.x - haloR, p.y - haloR, haloR * 2, haloR * 2);
+
+    // Star shape
+    let outerR, innerR;
+    if (n.type === 'primary') { outerR = 6; innerR = 2; }
+    else if (n.type === 'companion') { outerR = 3.5; innerR = 1.2; }
+    else if (n.type === 'satellite') { outerR = 2; innerR = 0.7; }
+    else { outerR = 2.5; innerR = 0.9; }
+
+    ctx.fillStyle = `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${a})`;
+    drawStar(ctx, p.x, p.y, outerR, innerR);
+    ctx.fill();
+  }
+
+  // Membrane (Human only)
+  if (!isAI) {
+    drawGlowingBubble(ctx, positions, time);
+  }
+
+  ctx.restore();
+}
+
+// ─── Card D: Deep Web ────────────────────────────────────────────────────
+function renderD(ctx, w, h, time) {
+  const scale = Math.min(w, h) / SIZE;
+  ctx.save();
+  ctx.translate((w - SIZE * scale) / 2, (h - SIZE * scale) / 2);
+  ctx.scale(scale, scale);
+
+  const positions = nodes.map(n => getAnimPos(n, time));
+  const isAI = currentMode === 'ai';
+  let alphas;
+
+  if (isAI) {
+    const fade = computeAIFade(positions);
+    alphas = fade.renderAlphas;
+  } else {
+    alphas = nodes.map(n => n.alpha);
+  }
+
+  // Classify nodes into layers
+  const backTypes = new Set(['satellite', 'assess']);
+  const midTypes = new Set(['companion']);
+  const frontTypes = new Set(['primary']);
+
+  function getLayer(n) {
+    if (frontTypes.has(n.type)) return 2;
+    if (midTypes.has(n.type)) return 1;
+    return 0;
+  }
+
+  // ── Back layer (satellites + assess) ──
+  for (const e of edges) {
+    const la = getLayer(nodes[e.a]), lb = getLayer(nodes[e.b]);
+    if (la > 0 && lb > 0) continue; // At least one node must be in back layer
+    if (la > 1 || lb > 1) continue; // Skip if either is front layer (those connect in front)
+    const pa = positions[e.a], pb = positions[e.b];
+    const na = nodes[e.a], nb = nodes[e.b];
+    const edgeAlpha = Math.min(alphas[e.a], alphas[e.b]) * 0.12;
+    if (edgeAlpha < 0.003) continue;
+    const midColor = blendColors(na.color, nb.color, 0.5);
+    // Draw 3 times for blur effect
+    const offsets = [[-0.3, -0.3], [0, 0], [0.3, 0.3]];
+    for (const [ox, oy] of offsets) {
+      ctx.strokeStyle = `rgba(${midColor[0]},${midColor[1]},${midColor[2]},${edgeAlpha * 0.33})`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(pa.x + ox, pa.y + oy);
+      ctx.lineTo(pb.x + ox, pb.y + oy);
+      ctx.stroke();
+    }
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    if (getLayer(nodes[i]) !== 0) continue;
+    const n = nodes[i];
+    const p = positions[i];
+    const a = alphas[i] * 0.2;
+    if (a < 0.01) continue;
+    const nr = n.r * 0.7;
+    ctx.fillStyle = `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${a})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, nr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Mid layer (companions) ──
+  for (const e of edges) {
+    const la = getLayer(nodes[e.a]), lb = getLayer(nodes[e.b]);
+    // Mid layer: at least one companion, no front-only connections
+    if (!(la === 1 || lb === 1)) continue;
+    if (la === 0 && lb === 0) continue; // Skip pure back-layer (already drawn)
+    if (la === 2 && lb === 2) continue; // Skip pure front-layer
+    const pa = positions[e.a], pb = positions[e.b];
+    const na = nodes[e.a], nb = nodes[e.b];
+    const edgeAlpha = Math.min(alphas[e.a], alphas[e.b]) * 0.35;
+    if (edgeAlpha < 0.005) continue;
+    const midColor = blendColors(na.color, nb.color, 0.5);
+    ctx.strokeStyle = `rgba(${midColor[0]},${midColor[1]},${midColor[2]},${edgeAlpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.stroke();
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    if (getLayer(nodes[i]) !== 1) continue;
+    const n = nodes[i];
+    const p = positions[i];
+    const a = alphas[i] * 0.6;
+    if (a < 0.01) continue;
+    ctx.fillStyle = `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${a})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, n.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Front layer (primaries) ──
+  for (const e of edges) {
+    const la = getLayer(nodes[e.a]), lb = getLayer(nodes[e.b]);
+    if (la !== 2 && lb !== 2) continue; // At least one primary
+    // Only draw connections between front-layer nodes here
+    if (la < 1 || lb < 1) continue; // Skip connections reaching back layer (already drawn in mid)
+    const pa = positions[e.a], pb = positions[e.b];
+    const na = nodes[e.a], nb = nodes[e.b];
+    const edgeAlpha = Math.min(alphas[e.a], alphas[e.b]) * 0.6;
+    if (edgeAlpha < 0.005) continue;
+    const midColor = blendColors(na.color, nb.color, 0.5);
+    ctx.strokeStyle = `rgba(${midColor[0]},${midColor[1]},${midColor[2]},${edgeAlpha})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.stroke();
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    if (getLayer(nodes[i]) !== 2) continue;
+    const n = nodes[i];
+    const p = positions[i];
+    const a = alphas[i] * 0.95;
+    if (a < 0.01) continue;
+    // Halo
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 12);
+    grad.addColorStop(0, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${0.1 * a})`);
+    grad.addColorStop(1, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(p.x - 12, p.y - 12, 24, 24);
+    // Node
+    ctx.fillStyle = `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${a})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Membrane (Human only)
+  if (!isAI) {
+    drawGlowingBubble(ctx, positions, time);
+  }
+
+  ctx.restore();
+}
+
+// ─── Card E: Living Tissue ───────────────────────────────────────────────
+function renderE(ctx, w, h, time) {
+  const scale = Math.min(w, h) / SIZE;
+  ctx.save();
+  ctx.translate((w - SIZE * scale) / 2, (h - SIZE * scale) / 2);
+  ctx.scale(scale, scale);
+
+  const positions = nodes.map(n => getAnimPos(n, time));
+  const isAI = currentMode === 'ai';
+  let alphas;
+
+  if (isAI) {
+    const fade = computeAIFade(positions);
+    alphas = fade.renderAlphas;
+  } else {
+    alphas = nodes.map(n => n.alpha);
+  }
+
+  function getDepthFactor(n) {
+    if (n.type === 'primary') return 1.0;
+    if (n.type === 'companion') return 0.75;
+    return 0.5;
+  }
+
+  // Filled triangles with depth layering
+  // Sort triangles by average depth (back to front)
+  const sortedTriangles = triangles.slice().sort((a, b) => {
+    const da = (getDepthFactor(nodes[a[0]]) + getDepthFactor(nodes[a[1]]) + getDepthFactor(nodes[a[2]])) / 3;
+    const db = (getDepthFactor(nodes[b[0]]) + getDepthFactor(nodes[b[1]]) + getDepthFactor(nodes[b[2]])) / 3;
+    return da - db; // Back first
+  });
+
+  for (const [i, j, k] of sortedTriangles) {
+    const pi = positions[i], pj = positions[j], pk = positions[k];
+    const triAlpha = Math.min(alphas[i], alphas[j], alphas[k]);
+    if (triAlpha < 0.01) continue;
+    const depthFactor = (getDepthFactor(nodes[i]) + getDepthFactor(nodes[j]) + getDepthFactor(nodes[k])) / 3;
+    const baseAlpha = 0.05 + depthFactor * 0.03;
+    const avgColor = blendColors(blendColors(nodes[i].color, nodes[j].color, 0.5), nodes[k].color, 0.33);
+    ctx.fillStyle = `rgba(${avgColor[0]},${avgColor[1]},${avgColor[2]},${baseAlpha * triAlpha * depthFactor})`;
+    ctx.beginPath();
+    ctx.moveTo(pi.x, pi.y);
+    ctx.lineTo(pj.x, pj.y);
+    ctx.lineTo(pk.x, pk.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Very thin connections — structural hints
+  for (const e of edges) {
+    const a = positions[e.a], b = positions[e.b];
+    const na = nodes[e.a], nb = nodes[e.b];
+    const edgeAlpha = Math.min(alphas[e.a], alphas[e.b]) * 0.2;
+    if (edgeAlpha < 0.003) continue;
+    const midColor = blendColors(na.color, nb.color, 0.5);
+    ctx.strokeStyle = `rgba(${midColor[0]},${midColor[1]},${midColor[2]},${edgeAlpha})`;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // Star-shaped nodes
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const p = positions[i];
+    const a = alphas[i];
+    if (a < 0.01) continue;
+
+    let outerR, innerR;
+    if (n.type === 'primary') { outerR = 6; innerR = 2; }
+    else if (n.type === 'companion') { outerR = 3.5; innerR = 1.2; }
+    else if (n.type === 'satellite') { outerR = 2; innerR = 0.7; }
+    else { outerR = 2.5; innerR = 0.9; }
+
+    ctx.fillStyle = `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${a})`;
+    drawStar(ctx, p.x, p.y, outerR, innerR);
+    ctx.fill();
+  }
+
+  // Membrane (Human only)
+  if (!isAI) {
+    drawGlowingBubble(ctx, positions, time);
+  }
+
+  ctx.restore();
+}
+
+// ─── Card F: Bioluminescent Depth ────────────────────────────────────────
+function renderF(ctx, w, h, time) {
+  const scale = Math.min(w, h) / SIZE;
+  ctx.save();
+  ctx.translate((w - SIZE * scale) / 2, (h - SIZE * scale) / 2);
+  ctx.scale(scale, scale);
+
+  const positions = nodes.map(n => getAnimPos(n, time));
+  const isAI = currentMode === 'ai';
+  let alphas;
+  let aiFade = null;
+
+  if (isAI) {
+    aiFade = computeAIFade(positions);
+    alphas = aiFade.renderAlphas;
+  } else {
+    alphas = nodes.map(n => n.alpha);
+  }
+
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Depth-layered bioluminescence
+  // Back layer: satellites + assess
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.type !== 'satellite' && n.type !== 'assess') continue;
+    const p = positions[i];
+    const a = alphas[i];
+    if (a < 0.01) continue;
+    let glowR = 15, glowA = 0.04;
+    // AI: shrink and fade glow beyond 60%
+    if (isAI && aiFade.dists[i] > aiFade.threshold && aiFade.maxDist > aiFade.threshold) {
+      const fadeFactor = Math.max(0.1, 1 - (aiFade.dists[i] - aiFade.threshold) / (aiFade.maxDist - aiFade.threshold));
+      glowR *= (0.5 + 0.5 * fadeFactor);
+      glowA *= fadeFactor * 0.5;
+    }
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+    grad.addColorStop(0, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${glowA * a})`);
+    grad.addColorStop(1, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(p.x - glowR, p.y - glowR, glowR * 2, glowR * 2);
+  }
+
+  // Mid layer: companions
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.type !== 'companion') continue;
+    const p = positions[i];
+    const a = alphas[i];
+    if (a < 0.01) continue;
+    let glowR = 25, glowA = 0.08;
+    if (isAI && aiFade.dists[i] > aiFade.threshold && aiFade.maxDist > aiFade.threshold) {
+      const fadeFactor = Math.max(0.1, 1 - (aiFade.dists[i] - aiFade.threshold) / (aiFade.maxDist - aiFade.threshold));
+      glowR *= (0.5 + 0.5 * fadeFactor);
+      glowA *= fadeFactor * 0.5;
+    }
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+    grad.addColorStop(0, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${glowA * a})`);
+    grad.addColorStop(1, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(p.x - glowR, p.y - glowR, glowR * 2, glowR * 2);
+  }
+
+  // Front layer: primaries
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.type !== 'primary') continue;
+    const p = positions[i];
+    const a = alphas[i];
+    if (a < 0.01) continue;
+    let glowR = 45, glowA = 0.15;
+    if (isAI && aiFade.dists[i] > aiFade.threshold && aiFade.maxDist > aiFade.threshold) {
+      const fadeFactor = Math.max(0.1, 1 - (aiFade.dists[i] - aiFade.threshold) / (aiFade.maxDist - aiFade.threshold));
+      glowR *= (0.5 + 0.5 * fadeFactor);
+      glowA *= fadeFactor * 0.5;
+    }
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+    grad.addColorStop(0, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${glowA * a})`);
+    grad.addColorStop(1, `rgba(${n.color[0]},${n.color[1]},${n.color[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(p.x - glowR, p.y - glowR, glowR * 2, glowR * 2);
+  }
+
+  // Connections — desaturated/whitened, thin
+  for (const e of edges) {
+    const pa = positions[e.a], pb = positions[e.b];
+    const na = nodes[e.a], nb = nodes[e.b];
+    const edgeAlpha = Math.min(alphas[e.a], alphas[e.b]) * 0.3;
+    if (edgeAlpha < 0.003) continue;
+    // Blend endpoint colors, then push 30% toward white [180,180,200]
+    const midColor = blendColors(na.color, nb.color, 0.5);
+    const whiteish = [180, 180, 200];
+    const desaturated = blendColors(midColor, whiteish, 0.3);
+    ctx.strokeStyle = `rgba(${desaturated[0]},${desaturated[1]},${desaturated[2]},${edgeAlpha})`;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.stroke();
+  }
+
+  // Nodes — small circles
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const p = positions[i];
+    const a = alphas[i] * 0.8;
+    if (a < 0.01) continue;
+    const nr = n.type === 'primary' ? 3 : 1.5;
+    ctx.fillStyle = `rgba(${n.color[0]},${n.color[1]},${n.color[2]},${a})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, nr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Membrane (Human only) — rendered OVER everything
+  if (!isAI) {
+    drawGlowingBubble(ctx, positions, time);
+  }
+
+  ctx.restore();
+}
+
+// ─── Canvas setup ────────────────────────────────────────────────────────
+const canvases = ['cA', 'cB', 'cC', 'cD', 'cE', 'cF'].map(id => document.getElementById(id));
+const renderers = [renderA, renderB, renderC, renderD, renderE, renderF];
+
+function resizeAll() {
+  for (const canvas of canvases) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+  }
+}
+
+// ─── Animation loop ──────────────────────────────────────────────────────
+function frame() {
+  simulate();
+  const time = performance.now() / 1000;
+  const dpr = window.devicePixelRatio || 1;
+
+  for (let i = 0; i < canvases.length; i++) {
+    const canvas = canvases[i];
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+
+    // Reset canvas state each frame
+    canvas.width = canvas.width; // Clears + resets state
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, w, h);
+
+    renderers[i](ctx, w, h, time);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+// ─── Controls ────────────────────────────────────────────────────────────
+document.querySelectorAll('[data-tier]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-tier]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const val = btn.dataset.tier;
+    if (val === 'R') {
+      currentTier = Math.floor(Math.random() * 3);
+    } else {
+      currentTier = parseInt(val);
+    }
+    buildAllNodes(currentTier);
+  });
+});
+
+document.querySelectorAll('[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    buildAllNodes(currentTier);
+  });
+});
+
+// ─── Init ────────────────────────────────────────────────────────────────
+window.addEventListener('resize', resizeAll);
+resizeAll();
+buildAllNodes(currentTier);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

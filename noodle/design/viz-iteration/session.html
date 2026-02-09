@@ -913,15 +913,42 @@ function animPos(n, time, isAI, t) {
   const sp = n.driftSpeed;
   const amp = n.driftAmp * (isAI ? 0.4 : 1.0) * dm;
 
+  // Micro: 3 harmonics (seconds-scale jitter)
   const dx1 = Math.sin(time * sp + n.phaseX) * amp;
   const dy1 = Math.cos(time * sp * 0.73 + n.phaseY) * amp;
   const dx2 = Math.sin(time * sp * 0.4 + n.phaseX * 2.1) * amp * 0.45;
   const dy2 = Math.cos(time * sp * 0.35 + n.phaseY * 1.7) * amp * 0.38;
   const dx3 = Math.sin(time * n.slowFreq + n.slowPhaseX) * amp * n.slowAmp;
   const dy3 = Math.cos(time * n.slowFreq * 0.8 + n.slowPhaseY) * amp * n.slowAmp;
+
+  // Orbital: slow rotation around home position (minutes-scale)
+  const orbScale = t.orbitScale ?? 0;
+  const oAngle = n.orbitAngle + time * n.orbitSpeed * (t.orbitSpeed ?? 1.0);
+  const oR = orbScale * (8 + n.baseR * 0.08);
+  const ox = Math.cos(oAngle) * oR;
+  const oy = Math.sin(oAngle) * oR;
+
+  // Tidal: constellation breathes in/out slowly (minutes-scale)
+  const tidalAmp = t.tidalAmp ?? 0;
+  const tidalFreq = t.tidalFreq ?? 0.003;
+  const tidal = 1 + tidalAmp * Math.sin(time * tidalFreq + n.baseAngle * 0.5);
+  const tdx = (n.baseX - 300) * (tidal - 1);
+  const tdy = (n.baseY - 300) * (tidal - 1);
+
+  // Long wander: ultra-slow position drift (many-minutes-scale)
+  const lw = t.longWander ?? 0;
+  const lwx = Math.sin(time * n.wanderFreq1 + n.wanderPhase1) * lw * 12
+            + Math.sin(time * n.wanderFreq3 + n.wanderPhase3) * lw * 7;
+  const lwy = Math.cos(time * n.wanderFreq2 + n.wanderPhase2) * lw * 10
+            + Math.cos(time * n.wanderFreq3 + n.wanderPhase3) * lw * 8;
+
   const depth = Math.sin(time * sp * 0.22 + n.phaseX * 0.6 + n.phaseY * 0.3);
 
-  return { x: n.x + dx1 + dx2 + dx3, y: n.y + dy1 + dy2 + dy3, depth };
+  return {
+    x: n.x + dx1 + dx2 + dx3 + ox + tdx + lwx,
+    y: n.y + dy1 + dy2 + dy3 + oy + tdy + lwy,
+    depth
+  };
 }
 
 // -- Shape Helpers --
@@ -999,11 +1026,13 @@ function renderViz(ctx, nodes, conns, stars, isAI, time, scale, t, darkMode) {
   ctx.globalCompositeOperation = 'lighter';
 
   // Nebula wash: massive saturated color pools
+  const nebAlpha = t.nebulaAlpha ?? 0.45;
+  const nebRadius = t.nebulaRadius ?? 280;
   for (let i = 0; i < 5; i++) {
     const n = nodes[i]; if (n.alpha < 0.08) continue;
     const p = animPos(n, time, isAI, t);
-    const nebR = 280 * breath;
-    const nebA = n.alpha * 0.45;
+    const nebR = nebRadius * breath;
+    const nebA = n.alpha * nebAlpha;
     const ng = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, nebR);
     ng.addColorStop(0, rgbStr(n.color, nebA));
     ng.addColorStop(0.25, rgbStr(n.color, nebA * 0.75));
@@ -1167,51 +1196,79 @@ const CARDS = [
   {
     id: 'current',
     badge: '\u2605',
-    name: 'Current',
-    desc: 'Production tuning',
-    macroDesc: 'Reference baseline',
-    overrides: {},
+    name: 'Round 1 Winner (B)',
+    desc: 'Softer glow baseline — still too bright',
+    macroDesc: 'Reference from Round 1',
+    overrides: { glowRadius: 180, glowPasses: 2, glowAlpha: 0.6 },
     isCurrent: true,
   },
   {
     id: 'a',
     badge: 'A',
-    name: 'Compact',
-    desc: 'Tighter constellation, more intimate',
-    macroDesc: 'Tighter constellation, more intimate',
-    overrides: { ringInner: 55, ringComp: 100, ringSat: 140 },
+    name: 'Whisper + Orbit',
+    desc: 'Minimal glow, slow orbital drift',
+    macroDesc: 'Near-silent glow with slow celestial rotation',
+    overrides: {
+      glowAlpha: 0.22, glowRadius: 120, glowPasses: 1,
+      nebulaAlpha: 0.12, nebulaRadius: 200,
+      orbitScale: 1.0, orbitSpeed: 1.2,
+      longWander: 0.4,
+    },
   },
   {
     id: 'b',
     badge: 'B',
-    name: 'Softer Glow',
-    desc: 'Less saturated, more subtle',
-    macroDesc: 'Less saturated, more subtle',
-    overrides: { glowRadius: 180, glowPasses: 2, glowAlpha: 0.6 },
+    name: 'Ember + Tide',
+    desc: 'Warm dim glow, tidal breathing',
+    macroDesc: 'Embers-in-dark with slow expansion/contraction',
+    overrides: {
+      glowAlpha: 0.30, glowRadius: 140, glowPasses: 2,
+      nebulaAlpha: 0.18, nebulaRadius: 220,
+      tidalAmp: 0.15, tidalFreq: 0.004,
+      breathAmp: 0.08,
+    },
   },
   {
     id: 'c',
     badge: 'C',
-    name: 'Bold Connections',
-    desc: 'Structural web more prominent',
-    macroDesc: 'Structural web more prominent',
-    overrides: { connAlpha: 1.0, connWidth: 2.8 },
+    name: 'Deep Drift',
+    desc: 'Faint glow, long slow wander',
+    macroDesc: 'Barely-there glow, nodes roam freely over time',
+    overrides: {
+      glowAlpha: 0.25, glowRadius: 130, glowPasses: 1,
+      nebulaAlpha: 0.14, nebulaRadius: 190,
+      longWander: 0.9, microDrift: 1.2,
+      orbitScale: 0.5,
+    },
   },
   {
     id: 'd',
     badge: 'D',
-    name: 'Expanded',
-    desc: 'Spread out, more spacious',
-    macroDesc: 'Spread out, more spacious',
-    overrides: { ringInner: 100, ringComp: 170, ringSat: 230 },
+    name: 'Living Organism',
+    desc: 'Subtle glow, orbital + tidal + wander combined',
+    macroDesc: 'All slow forces active — pieces moving in concert',
+    overrides: {
+      glowAlpha: 0.28, glowRadius: 140, glowPasses: 1,
+      nebulaAlpha: 0.16, nebulaRadius: 210,
+      orbitScale: 0.8, orbitSpeed: 1.0,
+      tidalAmp: 0.10, tidalFreq: 0.003,
+      longWander: 0.6, breathAmp: 0.07,
+    },
   },
   {
     id: 'e',
     badge: 'E',
-    name: 'Deeper Motion',
-    desc: 'More alive, more movement',
-    macroDesc: 'More alive, more movement',
-    overrides: { wanderStrength: 0.9, microDrift: 1.8, breathAmp: 0.10 },
+    name: 'Ghost',
+    desc: 'Barely visible glow, maximum movement',
+    macroDesc: 'Nodes are the show, glow almost gone',
+    overrides: {
+      glowAlpha: 0.12, glowRadius: 100, glowPasses: 1,
+      nebulaAlpha: 0.08, nebulaRadius: 160,
+      compGlow: false,
+      orbitScale: 1.2, orbitSpeed: 1.5,
+      tidalAmp: 0.12, tidalFreq: 0.005,
+      longWander: 0.8, microDrift: 1.4,
+    },
   },
 ];
 

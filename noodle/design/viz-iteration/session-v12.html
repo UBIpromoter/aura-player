@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Organism — v12 Neural Pathways</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #050A18; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px 10px; }
+  h1 { font-size: 16px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px; }
+  .controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
+  .controls button { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+  .controls button:hover { background: #334155; color: #e2e8f0; }
+  .controls button.active { background: #4ECDC4; color: #030712; border-color: #4ECDC4; font-weight: 600; }
+  .divider { width: 1px; background: #334155; margin: 0 4px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 960px; width: 100%; }
+  .card { background: #020510; border: 1px solid #1a1f35; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; align-items: center; }
+  .card canvas { border-radius: 4px; width: 300px; height: 300px; }
+  .card-label { font-size: 11px; color: #64748b; margin-top: 6px; letter-spacing: 1px; text-align: center; }
+  .card-label span { color: #94a3b8; font-weight: 600; }
+  .card-label .sub { display: block; font-size: 9px; color: #475569; margin-top: 2px; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+<h1>Aura Organism — v12 Neural Pathways</h1>
+<div class="controls">
+  <button onclick="setTier('seed')" id="btn-seed">Seed</button>
+  <button onclick="setTier('young')" id="btn-young">Young</button>
+  <button onclick="setTier('full')" id="btn-full" class="active">Full</button>
+  <button onclick="setTier('random')" id="btn-random">Random</button>
+  <div class="divider"></div>
+  <button onclick="setMode('human')" id="btn-human" class="active">Human</button>
+  <button onclick="setMode('ai')" id="btn-ai">AI</button>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+// =================================================================
+// DATA MODEL
+// =================================================================
+const NEURON_MAP = {
+  N: { label: 'Openness',          color: '#4ECDC4' },
+  E: { label: 'Conscientiousness', color: '#45B7D1' },
+  A: { label: 'Extraversion',      color: '#96E6A1' },
+  O: { label: 'Agreeableness',     color: '#DDA0DD' },
+  C: { label: 'Neuroticism',       color: '#F7DC6F' }
+};
+const TRAIT_KEYS = ['N','E','A','O','C'];
+
+const ASSESS_MAP = {
+  a1:  { label: 'Curiosity',     color: '#7FDBCA', link: 'N' },
+  a2:  { label: 'Imagination',   color: '#6BC5B0', link: 'N' },
+  a3:  { label: 'Discipline',    color: '#5DADE2', link: 'E' },
+  a4:  { label: 'Reliability',   color: '#3498DB', link: 'E' },
+  a5:  { label: 'Warmth',        color: '#82E0AA', link: 'A' },
+  a6:  { label: 'Assertiveness', color: '#58D68D', link: 'A' },
+  a7:  { label: 'Empathy',       color: '#C39BD3', link: 'O' },
+  a8:  { label: 'Trust',         color: '#AF7AC5', link: 'O' },
+  a9:  { label: 'Resilience',    color: '#F9E154', link: 'C' },
+  a10: { label: 'Calm',          color: '#F4D03F', link: 'C' }
+};
+
+const CARD_DEFS = [
+  { id: 'A', name: 'Neural Cell',       sub: 'Dense connection web, neural pathways lighting up' },
+  { id: 'B', name: 'Tendril Network',   sub: 'Organic tapered tendrils, thick bridges between organelles' },
+  { id: 'C', name: 'Constellation Web', sub: 'Precise geometric scaffold, star chart biology' },
+  { id: 'D', name: 'Plasma Channels',   sub: 'Wide luminous channels, rivers of light' },
+  { id: 'E', name: 'Mycelium',          sub: 'Dense branching fractal network, no empty space' },
+  { id: 'F', name: 'Generative Bloom',  sub: 'Parametric curves, algorithmic beauty' }
+];
+
+let currentTier = 'full';
+let currentMode = 'human';
+const cardStates = {};
+const DPR = window.devicePixelRatio || 1;
+const CW = 300, CH = 300;
+const CX = CW / 2, CY = CH / 2;
+const MEMBRANE_R = 115;
+let startTime = performance.now();
+
+// =================================================================
+// GENOME SYSTEM
+// =================================================================
+function generateGenome(tier) {
+  const traits = {};
+  if (tier === 'random') {
+    TRAIT_KEYS.forEach(k => { traits[k] = Math.random(); });
+  } else {
+    TRAIT_KEYS.forEach(k => { traits[k] = 0.5 + Math.random() * 0.3; });
+  }
+
+  let assessments;
+  if (tier === 'seed') {
+    assessments = [];
+  } else if (tier === 'young') {
+    assessments = Object.keys(ASSESS_MAP).filter(() => Math.random() > 0.4);
+  } else {
+    assessments = Object.keys(ASSESS_MAP).filter(() => Math.random() > 0.25);
+  }
+
+  const vals = TRAIT_KEYS.map(k => traits[k]);
+  const sum = vals.reduce((a,b) => a+b, 0);
+  const avg = sum / 5;
+  const variance = vals.reduce((a,v) => a + (v - avg) ** 2, 0) / 5;
+
+  return { traits, assessments, complexity: avg, asymmetry: variance };
+}
+
+// =================================================================
+// COLOR UTILITIES
+// =================================================================
+function hexToRGB(hex) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return { r, g, b };
+}
+
+function rgbaStr(hex, alpha) {
+  const { r, g, b } = hexToRGB(hex);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function blendHex(hex1, hex2, t) {
+  const c1 = hexToRGB(hex1), c2 = hexToRGB(hex2);
+  const r = Math.round(c1.r + (c2.r - c1.r) * t);
+  const g = Math.round(c1.g + (c2.g - c1.g) * t);
+  const b = Math.round(c1.b + (c2.b - c1.b) * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function blendRGBA(hex1, hex2, t, alpha) {
+  const c1 = hexToRGB(hex1), c2 = hexToRGB(hex2);
+  const r = Math.round(c1.r + (c2.r - c1.r) * t);
+  const g = Math.round(c1.g + (c2.g - c1.g) * t);
+  const b = Math.round(c1.b + (c2.b - c1.b) * t);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// =================================================================
+// POSITION HELPERS
+// =================================================================
+function posInside(cx, cy, maxR, angle, dist) {
+  const r = Math.min(dist, maxR - 18);
+  return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
+}
+
+function clampInside(x, y, cx, cy, maxR, margin) {
+  const dx = x - cx, dy = y - cy;
+  const dist = Math.hypot(dx, dy);
+  const limit = maxR - margin;
+  if (dist > limit) {
+    const scale = limit / dist;
+    return { x: cx + dx * scale, y: cy + dy * scale };
+  }
+  return { x, y };
+}
+
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// =================================================================
+// MEMBRANE GENERATION
+// =================================================================
+function generateMembrane(cx, cy, baseR, points, wobbleAmt, seed) {
+  const pts = [];
+  for (let i = 0; i < points; i++) {
+    const angle = (Math.PI * 2 * i) / points;
+    const wobble = Math.sin(seed * 7.3 + i * 2.1) * wobbleAmt +
+                   Math.cos(seed * 3.7 + i * 3.3) * wobbleAmt * 0.5;
+    const r = baseR + wobble;
+    pts.push({ x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r, angle, r });
+  }
+  return pts;
+}
+
+function drawMembranePath(ctx, pts) {
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i++) {
+    const p0 = pts[(i - 1 + pts.length) % pts.length];
+    const p1 = pts[i];
+    const p2 = pts[(i + 1) % pts.length];
+    const p3 = pts[(i + 2) % pts.length];
+    if (i === 0) ctx.moveTo(p1.x, p1.y);
+    const cpx1 = p1.x + (p2.x - p0.x) / 6;
+    const cpy1 = p1.y + (p2.y - p0.y) / 6;
+    const cpx2 = p2.x - (p3.x - p1.x) / 6;
+    const cpy2 = p2.y - (p3.y - p1.y) / 6;
+    ctx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, p2.x, p2.y);
+  }
+  ctx.closePath();
+}
+
+function drawExpandedMembrane(ctx, pts, cx, cy, expand) {
+  ctx.beginPath();
+  const expanded = pts.map(p => {
+    const dx = p.x - cx, dy = p.y - cy;
+    const d = Math.hypot(dx, dy);
+    const scale = (d + expand) / d;
+    return { x: cx + dx * scale, y: cy + dy * scale };
+  });
+  for (let i = 0; i < expanded.length; i++) {
+    const p0 = expanded[(i - 1 + expanded.length) % expanded.length];
+    const p1 = expanded[i];
+    const p2 = expanded[(i + 1) % expanded.length];
+    const p3 = expanded[(i + 2) % expanded.length];
+    if (i === 0) ctx.moveTo(p1.x, p1.y);
+    const cpx1 = p1.x + (p2.x - p0.x) / 6;
+    const cpy1 = p1.y + (p2.y - p0.y) / 6;
+    const cpx2 = p2.x - (p3.x - p1.x) / 6;
+    const cpy2 = p2.y - (p3.y - p1.y) / 6;
+    ctx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, p2.x, p2.y);
+  }
+  ctx.closePath();
+}
+
+// =================================================================
+// EXTERIOR GLOW (shared)
+// =================================================================
+function drawExteriorGlow(ctx, membranePts, primaryNodes, cx, cy) {
+  // For each primary, draw a large radial gradient extending beyond the membrane
+  for (const node of primaryNodes) {
+    const grad = ctx.createRadialGradient(node.x, node.y, 5, node.x, node.y, MEMBRANE_R + 50);
+    grad.addColorStop(0, rgbaStr(node.color, 0.0));
+    grad.addColorStop(0.4, rgbaStr(node.color, 0.0));
+    grad.addColorStop(0.65, rgbaStr(node.color, 0.28));
+    grad.addColorStop(0.8, rgbaStr(node.color, 0.18));
+    grad.addColorStop(0.9, rgbaStr(node.color, 0.08));
+    grad.addColorStop(1.0, rgbaStr(node.color, 0.0));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CW, CH);
+  }
+
+  // Additional membrane-edge glow passes
+  for (let pass = 0; pass < 4; pass++) {
+    const expand = 6 + pass * 9;
+    const alpha = 0.22 - pass * 0.045;
+    if (alpha <= 0) continue;
+
+    // Find nearest primary for each membrane point
+    drawExpandedMembrane(ctx, membranePts, cx, cy, expand);
+    // Use nearest primary color as average
+    const nearestColor = primaryNodes.length > 0 ? primaryNodes[pass % primaryNodes.length].color : '#4ECDC4';
+    ctx.fillStyle = rgbaStr(nearestColor, alpha);
+    ctx.fill();
+
+    // Subtract inner to get ring
+    drawExpandedMembrane(ctx, membranePts, cx, cy, expand - 6);
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = `rgba(0,0,0,${alpha * 1.5})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Segmented membrane glow: each segment colored by nearest primary
+  for (let pass = 0; pass < 3; pass++) {
+    const expand = 5 + pass * 10;
+    const alpha = 0.25 - pass * 0.06;
+    for (let i = 0; i < membranePts.length; i++) {
+      const p = membranePts[i];
+      const pNext = membranePts[(i + 1) % membranePts.length];
+      // Find nearest primary
+      let nearestPrim = primaryNodes[0];
+      let nearDist = Infinity;
+      for (const pn of primaryNodes) {
+        const d = Math.hypot(pn.x - p.x, pn.y - p.y);
+        if (d < nearDist) { nearDist = d; nearestPrim = pn; }
+      }
+      // Draw outward glow segment
+      const dx = p.x - cx, dy = p.y - cy;
+      const d = Math.hypot(dx, dy);
+      const nx = dx / d, ny = dy / d;
+      const ox = p.x + nx * expand, oy = p.y + ny * expand;
+      const oxN = pNext.x + (pNext.x - cx) / Math.hypot(pNext.x - cx, pNext.y - cy) * expand;
+      const oyN = pNext.y + (pNext.y - cy) / Math.hypot(pNext.x - cx, pNext.y - cy) * expand;
+
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(ox, oy);
+      ctx.lineTo(oxN, oyN);
+      ctx.lineTo(pNext.x, pNext.y);
+      ctx.closePath();
+      ctx.fillStyle = rgbaStr(nearestPrim.color, alpha);
+      ctx.fill();
+    }
+  }
+}
+
+// =================================================================
+// BUILD NODES
+// =================================================================
+function buildNodes(genome, seed) {
+  const nodes = [];
+  const primaries = [];
+
+  // Primary nodes at pentagon positions, pulled by trait value
+  TRAIT_KEYS.forEach((k, i) => {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * i) / 5;
+    const traitVal = genome.traits[k];
+    const baseDist = 35 + traitVal * 45;
+    const pos = posInside(CX, CY, MEMBRANE_R, angle, baseDist);
+    const radius = 8 + traitVal * 22;
+    const node = {
+      id: k, x: pos.x, y: pos.y,
+      radius, color: NEURON_MAP[k].color,
+      trait: traitVal, isPrimary: true, angle, label: NEURON_MAP[k].label
+    };
+    nodes.push(node);
+    primaries.push(node);
+  });
+
+  // Assessment nodes near their parent primary
+  const assessNodes = [];
+  genome.assessments.forEach((aKey, idx) => {
+    const info = ASSESS_MAP[aKey];
+    const parent = primaries.find(n => n.id === info.link);
+    if (!parent) return;
+    const offsetAngle = parent.angle + (idx % 2 === 0 ? 0.4 : -0.4) + seed * 0.1;
+    const offsetDist = parent.radius + 18 + Math.sin(seed + idx) * 10;
+    let ax = parent.x + Math.cos(offsetAngle) * offsetDist;
+    let ay = parent.y + Math.sin(offsetAngle) * offsetDist;
+    const clamped = clampInside(ax, ay, CX, CY, MEMBRANE_R, 20);
+    const aNode = {
+      id: aKey, x: clamped.x, y: clamped.y,
+      radius: 4 + Math.random() * 4,
+      color: info.color, isPrimary: false,
+      parentId: info.link, label: info.label
+    };
+    nodes.push(aNode);
+    assessNodes.push(aNode);
+  });
+
+  return { nodes, primaries, assessNodes };
+}
+
+// =================================================================
+// CONNECTION BUILDERS
+// =================================================================
+function buildPrimaryConnections(primaries) {
+  const conns = [];
+  for (let i = 0; i < primaries.length; i++) {
+    for (let j = i + 1; j < primaries.length; j++) {
+      conns.push({ a: primaries[i], b: primaries[j] });
+    }
+  }
+  return conns;
+}
+
+function buildAssessmentConnections(assessNodes, primaries, allNodes) {
+  const conns = [];
+  for (const an of assessNodes) {
+    // Connect to parent
+    const parent = primaries.find(p => p.id === an.parentId);
+    if (parent) conns.push({ a: an, b: parent });
+    // Connect to 2-3 nearest neighbors
+    const sorted = allNodes
+      .filter(n => n.id !== an.id && n.id !== an.parentId)
+      .sort((a, b) => dist(an, a) - dist(an, b));
+    const count = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < Math.min(count, sorted.length); i++) {
+      conns.push({ a: an, b: sorted[i] });
+    }
+  }
+  return conns;
+}
+
+// =================================================================
+// DRAWING HELPERS
+// =================================================================
+function drawGlowConnection(ctx, x1, y1, x2, y2, color1, color2, time, opts) {
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return;
+  const nx = -dy / len, ny = dx / len;
+  const offset = Math.sin(x1 * 0.05 + y1 * 0.05 + (opts.curveVar || 0)) * (opts.curveAmt || 15);
+  const cpx = mx + nx * offset, cpy = my + ny * offset;
+
+  const glowAlpha = (opts.glowAlpha || 0.12) * (opts.pulse ? (0.7 + 0.3 * Math.sin(time * 2 + x1 * 0.1)) : 1);
+  const lineAlpha = (opts.lineAlpha || 0.55) * (opts.pulse ? (0.7 + 0.3 * Math.sin(time * 2 + x1 * 0.1)) : 1);
+
+  // Glow
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.quadraticCurveTo(cpx, cpy, x2, y2);
+  ctx.strokeStyle = blendRGBA(color1, color2, 0.5, glowAlpha);
+  ctx.lineWidth = opts.glowWidth || 6;
+  ctx.stroke();
+
+  // Bright line
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.quadraticCurveTo(cpx, cpy, x2, y2);
+  ctx.strokeStyle = blendRGBA(color1, color2, 0.5, lineAlpha);
+  ctx.lineWidth = opts.lineWidth || 1.5;
+  ctx.stroke();
+}
+
+function quadBezierPoint(x1, y1, cpx, cpy, x2, y2, t) {
+  const mt = 1 - t;
+  return {
+    x: mt * mt * x1 + 2 * mt * t * cpx + t * t * x2,
+    y: mt * mt * y1 + 2 * mt * t * cpy + t * t * y2
+  };
+}
+
+function getConnectionCP(x1, y1, x2, y2, curveVar) {
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return { x: mx, y: my };
+  const nx = -dy / len, ny = dx / len;
+  const offset = Math.sin(x1 * 0.05 + y1 * 0.05 + (curveVar || 0)) * 15;
+  return { x: mx + nx * offset, y: my + ny * offset };
+}
+
+// =================================================================
+// PARTICLE SYSTEM (constrained inside membrane)
+// =================================================================
+function generateParticles(count, cx, cy, maxR) {
+  const particles = [];
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = Math.random() * (maxR - 20);
+    particles.push({
+      x: cx + Math.cos(angle) * r,
+      y: cy + Math.sin(angle) * r,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      size: 1 + Math.random() * 2,
+      alpha: 0.3 + Math.random() * 0.4
+    });
+  }
+  return particles;
+}
+
+function updateParticles(particles, cx, cy, maxR) {
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    const clamped = clampInside(p.x, p.y, cx, cy, maxR, 15);
+    if (clamped.x !== p.x || clamped.y !== p.y) {
+      p.x = clamped.x; p.y = clamped.y;
+      p.vx *= -0.5; p.vy *= -0.5;
+    }
+  }
+}
+
+// =================================================================
+// CARD A: NEURAL CELL
+// =================================================================
+function renderCardA(ctx, genome, time) {
+  const seed = genome.complexity * 100;
+  const membranePts = generateMembrane(CX, CY, MEMBRANE_R, 24, 8, seed);
+  const { nodes, primaries, assessNodes } = buildNodes(genome, seed);
+
+  // Exterior glow
+  drawExteriorGlow(ctx, membranePts, primaries, CX, CY);
+
+  // Membrane
+  drawMembranePath(ctx, membranePts);
+  ctx.strokeStyle = rgbaStr('#4ECDC4', 0.35);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Membrane fill (subtle)
+  drawMembranePath(ctx, membranePts);
+  ctx.fillStyle = rgbaStr('#0a1628', 0.6);
+  ctx.fill();
+
+  // === DENSE CONNECTION WEB (MAIN FEATURE) ===
+  // Primary-to-primary: all 10 connections
+  const primConns = buildPrimaryConnections(primaries);
+  for (const conn of primConns) {
+    const pulse = Math.random() > 0.5;
+    drawGlowConnection(ctx, conn.a.x, conn.a.y, conn.b.x, conn.b.y,
+      conn.a.color, conn.b.color, time,
+      { glowAlpha: 0.15, lineAlpha: 0.6, glowWidth: 7, lineWidth: 1.5, pulse, curveAmt: 18 });
+  }
+
+  // Assessment connections
+  const assessConns = buildAssessmentConnections(assessNodes, primaries, nodes);
+  for (const conn of assessConns) {
+    drawGlowConnection(ctx, conn.a.x, conn.a.y, conn.b.x, conn.b.y,
+      conn.a.color, conn.b.color, time,
+      { glowAlpha: 0.1, lineAlpha: 0.45, glowWidth: 4, lineWidth: 1, pulse: Math.random() > 0.6, curveAmt: 12 });
+  }
+
+  // Particles inside membrane
+  if (!ctx._particlesA) ctx._particlesA = generateParticles(18, CX, CY, MEMBRANE_R);
+  updateParticles(ctx._particlesA, CX, CY, MEMBRANE_R);
+  for (const p of ctx._particlesA) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr('#4ECDC4', p.alpha * (0.5 + 0.5 * Math.sin(time * 3 + p.x)));
+    ctx.fill();
+  }
+
+  // Primary organelles
+  for (const node of primaries) {
+    const breathe = 1 + Math.sin(time * 1.5 + node.angle) * 0.05;
+    const r = node.radius * breathe;
+
+    // Glow
+    const glow = ctx.createRadialGradient(node.x, node.y, r * 0.3, node.x, node.y, r * 2.5);
+    glow.addColorStop(0, rgbaStr(node.color, 0.5));
+    glow.addColorStop(1, rgbaStr(node.color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Solid body
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.85);
+    ctx.fill();
+    ctx.strokeStyle = rgbaStr(node.color, 0.9);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Concentric rings (internal detail)
+    for (let ring = 1; ring <= 3; ring++) {
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r * (ring / 4), 0, Math.PI * 2);
+      ctx.strokeStyle = rgbaStr(node.color, 0.25 + ring * 0.05);
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  }
+
+  // Assessment nodes
+  for (const node of assessNodes) {
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.7);
+    ctx.fill();
+    ctx.strokeStyle = rgbaStr(node.color, 0.5);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+// =================================================================
+// CARD B: TENDRIL NETWORK
+// =================================================================
+function renderCardB(ctx, genome, time) {
+  const seed = genome.complexity * 200 + 50;
+  const membranePts = generateMembrane(CX, CY, MEMBRANE_R, 28, 10, seed);
+  const { nodes, primaries, assessNodes } = buildNodes(genome, seed);
+
+  // Exterior glow
+  drawExteriorGlow(ctx, membranePts, primaries, CX, CY);
+
+  // Membrane
+  drawMembranePath(ctx, membranePts);
+  ctx.fillStyle = rgbaStr('#080e22', 0.65);
+  ctx.fill();
+  drawMembranePath(ctx, membranePts);
+  ctx.strokeStyle = rgbaStr('#45B7D1', 0.3);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // === TENDRIL CONNECTIONS ===
+  // All pairs within range (dense)
+  const allPairs = [];
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const d = dist(nodes[i], nodes[j]);
+      if (d < 180) allPairs.push({ a: nodes[i], b: nodes[j], dist: d });
+    }
+  }
+  // Always include primary-to-primary
+  const primConns = buildPrimaryConnections(primaries);
+  for (const conn of primConns) {
+    if (!allPairs.find(p => (p.a.id === conn.a.id && p.b.id === conn.b.id) || (p.a.id === conn.b.id && p.b.id === conn.a.id))) {
+      allPairs.push({ a: conn.a, b: conn.b, dist: dist(conn.a, conn.b) });
+    }
+  }
+
+  for (const pair of allPairs) {
+    const { a, b } = pair;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) continue;
+    const nx = -dy / len, ny = dx / len;
+    const offset = Math.sin(a.x * 0.07 + a.y * 0.07 + seed) * 20;
+    const cpx = mx + nx * offset, cpy = my + ny * offset;
+
+    // Tapered tendril: thick at ends, thin in middle
+    const steps = 30;
+    for (let s = 0; s < steps - 1; s++) {
+      const t1 = s / steps, t2 = (s + 1) / steps;
+      const p1 = quadBezierPoint(a.x, a.y, cpx, cpy, b.x, b.y, t1);
+      const p2 = quadBezierPoint(a.x, a.y, cpx, cpy, b.x, b.y, t2);
+
+      // Taper: thick at 0 and 1, thin at 0.5
+      const distFromMid = Math.abs(t1 - 0.5) * 2; // 0 at mid, 1 at ends
+      const width = 1 + distFromMid * 3.5;
+      const alpha = 0.12 + distFromMid * 0.15;
+
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = blendRGBA(a.color, b.color, t1, alpha);
+      ctx.lineWidth = width;
+      ctx.stroke();
+    }
+
+    // Bright center line
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo(cpx, cpy, b.x, b.y);
+    ctx.strokeStyle = blendRGBA(a.color, b.color, 0.5, 0.35);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Particle riding along tendril
+    const tPos = (time * 0.3 + pair.dist * 0.01) % 1;
+    const particle = quadBezierPoint(a.x, a.y, cpx, cpy, b.x, b.y, tPos);
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = blendRGBA(a.color, b.color, tPos, 0.7);
+    ctx.fill();
+  }
+
+  // Primary organelles as blob shapes
+  for (const node of primaries) {
+    const breathe = 1 + Math.sin(time * 1.2 + node.angle) * 0.06;
+    const r = node.radius * breathe;
+    const pts = 8;
+
+    // Glow
+    const glow = ctx.createRadialGradient(node.x, node.y, r * 0.2, node.x, node.y, r * 2.2);
+    glow.addColorStop(0, rgbaStr(node.color, 0.45));
+    glow.addColorStop(1, rgbaStr(node.color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Blob shape
+    ctx.beginPath();
+    for (let i = 0; i <= pts; i++) {
+      const angle = (Math.PI * 2 * i) / pts;
+      const wobble = r * (0.85 + Math.sin(seed * 5 + i * 1.7 + node.angle * 3) * 0.15);
+      const bx = node.x + Math.cos(angle) * wobble;
+      const by = node.y + Math.sin(angle) * wobble;
+      if (i === 0) ctx.moveTo(bx, by);
+      else ctx.lineTo(bx, by);
+    }
+    ctx.closePath();
+    ctx.fillStyle = rgbaStr(node.color, 0.8);
+    ctx.fill();
+    ctx.strokeStyle = rgbaStr(node.color, 0.6);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Internal: wavy parallel lines (cristae)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 0.85, 0, Math.PI * 2);
+    ctx.clip();
+    for (let line = -3; line <= 3; line++) {
+      ctx.beginPath();
+      for (let x = -r; x <= r; x += 2) {
+        const wavey = line * 4 + Math.sin(x * 0.3 + seed) * 2;
+        const px = node.x + x, py = node.y + wavey;
+        if (x === -r) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.strokeStyle = rgbaStr(node.color, 0.3);
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Assessment nodes
+  for (const node of assessNodes) {
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.65);
+    ctx.fill();
+  }
+}
+
+// =================================================================
+// CARD C: CONSTELLATION WEB
+// =================================================================
+function renderCardC(ctx, genome, time) {
+  const seed = genome.complexity * 300 + 100;
+  const membranePts = generateMembrane(CX, CY, MEMBRANE_R, 20, 5, seed);
+  const { nodes, primaries, assessNodes } = buildNodes(genome, seed);
+
+  // Exterior glow (bright)
+  drawExteriorGlow(ctx, membranePts, primaries, CX, CY);
+
+  // Membrane
+  drawMembranePath(ctx, membranePts);
+  ctx.fillStyle = rgbaStr('#060d20', 0.7);
+  ctx.fill();
+  drawMembranePath(ctx, membranePts);
+  ctx.strokeStyle = rgbaStr('#96E6A1', 0.35);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // === CONNECTION WEB: straight bright lines with diamonds and hash marks ===
+  // All connections (primary-to-primary + assessment connections)
+  const allConns = [];
+  const primConns = buildPrimaryConnections(primaries);
+  allConns.push(...primConns);
+  const assessConns = buildAssessmentConnections(assessNodes, primaries, nodes);
+  allConns.push(...assessConns);
+
+  // Track intersection points for diamonds
+  const intersections = [];
+
+  for (let ci = 0; ci < allConns.length; ci++) {
+    const conn = allConns[ci];
+    const { a, b } = conn;
+
+    // Glow line
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = blendRGBA(a.color, b.color, 0.5, 0.12);
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Bright line
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = blendRGBA(a.color, b.color, 0.5, 0.55);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Hash marks along connection
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) continue;
+    const ux = dx / len, uy = dy / len;
+    const px = -uy, py = ux; // perpendicular
+    const spacing = 15;
+    const numMarks = Math.floor(len / spacing);
+    for (let m = 1; m < numMarks; m++) {
+      const t = m / numMarks;
+      const hx = a.x + dx * t, hy = a.y + dy * t;
+      ctx.beginPath();
+      ctx.moveTo(hx - px * 3, hy - py * 3);
+      ctx.lineTo(hx + px * 3, hy + py * 3);
+      ctx.strokeStyle = blendRGBA(a.color, b.color, t, 0.3);
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+    }
+
+    // Check intersections with previous connections
+    for (let cj = 0; cj < ci; cj++) {
+      const other = allConns[cj];
+      const ix = lineIntersection(a.x, a.y, b.x, b.y, other.a.x, other.a.y, other.b.x, other.b.y);
+      if (ix) {
+        intersections.push({ x: ix.x, y: ix.y, color: blendHex(a.color, other.a.color, 0.5) });
+      }
+    }
+  }
+
+  // Draw diamond shapes at intersections
+  for (const ix of intersections) {
+    const clamped = clampInside(ix.x, ix.y, CX, CY, MEMBRANE_R, 5);
+    const s = 3;
+    ctx.beginPath();
+    ctx.moveTo(clamped.x, clamped.y - s);
+    ctx.lineTo(clamped.x + s, clamped.y);
+    ctx.lineTo(clamped.x, clamped.y + s);
+    ctx.lineTo(clamped.x - s, clamped.y);
+    ctx.closePath();
+    ctx.fillStyle = rgbaStr(ix.color, 0.7);
+    ctx.fill();
+  }
+
+  // Primary organelles with concentric ring halos
+  for (const node of primaries) {
+    const breathe = 1 + Math.sin(time * 1.8 + node.angle) * 0.04;
+    const r = node.radius * breathe;
+
+    // Halo rings
+    for (let ring = 1; ring <= 3; ring++) {
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r + ring * 6, 0, Math.PI * 2);
+      ctx.strokeStyle = rgbaStr(node.color, 0.2 - ring * 0.04);
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    // Glow
+    const glow = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r * 2);
+    glow.addColorStop(0, rgbaStr(node.color, 0.6));
+    glow.addColorStop(1, rgbaStr(node.color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.85);
+    ctx.fill();
+
+    // Internal spirograph (rose curve)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 0.9, 0, Math.PI * 2);
+    ctx.clip();
+    const k = 2 + Math.floor(node.trait * 6);
+    ctx.beginPath();
+    for (let theta = 0; theta < Math.PI * 2 * k; theta += 0.02) {
+      const rr = (r * 0.8) * Math.cos(k * theta);
+      const sx = node.x + rr * Math.cos(theta);
+      const sy = node.y + rr * Math.sin(theta);
+      if (theta === 0) ctx.moveTo(sx, sy);
+      else ctx.lineTo(sx, sy);
+    }
+    ctx.strokeStyle = rgbaStr(node.color, 0.35);
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Assessment nodes (positioned, some sit on connection lines)
+  for (const node of assessNodes) {
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.7);
+    ctx.fill();
+    ctx.strokeStyle = rgbaStr(node.color, 0.4);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+}
+
+// Line intersection helper
+function lineIntersection(x1,y1,x2,y2,x3,y3,x4,y4) {
+  const denom = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
+  if (Math.abs(denom) < 0.001) return null;
+  const t = ((x1-x3)*(y3-y4) - (y1-y3)*(x3-x4)) / denom;
+  const u = -((x1-x2)*(y1-y3) - (y1-y2)*(x1-x3)) / denom;
+  if (t >= 0.05 && t <= 0.95 && u >= 0.05 && u <= 0.95) {
+    return { x: x1 + t*(x2-x1), y: y1 + t*(y2-y1) };
+  }
+  return null;
+}
+
+// =================================================================
+// CARD D: PLASMA CHANNELS
+// =================================================================
+function renderCardD(ctx, genome, time) {
+  const seed = genome.complexity * 400 + 150;
+  const membranePts = generateMembrane(CX, CY, MEMBRANE_R, 26, 12, seed);
+  const { nodes, primaries, assessNodes } = buildNodes(genome, seed);
+
+  // DRAMATIC exterior glow (extra passes, higher alpha)
+  // Extra radial gradients per primary
+  for (const node of primaries) {
+    const grad = ctx.createRadialGradient(node.x, node.y, 5, node.x, node.y, MEMBRANE_R + 60);
+    grad.addColorStop(0, rgbaStr(node.color, 0.0));
+    grad.addColorStop(0.4, rgbaStr(node.color, 0.0));
+    grad.addColorStop(0.6, rgbaStr(node.color, 0.35));
+    grad.addColorStop(0.75, rgbaStr(node.color, 0.25));
+    grad.addColorStop(0.88, rgbaStr(node.color, 0.12));
+    grad.addColorStop(1.0, rgbaStr(node.color, 0.0));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CW, CH);
+  }
+  drawExteriorGlow(ctx, membranePts, primaries, CX, CY);
+
+  // Thick membrane
+  for (let layer = 3; layer >= 0; layer--) {
+    drawMembranePath(ctx, membranePts);
+    ctx.strokeStyle = rgbaStr('#DDA0DD', 0.08 + layer * 0.04);
+    ctx.lineWidth = 3 + layer * 2;
+    ctx.stroke();
+  }
+  drawMembranePath(ctx, membranePts);
+  ctx.fillStyle = rgbaStr('#070c1e', 0.6);
+  ctx.fill();
+
+  // === PLASMA CHANNELS ===
+  // Wide luminous channels between all primaries
+  const primConns = buildPrimaryConnections(primaries);
+  for (const conn of primConns) {
+    const { a, b } = conn;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) continue;
+    const nx = -dy / len, ny = dx / len;
+    const offset = Math.sin(a.x * 0.06 + seed) * 18;
+    const cpx = mx + nx * offset, cpy = my + ny * offset;
+
+    // Wide channel glow
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo(cpx, cpy, b.x, b.y);
+    ctx.strokeStyle = blendRGBA(a.color, b.color, 0.5, 0.18);
+    ctx.lineWidth = 14;
+    ctx.stroke();
+
+    // Medium channel
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo(cpx, cpy, b.x, b.y);
+    ctx.strokeStyle = blendRGBA(a.color, b.color, 0.5, 0.12);
+    ctx.lineWidth = 8;
+    ctx.stroke();
+
+    // Bright center line
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo(cpx, cpy, b.x, b.y);
+    ctx.strokeStyle = blendRGBA(a.color, b.color, 0.5, 0.65);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Light pulse traveling along channel
+    const pulseT = (time * 0.4 + len * 0.005) % 1;
+    const cp = { x: cpx, y: cpy };
+    const pulse = quadBezierPoint(a.x, a.y, cp.x, cp.y, b.x, b.y, pulseT);
+    const pulseGrad = ctx.createRadialGradient(pulse.x, pulse.y, 0, pulse.x, pulse.y, 8);
+    pulseGrad.addColorStop(0, blendRGBA(a.color, b.color, pulseT, 0.8));
+    pulseGrad.addColorStop(1, blendRGBA(a.color, b.color, pulseT, 0));
+    ctx.fillStyle = pulseGrad;
+    ctx.beginPath();
+    ctx.arc(pulse.x, pulse.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Branch channels to assessment nodes
+  for (const an of assessNodes) {
+    const parent = primaries.find(p => p.id === an.parentId);
+    if (!parent) continue;
+
+    // Channel to parent
+    ctx.beginPath();
+    ctx.moveTo(parent.x, parent.y);
+    ctx.lineTo(an.x, an.y);
+    ctx.strokeStyle = blendRGBA(parent.color, an.color, 0.5, 0.12);
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(parent.x, parent.y);
+    ctx.lineTo(an.x, an.y);
+    ctx.strokeStyle = blendRGBA(parent.color, an.color, 0.5, 0.5);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Branch to nearest other primary
+    let nearest = null, nearDist = Infinity;
+    for (const p of primaries) {
+      if (p.id === an.parentId) continue;
+      const d = dist(p, an);
+      if (d < nearDist) { nearDist = d; nearest = p; }
+    }
+    if (nearest) {
+      ctx.beginPath();
+      ctx.moveTo(an.x, an.y);
+      ctx.lineTo(nearest.x, nearest.y);
+      ctx.strokeStyle = blendRGBA(an.color, nearest.color, 0.5, 0.08);
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(an.x, an.y);
+      ctx.lineTo(nearest.x, nearest.y);
+      ctx.strokeStyle = blendRGBA(an.color, nearest.color, 0.5, 0.35);
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+    }
+  }
+
+  // Primary organelles (large, glowing)
+  for (const node of primaries) {
+    const breathe = 1 + Math.sin(time * 1.3 + node.angle) * 0.07;
+    const r = node.radius * breathe;
+
+    // Large glow
+    const glow = ctx.createRadialGradient(node.x, node.y, r * 0.2, node.x, node.y, r * 3);
+    glow.addColorStop(0, rgbaStr(node.color, 0.55));
+    glow.addColorStop(0.5, rgbaStr(node.color, 0.15));
+    glow.addColorStop(1, rgbaStr(node.color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.85);
+    ctx.fill();
+
+    // Internal: radial gradient core with stipple
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.clip();
+    const coreGrad = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r);
+    coreGrad.addColorStop(0, rgbaStr('#ffffff', 0.3));
+    coreGrad.addColorStop(0.5, rgbaStr(node.color, 0.2));
+    coreGrad.addColorStop(1, rgbaStr(node.color, 0));
+    ctx.fillStyle = coreGrad;
+    ctx.fillRect(node.x - r, node.y - r, r * 2, r * 2);
+    // Stipple dots
+    for (let s = 0; s < 12; s++) {
+      const sa = Math.random() * Math.PI * 2;
+      const sr = Math.random() * r * 0.8;
+      ctx.beginPath();
+      ctx.arc(node.x + Math.cos(sa) * sr, node.y + Math.sin(sa) * sr, 1, 0, Math.PI * 2);
+      ctx.fillStyle = rgbaStr(node.color, 0.4);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Assessment nodes
+  for (const node of assessNodes) {
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, node.radius + 1, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.7);
+    ctx.fill();
+  }
+}
+
+// =================================================================
+// CARD E: MYCELIUM
+// =================================================================
+function renderCardE(ctx, genome, time) {
+  const seed = genome.complexity * 500 + 200;
+  const membranePts = generateMembrane(CX, CY, MEMBRANE_R, 22, 9, seed);
+  const { nodes, primaries, assessNodes } = buildNodes(genome, seed);
+
+  // Exterior glow
+  drawExteriorGlow(ctx, membranePts, primaries, CX, CY);
+
+  // Membrane
+  drawMembranePath(ctx, membranePts);
+  ctx.fillStyle = rgbaStr('#060b1c', 0.65);
+  ctx.fill();
+  drawMembranePath(ctx, membranePts);
+  ctx.strokeStyle = rgbaStr('#F7DC6F', 0.3);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // === MYCELIUM BRANCHING NETWORK ===
+  // Generate branches from each node
+  const branches = [];
+
+  function addBranch(from, toAngle, length, depth, color) {
+    if (depth > 3 || length < 8) return;
+    const toX = from.x + Math.cos(toAngle) * length;
+    const toY = from.y + Math.sin(toAngle) * length;
+    const clamped = clampInside(toX, toY, CX, CY, MEMBRANE_R, 12);
+
+    branches.push({
+      x1: from.x, y1: from.y,
+      x2: clamped.x, y2: clamped.y,
+      color, depth
+    });
+
+    // Sub-branches
+    const numSub = 1 + Math.floor(Math.random() * 2);
+    for (let s = 0; s < numSub; s++) {
+      const subAngle = toAngle + (Math.random() - 0.5) * 1.2;
+      const subLen = length * (0.5 + Math.random() * 0.3);
+      addBranch({ x: clamped.x, y: clamped.y }, subAngle, subLen, depth + 1, color);
+    }
+  }
+
+  // From each primary, grow 3-5 main branches toward other nodes
+  for (const node of primaries) {
+    const numBranches = 3 + Math.floor(node.trait * 3);
+    for (let b = 0; b < numBranches; b++) {
+      // Aim toward a random other node
+      const target = nodes[Math.floor(Math.random() * nodes.length)];
+      const angle = Math.atan2(target.y - node.y, target.x - node.x) + (Math.random() - 0.5) * 0.5;
+      const length = 30 + Math.random() * 50;
+      addBranch(node, angle, length, 0, node.color);
+    }
+  }
+
+  // From each assessment node, grow 2-3 branches
+  for (const node of assessNodes) {
+    const numBranches = 2 + Math.floor(Math.random() * 2);
+    for (let b = 0; b < numBranches; b++) {
+      const angle = Math.random() * Math.PI * 2;
+      const length = 20 + Math.random() * 35;
+      addBranch(node, angle, length, 0, node.color);
+    }
+  }
+
+  // Direct connections between all primaries (ensure dense web)
+  const primConns = buildPrimaryConnections(primaries);
+  for (const conn of primConns) {
+    drawGlowConnection(ctx, conn.a.x, conn.a.y, conn.b.x, conn.b.y,
+      conn.a.color, conn.b.color, time,
+      { glowAlpha: 0.1, lineAlpha: 0.5, glowWidth: 4, lineWidth: 1, curveAmt: 12 });
+  }
+
+  // Assessment to parent connections
+  for (const an of assessNodes) {
+    const parent = primaries.find(p => p.id === an.parentId);
+    if (parent) {
+      drawGlowConnection(ctx, an.x, an.y, parent.x, parent.y,
+        an.color, parent.color, time,
+        { glowAlpha: 0.08, lineAlpha: 0.4, glowWidth: 3, lineWidth: 0.8, curveAmt: 8 });
+    }
+  }
+
+  // Render all mycelium branches
+  for (const br of branches) {
+    const alpha = 0.6 - br.depth * 0.12;
+    const width = 1.5 - br.depth * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(br.x1, br.y1);
+    ctx.lineTo(br.x2, br.y2);
+    ctx.strokeStyle = rgbaStr(br.color, Math.max(alpha, 0.15));
+    ctx.lineWidth = Math.max(width, 0.4);
+    ctx.stroke();
+
+    // Branch point dot
+    ctx.beginPath();
+    ctx.arc(br.x2, br.y2, 1.2, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(br.color, alpha * 0.8);
+    ctx.fill();
+  }
+
+  // Particles drifting along branches
+  if (!ctx._particlesE) ctx._particlesE = generateParticles(12, CX, CY, MEMBRANE_R);
+  updateParticles(ctx._particlesE, CX, CY, MEMBRANE_R);
+  for (const p of ctx._particlesE) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * 0.7, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr('#F7DC6F', p.alpha * 0.6);
+    ctx.fill();
+  }
+
+  // Primary organelles as solid nuclei with glow ring
+  for (const node of primaries) {
+    const breathe = 1 + Math.sin(time * 1.6 + node.angle) * 0.05;
+    const r = node.radius * breathe;
+
+    // Glow ring
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = rgbaStr(node.color, 0.35);
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Glow
+    const glow = ctx.createRadialGradient(node.x, node.y, r * 0.3, node.x, node.y, r * 2);
+    glow.addColorStop(0, rgbaStr(node.color, 0.5));
+    glow.addColorStop(1, rgbaStr(node.color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.9);
+    ctx.fill();
+
+    // Internal: crosshatch
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 0.85, 0, Math.PI * 2);
+    ctx.clip();
+    for (let set = 0; set < 2; set++) {
+      const hatchAngle = set === 0 ? Math.PI / 6 : -Math.PI / 6;
+      const cos = Math.cos(hatchAngle), sin = Math.sin(hatchAngle);
+      for (let d = -r; d <= r; d += 4) {
+        const x1 = node.x + cos * (-r) + sin * d;
+        const y1 = node.y + sin * (-r) - cos * d;
+        const x2 = node.x + cos * r + sin * d;
+        const y2 = node.y + sin * r - cos * d;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = rgbaStr(node.color, 0.2);
+        ctx.lineWidth = 0.4;
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // Assessment nodes at branch intersections
+  for (const node of assessNodes) {
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, node.radius + 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.7);
+    ctx.fill();
+  }
+}
+
+// =================================================================
+// CARD F: GENERATIVE BLOOM
+// =================================================================
+function renderCardF(ctx, genome, time) {
+  const seed = genome.complexity * 600 + 250;
+  const membranePts = generateMembrane(CX, CY, MEMBRANE_R, 24, 8, seed);
+  const { nodes, primaries, assessNodes } = buildNodes(genome, seed);
+
+  // Rich exterior glow
+  drawExteriorGlow(ctx, membranePts, primaries, CX, CY);
+
+  // Membrane
+  drawMembranePath(ctx, membranePts);
+  ctx.fillStyle = rgbaStr('#070d20', 0.6);
+  ctx.fill();
+  drawMembranePath(ctx, membranePts);
+  ctx.strokeStyle = rgbaStr('#DDA0DD', 0.35);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // === DENSE CONNECTION WEB with generative ornaments ===
+  const primConns = buildPrimaryConnections(primaries);
+  const assessConns = buildAssessmentConnections(assessNodes, primaries, nodes);
+  const allConns = [...primConns, ...assessConns];
+
+  for (const conn of allConns) {
+    const { a, b } = conn;
+    const isPrim = a.isPrimary && b.isPrimary;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) continue;
+    const nx = -dy / len, ny = dx / len;
+    const offset = Math.sin(a.x * 0.06 + a.y * 0.06 + seed) * 15;
+    const cpx = mx + nx * offset, cpy = my + ny * offset;
+
+    // Glow
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo(cpx, cpy, b.x, b.y);
+    ctx.strokeStyle = blendRGBA(a.color, b.color, 0.5, isPrim ? 0.15 : 0.08);
+    ctx.lineWidth = isPrim ? 6 : 3;
+    ctx.stroke();
+
+    // Bright line
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo(cpx, cpy, b.x, b.y);
+    ctx.strokeStyle = blendRGBA(a.color, b.color, 0.5, isPrim ? 0.6 : 0.45);
+    ctx.lineWidth = isPrim ? 1.5 : 0.8;
+    ctx.stroke();
+
+    // Ornaments along connection
+    const numOrnaments = Math.floor(len / 12);
+    for (let o = 1; o < numOrnaments; o++) {
+      const t = o / numOrnaments;
+      const cp = { x: cpx, y: cpy };
+      const pt = quadBezierPoint(a.x, a.y, cp.x, cp.y, b.x, b.y, t);
+      const ornType = (o + Math.floor(seed)) % 3;
+      const ornAlpha = 0.4 + Math.sin(time * 2 + o) * 0.15;
+
+      if (ornType === 0) {
+        // Small circle
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = blendRGBA(a.color, b.color, t, ornAlpha);
+        ctx.fill();
+      } else if (ornType === 1) {
+        // Diamond
+        const s = 2;
+        ctx.beginPath();
+        ctx.moveTo(pt.x, pt.y - s);
+        ctx.lineTo(pt.x + s, pt.y);
+        ctx.lineTo(pt.x, pt.y + s);
+        ctx.lineTo(pt.x - s, pt.y);
+        ctx.closePath();
+        ctx.fillStyle = blendRGBA(a.color, b.color, t, ornAlpha);
+        ctx.fill();
+      } else {
+        // Dot
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 0.8, 0, Math.PI * 2);
+        ctx.fillStyle = blendRGBA(a.color, b.color, t, ornAlpha * 1.2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // === GENERATIVE PRIMARY ORGANELLES ===
+  const curveTypes = ['lissajous', 'rose', 'spirograph', 'epitrochoid', 'butterfly'];
+
+  for (let pi = 0; pi < primaries.length; pi++) {
+    const node = primaries[pi];
+    const breathe = 1 + Math.sin(time * 1.4 + node.angle) * 0.05;
+    const r = node.radius * breathe;
+    const curveType = curveTypes[pi % curveTypes.length];
+    const trait = node.trait;
+
+    // Outer glow
+    const glow = ctx.createRadialGradient(node.x, node.y, r * 0.3, node.x, node.y, r * 2.5);
+    glow.addColorStop(0, rgbaStr(node.color, 0.5));
+    glow.addColorStop(1, rgbaStr(node.color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body fill
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.3);
+    ctx.fill();
+
+    // Parametric curve CLIPPED to organelle boundary
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 0.95, 0, Math.PI * 2);
+    ctx.clip();
+
+    const numPoints = 300 + Math.floor(trait * 200);
+    ctx.beginPath();
+
+    for (let i = 0; i <= numPoints; i++) {
+      const t = (i / numPoints) * Math.PI * 2 * (2 + Math.floor(trait * 5));
+      let px, py;
+
+      switch (curveType) {
+        case 'lissajous': {
+          const a_param = 2 + Math.floor(trait * 5);
+          const b_param = 3 + Math.floor(trait * 4);
+          px = node.x + Math.sin(a_param * t) * r * 0.8;
+          py = node.y + Math.cos(b_param * t) * r * 0.8;
+          break;
+        }
+        case 'rose': {
+          const k = 2 + Math.floor(trait * 6);
+          const rr = r * 0.8 * Math.cos(k * t);
+          px = node.x + rr * Math.cos(t);
+          py = node.y + rr * Math.sin(t);
+          break;
+        }
+        case 'spirograph': {
+          const R_sp = r * 0.5;
+          const r_sp = r * (0.15 + trait * 0.2);
+          const d_sp = r * (0.1 + trait * 0.3);
+          px = node.x + (R_sp - r_sp) * Math.cos(t) + d_sp * Math.cos(((R_sp - r_sp) / r_sp) * t);
+          py = node.y + (R_sp - r_sp) * Math.sin(t) - d_sp * Math.sin(((R_sp - r_sp) / r_sp) * t);
+          break;
+        }
+        case 'epitrochoid': {
+          const R_ep = r * 0.3;
+          const r_ep = r * (0.1 + trait * 0.15);
+          const d_ep = r * (0.2 + trait * 0.25);
+          px = node.x + (R_ep + r_ep) * Math.cos(t) - d_ep * Math.cos(((R_ep + r_ep) / r_ep) * t);
+          py = node.y + (R_ep + r_ep) * Math.sin(t) - d_ep * Math.sin(((R_ep + r_ep) / r_ep) * t);
+          break;
+        }
+        case 'butterfly': {
+          const scale = r * 0.12;
+          const expT = Math.exp(Math.cos(t)) - 2 * Math.cos(4 * t) - Math.pow(Math.sin(t / 12), 5);
+          px = node.x + Math.sin(t) * expT * scale;
+          py = node.y + Math.cos(t) * expT * scale;
+          break;
+        }
+      }
+
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+
+    ctx.strokeStyle = rgbaStr(node.color, 0.55);
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+
+    // Body border
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = rgbaStr(node.color, 0.7);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  // Assessment nodes with simpler parametric curves
+  for (let ai = 0; ai < assessNodes.length; ai++) {
+    const node = assessNodes[ai];
+    const r = node.radius;
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaStr(node.color, 0.3);
+    ctx.fill();
+
+    // Simple rose curve inside
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 0.9, 0, Math.PI * 2);
+    ctx.clip();
+    const k = 2 + (ai % 4);
+    ctx.beginPath();
+    for (let theta = 0; theta < Math.PI * 2 * k; theta += 0.05) {
+      const rr = r * 0.7 * Math.cos(k * theta);
+      const sx = node.x + rr * Math.cos(theta);
+      const sy = node.y + rr * Math.sin(theta);
+      if (theta === 0) ctx.moveTo(sx, sy);
+      else ctx.lineTo(sx, sy);
+    }
+    ctx.strokeStyle = rgbaStr(node.color, 0.4);
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = rgbaStr(node.color, 0.5);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+}
+
+// =================================================================
+// RENDER DISPATCH
+// =================================================================
+const RENDERERS = [renderCardA, renderCardB, renderCardC, renderCardD, renderCardE, renderCardF];
+
+// =================================================================
+// CARD SETUP & ANIMATION
+// =================================================================
+function setupCards() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  for (let i = 0; i < CARD_DEFS.length; i++) {
+    const def = CARD_DEFS[i];
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = CW * DPR;
+    canvas.height = CH * DPR;
+    canvas.style.width = CW + 'px';
+    canvas.style.height = CH + 'px';
+    card.appendChild(canvas);
+
+    const label = document.createElement('div');
+    label.className = 'card-label';
+    label.innerHTML = `<span>${def.id}: ${def.name}</span><span class="sub">${def.sub}</span>`;
+    card.appendChild(label);
+
+    grid.appendChild(card);
+
+    const genome = generateGenome(currentTier);
+    cardStates[i] = { canvas, genome, def };
+  }
+}
+
+function regenerate() {
+  for (let i = 0; i < CARD_DEFS.length; i++) {
+    cardStates[i].genome = generateGenome(currentTier);
+    // Reset particle caches
+    const ctx = cardStates[i].canvas.getContext('2d');
+    ctx._particlesA = null;
+    ctx._particlesE = null;
+  }
+}
+
+function animate() {
+  const time = (performance.now() - startTime) / 1000;
+
+  for (let i = 0; i < CARD_DEFS.length; i++) {
+    const state = cardStates[i];
+    const ctx = state.canvas.getContext('2d');
+
+    // Reset canvas state per frame
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.clearRect(0, 0, CW, CH);
+
+    // Background
+    ctx.fillStyle = '#050A18';
+    ctx.fillRect(0, 0, CW, CH);
+
+    RENDERERS[i](ctx, state.genome, time);
+  }
+
+  requestAnimationFrame(animate);
+}
+
+// =================================================================
+// CONTROLS
+// =================================================================
+function setTier(tier) {
+  currentTier = tier;
+  document.querySelectorAll('.controls button').forEach(b => {
+    if (['btn-seed','btn-young','btn-full','btn-random'].includes(b.id)) {
+      b.classList.toggle('active', b.id === 'btn-' + tier);
+    }
+  });
+  regenerate();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.controls button').forEach(b => {
+    if (['btn-human','btn-ai'].includes(b.id)) {
+      b.classList.toggle('active', b.id === 'btn-' + mode);
+    }
+  });
+}
+
+// =================================================================
+// INIT
+// =================================================================
+setupCards();
+animate();
+</script>
+</body>
+</html>

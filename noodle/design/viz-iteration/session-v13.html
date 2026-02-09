@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Organism — v13 Macro</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;min-height:100vh;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    padding:4px;transition:background 0.4s;}
+  body.dark{background:#050A18;color:#e2e8f0;} body.light{background:#F0F2F5;color:#1e293b;}
+  h1{font-size:11px;font-weight:400;letter-spacing:3px;text-transform:uppercase;margin-bottom:3px;text-align:center;}
+  body.dark h1{color:#334155;} body.light h1{color:#94a3b8;}
+  .ctrls{display:flex;gap:5px;margin-bottom:3px;align-items:center;flex-wrap:wrap;justify-content:center;}
+  .ctrls button{border:1px solid;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:10px;letter-spacing:0.7px;transition:all 0.2s;font-family:inherit;}
+  body.dark .ctrls button{background:#0f172a;border-color:#1e293b;color:#475569;}
+  body.dark .ctrls button:hover{background:#1e293b;color:#94a3b8;}
+  body.dark .ctrls button.on{background:rgba(78,205,196,0.12);color:#4ECDC4;border-color:rgba(78,205,196,0.25);}
+  body.light .ctrls button{background:#fff;border-color:#d1d5db;color:#6b7280;}
+  body.light .ctrls button:hover{background:#f3f4f6;color:#374151;}
+  body.light .ctrls button.on{background:rgba(78,205,196,0.12);color:#0d9488;border-color:rgba(78,205,196,0.4);}
+  .div{width:1px;height:16px;margin:0 1px;}
+  body.dark .div{background:#1e293b;} body.light .div{background:#d1d5db;}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;width:100%;}
+  .card{position:relative;}
+  .card canvas{display:block;width:100%;height:auto;border-radius:4px;}
+  .lbl{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9px;letter-spacing:1px;pointer-events:none;}
+  body.dark .lbl{color:#475569;} body.light .lbl{color:#9ca3af;}
+  .lbl b{font-weight:600;}
+  .kill{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;
+    border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.5);color:rgba(255,255,255,0.4);
+    font-size:11px;line-height:20px;text-align:center;cursor:pointer;transition:all 0.2s;z-index:2;}
+  .kill:hover{background:rgba(220,50,50,0.7);color:#fff;border-color:rgba(220,50,50,0.8);}
+  body.light .kill{border-color:rgba(0,0,0,0.15);background:rgba(255,255,255,0.6);color:rgba(0,0,0,0.3);}
+  body.light .kill:hover{background:rgba(220,50,50,0.7);color:#fff;}
+</style>
+</head>
+<body class="dark">
+<h1>v13 — organelle riffs</h1>
+<div class="ctrls">
+  <button onclick="rAll()">Random</button>
+  <div class="div"></div>
+  <button onclick="sS(0)" id="s0">Seed</button>
+  <button onclick="sS(1)" id="s1">Young</button>
+  <button onclick="sS(2)" id="s2">Growing</button>
+  <button onclick="sS(3)" id="s3" class="on">Full</button>
+  <div class="div"></div>
+  <button onclick="sE('human')" id="eh" class="on">Human</button>
+  <button onclick="sE('ai')" id="ea">AI</button>
+  <div class="div"></div>
+  <button onclick="sT('dark')" id="td" class="on">Dark</button>
+  <button onclick="sT('light')" id="tl">Light</button>
+</div>
+<div class="grid" id="grid"></div>
+<script>
+const NC=6;
+const PI=Math.PI,PI2=PI*2,CW=600,CH=600,CX=300,CY=300;
+
+// ── Colors ──
+const TR={
+  N:{l:'Open',base:[78,205,196],accent:[255,154,139]},
+  E:{l:'Consc',base:[69,183,209],accent:[255,183,77]},
+  A:{l:'Extra',base:[150,230,161],accent:[230,120,200]},
+  O:{l:'Agree',base:[221,160,221],accent:[120,220,180]},
+  C:{l:'Neuro',base:[247,220,111],accent:[140,160,240]}
+};
+const TK=Object.keys(TR);
+const AD=[{a:['N','E'],n:4},{a:['A','C'],n:4},{a:['N'],n:3},{a:['A','O'],n:4},{a:['E','C'],n:3},
+  {a:['N','E','A','O','C'],n:6},{a:['O','A'],n:5},{a:['C','N'],n:4},{a:['N','E'],n:5},{a:['A','O'],n:5},{a:['E','C'],n:4},
+  {a:['N','A','C'],n:5},{a:['E','O','N'],n:5},{a:['A','E','C','O'],n:6}];
+const SC=[0.28,0.50,0.75,1.0],GS=[0.4,0.6,0.82,1.0];
+
+let ent='human',thm='dark',stg=3,cards=[],st=performance.now(),lt=0;
+
+// ── Helpers ──
+function m32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function rg(c,a){return`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;}
+function lt2(c,n){return[Math.min(255,c[0]+n),Math.min(255,c[1]+n),Math.min(255,c[2]+n)];}
+function drk(c,n){return[Math.max(0,c[0]-n),Math.max(0,c[1]-n),Math.max(0,c[2]-n)];}
+function ds(x1,y1,x2,y2){const a=x1-x2,b=y1-y2;return Math.sqrt(a*a+b*b);}
+function bl(cs,ws){let r=0,g=0,b=0,w=0;for(let i=0;i<cs.length;i++){r+=cs[i][0]*ws[i];g+=cs[i][1]*ws[i];b+=cs[i][2]*ws[i];w+=ws[i];}return w?[r/w|0,g/w|0,b/w|0]:[128,128,128];}
+function lerp3(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+function sat(c,s){const g=0.299*c[0]+0.587*c[1]+0.114*c[2];return[Math.min(255,g+(c[0]-g)*s)|0,Math.min(255,g+(c[1]-g)*s)|0,Math.min(255,g+(c[2]-g)*s)|0];}
+function vc(c,dk){return dk?c:sat(lt2(c,35),1.5);}
+
+// ── Genome ──
+function rGen(){
+  const s=Math.random()*99999|0,r=m32(s),t={};
+  for(const k of TK)t[k]=0.2+r()*0.5;
+  const h=[...TK].sort(()=>r()-0.5);
+  t[h[0]]=0.85+r()*0.15;t[h[1]]=0.65+r()*0.2;t[h[4]]=0.03+r()*0.1;
+  const sorted=[...TK].sort((a,b)=>t[b]-t[a]);
+  const glow=bl([TR[sorted[0]].base,TR[sorted[1]].base],[0.65,0.35]);
+  return{t,s,dom:h[0],glow,glowAccent:TR[sorted[0]].accent};
+}
+
+// ── Nodes ──
+function mkNodes(g){
+  const r=m32(g.s+3333),res=[];
+  for(let i=0;i<5;i++){
+    const k=TK[i],tv=g.t[k],an=(i/5)*PI2-PI/2,br=55+tv*65;
+    res.push({tp:'p',k,tv,rgb:TR[k].base,accent:TR[k].accent,
+      bA:an,bR:br,bX:CX+Math.cos(an)*br,bY:CY+Math.sin(an)*br,
+      x:0,y:0,dp:0,rd:20+tv*30,sd:g.s+i*137.5,bp:i*1.47,stg:0});
+  }
+  for(let i=0;i<5;i++){const p=res[i];for(let c=0;c<3;c++){
+    const o=p.bA+(c-1)*0.45+(r()-0.5)*0.25,cr=p.bR+20+r()*28,tv=p.tv*(0.3+r()*0.35);
+    res.push({tp:'c',k:p.k,tv,rgb:p.rgb,accent:p.accent,
+      bA:o,bR:cr,bX:CX+Math.cos(o)*cr,bY:CY+Math.sin(o)*cr,
+      x:0,y:0,dp:0,rd:4+tv*9,sd:g.s+(10+i*3+c)*137.5,bp:(10+i*3+c)*0.9,stg:1});
+  }}
+  let ai=0;
+  for(let a=0;a<AD.length;a++){const d=AD[a],as2=a<5?2:3;
+    for(let n=0;n<d.n;n++){
+      const ak=d.a[n%d.a.length],ai2=TK.indexOf(ak),ap=res[ai2];
+      const sc2=15+r()*35,sa=r()*PI2,tv=ap.tv*(0.15+r()*0.25);
+      const nb=res[(ai2+1+Math.floor(r()*3))%5];
+      const rgb=lerp3(ap.rgb,nb.accent,0.15+r()*0.2).map(v=>Math.max(0,Math.min(255,v))|0);
+      res.push({tp:'a',k:ak,tv,rgb,accent:ap.accent,
+        bA:ap.bA+(r()-0.5)*0.9,bR:ap.bR+sc2*Math.cos(sa)*0.8,
+        bX:ap.bX+Math.cos(sa)*sc2,bY:ap.bY+Math.sin(sa)*sc2,
+        x:0,y:0,dp:0,rd:2.5+tv*5,sd:g.s+(30+ai)*137.5,bp:(30+ai)*0.7,stg:as2});ai++;
+  }}
+  for(let h=0;h<15;h++){
+    const ha=(h/15)*PI2+(r()-0.5)*0.3,hr2=110+r()*45;
+    const pi=h%5,pp=res[pi],tv2=pp.tv*(0.1+r()*0.15);
+    const rgb2=lerp3(pp.rgb,pp.accent,0.2+r()*0.3).map(v=>Math.max(0,Math.min(255,v))|0);
+    res.push({tp:'a',k:TK[pi],tv:tv2,rgb:rgb2,accent:pp.accent,
+      bA:ha,bR:hr2,bX:CX+Math.cos(ha)*hr2,bY:CY+Math.sin(ha)*hr2,
+      x:0,y:0,dp:0,rd:1.5+tv2*3,sd:g.s+(100+h)*137.5,bp:(100+h)*0.5,stg:3});
+  }
+  return res;
+}
+
+function filt(all,si){return all.filter(n=>n.tp==='p'||(n.tp==='c'&&si>=1)||(n.tp==='a'&&si>=n.stg));}
+function updN(ns,t,sc){
+  for(const n of ns){
+    const s=n.sd,sp=n.tp==='p'?1:1.12,am=n.tp==='p'?1:0.6;
+    const dx=(Math.sin(t*0.09*sp+s)*22+Math.sin(t*0.27*sp+s+1.3)*7+Math.sin(t*0.67*sp+s+2.7)*3)*am*sc;
+    const dy=(Math.cos(t*0.08*sp+s+0.7)*20+Math.cos(t*0.23*sp+s+2.1)*8+Math.cos(t*0.59*sp+s+4.1)*3)*am*sc;
+    n.dp=Math.sin(t*0.11+s*2.1)*0.2;
+    n.x=CX+(n.bX-CX)*sc+dx;n.y=CY+(n.bY-CY)*sc+dy;
+  }
+  let cx=0,cy=0;for(const n of ns){cx+=n.x;cy+=n.y;}cx/=ns.length;cy/=ns.length;
+  const sx=(CX-cx)*0.15,sy=(CY-cy)*0.15;
+  for(const n of ns){n.x+=sx;n.y+=sy;}
+}
+
+// ── Connections ──
+function mkCon(ns){
+  const cn=[],seen=new Set(),K=ns.length<10?3:5;
+  for(let i=0;i<ns.length;i++){const dd=[];
+    for(let j=0;j<ns.length;j++){if(i===j)continue;dd.push({j,d:ds(ns[i].bX,ns[i].bY,ns[j].bX,ns[j].bY)});}
+    dd.sort((a,b)=>a.d-b.d);
+    for(let k=0;k<Math.min(K,dd.length);k++){const j=dd[k].j,ky=Math.min(i,j)+'-'+Math.max(i,j);
+      if(seen.has(ky))continue;seen.add(ky);
+      cn.push({a:i,b:j,col:bl([ns[i].rgb,ns[j].rgb],[0.5,0.5]),str:(ns[i].tv+ns[j].tv)/2,cs:i*31+j*17});}}
+  const pI=[];ns.forEach((n,i)=>{if(n.tp==='p')pI.push(i);});
+  for(let i=0;i<pI.length;i++)for(let j=i+1;j<pI.length;j++){const ky=pI[i]+'-'+pI[j];
+    if(!seen.has(ky)){seen.add(ky);const a=ns[pI[i]],b=ns[pI[j]];
+    cn.push({a:pI[i],b:pI[j],col:bl([a.rgb,b.rgb],[0.5,0.5]),str:(a.tv+b.tv)/2,cs:pI[i]*31+pI[j]*17});}}
+  return cn;
+}
+function mkPul(cn,sd){const r=m32(sd+5555),res=[];
+  for(const c of cn){const ct=1+Math.floor(c.str*1.5);for(let i=0;i<ct;i++)
+    res.push({a:c.a,b:c.b,cs:c.cs,p:r(),sp:0.1+r()*0.2,dr:r()>0.5?1:-1,col:lt2(c.col,55),sz:0.8+c.str*1.5});}
+  return res;
+}
+function updPul(pls,dt){for(const q of pls){q.p+=q.sp*q.dr*dt;if(q.p>1)q.p-=1;if(q.p<0)q.p+=1;}}
+function cMid(a,b,cs,t){const sw=Math.sin(t*0.25+cs*0.1)*12,px=-(b.y-a.y),py=b.x-a.x,pl=Math.sqrt(px*px+py*py)||1;
+  return{x:(a.x+b.x)/2+(px/pl)*sw,y:(a.y+b.y)/2+(py/pl)*sw};}
+
+// ── Blob outline ──
+function blobP(ctx,cx,cy,r,sd,t){
+  ctx.beginPath();for(let i=0;i<=48;i++){const a=(i/48)*PI2;
+    const br=r+Math.sin(a*3+t*0.45+sd)*r*0.12+Math.sin(a*5+t*0.28+sd*1.3)*r*0.06+Math.sin(a*2+t*0.65+sd*0.7)*r*0.08;
+    const px=cx+Math.cos(a)*br,py=cy+Math.sin(a)*br;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
+  ctx.closePath();
+}
+
+// ── Membrane ──
+function mkMem(ns,t){
+  if(!ns.length)return{cx:CX,cy:CY,r:0};
+  let cx=0,cy=0;for(const n of ns){cx+=n.x;cy+=n.y;}cx/=ns.length;cy/=ns.length;
+  let maxR=0;for(const n of ns){const d=ds(n.x,n.y,cx,cy)+n.rd*SC[stg];if(d>maxR)maxR=d;}
+  return{cx,cy,r:maxR+15};
+}
+function drawMemCircle(ctx,mem,t){
+  ctx.beginPath();for(let i=0;i<=64;i++){
+    const a=(i/64)*PI2,w=Math.sin(a*3+t*0.3)*2.5+Math.sin(a*5+t*0.2+1.3)*1.2+Math.sin(a*7+t*0.13)*0.6;
+    const px=mem.cx+Math.cos(a)*(mem.r+w),py=mem.cy+Math.sin(a)*(mem.r+w);
+    if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
+  ctx.closePath();
+}
+
+// ── Regional glow — each primary's color bleeds to the canvas edge ──
+function drawGlow(ctx,mem,genome,intensity,dk,t,prims){
+  if(mem.r===0)return;
+  if(prims&&prims.length){
+    for(const p of prims){
+      const pc=dk?p.rgb:sat(p.rgb,1.4),str=p.tv*intensity;
+
+      // Pass 1: MASSIVE wash — reaches canvas edge in this primary's direction
+      // Radius = distance from primary to farthest canvas corner
+      const dx=Math.max(p.x,CW-p.x),dy=Math.max(p.y,CH-p.y);
+      const r1=Math.sqrt(dx*dx+dy*dy);
+      const g1=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r1);
+      g1.addColorStop(0,rg(pc,(dk?0.55:0.35)*str));
+      g1.addColorStop(0.15,rg(pc,(dk?0.4:0.25)*str));
+      g1.addColorStop(0.35,rg(pc,(dk?0.2:0.12)*str));
+      g1.addColorStop(0.6,rg(pc,(dk?0.08:0.04)*str));
+      g1.addColorStop(1,rg(pc,(dk?0.02:0.01)*str));
+      ctx.fillStyle=g1;ctx.fillRect(0,0,CW,CH);
+
+      // Pass 2: Hot concentrated core
+      const r2=p.rd*SC[stg]*5+60;
+      const g2=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r2);
+      g2.addColorStop(0,rg(pc,(dk?0.5:0.3)*str));
+      g2.addColorStop(0.4,rg(pc,(dk?0.2:0.12)*str));
+      g2.addColorStop(1,rg(pc,0));
+      ctx.fillStyle=g2;ctx.fillRect(0,0,CW,CH);
+
+      // Pass 3: Accent color bleed
+      const ac=dk?p.accent:sat(p.accent,1.4);
+      const r3=r1*0.6;
+      const g3=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r3);
+      g3.addColorStop(0,rg(ac,(dk?0.12:0.08)*str));
+      g3.addColorStop(0.4,rg(ac,(dk?0.05:0.03)*str));
+      g3.addColorStop(1,rg(ac,0));
+      ctx.fillStyle=g3;ctx.fillRect(0,0,CW,CH);
+    }
+  }
+}
+function drawMembrane(ctx,mem,genome,dk,t){
+  if(mem.r===0)return;const mc=dk?lt2(genome.glow,50):drk(genome.glow,10);
+  drawMemCircle(ctx,mem,t);ctx.strokeStyle=rg(mc,dk?0.04:0.025);ctx.lineWidth=25;ctx.stroke();
+  drawMemCircle(ctx,mem,t);ctx.strokeStyle=rg(mc,dk?0.06:0.04);ctx.lineWidth=12;ctx.stroke();
+  drawMemCircle(ctx,mem,t);ctx.strokeStyle=rg(mc,dk?0.1:0.07);ctx.lineWidth=5;ctx.stroke();
+  drawMemCircle(ctx,mem,t);ctx.strokeStyle=rg(mc,dk?0.3:0.22);ctx.lineWidth=1.5;ctx.stroke();
+  drawMemCircle(ctx,mem,t);ctx.strokeStyle=rg(dk?lt2(mc,50):mc,dk?0.15:0.1);ctx.lineWidth=0.5;ctx.stroke();
+}
+function drawAIFade(ctx,sc,dk){
+  const bg=dk?'5,10,24':'240,242,245';
+  const g=ctx.createRadialGradient(CX,CY,100*sc,CX,CY,310);
+  g.addColorStop(0,`rgba(${bg},0)`);g.addColorStop(0.6,`rgba(${bg},0)`);
+  g.addColorStop(1,`rgba(${bg},0.93)`);ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);
+}
+
+// ══════════════════════════════════════════════════════════════
+// INTERIOR POOL — 24 distinct organelle treatments
+// Kill a card → replaced with next unused interior
+// ══════════════════════════════════════════════════════════════
+
+const POOL = [
+
+// 0: Lissajous Crosshatch — dense parametric curves
+{name:'Lissajous', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*999|0),bright=dk?lt2(col,90):lt2(col,50),types=['lissajous','rose','spirograph','lissajous','rose'];
+  for(let c=0;c<5;c++){const kind=types[c],ph=sr()*PI2,fa=2+Math.floor(sr()*5),fb=3+Math.floor(sr()*4),pet=3+Math.floor(sr()*4),lw=0.6+sr()*0.3;
+    ctx.beginPath();const np=250+Math.floor(n.tv*150),lp=2+Math.floor(n.tv*5);
+    for(let s=0;s<=np;s++){const tt=(s/np)*PI2*lp;let px,py;
+      if(kind==='lissajous'){px=n.x+Math.sin(fa*tt+ph+t*0.05)*r*0.78;py=n.y+Math.cos(fb*tt+ph*1.3+t*0.04)*r*0.78;}
+      else if(kind==='rose'){const rr=r*0.75*Math.abs(Math.cos(pet*tt+ph+t*0.08));px=n.x+Math.cos(tt)*rr;py=n.y+Math.sin(tt)*rr;}
+      else{const R=r*0.5,r2=r*0.25,d2=r*0.4;px=n.x+(R-r2)*Math.cos(tt+ph)+d2*Math.cos((R-r2)/r2*tt+ph+t*0.06);py=n.y+(R-r2)*Math.sin(tt+ph)+d2*Math.sin((R-r2)/r2*tt+ph+t*0.06);}
+      s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+    ctx.strokeStyle=rg(bright,dk?0.5:0.4);ctx.lineWidth=lw;ctx.stroke();}}},
+
+// 1: Filament Web — branching network
+{name:'Filament', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*666|0),bright=dk?lt2(col,90):lt2(col,50),count=10+Math.ceil(n.tv*10),pts=[];
+  for(let i=0;i<count;i++){const a=sr()*PI2,d=sr()*r*0.75;pts.push({x:n.x+Math.cos(a+t*0.02)*d,y:n.y+Math.sin(a+t*0.02)*d});}
+  pts.push({x:n.x,y:n.y});
+  for(let i=0;i<pts.length;i++){const dists=[];for(let j=0;j<pts.length;j++){if(i===j)continue;dists.push({j,d:ds(pts[i].x,pts[i].y,pts[j].x,pts[j].y)});}
+    dists.sort((a,b)=>a.d-b.d);for(let k=0;k<Math.min(3,dists.length);k++){const o=pts[dists[k].j],cv=sr()*10-5;
+      ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.quadraticCurveTo((pts[i].x+o.x)/2+cv,(pts[i].y+o.y)/2+cv,o.x,o.y);
+      ctx.strokeStyle=rg(bright,dk?0.4:0.32);ctx.lineWidth=0.4+sr()*0.5;ctx.stroke();}}
+  for(const p of pts){ctx.fillStyle=rg(bright,dk?0.5:0.45);ctx.beginPath();ctx.arc(p.x,p.y,0.8+sr()*1.2,0,PI2);ctx.fill();}}},
+
+// 2: Plasma Tendrils — thick flowing organic curves
+{name:'Plasma', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*777|0),bright=dk?lt2(col,100):lt2(col,60),tendrils=4+Math.floor(sr()*3);
+  for(let i=0;i<tendrils;i++){const ba=sr()*PI2,curl=1.5+sr()*2.5;
+    for(let w=0;w<3;w++){ctx.beginPath();for(let s=0;s<=40;s++){const f=s/40,a=ba+f*curl+Math.sin(f*4+t*0.15+n.sd)*0.5;
+      const d=f*r*0.85+w*1.5,px=n.x+Math.cos(a)*d,py=n.y+Math.sin(a)*d;s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+      ctx.strokeStyle=rg(bright,(dk?0.45:0.35)*(1-w*0.3));ctx.lineWidth=2.5-w*0.8;ctx.lineCap='round';ctx.stroke();}}
+  ctx.fillStyle=rg(bright,dk?0.5:0.4);ctx.beginPath();ctx.arc(n.x,n.y,r*0.08,0,PI2);ctx.fill();}},
+
+// 3: Rose Petals — overlapping rose curves
+{name:'Rose', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*444|0),bright=dk?lt2(col,80):lt2(col,45);
+  for(let L=0;L<4;L++){const pet=2+Math.floor(sr()*5),ph=sr()*PI2+t*0.04,sc=0.35+L*0.18;
+    ctx.beginPath();for(let s=0;s<=200;s++){const tt=(s/200)*PI2*2,rr=r*sc*Math.abs(Math.cos(pet*tt*0.5+ph));
+      const px=n.x+Math.cos(tt+ph*0.5)*rr,py=n.y+Math.sin(tt+ph*0.5)*rr;s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+    ctx.strokeStyle=rg(bright,(dk?0.5:0.4)*(1-L*0.1));ctx.lineWidth=0.8-L*0.08;ctx.stroke();if(L===0){ctx.fillStyle=rg(bright,dk?0.08:0.05);ctx.fill();}}}},
+
+// 4: Spirograph — dense epitrochoid curves
+{name:'Spirograph', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*333|0),bright=dk?lt2(col,90):lt2(col,50);
+  for(let c=0;c<5;c++){const R=r*(0.3+sr()*0.4),rr=r*(0.08+sr()*0.2),d=r*(0.1+sr()*0.35),ph=sr()*PI2+t*0.03*(c+1);
+    ctx.beginPath();for(let s=0;s<=400;s++){const tt=(s/400)*PI2*5;
+      const px=n.x+(R-rr)*Math.cos(tt+ph)+d*Math.cos((R-rr)/rr*tt+ph),py=n.y+(R-rr)*Math.sin(tt+ph)+d*Math.sin((R-rr)/rr*tt+ph);
+      s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+    ctx.strokeStyle=rg(bright,(dk?0.4:0.32)*(1-c*0.05));ctx.lineWidth=0.5+sr()*0.4;ctx.stroke();}}},
+
+// 5: Moiré Waves — overlapping sine wave interference
+{name:'Moiré', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*222|0),bright=dk?lt2(col,85):lt2(col,45);
+  for(let w=0;w<7;w++){const ba=w*(PI/7)+sr()*0.3+t*0.02,freq=3+sr()*5,amp=r*0.15+sr()*r*0.2;
+    ctx.beginPath();for(let s=0;s<=80;s++){const f=(s/80-0.5)*2,along=f*r*0.9,wave=Math.sin(f*freq+t*0.1+w)*amp*Math.max(0,1-Math.abs(f));
+      const ca=Math.cos(ba),sa=Math.sin(ba),px=n.x+ca*along-sa*wave,py=n.y+sa*along+ca*wave;s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+    ctx.strokeStyle=rg(bright,(dk?0.4:0.3));ctx.lineWidth=0.6+sr()*0.4;ctx.stroke();}}},
+
+// 6: Dendrite Branch — recursive branching trees
+{name:'Dendrite', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*111|0),bright=dk?lt2(col,90):lt2(col,50);
+  function branch(x,y,a,len,dep,lw){if(dep<=0||len<3)return;const w=Math.sin(t*0.15+dep*1.7+sr()*10)*0.15;
+    const ex=x+Math.cos(a+w)*len,ey=y+Math.sin(a+w)*len;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ex,ey);
+    ctx.strokeStyle=rg(bright,(dk?0.5:0.4)*(dep/4));ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
+    const sp=0.4+sr()*0.5;branch(ex,ey,a-sp,len*0.65,dep-1,lw*0.7);branch(ex,ey,a+sp,len*0.65,dep-1,lw*0.7);
+    if(sr()>0.5)branch(ex,ey,a+(sr()-0.5)*0.3,len*0.5,dep-1,lw*0.5);}
+  for(let b=0;b<4+Math.floor(sr()*3);b++){branch(n.x,n.y,(b/(4+Math.floor(sr()*3)))*PI2+sr()*0.3+t*0.02,r*0.45,4,2);}
+  ctx.fillStyle=rg(bright,dk?0.4:0.35);ctx.beginPath();ctx.arc(n.x,n.y,r*0.1,0,PI2);ctx.fill();}},
+
+// 7: Starburst — radial lines with organic wobble
+{name:'Starburst', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*888|0),bright=dk?lt2(col,90):lt2(col,50),rays=14+Math.floor(sr()*12+n.tv*8);
+  for(let i=0;i<rays;i++){const a=(i/rays)*PI2+sr()*0.1+t*0.03,len=r*(0.3+sr()*0.65),wb=Math.sin(a*3+t*0.2+n.sd)*r*0.06;
+    const mx=n.x+Math.cos(a)*len*0.5+Math.cos(a+PI/2)*wb,my=n.y+Math.sin(a)*len*0.5+Math.sin(a+PI/2)*wb;
+    ctx.beginPath();ctx.moveTo(n.x+Math.cos(a)*r*0.05,n.y+Math.sin(a)*r*0.05);ctx.quadraticCurveTo(mx,my,n.x+Math.cos(a)*len,n.y+Math.sin(a)*len);
+    ctx.strokeStyle=rg(bright,(dk?0.5:0.4)*(0.5+sr()*0.5));ctx.lineWidth=0.3+sr()*2;ctx.lineCap='round';ctx.stroke();}
+  const cg=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*0.15);cg.addColorStop(0,rg(bright,dk?0.6:0.5));cg.addColorStop(1,rg(bright,0));
+  ctx.fillStyle=cg;ctx.beginPath();ctx.arc(n.x,n.y,r*0.15,0,PI2);ctx.fill();}},
+
+// 8: Axon Tree — thick-to-thin neuron-like branches with bright soma
+{name:'Axon Tree', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*1234|0),bright=dk?lt2(col,100):lt2(col,60),hot=dk?lt2(col,150):lt2(col,100);
+  const arms=3+Math.floor(sr()*3);
+  for(let a=0;a<arms;a++){const baseA=(a/arms)*PI2+sr()*0.5+t*0.015;
+    let cx2=n.x,cy2=n.y,ca=baseA,lw=3+sr()*2;
+    for(let seg=0;seg<12;seg++){const len=(r*0.12)*(1-seg*0.04)+sr()*r*0.04;
+      const nx2=cx2+Math.cos(ca)*len,ny2=cy2+Math.sin(ca)*len;
+      ctx.beginPath();ctx.moveTo(cx2,cy2);ctx.lineTo(nx2,ny2);ctx.strokeStyle=rg(bright,(dk?0.6:0.5)*(1-seg*0.06));ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
+      cx2=nx2;cy2=ny2;ca+=sr()*0.8-0.4;lw*=0.82;
+      if(seg>4&&sr()>0.4){const ba=ca+(sr()>0.5?0.6:-0.6);let bx=cx2,by=cy2,bw=lw*0.8;
+        for(let b=0;b<5;b++){const bx2=bx+Math.cos(ba+sr()*0.3)*r*0.06,by2=by+Math.sin(ba+sr()*0.3)*r*0.06;
+          ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx2,by2);ctx.strokeStyle=rg(bright,(dk?0.4:0.3)*(1-b*0.15));ctx.lineWidth=bw;ctx.lineCap='round';ctx.stroke();
+          bx=bx2;by=by2;bw*=0.7;}}}}
+  // Hot soma core
+  const sg=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*0.2);
+  sg.addColorStop(0,rg(hot,dk?0.8:0.7));sg.addColorStop(0.4,rg(bright,dk?0.4:0.3));sg.addColorStop(1,rg(bright,0));
+  ctx.fillStyle=sg;ctx.beginPath();ctx.arc(n.x,n.y,r*0.2,0,PI2);ctx.fill();}},
+
+// 9: Nucleus Radials — central sphere with radiating filaments (ref image 1)
+{name:'Nucleus Radials', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*2345|0),bright=dk?lt2(col,90):lt2(col,50),hot=dk?lt2(col,140):lt2(col,90);
+  // Radiating filaments from nucleus
+  const rays=18+Math.floor(sr()*10);
+  for(let i=0;i<rays;i++){const a=(i/rays)*PI2+Math.sin(t*0.1+i)*0.1,len=r*0.4+sr()*r*0.45;
+    ctx.beginPath();ctx.moveTo(n.x+Math.cos(a)*r*0.15,n.y+Math.sin(a)*r*0.15);
+    const mx=n.x+Math.cos(a)*len*0.6+Math.sin(t*0.2+i*2)*3,my=n.y+Math.sin(a)*len*0.6+Math.cos(t*0.2+i*2)*3;
+    ctx.quadraticCurveTo(mx,my,n.x+Math.cos(a)*len,n.y+Math.sin(a)*len);
+    ctx.strokeStyle=rg(bright,(dk?0.25:0.18)*(0.5+sr()*0.5));ctx.lineWidth=0.4+sr()*0.8;ctx.stroke();}
+  // Bright nucleus sphere
+  const sg=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*0.22);
+  sg.addColorStop(0,rg(hot,dk?0.85:0.75));sg.addColorStop(0.5,rg(bright,dk?0.5:0.4));sg.addColorStop(1,rg(bright,0));
+  ctx.fillStyle=sg;ctx.beginPath();ctx.arc(n.x,n.y,r*0.22,0,PI2);ctx.fill();}},
+
+// 10: Synaptic Dots — branches with bright junction dots (ref image 3)
+{name:'Synaptic', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*3456|0),bright=dk?lt2(col,80):lt2(col,45),hot=dk?lt2(col,130):lt2(col,80);
+  const arms=5+Math.floor(sr()*3),junctions=[];
+  for(let a=0;a<arms;a++){const ba=(a/arms)*PI2+sr()*0.4;
+    let cx2=n.x,cy2=n.y,ca=ba;
+    for(let s=0;s<8;s++){const len=r*0.1+sr()*r*0.05,nx2=cx2+Math.cos(ca)*len,ny2=cy2+Math.sin(ca)*len;
+      ctx.beginPath();ctx.moveTo(cx2,cy2);ctx.lineTo(nx2,ny2);ctx.strokeStyle=rg(bright,(dk?0.45:0.35)*(1-s*0.08));ctx.lineWidth=1.5-s*0.12;ctx.lineCap='round';ctx.stroke();
+      if(s>1&&sr()>0.3)junctions.push({x:nx2,y:ny2,sz:1.5+sr()*3});
+      cx2=nx2;cy2=ny2;ca+=sr()*0.7-0.35;}}
+  // Bright synaptic dots
+  for(const j of junctions){const jg=ctx.createRadialGradient(j.x,j.y,0,j.x,j.y,j.sz*3);
+    jg.addColorStop(0,rg(hot,dk?0.8:0.7));jg.addColorStop(0.3,rg(bright,dk?0.3:0.2));jg.addColorStop(1,rg(bright,0));
+    ctx.fillStyle=jg;ctx.beginPath();ctx.arc(j.x,j.y,j.sz*3,0,PI2);ctx.fill();}}},
+
+// 11: Vesicles — scattered organelle blobs of varying sizes (ref image 1)
+{name:'Vesicles', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*4567|0),bright=dk?lt2(col,70):lt2(col,40),hot=dk?lt2(col,120):lt2(col,70);
+  const count=8+Math.floor(sr()*8+n.tv*6);
+  for(let i=0;i<count;i++){const a=sr()*PI2+t*0.01,d=r*0.15+sr()*r*0.6,sz=r*0.06+sr()*r*0.15;
+    const vx=n.x+Math.cos(a)*d,vy=n.y+Math.sin(a)*d;
+    // Blob shape
+    blobP(ctx,vx,vy,sz,n.sd+i*71,t);ctx.fillStyle=rg(dk?drk(bright,20):lt2(bright,10),dk?0.5:0.4);ctx.fill();
+    blobP(ctx,vx,vy,sz,n.sd+i*71,t);ctx.strokeStyle=rg(bright,dk?0.3:0.25);ctx.lineWidth=0.6;ctx.stroke();
+    // Inner glow
+    const vg=ctx.createRadialGradient(vx,vy,0,vx,vy,sz*0.6);
+    vg.addColorStop(0,rg(hot,dk?0.4:0.3));vg.addColorStop(1,rg(hot,0));
+    ctx.fillStyle=vg;ctx.beginPath();ctx.arc(vx,vy,sz*0.6,0,PI2);ctx.fill();}
+  // Scattered particles
+  for(let i=0;i<15;i++){const a=sr()*PI2,d=sr()*r*0.8;
+    ctx.fillStyle=rg(bright,dk?0.4:0.3);ctx.beginPath();ctx.arc(n.x+Math.cos(a)*d,n.y+Math.sin(a)*d,0.5+sr()*1.5,0,PI2);ctx.fill();}}},
+
+// 12: Electric Arc — lightning-like branching with hot core
+{name:'Electric Arc', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*5678|0),bright=dk?lt2(col,90):lt2(col,50),hot=dk?[220,240,255]:[180,200,240];
+  const arcs=4+Math.floor(sr()*3);
+  for(let a=0;a<arcs;a++){const ba=(a/arcs)*PI2+sr()*0.5+t*0.02;
+    const pts=[{x:n.x,y:n.y}];let cx2=n.x,cy2=n.y,ca=ba;
+    for(let s=0;s<10;s++){const len=r*0.08+sr()*r*0.06;ca+=sr()*0.6-0.3;
+      cx2+=Math.cos(ca)*len;cy2+=Math.sin(ca)*len;pts.push({x:cx2,y:cy2});}
+    // Glow pass
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.strokeStyle=rg(bright,dk?0.15:0.1);ctx.lineWidth=6;ctx.lineCap='round';ctx.stroke();
+    // Core pass
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.strokeStyle=rg(hot,dk?0.6:0.5);ctx.lineWidth=1.2;ctx.stroke();
+    // Fork branches
+    for(let i=3;i<pts.length;i+=2){if(sr()>0.4)continue;let fx=pts[i].x,fy=pts[i].y,fa=ca+(sr()>0.5?0.7:-0.7);
+      ctx.beginPath();ctx.moveTo(fx,fy);for(let b=0;b<4;b++){fx+=Math.cos(fa)*r*0.05;fy+=Math.sin(fa)*r*0.05;fa+=sr()*0.4-0.2;ctx.lineTo(fx,fy);}
+      ctx.strokeStyle=rg(hot,dk?0.4:0.3);ctx.lineWidth=0.6;ctx.stroke();}}
+  const sg=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*0.18);
+  sg.addColorStop(0,rg(hot,dk?0.9:0.8));sg.addColorStop(0.5,rg(bright,dk?0.3:0.2));sg.addColorStop(1,rg(bright,0));
+  ctx.fillStyle=sg;ctx.beginPath();ctx.arc(n.x,n.y,r*0.18,0,PI2);ctx.fill();}},
+
+// 13: Capillary Mesh — extremely fine dense mesh
+{name:'Capillary', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*6789|0),bright=dk?lt2(col,80):lt2(col,45);
+  const pts=[];for(let i=0;i<25+Math.floor(n.tv*15);i++){const a=sr()*PI2,d=sr()*r*0.8;pts.push({x:n.x+Math.cos(a+t*0.008)*d,y:n.y+Math.sin(a+t*0.008)*d});}
+  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+    const d=ds(pts[i].x,pts[i].y,pts[j].x,pts[j].y);if(d<r*0.45){
+      ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);
+      ctx.strokeStyle=rg(bright,(dk?0.2:0.15)*(1-d/(r*0.45)));ctx.lineWidth=0.3;ctx.stroke();}}}},
+
+// 14: Pulse Rings — expanding concentric rings from center
+{name:'Pulse Rings', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*7890|0),bright=dk?lt2(col,90):lt2(col,50);
+  const rings=6+Math.floor(sr()*4);
+  for(let i=0;i<rings;i++){const phase=(t*0.3+i*0.7+sr()*2)%3,rr=r*0.1+phase*r*0.3,alpha=Math.max(0,1-phase/2.5);
+    if(rr>0&&alpha>0){ctx.beginPath();for(let s=0;s<=48;s++){const a=(s/48)*PI2,w=Math.sin(a*4+t*0.3+i)*rr*0.06;
+      const px=n.x+Math.cos(a)*(rr+w),py=n.y+Math.sin(a)*(rr+w);s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}ctx.closePath();
+      ctx.strokeStyle=rg(bright,(dk?0.5:0.4)*alpha);ctx.lineWidth=1.5-phase*0.3;ctx.stroke();}}
+  ctx.fillStyle=rg(bright,dk?0.5:0.4);ctx.beginPath();ctx.arc(n.x,n.y,r*0.08,0,PI2);ctx.fill();}},
+
+// 15: Chromatin Tangle — dense squiggly tangled threads
+{name:'Chromatin', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*8901|0),bright=dk?lt2(col,85):lt2(col,48);
+  const strands=6+Math.floor(sr()*4);
+  for(let s=0;s<strands;s++){const startA=sr()*PI2,startR=sr()*r*0.3;
+    let cx2=n.x+Math.cos(startA)*startR,cy2=n.y+Math.sin(startA)*startR;
+    ctx.beginPath();ctx.moveTo(cx2,cy2);
+    for(let p=0;p<30;p++){const da=sr()*1.2-0.6+Math.sin(t*0.12+s+p*0.3)*0.3,step=r*0.04+sr()*r*0.03;
+      cx2+=Math.cos(da+p*0.5+s)*step;cy2+=Math.sin(da+p*0.7+s)*step;
+      ctx.lineTo(cx2,cy2);}
+    ctx.strokeStyle=rg(bright,dk?0.45:0.35);ctx.lineWidth=0.8+sr()*0.6;ctx.lineCap='round';ctx.stroke();}}},
+
+// 16: Spore Cloud — clustered tiny dot formations
+{name:'Spore Cloud', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*9012|0),bright=dk?lt2(col,90):lt2(col,50);
+  const clusters=4+Math.floor(sr()*3);
+  for(let c=0;c<clusters;c++){const ca=sr()*PI2+t*0.01,cd=sr()*r*0.5,cx2=n.x+Math.cos(ca)*cd,cy2=n.y+Math.sin(ca)*cd;
+    const dots=8+Math.floor(sr()*12);
+    for(let d=0;d<dots;d++){const da=sr()*PI2,dd=sr()*r*0.15;
+      const dx=cx2+Math.cos(da)*dd,dy=cy2+Math.sin(da)*dd,sz=0.5+sr()*2.5;
+      const dg=ctx.createRadialGradient(dx,dy,0,dx,dy,sz*2);
+      dg.addColorStop(0,rg(bright,dk?0.6:0.5));dg.addColorStop(0.5,rg(bright,dk?0.15:0.1));dg.addColorStop(1,rg(bright,0));
+      ctx.fillStyle=dg;ctx.beginPath();ctx.arc(dx,dy,sz*2,0,PI2);ctx.fill();}}}},
+
+// 17: Fiber Optic — parallel curving lines diverging from center
+{name:'Fiber Optic', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*1357|0),bright=dk?lt2(col,95):lt2(col,55);
+  const fibers=10+Math.floor(sr()*8);
+  for(let f=0;f<fibers;f++){const baseA=(f/fibers)*PI2+sr()*0.2+t*0.02,spread=sr()*0.3-0.15;
+    ctx.beginPath();let cx2=n.x,cy2=n.y;ctx.moveTo(cx2,cy2);
+    for(let s=1;s<=20;s++){const frac=s/20,a=baseA+spread*frac+Math.sin(frac*3+t*0.15+f)*0.15;
+      cx2=n.x+Math.cos(a)*frac*r*0.85;cy2=n.y+Math.sin(a)*frac*r*0.85;ctx.lineTo(cx2,cy2);}
+    ctx.strokeStyle=rg(bright,(dk?0.4:0.3)*(0.5+sr()*0.5));ctx.lineWidth=0.4+sr()*0.8;ctx.lineCap='round';ctx.stroke();}}},
+
+// 18: Galaxy Spiral — spiral arms with star-like dots
+{name:'Galaxy', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*2468|0),bright=dk?lt2(col,90):lt2(col,50),hot=dk?lt2(col,140):lt2(col,90);
+  const arms=2+Math.floor(sr()*2),spin=t*0.08+n.sd;
+  for(let a=0;a<arms;a++){const ba=(a/arms)*PI2+spin;
+    ctx.beginPath();for(let s=0;s<=80;s++){const f=s/80,angle=ba+f*PI*3,dist=f*r*0.85;
+      const px=n.x+Math.cos(angle)*dist,py=n.y+Math.sin(angle)*dist;s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      if(s%4===0&&f>0.1){ctx.fillStyle=rg(hot,(dk?0.6:0.5)*f);ctx.fillRect(px-0.5,py-0.5,1,1);}}
+    ctx.strokeStyle=rg(bright,dk?0.35:0.28);ctx.lineWidth=1.5-0.8*(1);ctx.stroke();}
+  // Star dots scattered
+  for(let i=0;i<20;i++){const a=sr()*PI2,d=sr()*r*0.7;
+    ctx.fillStyle=rg(hot,dk?0.5:0.4);ctx.beginPath();ctx.arc(n.x+Math.cos(a)*d,n.y+Math.sin(a)*d,0.5+sr()*1,0,PI2);ctx.fill();}
+  const cg=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*0.12);cg.addColorStop(0,rg(hot,dk?0.8:0.7));cg.addColorStop(1,rg(hot,0));
+  ctx.fillStyle=cg;ctx.beginPath();ctx.arc(n.x,n.y,r*0.12,0,PI2);ctx.fill();}},
+
+// 19: Coral Branches — organic branching with bulbous tips
+{name:'Coral', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*3579|0),bright=dk?lt2(col,85):lt2(col,48);
+  const branches=5+Math.floor(sr()*3);
+  function drawCoral(x,y,a,len,dep,lw){if(dep<=0||len<4)return;
+    const segs=4+Math.floor(sr()*3);let cx2=x,cy2=y,ca=a;
+    for(let s=0;s<segs;s++){const nx2=cx2+Math.cos(ca)*len/segs,ny2=cy2+Math.sin(ca)*len/segs;
+      ctx.beginPath();ctx.moveTo(cx2,cy2);ctx.lineTo(nx2,ny2);ctx.strokeStyle=rg(bright,(dk?0.5:0.4)*(dep/3));ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
+      cx2=nx2;cy2=ny2;ca+=sr()*0.3-0.15;}
+    // Bulbous tip
+    ctx.fillStyle=rg(bright,(dk?0.35:0.28)*(dep/3));ctx.beginPath();ctx.arc(cx2,cy2,lw*1.5,0,PI2);ctx.fill();
+    if(dep>1){const sp=0.5+sr()*0.4;drawCoral(cx2,cy2,ca-sp,len*0.6,dep-1,lw*0.7);drawCoral(cx2,cy2,ca+sp,len*0.6,dep-1,lw*0.7);}}
+  for(let b=0;b<branches;b++){drawCoral(n.x,n.y,(b/branches)*PI2+sr()*0.4+t*0.01,r*0.4,3,2.5);}}},
+
+// 20: Mitosis — two nuclei with shared filaments
+{name:'Mitosis', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*4680|0),bright=dk?lt2(col,85):lt2(col,48),hot=dk?lt2(col,130):lt2(col,80);
+  const sep=r*0.25+Math.sin(t*0.15)*r*0.05,a0=sr()*PI2+t*0.02;
+  const n1={x:n.x+Math.cos(a0)*sep,y:n.y+Math.sin(a0)*sep},n2={x:n.x-Math.cos(a0)*sep,y:n.y-Math.sin(a0)*sep};
+  // Spindle fibers between nuclei
+  for(let f=0;f<12;f++){const off=(f/12-0.5)*r*0.5;
+    const mx=n.x+Math.cos(a0+PI/2)*off+Math.sin(t*0.2+f)*3,my=n.y+Math.sin(a0+PI/2)*off+Math.cos(t*0.2+f)*3;
+    ctx.beginPath();ctx.moveTo(n1.x,n1.y);ctx.quadraticCurveTo(mx,my,n2.x,n2.y);
+    ctx.strokeStyle=rg(bright,(dk?0.25:0.18));ctx.lineWidth=0.4;ctx.stroke();}
+  // Two nuclei
+  for(const nn of [n1,n2]){const sg=ctx.createRadialGradient(nn.x,nn.y,0,nn.x,nn.y,r*0.2);
+    sg.addColorStop(0,rg(hot,dk?0.8:0.7));sg.addColorStop(0.5,rg(bright,dk?0.3:0.2));sg.addColorStop(1,rg(bright,0));
+    ctx.fillStyle=sg;ctx.beginPath();ctx.arc(nn.x,nn.y,r*0.2,0,PI2);ctx.fill();}}},
+
+// 21: Mycelium — organic branching with nodes at forks
+{name:'Mycelium', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*5791|0),bright=dk?lt2(col,88):lt2(col,50),nodes2=[];
+  function grow(x,y,a,len,dep){if(dep<=0||len<3)return;
+    const ex=x+Math.cos(a+Math.sin(t*0.1+dep)*0.1)*len,ey=y+Math.sin(a+Math.sin(t*0.1+dep)*0.1)*len;
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ex,ey);ctx.strokeStyle=rg(bright,(dk?0.4:0.3)*(dep/5));ctx.lineWidth=0.5+dep*0.3;ctx.stroke();
+    nodes2.push({x:ex,y:ey,sz:1+dep*0.5});
+    const forks=sr()>0.6?3:2;for(let f=0;f<forks;f++){grow(ex,ey,a+(f-1)*0.6+sr()*0.3,len*0.65,dep-1);}}
+  for(let b=0;b<5;b++){grow(n.x,n.y,(b/5)*PI2+sr()*0.3+t*0.01,r*0.3,4);}
+  for(const nd of nodes2){ctx.fillStyle=rg(bright,dk?0.5:0.4);ctx.beginPath();ctx.arc(nd.x,nd.y,nd.sz,0,PI2);ctx.fill();}}},
+
+// 22: Membrane Folds — concentric irregular organic shapes
+{name:'Membrane Folds', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*6802|0),bright=dk?lt2(col,80):lt2(col,45);
+  const layers=5+Math.floor(sr()*3);
+  for(let L=0;L<layers;L++){const lr=r*(0.15+L*0.13),wobbleAmp=lr*0.15+sr()*lr*0.1;
+    ctx.beginPath();for(let s=0;s<=48;s++){const a=(s/48)*PI2;
+      const w=Math.sin(a*3+t*0.2+L*2+sr()*5)*wobbleAmp+Math.sin(a*5+t*0.15+L)*wobbleAmp*0.4;
+      const px=n.x+Math.cos(a)*(lr+w),py=n.y+Math.sin(a)*(lr+w);s===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}ctx.closePath();
+    ctx.strokeStyle=rg(bright,(dk?0.4:0.3)*(1-L*0.08));ctx.lineWidth=0.6+sr()*0.4;ctx.stroke();}}},
+
+// 23: Constellation Mesh — angular connections between distant points
+{name:'Constellation', fn(ctx,n,r,col,dk,t){
+  const sr=m32(n.sd*7913|0),bright=dk?lt2(col,90):lt2(col,55),hot=dk?lt2(col,140):lt2(col,90);
+  const stars=12+Math.floor(sr()*8);const pts=[];
+  for(let i=0;i<stars;i++){const a=sr()*PI2,d=r*0.1+sr()*r*0.7;
+    pts.push({x:n.x+Math.cos(a+t*0.005)*d,y:n.y+Math.sin(a+t*0.005)*d});}
+  // Long-range connections (unlike filament which connects nearest)
+  for(let i=0;i<pts.length;i++)for(let j=i+2;j<pts.length;j+=2){
+    if(sr()>0.5)continue;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);
+    ctx.strokeStyle=rg(bright,dk?0.15:0.1);ctx.lineWidth=0.3;ctx.stroke();}
+  for(const p of pts){const sg=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,3+sr()*4);
+    sg.addColorStop(0,rg(hot,dk?0.8:0.7));sg.addColorStop(0.5,rg(bright,dk?0.2:0.15));sg.addColorStop(1,rg(bright,0));
+    ctx.fillStyle=sg;ctx.beginPath();ctx.arc(p.x,p.y,3+sr()*4,0,PI2);ctx.fill();}}}
+
+];
+
+// ══════════════════════════════════════════════════════════════
+// CARD RENDERER
+// ══════════════════════════════════════════════════════════════
+function renderCard(card,t,dt){
+  const {ctx,act,con,pul,interiorFn}=card;
+  const sc=SC[stg],gs=GS[stg],dk=thm==='dark',genome=card.genome;
+  ctx.fillStyle=dk?'#050A18':'#F0F2F5';ctx.fillRect(0,0,CW,CH);
+  updN(act,t,sc);const mem=mkMem(act,t);updPul(pul,dt);
+  const prims=act.filter(n=>n.tp==='p');
+
+  drawGlow(ctx,mem,genome,gs,dk,t,prims);
+
+  // Connections
+  for(const c of con){const a=act[c.a],b=act[c.b];if(!a||!b)continue;
+    const m=cMid(a,b,c.cs,t),col=vc(c.col,dk);
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(m.x,m.y,b.x,b.y);
+    ctx.strokeStyle=rg(col,(dk?0.06:0.08)+c.str*0.04);ctx.lineWidth=8+c.str*5;ctx.lineCap='round';ctx.stroke();
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(m.x,m.y,b.x,b.y);
+    ctx.strokeStyle=rg(col,(dk?0.15:0.18)+c.str*0.1);ctx.lineWidth=3+c.str*3;ctx.lineCap='round';ctx.stroke();
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(m.x,m.y,b.x,b.y);
+    ctx.strokeStyle=rg(dk?lt2(col,30):col,(dk?0.5:0.6)+c.str*0.15);ctx.lineWidth=0.7+c.str*0.9;ctx.stroke();
+  }
+
+  // Pulses
+  for(const p of pul){const a=act[p.a],b=act[p.b];if(!a||!b)continue;
+    const m=cMid(a,b,p.cs,t),pr=p.p,mt=1-pr;
+    const px=mt*mt*a.x+2*mt*pr*m.x+pr*pr*b.x,py=mt*mt*a.y+2*mt*pr*m.y+pr*pr*b.y;
+    const gr=ctx.createRadialGradient(px,py,0,px,py,p.sz*2.5);
+    gr.addColorStop(0,rg(vc(p.col,dk),dk?0.7:0.6));gr.addColorStop(0.3,rg(p.col,dk?0.25:0.2));gr.addColorStop(1,rg(p.col,0));
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(px,py,p.sz*2.5,0,PI2);ctx.fill();
+  }
+
+  // Nodes
+  const sorted=[...act].sort((a,b)=>a.dp-b.dp);
+  for(const n of sorted){
+    const r=n.rd*sc*(1+0.03*Math.sin(n.bp+t*0.8)),col=vc(n.rgb,dk);
+    if(n.tp==='p'){
+      const hr=ctx.createRadialGradient(n.x,n.y,r*0.6,n.x,n.y,r*2.2);
+      hr.addColorStop(0,rg(col,dk?0.2:0.15));hr.addColorStop(0.4,rg(col,dk?0.08:0.05));hr.addColorStop(1,rg(col,0));
+      ctx.fillStyle=hr;ctx.beginPath();ctx.arc(n.x,n.y,r*2.2,0,PI2);ctx.fill();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.fillStyle=rg(dk?drk(col,55):lt2(col,10),dk?0.88:0.78);ctx.fill();
+      ctx.save();blobP(ctx,n.x,n.y,r,n.sd,t);ctx.clip();interiorFn(ctx,n,r,col,dk,t);ctx.restore();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.strokeStyle=rg(col,dk?0.15:0.1);ctx.lineWidth=6;ctx.stroke();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.strokeStyle=rg(col,dk?0.35:0.25);ctx.lineWidth=2.5;ctx.stroke();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.strokeStyle=rg(dk?lt2(col,40):col,dk?0.75:0.65);ctx.lineWidth=0.8;ctx.stroke();
+    } else if(n.tp==='c'){
+      const gr2=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*5);
+      gr2.addColorStop(0,rg(col,dk?0.2:0.15));gr2.addColorStop(0.3,rg(col,dk?0.08:0.06));gr2.addColorStop(1,rg(col,0));
+      ctx.fillStyle=gr2;ctx.beginPath();ctx.arc(n.x,n.y,r*5,0,PI2);ctx.fill();
+      const gr=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*3);
+      gr.addColorStop(0,rg(col,dk?0.45:0.35));gr.addColorStop(0.3,rg(col,dk?0.2:0.15));gr.addColorStop(0.6,rg(col,dk?0.06:0.04));gr.addColorStop(1,rg(col,0));
+      ctx.fillStyle=gr;ctx.beginPath();ctx.arc(n.x,n.y,r*3,0,PI2);ctx.fill();
+      ctx.fillStyle=rg(dk?drk(col,25):lt2(col,10),dk?0.85:0.75);ctx.beginPath();ctx.arc(n.x,n.y,r,0,PI2);ctx.fill();
+      ctx.fillStyle=rg(dk?lt2(col,80):col,dk?0.9:0.85);ctx.beginPath();ctx.arc(n.x,n.y,r*0.4,0,PI2);ctx.fill();
+      ctx.strokeStyle=rg(col,dk?0.6:0.5);ctx.lineWidth=0.6;ctx.beginPath();ctx.arc(n.x,n.y,r,0,PI2);ctx.stroke();
+    } else {
+      const gr2=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*4);
+      gr2.addColorStop(0,rg(col,dk?0.35:0.28));gr2.addColorStop(0.3,rg(col,dk?0.12:0.08));gr2.addColorStop(1,rg(col,0));
+      ctx.fillStyle=gr2;ctx.beginPath();ctx.arc(n.x,n.y,r*4,0,PI2);ctx.fill();
+      ctx.fillStyle=rg(col,dk?0.8:0.7);ctx.beginPath();ctx.arc(n.x,n.y,r,0,PI2);ctx.fill();
+    }
+  }
+
+  if(ent==='human') drawMembrane(ctx,mem,genome,dk,t);
+  else drawAIFade(ctx,sc,dk);
+}
+
+// ── Main loop ──
+function render(ts){
+  const t=(ts-st)/1000,dt=lt?Math.min((ts-lt)/1000,0.05):0.016;lt=ts;
+  for(let i=0;i<NC;i++)renderCard(cards[i],t,dt);
+  requestAnimationFrame(render);
+}
+
+// ── Kill/Replace system ──
+let usedIndices=new Set();
+function nextInterior(exclude){
+  const avail=[];for(let i=0;i<POOL.length;i++){if(!usedIndices.has(i)&&i!==exclude)avail.push(i);}
+  if(!avail.length){usedIndices.clear();for(let i=0;i<NC;i++)if(cards[i])usedIndices.add(cards[i].poolIdx);
+    for(let i=0;i<POOL.length;i++){if(!usedIndices.has(i))avail.push(i);}}
+  const idx=avail[Math.floor(Math.random()*avail.length)];
+  usedIndices.add(idx);return idx;
+}
+
+function killCard(i){
+  const old=cards[i].poolIdx;
+  const idx=nextInterior(old);
+  usedIndices.delete(old);
+  const g=rGen(),all=mkNodes(g),act=filt(all,stg),cn=mkCon(act),pl=mkPul(cn,g.s);
+  cards[i]={genome:g,all,act,con:cn,pul:pl,ctx:cards[i].ctx,interiorFn:POOL[idx].fn,poolIdx:idx};
+  document.querySelector(`#grid .card:nth-child(${i+1}) .lbl`).innerHTML=`<b>${String.fromCharCode(65+i)}</b> ${POOL[idx].name}`;
+}
+
+// ── Build grid HTML ──
+function buildGrid(){
+  const grid=document.getElementById('grid');grid.innerHTML='';
+  for(let i=0;i<NC;i++){
+    const card=document.createElement('div');card.className='card';
+    card.innerHTML=`<canvas id="c${i}" width="${CW}" height="${CH}"></canvas><div class="kill" onclick="killCard(${i})">✕</div><div class="lbl"><b>${String.fromCharCode(65+i)}</b> —</div>`;
+    grid.appendChild(card);
+  }
+}
+
+// ── Controls ──
+function bCard(i){
+  const idx=nextInterior(-1);
+  return bCardWith(i,idx);
+}
+function bCardWith(i,idx){
+  usedIndices.add(idx);
+  const g=rGen(),all=mkNodes(g),act=filt(all,stg),cn=mkCon(act),pl=mkPul(cn,g.s);
+  const c={genome:g,all,act,con:cn,pul:pl,ctx:document.getElementById('c'+i).getContext('2d'),interiorFn:POOL[idx].fn,poolIdx:idx};
+  document.querySelector(`#grid .card:nth-child(${i+1}) .lbl`).innerHTML=`<b>${String.fromCharCode(65+i)}</b> ${POOL[idx].name}`;
+  return c;
+}
+function rebC(){for(let i=0;i<NC;i++){const c=cards[i];c.act=filt(c.all,stg);c.con=mkCon(c.act);c.pul=mkPul(c.con,c.genome.s);}}
+function rAll(){usedIndices.clear();buildGrid();cards=[];for(let i=0;i<NC;i++)cards.push(bCard(i));}
+function sS(i){if(i===stg)rAll();stg=i;for(let j=0;j<4;j++)document.getElementById('s'+j).classList.toggle('on',j===i);rebC();}
+function sE(m){ent=m;document.getElementById('eh').classList.toggle('on',m==='human');document.getElementById('ea').classList.toggle('on',m==='ai');}
+function sT(t2){thm=t2;document.body.className=t2;document.getElementById('td').classList.toggle('on',t2==='dark');document.getElementById('tl').classList.toggle('on',t2==='light');}
+
+// Pre-seed with Philip's 6 keepers: Chromatin(15), Constellation(23), Vesicles(11), Axon Tree(8), Membrane Folds(22), Synaptic(10)
+const SEED=[15,23,11,8,22,10];
+buildGrid();cards=[];for(let i=0;i<NC;i++)cards.push(bCardWith(i,SEED[i]));
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Constellation — Macro Iteration v2</title>
+<style>
+  /* ============================================================
+     RESET & BASE
+     ============================================================ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  .header {
+    height: 50px;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: #0e0e16;
+    border-bottom: 1px solid #1e1e2e;
+    z-index: 10;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #6a6a80;
+    white-space: nowrap;
+  }
+
+  .macro-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: #1e1e2e;
+    border: 1px solid #2a2a3e;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #8b8ba0;
+  }
+
+  .header-left .subject {
+    color: #e0e0e8;
+    font-weight: 500;
+    font-size: 14px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .feedback-btn {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #2a2a3e;
+    border-radius: 6px;
+    background: transparent;
+    color: #8b8ba0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .feedback-btn:hover {
+    background: #1e1e2e;
+    color: #e0e0e8;
+    border-color: #3a3a52;
+  }
+
+  .feedback-btn.has-ratings {
+    border-color: #3ecf8e44;
+    color: #3ecf8e;
+  }
+
+  /* ============================================================
+     GRID
+     ============================================================ */
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 6px;
+    padding: 6px;
+    min-height: 0;
+  }
+
+  /* ============================================================
+     CARD
+     ============================================================ */
+  .card {
+    display: flex;
+    flex-direction: column;
+    background: #12121e;
+    border: 1px solid #1e1e2e;
+    border-radius: 8px;
+    overflow: hidden;
+    min-height: 0;
+    position: relative;
+    transition: all 0.3s ease;
+  }
+
+  .card.state-kept {
+    border-color: #3ecf8e55;
+    box-shadow: 0 0 12px #3ecf8e18, inset 0 0 12px #3ecf8e08;
+  }
+
+  .card.state-remix {
+    border-color: #c89b3c55;
+    box-shadow: 0 0 12px #c89b3c18, inset 0 0 12px #c89b3c08;
+  }
+
+  .card.state-killed {
+    opacity: 0.35;
+    filter: saturate(0.3);
+  }
+
+  .card.state-killed .card-controls {
+    opacity: 1;
+    filter: saturate(1);
+  }
+
+  /* VIZ AREA */
+  .viz-area {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    background: #0a0a0f;
+    border-radius: 7px 7px 0 0;
+  }
+
+  .viz-area canvas,
+  .viz-area svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* CARD BOTTOM STRIP */
+  .card-info {
+    padding: 6px 10px 4px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #12121e;
+    border-top: 1px solid #1a1a28;
+  }
+
+  .card-badge {
+    font-size: 10px;
+    font-weight: 700;
+    color: #6a6a80;
+    background: #1a1a28;
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  .card-badge.star { color: #d946ef; background: #d946ef18; }
+
+  .card-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #c0c0d0;
+    white-space: nowrap;
+  }
+
+  .card-desc {
+    font-size: 10px;
+    color: #55556a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* CARD CONTROLS */
+  .card-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px 6px 10px;
+    background: #12121e;
+  }
+
+  .rate-btn {
+    width: 28px;
+    height: 24px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: #44445a;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .rate-btn:hover { background: #1e1e2e; color: #8b8ba0; }
+
+  .rate-btn.keep:hover, .rate-btn.keep.active { color: #3ecf8e; border-color: #3ecf8e44; background: #3ecf8e12; }
+  .rate-btn.remix:hover, .rate-btn.remix.active { color: #c89b3c; border-color: #c89b3c44; background: #c89b3c12; }
+  .rate-btn.kill:hover, .rate-btn.kill.active { color: #e5534b; border-color: #e5534b44; background: #e5534b12; }
+
+  .undo-btn {
+    width: 28px;
+    height: 24px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: #33334a;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card.state-kept .undo-btn,
+  .card.state-remix .undo-btn,
+  .card.state-killed .undo-btn {
+    display: flex;
+  }
+
+  .undo-btn:hover { color: #8b8ba0; background: #1e1e2e; }
+
+  .note-input {
+    flex: 1;
+    height: 24px;
+    margin-left: 4px;
+    padding: 0 8px;
+    font-size: 11px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: #8b8ba0;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+
+  .note-input::placeholder { color: #2e2e42; }
+  .note-input:focus { border-color: #2a2a3e; background: #0e0e16; }
+
+  /* ============================================================
+     FEEDBACK OVERLAY
+     ============================================================ */
+  .overlay-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5,5,10,0.85);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .overlay-backdrop.open { display: flex; }
+
+  .overlay-panel {
+    background: #12121e;
+    border: 1px solid #2a2a3e;
+    border-radius: 12px;
+    padding: 24px 28px;
+    width: 520px;
+    max-height: 70vh;
+    overflow-y: auto;
+    color: #c0c0d0;
+  }
+
+  .overlay-panel h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #e0e0e8;
+  }
+
+  .overlay-columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .overlay-col h3 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .overlay-col.keep h3 { color: #3ecf8e; }
+  .overlay-col.remix h3 { color: #c89b3c; }
+  .overlay-col.kill h3 { color: #e5534b; }
+
+  .overlay-col .item {
+    font-size: 12px;
+    color: #8b8ba0;
+    margin-bottom: 4px;
+  }
+
+  .overlay-col .item .note {
+    font-style: italic;
+    color: #55556a;
+  }
+
+  .overlay-col .empty {
+    font-size: 11px;
+    color: #33334a;
+    font-style: italic;
+  }
+
+  .clipboard-btn {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #2a2a3e;
+    border-radius: 6px;
+    background: #1a1a28;
+    color: #8b8ba0;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .clipboard-btn:hover { background: #22222e; color: #e0e0e8; border-color: #3a3a52; }
+  .clipboard-btn.copied { color: #3ecf8e; border-color: #3ecf8e44; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <span class="macro-badge">MACRO</span>
+    <span class="subject">Exploring: Aura Constellation</span>
+  </div>
+  <div class="header-right">
+    <button class="feedback-btn" id="feedbackBtn" onclick="toggleOverlay()">Feedback (0)</button>
+  </div>
+</div>
+
+<!-- GRID -->
+<div class="grid" id="grid">
+  <!-- Cards injected by JS -->
+</div>
+
+<!-- FEEDBACK OVERLAY -->
+<div class="overlay-backdrop" id="overlayBackdrop" onclick="if(event.target===this)closeOverlay()">
+  <div class="overlay-panel">
+    <h2>Feedback Summary</h2>
+    <div class="overlay-columns" id="overlayColumns">
+      <div class="overlay-col keep">
+        <h3>Keep</h3>
+        <div id="olKeep"></div>
+      </div>
+      <div class="overlay-col remix">
+        <h3>Remix</h3>
+        <div id="olRemix"></div>
+      </div>
+      <div class="overlay-col kill">
+        <h3>Kill</h3>
+        <div id="olKill"></div>
+      </div>
+    </div>
+    <button class="clipboard-btn" id="clipboardBtn" onclick="copyFeedback()">Send to Jude</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// SHARED DATA
+// ============================================================
+
+const PRIMARIES = [
+  { id: 'curiosity',  name: 'Curiosity',  color: '#8b5cf6', rgb: [139,92,246] },
+  { id: 'empathy',    name: 'Empathy',    color: '#10b981', rgb: [16,185,129] },
+  { id: 'resilience', name: 'Resilience', color: '#f43f5e', rgb: [244,63,94]  },
+  { id: 'creativity', name: 'Creativity', color: '#06b6d4', rgb: [6,182,212]  },
+  { id: 'drive',      name: 'Drive',      color: '#d946ef', rgb: [217,70,239] },
+];
+
+const COMPANIONS = [
+  { id: 'wonder',       name: 'Wonder',       parentIdx: 0, color: '#a78bfa', rgb: [167,139,250] },
+  { id: 'openness',     name: 'Openness',     parentIdx: 0, color: '#7c3aed', rgb: [124,58,237]  },
+  { id: 'compassion',   name: 'Compassion',   parentIdx: 1, color: '#34d399', rgb: [52,211,153]  },
+  { id: 'warmth',       name: 'Warmth',       parentIdx: 1, color: '#059669', rgb: [5,150,105]   },
+  { id: 'grit',         name: 'Grit',         parentIdx: 2, color: '#fb7185', rgb: [251,113,133] },
+  { id: 'tenacity',     name: 'Tenacity',     parentIdx: 2, color: '#e11d48', rgb: [225,29,72]   },
+  { id: 'imagination',  name: 'Imagination',  parentIdx: 3, color: '#22d3ee', rgb: [34,211,238]  },
+  { id: 'vision',       name: 'Vision',       parentIdx: 3, color: '#0891b2', rgb: [8,145,178]   },
+  { id: 'ambition',     name: 'Ambition',     parentIdx: 4, color: '#e879f9', rgb: [232,121,249] },
+  { id: 'intensity',    name: 'Intensity',    parentIdx: 4, color: '#a21caf', rgb: [162,28,175]  },
+];
+
+const ALL_NODES = [...PRIMARIES.map((p,i) => ({...p, type:'primary', idx:i})),
+                   ...COMPANIONS.map((c,i) => ({...c, type:'companion', idx: PRIMARIES.length + i}))];
+
+// Connection topology: every node connects to at least 2 others
+// Primaries form a pentagon (0-1-2-3-4-0) plus cross-connections
+// Each companion connects to its parent + at least 1 neighbor
+const CONNECTIONS = [
+  // Pentagon ring
+  [0,1],[1,2],[2,3],[3,4],[4,0],
+  // Pentagon cross (star)
+  [0,2],[1,3],[2,4],[3,0],[4,1],
+  // Companions to parents
+  [5,0],[6,0],   // wonder, openness -> curiosity
+  [7,1],[8,1],   // compassion, warmth -> empathy
+  [9,2],[10,2],  // grit, tenacity -> resilience
+  [11,3],[12,3], // imagination, vision -> creativity
+  [13,4],[14,4], // ambition, intensity -> drive
+  // Cross-companion links (ensure >= 2 connections per companion)
+  [5,7],   // wonder — compassion
+  [6,11],  // openness — imagination
+  [7,9],   // compassion — grit
+  [8,10],  // warmth — tenacity
+  [9,13],  // grit — ambition
+  [10,14], // tenacity — intensity
+  [11,5],  // imagination — wonder
+  [12,8],  // vision — warmth
+  [13,6],  // ambition — openness
+  [14,12], // intensity — vision
+];
+
+// ============================================================
+// TIGHT LAYOUT GENERATOR
+// ============================================================
+
+function generateTightLayout(cx, cy, scale) {
+  // scale=1.0 means primaries at r~55, companions at r~80
+  const nodes = [];
+  // Primaries: pentagon at r=55*scale
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+    const r = 55 * scale;
+    nodes.push({
+      baseX: cx + Math.cos(angle) * r,
+      baseY: cy + Math.sin(angle) * r,
+      x: 0, y: 0, // set by animation
+      color: PRIMARIES[i].color,
+      rgb: PRIMARIES[i].rgb,
+      type: 'primary',
+      name: PRIMARIES[i].name,
+    });
+  }
+  // Companions: placed near parent, at r~80*scale with slight offset
+  for (let i = 0; i < 10; i++) {
+    const parent = COMPANIONS[i].parentIdx;
+    const parentAngle = (parent / 5) * Math.PI * 2 - Math.PI / 2;
+    // Offset each companion slightly from parent angle
+    const offset = (i % 2 === 0) ? -0.18 : 0.18;
+    const angle = parentAngle + offset;
+    const r = (78 + (i % 3) * 6) * scale;
+    nodes.push({
+      baseX: cx + Math.cos(angle) * r,
+      baseY: cy + Math.sin(angle) * r,
+      x: 0, y: 0,
+      color: COMPANIONS[i].color,
+      rgb: COMPANIONS[i].rgb,
+      type: 'companion',
+      name: COMPANIONS[i].name,
+    });
+  }
+  return nodes;
+}
+
+// Production ring layout (wider spacing for ★ Current card)
+function generateProductionLayout(cx, cy) {
+  const nodes = [];
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+    nodes.push({
+      baseX: cx + Math.cos(angle) * 80,
+      baseY: cy + Math.sin(angle) * 80,
+      x: 0, y: 0,
+      color: PRIMARIES[i].color,
+      rgb: PRIMARIES[i].rgb,
+      type: 'primary',
+      name: PRIMARIES[i].name,
+    });
+  }
+  for (let i = 0; i < 10; i++) {
+    const parent = COMPANIONS[i].parentIdx;
+    const parentAngle = (parent / 5) * Math.PI * 2 - Math.PI / 2;
+    const offset = (i % 2 === 0) ? -0.15 : 0.15;
+    const angle = parentAngle + offset;
+    const r = 140;
+    nodes.push({
+      baseX: cx + Math.cos(angle) * r,
+      baseY: cy + Math.sin(angle) * r,
+      x: 0, y: 0,
+      color: COMPANIONS[i].color,
+      rgb: COMPANIONS[i].rgb,
+      type: 'companion',
+      name: COMPANIONS[i].name,
+    });
+  }
+  return nodes;
+}
+
+// ============================================================
+// ANIMATION HELPERS
+// ============================================================
+
+function drift(baseX, baseY, t, idx, ampX, ampY) {
+  // Multi-harmonic gentle drift
+  const seed = idx * 1.37;
+  const x = baseX
+    + Math.sin(t * 0.0008 + seed) * ampX * 0.6
+    + Math.sin(t * 0.0003 + seed * 2.1) * ampX * 0.3
+    + Math.sin(t * 0.00008 + seed * 0.7) * ampX * 1.2; // very slow drift
+  const y = baseY
+    + Math.cos(t * 0.0009 + seed * 1.5) * ampY * 0.6
+    + Math.cos(t * 0.00035 + seed * 2.7) * ampY * 0.3
+    + Math.cos(t * 0.00009 + seed * 1.1) * ampY * 1.2;
+  return { x, y };
+}
+
+function breathScale(t) {
+  return 1.0 + Math.sin(t * 0.0004) * 0.025;
+}
+
+// ============================================================
+// CARD DEFINITIONS
+// ============================================================
+
+const CARDS = [
+  { id: 'current', badge: '★',  badgeClass: 'star', name: 'Current', desc: 'Production canvas — additive blending' },
+  { id: 'A',       badge: 'A',  badgeClass: '',     name: 'SVG Classic', desc: 'Gaussian-blurred atmospheric ellipses + crisp SVG web' },
+  { id: 'B',       badge: 'B',  badgeClass: '',     name: 'Dark Core Canvas', desc: 'Transparent center, color glows outward from edges' },
+  { id: 'C',       badge: 'C',  badgeClass: '',     name: 'Membrane', desc: 'Convex hull body with outward glowing edge' },
+  { id: 'D',       badge: 'D',  badgeClass: '',     name: 'Layered Cloud', desc: 'Slow atmospheric clouds behind crisp web' },
+  { id: 'E',       badge: 'E',  badgeClass: '',     name: 'Bioluminescent Ring', desc: 'Organic ring with inward web, outward glow' },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+
+const state = {};
+CARDS.forEach(c => { state[c.id] = { rating: null, note: '' }; });
+
+// ============================================================
+// BUILD DOM
+// ============================================================
+
+const grid = document.getElementById('grid');
+
+CARDS.forEach(card => {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.id = 'card-' + card.id;
+  el.innerHTML = `
+    <div class="viz-area" id="viz-${card.id}"></div>
+    <div class="card-info">
+      <span class="card-badge ${card.badgeClass}">${card.badge}</span>
+      <span class="card-name">${card.name}</span>
+      <span class="card-desc">${card.desc}</span>
+    </div>
+    <div class="card-controls">
+      <button class="rate-btn keep" data-card="${card.id}" data-action="keep" title="Keep">+</button>
+      <button class="rate-btn remix" data-card="${card.id}" data-action="remix" title="Remix">↻</button>
+      <button class="rate-btn kill" data-card="${card.id}" data-action="kill" title="Kill">×</button>
+      <button class="undo-btn" data-card="${card.id}" data-action="undo" title="Undo">↩</button>
+      <input class="note-input" data-card="${card.id}" placeholder="notes…" />
+    </div>
+  `;
+  grid.appendChild(el);
+});
+
+// ============================================================
+// RATING LOGIC
+// ============================================================
+
+document.querySelectorAll('.rate-btn, .undo-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cardId = btn.dataset.card;
+    const action = btn.dataset.action;
+    const cardEl = document.getElementById('card-' + cardId);
+
+    if (action === 'undo') {
+      state[cardId].rating = null;
+      cardEl.classList.remove('state-kept', 'state-remix', 'state-killed');
+      cardEl.querySelectorAll('.rate-btn').forEach(b => b.classList.remove('active'));
+    } else {
+      // Toggle: if same rating, remove it
+      if (state[cardId].rating === action) {
+        state[cardId].rating = null;
+        cardEl.classList.remove('state-kept', 'state-remix', 'state-killed');
+        cardEl.querySelectorAll('.rate-btn').forEach(b => b.classList.remove('active'));
+      } else {
+        state[cardId].rating = action;
+        cardEl.classList.remove('state-kept', 'state-remix', 'state-killed');
+        if (action === 'keep') cardEl.classList.add('state-kept');
+        if (action === 'remix') cardEl.classList.add('state-remix');
+        if (action === 'kill') cardEl.classList.add('state-killed');
+        cardEl.querySelectorAll('.rate-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    }
+    updateFeedbackCount();
+  });
+});
+
+document.querySelectorAll('.note-input').forEach(input => {
+  input.addEventListener('input', () => {
+    state[input.dataset.card].note = input.value;
+  });
+});
+
+function updateFeedbackCount() {
+  const count = Object.values(state).filter(s => s.rating).length;
+  const btn = document.getElementById('feedbackBtn');
+  btn.textContent = `Feedback (${count})`;
+  btn.classList.toggle('has-ratings', count > 0);
+}
+
+// ============================================================
+// OVERLAY
+// ============================================================
+
+function toggleOverlay() {
+  const el = document.getElementById('overlayBackdrop');
+  if (el.classList.contains('open')) { closeOverlay(); } else { openOverlay(); }
+}
+
+function openOverlay() {
+  const el = document.getElementById('overlayBackdrop');
+  el.classList.add('open');
+  renderOverlay();
+}
+
+function closeOverlay() {
+  document.getElementById('overlayBackdrop').classList.remove('open');
+}
+
+function renderOverlay() {
+  const buckets = { keep: [], remix: [], kill: [] };
+  CARDS.forEach(card => {
+    const s = state[card.id];
+    if (s.rating) {
+      buckets[s.rating].push({ badge: card.badge, name: card.name, note: s.note });
+    }
+  });
+
+  ['keep', 'remix', 'kill'].forEach(key => {
+    const container = document.getElementById('ol' + key.charAt(0).toUpperCase() + key.slice(1));
+    if (buckets[key].length === 0) {
+      container.innerHTML = '<div class="empty">None</div>';
+    } else {
+      container.innerHTML = buckets[key].map(item => {
+        let html = `<div class="item">${item.badge} — "${item.name}"`;
+        if (item.note) html += ` <span class="note">— "${item.note}"</span>`;
+        html += '</div>';
+        return html;
+      }).join('');
+    }
+  });
+}
+
+function copyFeedback() {
+  const lines = ['macro — Aura Constellation'];
+  const buckets = { KEEP: [], REMIX: [], KILL: [] };
+  CARDS.forEach(card => {
+    const s = state[card.id];
+    if (s.rating === 'keep') buckets.KEEP.push(card);
+    if (s.rating === 'remix') buckets.REMIX.push(card);
+    if (s.rating === 'kill') buckets.KILL.push(card);
+  });
+
+  ['KEEP', 'REMIX', 'KILL'].forEach(key => {
+    if (buckets[key].length > 0) {
+      const parts = buckets[key].map(c => {
+        const note = state[c.id].note;
+        let s = `${c.badge} — "${c.name}"`;
+        if (note) s += ` — "${note}"`;
+        return s;
+      });
+      lines.push(`${key}: ${parts.join(', ')}`);
+    }
+  });
+
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const btn = document.getElementById('clipboardBtn');
+    btn.classList.add('copied');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Send to Jude'; }, 1500);
+  });
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeOverlay();
+  if (e.key === 'Tab' && !e.target.classList.contains('note-input')) {
+    e.preventDefault();
+    toggleOverlay();
+  }
+});
+
+// ============================================================
+// RENDERERS
+// ============================================================
+
+// Helper: get viz container dimensions
+function vizSize(id) {
+  const el = document.getElementById('viz-' + id);
+  return { el, w: el.clientWidth, h: el.clientHeight };
+}
+
+// ------------------------------------------------------------------
+// ★ CURRENT — Production canvas with additive blending (deliberately bright)
+// ------------------------------------------------------------------
+function initCurrent() {
+  const { el, w, h } = vizSize('current');
+  const canvas = document.createElement('canvas');
+  el.appendChild(canvas);
+
+  let nodes = null;
+
+  function render(t) {
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
+    canvas.width = cw;
+    canvas.height = ch;
+
+    if (!nodes || Math.abs(nodes[0].baseX - cw/2) > 50) {
+      nodes = generateProductionLayout(cw / 2, ch / 2);
+    }
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, cw, ch);
+
+    const bs = breathScale(t);
+    const cx = cw / 2;
+    const cy = ch / 2;
+
+    // Update positions
+    nodes.forEach((n, i) => {
+      const d = drift(n.baseX, n.baseY, t, i, 3, 3);
+      n.x = cx + (d.x - cx) * bs;
+      n.y = cy + (d.y - cy) * bs;
+    });
+
+    // Per-primary nebula wash — additive blending
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 5; i++) {
+      const n = nodes[i];
+      const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, 280);
+      grad.addColorStop(0, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},0.45)`);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, cw, ch);
+    }
+
+    // Per-primary glow — 4 passes
+    for (let i = 0; i < 5; i++) {
+      const n = nodes[i];
+      for (let p = 0; p < 4; p++) {
+        const r = 320 - p * 40;
+        const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+        grad.addColorStop(0, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},1.0)`);
+        grad.addColorStop(0.3, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},0.3)`);
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, cw, ch);
+      }
+    }
+
+    // Connections
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1;
+    CONNECTIONS.forEach(([a, b]) => {
+      ctx.beginPath();
+      ctx.moveTo(nodes[a].x, nodes[a].y);
+      ctx.lineTo(nodes[b].x, nodes[b].y);
+      ctx.stroke();
+    });
+
+    // Nodes
+    nodes.forEach(n => {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.type === 'primary' ? 6 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = n.color;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+}
+
+// ------------------------------------------------------------------
+// A — SVG Classic
+// ------------------------------------------------------------------
+function initSVGClassic() {
+  const { el } = vizSize('A');
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '100%');
+  svg.style.position = 'absolute';
+  svg.style.top = '0';
+  svg.style.left = '0';
+  el.appendChild(svg);
+
+  // Defs: blur filter
+  const defs = document.createElementNS(svgNS, 'defs');
+  const filterBlur = document.createElementNS(svgNS, 'filter');
+  filterBlur.setAttribute('id', 'cloudBlur');
+  filterBlur.setAttribute('x', '-50%');
+  filterBlur.setAttribute('y', '-50%');
+  filterBlur.setAttribute('width', '200%');
+  filterBlur.setAttribute('height', '200%');
+  const blur = document.createElementNS(svgNS, 'feGaussianBlur');
+  blur.setAttribute('stdDeviation', '30');
+  filterBlur.appendChild(blur);
+  defs.appendChild(filterBlur);
+
+  const filterHalo = document.createElementNS(svgNS, 'filter');
+  filterHalo.setAttribute('id', 'haloBlur');
+  filterHalo.setAttribute('x', '-100%');
+  filterHalo.setAttribute('y', '-100%');
+  filterHalo.setAttribute('width', '300%');
+  filterHalo.setAttribute('height', '300%');
+  const haloB = document.createElementNS(svgNS, 'feGaussianBlur');
+  haloB.setAttribute('stdDeviation', '4');
+  filterHalo.appendChild(haloB);
+  defs.appendChild(filterHalo);
+
+  svg.appendChild(defs);
+
+  // Cloud layer group
+  const cloudGroup = document.createElementNS(svgNS, 'g');
+  cloudGroup.setAttribute('filter', 'url(#cloudBlur)');
+  svg.appendChild(cloudGroup);
+
+  // Connection layer
+  const connGroup = document.createElementNS(svgNS, 'g');
+  svg.appendChild(connGroup);
+
+  // Halo layer
+  const haloGroup = document.createElementNS(svgNS, 'g');
+  haloGroup.setAttribute('filter', 'url(#haloBlur)');
+  svg.appendChild(haloGroup);
+
+  // Node layer
+  const nodeGroup = document.createElementNS(svgNS, 'g');
+  svg.appendChild(nodeGroup);
+
+  let nodes = null;
+  let clouds = [];
+  let connLines = [];
+  let haloCircles = [];
+  let nodeCircles = [];
+
+  function setup() {
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
+    const scale = Math.min(cw, ch) / 250;
+    nodes = generateTightLayout(cw / 2, ch / 2, scale);
+
+    // Clear
+    cloudGroup.innerHTML = '';
+    connGroup.innerHTML = '';
+    haloGroup.innerHTML = '';
+    nodeGroup.innerHTML = '';
+    clouds = [];
+    connLines = [];
+    haloCircles = [];
+    nodeCircles = [];
+
+    // Atmospheric ellipses (one per primary, slightly offset)
+    for (let i = 0; i < 5; i++) {
+      const ellipse = document.createElementNS(svgNS, 'ellipse');
+      const n = nodes[i];
+      ellipse.setAttribute('cx', n.baseX);
+      ellipse.setAttribute('cy', n.baseY);
+      ellipse.setAttribute('rx', 60 * scale);
+      ellipse.setAttribute('ry', 45 * scale);
+      ellipse.setAttribute('fill', n.color);
+      ellipse.setAttribute('opacity', '0.75');
+      cloudGroup.appendChild(ellipse);
+      clouds.push({ el: ellipse, baseX: n.baseX, baseY: n.baseY, idx: i, rxBase: 60 * scale, ryBase: 45 * scale });
+    }
+
+    // Connections
+    CONNECTIONS.forEach(([a, b]) => {
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('stroke', 'white');
+      line.setAttribute('stroke-width', '1');
+      line.setAttribute('stroke-opacity', '0.35');
+      connGroup.appendChild(line);
+      connLines.push({ el: line, a, b });
+    });
+
+    // Halos
+    nodes.forEach((n, i) => {
+      const c = document.createElementNS(svgNS, 'circle');
+      c.setAttribute('r', n.type === 'primary' ? 12 : 8);
+      c.setAttribute('fill', n.color);
+      c.setAttribute('opacity', '0.25');
+      haloGroup.appendChild(c);
+      haloCircles.push(c);
+    });
+
+    // Nodes
+    nodes.forEach((n, i) => {
+      const c = document.createElementNS(svgNS, 'circle');
+      c.setAttribute('r', n.type === 'primary' ? 5 : 3);
+      c.setAttribute('fill', n.color);
+      nodeGroup.appendChild(c);
+      nodeCircles.push(c);
+    });
+  }
+
+  setup();
+
+  function render(t) {
+    if (!nodes) { requestAnimationFrame(render); return; }
+
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const bs = breathScale(t);
+
+    // Check for resize
+    if (Math.abs(nodes[0].baseX - cx) > 50) { setup(); }
+
+    // Update node positions
+    nodes.forEach((n, i) => {
+      const d = drift(n.baseX, n.baseY, t, i, 2, 2);
+      n.x = cx + (d.x - cx) * bs;
+      n.y = cy + (d.y - cy) * bs;
+    });
+
+    // Update clouds (slow independent drift)
+    clouds.forEach((cloud, i) => {
+      const d = drift(cloud.baseX, cloud.baseY, t, i + 100, 4, 4);
+      cloud.el.setAttribute('cx', cx + (d.x - cx) * bs);
+      cloud.el.setAttribute('cy', cy + (d.y - cy) * bs);
+      // Subtle size variation
+      const rxVar = cloud.rxBase * (1 + Math.sin(t * 0.0003 + i * 2.3) * 0.08);
+      const ryVar = cloud.ryBase * (1 + Math.cos(t * 0.0004 + i * 1.7) * 0.08);
+      cloud.el.setAttribute('rx', rxVar);
+      cloud.el.setAttribute('ry', ryVar);
+    });
+
+    // Update connections
+    connLines.forEach(conn => {
+      conn.el.setAttribute('x1', nodes[conn.a].x);
+      conn.el.setAttribute('y1', nodes[conn.a].y);
+      conn.el.setAttribute('x2', nodes[conn.b].x);
+      conn.el.setAttribute('y2', nodes[conn.b].y);
+    });
+
+    // Update halos & nodes
+    nodes.forEach((n, i) => {
+      haloCircles[i].setAttribute('cx', n.x);
+      haloCircles[i].setAttribute('cy', n.y);
+      nodeCircles[i].setAttribute('cx', n.x);
+      nodeCircles[i].setAttribute('cy', n.y);
+    });
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+// ------------------------------------------------------------------
+// B — Dark Core Canvas
+// ------------------------------------------------------------------
+function initDarkCore() {
+  const { el } = vizSize('B');
+  const canvas = document.createElement('canvas');
+  el.appendChild(canvas);
+
+  let nodes = null;
+
+  function render(t) {
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
+    canvas.width = cw;
+    canvas.height = ch;
+
+    const scale = Math.min(cw, ch) / 250;
+    if (!nodes || Math.abs(nodes[0].baseX - cw/2) > 50) {
+      nodes = generateTightLayout(cw / 2, ch / 2, scale);
+    }
+
+    const ctx = canvas.getContext('2d');
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const bs = breathScale(t);
+
+    // Pure black background
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Update positions
+    nodes.forEach((n, i) => {
+      const d = drift(n.baseX, n.baseY, t, i, 2, 2);
+      n.x = cx + (d.x - cx) * bs;
+      n.y = cy + (d.y - cy) * bs;
+    });
+
+    // Compute centroid of all nodes
+    let centX = 0, centY = 0;
+    nodes.forEach(n => { centX += n.x; centY += n.y; });
+    centX /= nodes.length;
+    centY /= nodes.length;
+
+    // Compute average distance from centroid to nodes
+    let avgDist = 0;
+    nodes.forEach(n => {
+      avgDist += Math.hypot(n.x - centX, n.y - centY);
+    });
+    avgDist /= nodes.length;
+
+    // Draw outward-glowing ring: center transparent, mid-ring colored, outer transparent
+    // Blend all primary colors for the ring
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Multiple radial rings per primary color
+    for (let i = 0; i < 5; i++) {
+      const n = nodes[i];
+      const r = n.rgb;
+      const innerR = avgDist * 0.5;
+      const midR = avgDist * 1.3;
+      const outerR = avgDist * 2.8;
+
+      const grad = ctx.createRadialGradient(centX, centY, innerR, centX, centY, outerR);
+      grad.addColorStop(0, `rgba(${r[0]},${r[1]},${r[2]},0)`);       // dark center
+      grad.addColorStop(0.3, `rgba(${r[0]},${r[1]},${r[2]},0.08)`);
+      grad.addColorStop(0.5, `rgba(${r[0]},${r[1]},${r[2]},0.14)`);  // mid peak
+      grad.addColorStop(0.7, `rgba(${r[0]},${r[1]},${r[2]},0.10)`);
+      grad.addColorStop(1, `rgba(${r[0]},${r[1]},${r[2]},0)`);       // outer fade
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, cw, ch);
+    }
+
+    // Per-node small glow (normal blend, dim)
+    nodes.forEach((n, i) => {
+      const rad = n.type === 'primary' ? 25 : 18;
+      const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, rad);
+      grad.addColorStop(0, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},0.20)`);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(n.x - rad, n.y - rad, rad * 2, rad * 2);
+    });
+
+    // Connections
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    CONNECTIONS.forEach(([a, b]) => {
+      ctx.beginPath();
+      ctx.moveTo(nodes[a].x, nodes[a].y);
+      ctx.lineTo(nodes[b].x, nodes[b].y);
+      ctx.stroke();
+    });
+
+    // Nodes — small
+    nodes.forEach(n => {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.type === 'primary' ? 4 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = n.color;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+// ------------------------------------------------------------------
+// C — Membrane
+// ------------------------------------------------------------------
+function initMembrane() {
+  const { el } = vizSize('C');
+  const canvas = document.createElement('canvas');
+  el.appendChild(canvas);
+
+  let nodes = null;
+
+  // Graham scan convex hull
+  function convexHull(points) {
+    if (points.length < 3) return points.slice();
+    const sorted = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+    const cross = (O, A, B) => (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
+    const lower = [];
+    for (const p of sorted) {
+      while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
+      lower.push(p);
+    }
+    const upper = [];
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const p = sorted[i];
+      while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
+      upper.push(p);
+    }
+    upper.pop();
+    lower.pop();
+    return lower.concat(upper);
+  }
+
+  function drawHullPath(ctx, hull, inflate) {
+    if (hull.length < 3) return;
+    // Compute centroid
+    let cx2 = 0, cy2 = 0;
+    hull.forEach(p => { cx2 += p.x; cy2 += p.y; });
+    cx2 /= hull.length; cy2 /= hull.length;
+
+    ctx.beginPath();
+    hull.forEach((p, i) => {
+      // Inflate outward from centroid
+      const dx = p.x - cx2;
+      const dy = p.y - cy2;
+      const len = Math.hypot(dx, dy) || 1;
+      const px = p.x + (dx / len) * inflate;
+      const py = p.y + (dy / len) * inflate;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+  }
+
+  function render(t) {
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
+    canvas.width = cw;
+    canvas.height = ch;
+
+    const scale = Math.min(cw, ch) / 250;
+    if (!nodes || Math.abs(nodes[0].baseX - cw/2) > 50) {
+      nodes = generateTightLayout(cw / 2, ch / 2, scale);
+    }
+
+    const ctx = canvas.getContext('2d');
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const bs = breathScale(t);
+
+    // Black bg
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Update positions
+    nodes.forEach((n, i) => {
+      const d = drift(n.baseX, n.baseY, t, i, 2, 2);
+      n.x = cx + (d.x - cx) * bs;
+      n.y = cy + (d.y - cy) * bs;
+    });
+
+    const hull = convexHull(nodes.map(n => ({ x: n.x, y: n.y })));
+
+    // Compute centroid
+    let hcx = 0, hcy = 0;
+    hull.forEach(p => { hcx += p.x; hcy += p.y; });
+    hcx /= hull.length; hcy /= hull.length;
+
+    // OUTER GLOW: draw hull at multiple inflations with decreasing alpha
+    ctx.globalCompositeOperation = 'source-over';
+    const glowPasses = [
+      { inflate: 80 * scale, alpha: 0.03 },
+      { inflate: 60 * scale, alpha: 0.05 },
+      { inflate: 40 * scale, alpha: 0.06 },
+      { inflate: 25 * scale, alpha: 0.08 },
+      { inflate: 15 * scale, alpha: 0.10 },
+    ];
+    glowPasses.forEach(pass => {
+      // Average color
+      drawHullPath(ctx, hull, pass.inflate);
+      const grad = ctx.createRadialGradient(hcx, hcy, 0, hcx, hcy, 150 * scale);
+      grad.addColorStop(0, `rgba(100,80,200,${pass.alpha * 0.3})`);
+      grad.addColorStop(0.5, `rgba(80,180,180,${pass.alpha})`);
+      grad.addColorStop(1, `rgba(200,60,180,${pass.alpha * 0.5})`);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    });
+
+    // Membrane edge: draw hull boundary with glow
+    for (let w = 8; w >= 1; w -= 1) {
+      drawHullPath(ctx, hull, 2);
+      ctx.strokeStyle = `rgba(180,160,255,${0.04 * (9 - w)})`;
+      ctx.lineWidth = w * scale;
+      ctx.stroke();
+    }
+
+    // Interior fill — very subtle
+    drawHullPath(ctx, hull, 0);
+    const interiorGrad = ctx.createRadialGradient(hcx, hcy, 0, hcx, hcy, 100 * scale);
+    interiorGrad.addColorStop(0, 'rgba(60,40,120,0.04)');
+    interiorGrad.addColorStop(1, 'rgba(40,120,100,0.08)');
+    ctx.fillStyle = interiorGrad;
+    ctx.fill();
+
+    // Connections — colored by primary
+    ctx.lineWidth = 1;
+    CONNECTIONS.forEach(([a, b]) => {
+      const nA = nodes[a];
+      const nB = nodes[b];
+      // Use blend of colors
+      ctx.strokeStyle = `rgba(${Math.round((nA.rgb[0]+nB.rgb[0])/2)},${Math.round((nA.rgb[1]+nB.rgb[1])/2)},${Math.round((nA.rgb[2]+nB.rgb[2])/2)},0.20)`;
+      ctx.beginPath();
+      ctx.moveTo(nA.x, nA.y);
+      ctx.lineTo(nB.x, nB.y);
+      ctx.stroke();
+    });
+
+    // Nodes
+    nodes.forEach(n => {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.type === 'primary' ? 3.5 : 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = n.color;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+// ------------------------------------------------------------------
+// D — Layered Cloud
+// ------------------------------------------------------------------
+function initLayeredCloud() {
+  const { el } = vizSize('D');
+  const canvas = document.createElement('canvas');
+  el.appendChild(canvas);
+
+  let nodes = null;
+
+  // Atmospheric clouds — asymmetric positions, rich and visible
+  const cloudDefs = [
+    { baseAngle: 0.3,  baseDist: 0.12, color: PRIMARIES[0].rgb, radius: 220, alpha: 0.28 },
+    { baseAngle: 1.8,  baseDist: 0.18, color: PRIMARIES[1].rgb, radius: 200, alpha: 0.30 },
+    { baseAngle: 3.2,  baseDist: 0.10, color: PRIMARIES[2].rgb, radius: 240, alpha: 0.25 },
+    { baseAngle: 4.8,  baseDist: 0.15, color: PRIMARIES[3].rgb, radius: 210, alpha: 0.28 },
+  ];
+
+  function render(t) {
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
+    canvas.width = cw;
+    canvas.height = ch;
+
+    const scale = Math.min(cw, ch) / 250;
+    if (!nodes || Math.abs(nodes[0].baseX - cw/2) > 50) {
+      nodes = generateTightLayout(cw / 2, ch / 2, scale);
+    }
+
+    const ctx = canvas.getContext('2d');
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const bs = breathScale(t);
+
+    // Black bg
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Update node positions
+    nodes.forEach((n, i) => {
+      const d = drift(n.baseX, n.baseY, t, i, 2, 2);
+      n.x = cx + (d.x - cx) * bs;
+      n.y = cy + (d.y - cy) * bs;
+    });
+
+    // LAYER 1: Atmospheric clouds — normal compositing, slow drift
+    ctx.globalCompositeOperation = 'source-over';
+    cloudDefs.forEach((cloud, ci) => {
+      // Very slow independent drift for clouds
+      const angle = cloud.baseAngle + Math.sin(t * 0.00005 + ci * 3.1) * 0.4;
+      const dist = cloud.baseDist * Math.min(cw, ch) + Math.sin(t * 0.00008 + ci * 1.7) * 15;
+      const cloudX = cx + Math.cos(angle) * dist;
+      const cloudY = cy + Math.sin(angle) * dist;
+      const r = cloud.radius * scale;
+
+      const grad = ctx.createRadialGradient(cloudX, cloudY, 0, cloudX, cloudY, r);
+      grad.addColorStop(0, `rgba(${cloud.color[0]},${cloud.color[1]},${cloud.color[2]},${cloud.alpha})`);
+      grad.addColorStop(0.35, `rgba(${cloud.color[0]},${cloud.color[1]},${cloud.color[2]},${cloud.alpha * 0.65})`);
+      grad.addColorStop(0.7, `rgba(${cloud.color[0]},${cloud.color[1]},${cloud.color[2]},${cloud.alpha * 0.2})`);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, cw, ch);
+    });
+
+    // Second pass: a single blended nebula cloud for cohesion
+    const nebAngle = Math.sin(t * 0.00003) * 0.3;
+    const nebX = cx + Math.cos(nebAngle) * 10;
+    const nebY = cy + Math.sin(nebAngle) * 8;
+    const nebR = Math.min(cw, ch) * 0.55;
+    const nebGrad = ctx.createRadialGradient(nebX, nebY, nebR * 0.2, nebX, nebY, nebR);
+    nebGrad.addColorStop(0, 'rgba(80,50,160,0.06)');
+    nebGrad.addColorStop(0.5, 'rgba(40,140,160,0.04)');
+    nebGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = nebGrad;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // LAYER 2: Connections
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    CONNECTIONS.forEach(([a, b]) => {
+      ctx.beginPath();
+      ctx.moveTo(nodes[a].x, nodes[a].y);
+      ctx.lineTo(nodes[b].x, nodes[b].y);
+      ctx.stroke();
+    });
+
+    // LAYER 3: Per-node halo (small, dim, normal blend)
+    nodes.forEach(n => {
+      const haloR = 15;
+      const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, haloR);
+      grad.addColorStop(0, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},0.15)`);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(n.x - haloR, n.y - haloR, haloR * 2, haloR * 2);
+    });
+
+    // LAYER 3: Nodes
+    nodes.forEach(n => {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.type === 'primary' ? 5 : 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = n.color;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+// ------------------------------------------------------------------
+// E — Bioluminescent Ring
+// ------------------------------------------------------------------
+function initBiolumRing() {
+  const { el } = vizSize('E');
+  const canvas = document.createElement('canvas');
+  el.appendChild(canvas);
+
+  let nodes = null;
+
+  // Perlin-like noise for ring shape
+  function ringNoise(angle, t) {
+    // Multiple octaves of sin for organic shape
+    return Math.sin(angle * 3 + t * 0.0002) * 0.12
+         + Math.sin(angle * 5 + t * 0.0003 + 1.2) * 0.06
+         + Math.sin(angle * 7 + t * 0.00015 + 2.5) * 0.04;
+  }
+
+  function generateRingLayout(cx, cy, baseR, t) {
+    const ringNodes = [];
+    // All 15 nodes on an irregular ring
+    const totalNodes = 15;
+    for (let i = 0; i < totalNodes; i++) {
+      const angle = (i / totalNodes) * Math.PI * 2 - Math.PI / 2;
+      const noiseVal = ringNoise(angle, t);
+      const r = baseR * (1 + noiseVal);
+      const isPrimary = i < 5;
+      const dataIdx = i;
+      const nodeData = i < 5 ? PRIMARIES[i] : COMPANIONS[i - 5];
+      ringNodes.push({
+        baseX: cx + Math.cos(angle) * r,
+        baseY: cy + Math.sin(angle) * r,
+        x: 0, y: 0,
+        angle: angle,
+        baseR: r,
+        color: nodeData.color,
+        rgb: nodeData.rgb,
+        type: isPrimary ? 'primary' : 'companion',
+        name: nodeData.name,
+      });
+    }
+    return ringNodes;
+  }
+
+  let prevW = 0, prevH = 0;
+
+  function render(t) {
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
+    canvas.width = cw;
+    canvas.height = ch;
+
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const baseR = Math.min(cw, ch) * 0.28;
+    const bs = breathScale(t);
+    const scale = Math.min(cw, ch) / 250;
+
+    nodes = generateRingLayout(cx, cy, baseR, t);
+
+    const ctx = canvas.getContext('2d');
+
+    // Black bg
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Update positions with drift
+    nodes.forEach((n, i) => {
+      const d = drift(n.baseX, n.baseY, t, i, 1.5, 1.5);
+      n.x = cx + (d.x - cx) * bs;
+      n.y = cy + (d.y - cy) * bs;
+    });
+
+    // Outer glow: radial gradient from ring outward
+    ctx.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 5; i++) {
+      const n = nodes[i];
+      const glowR = baseR * 2.2;
+      const grad = ctx.createRadialGradient(cx, cy, baseR * 0.7, cx, cy, glowR);
+      grad.addColorStop(0, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},0)`);
+      grad.addColorStop(0.3, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},0.06)`);
+      grad.addColorStop(0.6, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},0.04)`);
+      grad.addColorStop(1, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, cw, ch);
+    }
+
+    // Draw the ring itself as a glowing loop
+    // Ring path: interpolate through all node positions
+    function drawRingPath(ctx, inflate) {
+      ctx.beginPath();
+      for (let step = 0; step <= 360; step++) {
+        const angle = (step / 360) * Math.PI * 2 - Math.PI / 2;
+        const noiseVal = ringNoise(angle, t);
+        const r = (baseR * (1 + noiseVal) + inflate) * bs;
+        const px = cx + Math.cos(angle) * r;
+        const py = cy + Math.sin(angle) * r;
+        if (step === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    }
+
+    // Ring glow passes
+    for (let w = 12; w >= 1; w -= 2) {
+      drawRingPath(ctx, 0);
+      ctx.strokeStyle = `rgba(180,160,255,${0.02 * (14 - w)})`;
+      ctx.lineWidth = w;
+      ctx.stroke();
+    }
+
+    // Crisp ring
+    drawRingPath(ctx, 0);
+    ctx.strokeStyle = 'rgba(200,190,255,0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Interior web: connections between nodes across the ring
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 0.8;
+    CONNECTIONS.forEach(([a, b]) => {
+      if (a < 15 && b < 15) {
+        ctx.beginPath();
+        ctx.moveTo(nodes[a].x, nodes[a].y);
+        ctx.lineTo(nodes[b].x, nodes[b].y);
+        ctx.stroke();
+      }
+    });
+
+    // Nodes with pulse
+    nodes.forEach((n, i) => {
+      const pulseR = (n.type === 'primary' ? 4 : 3) + Math.sin(t * 0.002 + i * 0.9) * 1;
+
+      // Node halo
+      const haloR = pulseR * 3;
+      const haloGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, haloR);
+      haloGrad.addColorStop(0, `rgba(${n.rgb[0]},${n.rgb[1]},${n.rgb[2]},0.2)`);
+      haloGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = haloGrad;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, haloR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Node
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, pulseR, 0, Math.PI * 2);
+      ctx.fillStyle = n.color;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+// ============================================================
+// INIT ALL RENDERERS
+// ============================================================
+
+function initAll() {
+  initCurrent();
+  initSVGClassic();
+  initDarkCore();
+  initMembrane();
+  initLayeredCloud();
+  initBiolumRing();
+}
+
+// Wait for layout to settle
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    initAll();
+  });
+});
+
+</script>
+</body>
+</html>

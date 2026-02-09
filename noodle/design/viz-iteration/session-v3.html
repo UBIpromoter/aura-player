@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Organism — Macro</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  .header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px 10px;
+    background: #0e0e16;
+    border-bottom: 1px solid #1e1e2e;
+    z-index: 10;
+  }
+  .title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #c0c0d0;
+    letter-spacing: 0.5px;
+  }
+  .ctrl-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .btn {
+    padding: 5px 14px;
+    border: 1px solid #2a2a3e;
+    border-radius: 6px;
+    background: transparent;
+    color: #8b8ba0;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .btn:hover { border-color: #6b7280; color: #d1d5db; }
+  .btn.active { border-color: #8b5cf6; color: #fff; background: rgba(139,92,246,0.12); }
+  .ctrl-sep {
+    width: 1px;
+    height: 18px;
+    background: #2a2a3e;
+    margin: 0 4px;
+  }
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 8px;
+    padding: 8px;
+    min-height: 0;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    background: #0a0a0f;
+    border: 1px solid #1a1a2a;
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 0;
+    position: relative;
+  }
+  .card canvas {
+    display: block;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+  }
+  .card-label {
+    text-align: center;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #6a6a80;
+    letter-spacing: 0.3px;
+    background: #0e0e16;
+    border-top: 1px solid #1a1a2a;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">Aura Organism — Macro</div>
+  <div class="ctrl-row">
+    <button class="btn active" id="btn-seed">Seed</button>
+    <button class="btn" id="btn-young">Young</button>
+    <button class="btn" id="btn-full">Full</button>
+    <button class="btn" id="btn-random">Random</button>
+    <div class="ctrl-sep"></div>
+    <button class="btn active" id="btn-human">Human</button>
+    <button class="btn" id="btn-ai">AI</button>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  // =================================================================
+  // PALETTE & HELPERS
+  // =================================================================
+  var C = {
+    violet: '#8b5cf6', indigo: '#6366f1', cyan: '#06b6d4',
+    rose: '#f43f5e', pink: '#ec4899', emerald: '#10b981', amber: '#f59e0b',
+  };
+
+  function hexRgb(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpRgb(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+  function rgbStr(c, a) { return 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + a.toFixed(4) + ')'; }
+
+  function seededRng(seed) {
+    var s = seed;
+    return function() { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
+  }
+
+  // =================================================================
+  // DATA MAPS
+  // =================================================================
+  var SENSITIVE = [false, true, true, false, false];
+
+  var NEURON_MAP = [
+    { colorQ: 'onboard-1', posQ: 'onboard-2', colors: ['#a78bfa', '#c4b5fd'] },
+    { colorQ: 'onboard-3', posQ: 'onboard-4', colors: ['#818cf8', '#a5b4fc'] },
+    { colorQ: 'onboard-5', posQ: 'onboard-6', colors: ['#22d3ee', '#67e8f9'] },
+    { colorQ: 'onboard-7', posQ: 'onboard-8', colors: ['#fb7185', '#fda4af'] },
+    { colorQ: 'onboard-9', posQ: 'onboard-10', colors: ['#34d399', '#6ee7b7'] },
+  ];
+
+  var HUMAN_CONNS = [[0,1],[1,2],[2,3],[3,4],[4,0],[0,2],[1,3],[2,4],[3,0],[4,1]];
+  var AI_CONNS = [[0,1],[0,2],[0,3],[0,4],[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]];
+
+  var ASSESS_MAP = [
+    { ids: ['starter-personality'], name: 'Personality', color: C.violet, tier: 1, nodes: 3, affinities: [0, 1] },
+    { ids: ['starter-motivation'], name: 'Motivation', color: C.amber, tier: 1, nodes: 3, affinities: [4, 0] },
+    { ids: ['starter-thinking'], name: 'Thinking', color: C.cyan, tier: 1, nodes: 4, affinities: [2, 4] },
+    { ids: ['starter-connection'], name: 'Connection', color: C.pink, tier: 1, nodes: 3, affinities: [2, 3] },
+    { ids: ['starter-strategy'], name: 'Strategy', color: C.emerald, tier: 1, nodes: 3, affinities: [1, 4] },
+    { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: C.violet, tier: 2, nodes: 5, affinities: [0, 2, 4] },
+    { ids: ['integrity'], name: 'Character', color: C.emerald, tier: 2, nodes: 3, affinities: [3, 1] },
+    { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: C.indigo, tier: 2, nodes: 4, affinities: [3, 4] },
+    { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: C.cyan, tier: 2, nodes: 4, affinities: [4, 0] },
+    { ids: ['attachment'], name: 'Relationships', color: C.rose, tier: 2, nodes: 3, affinities: [2, 3] },
+    { ids: ['risk'], name: 'Behavior', color: C.amber, tier: 2, nodes: 3, affinities: [1, 4] },
+  ];
+
+  // =================================================================
+  // SHARED STATE
+  // =================================================================
+  var entityType = 'human';
+  var currentTier = 0; // 0=Seed, 1=Young, 2=Full/Random
+  var onboardingAnswers = {};
+  var assessState = {};
+
+  // Default onboarding
+  for (var qi = 1; qi <= 10; qi++) {
+    onboardingAnswers['onboard-' + qi] = (qi % 3 === 0) ? 1 : 0;
+  }
+
+  // =================================================================
+  // DERIVE HELPERS
+  // =================================================================
+  function deriveAnswers() {
+    var colorAns = new Array(5).fill(null);
+    var posAns = new Array(5).fill(null);
+    for (var i = 0; i < 5; i++) {
+      var nm = NEURON_MAP[i];
+      if (nm.colorQ in onboardingAnswers) colorAns[i] = onboardingAnswers[nm.colorQ];
+      if (nm.posQ in onboardingAnswers) posAns[i] = onboardingAnswers[nm.posQ];
+    }
+    return { colorAns: colorAns, posAns: posAns };
+  }
+
+  // =================================================================
+  // ANSWER HASH + SEED POSITIONS (scaled for 400x400)
+  // =================================================================
+  function answerHash(colorAns, posAns) {
+    var h = 0;
+    for (var i = 0; i < 5; i++) {
+      h = h * 31 + (colorAns[i] !== null ? colorAns[i] + 1 : 0);
+      h = h * 37 + (posAns[i] !== null ? posAns[i] + 1 : 0);
+    }
+    return h;
+  }
+
+  function primarySeedPositions(colorAns, posAns, CX, CY) {
+    var hash = answerHash(colorAns, posAns);
+    var rng = seededRng(hash + 7919);
+    var positions = [];
+    var baseAngles = [0, 1, 2, 3, 4].map(function(i) {
+      var angle = (i / 5) * Math.PI * 2;
+      if (posAns[i] !== null) angle += (posAns[i] === 0 ? -0.7 : 0.7);
+      if (colorAns[i] !== null) angle += (colorAns[i] === 0 ? -0.35 : 0.35);
+      angle += (hash % 628) / 100;
+      return angle;
+    });
+    for (var i = 0; i < 5; i++) {
+      var answered = colorAns[i] !== null || posAns[i] !== null;
+      // Scale for 400x400 (original was 600x600, so ~0.67x)
+      var baseR = answered ? 60 + rng() * 37 : 37 + rng() * 23;
+      positions.push({
+        x: CX + Math.cos(baseAngles[i]) * baseR,
+        y: CY + Math.sin(baseAngles[i]) * baseR,
+      });
+    }
+    return positions;
+  }
+
+  // =================================================================
+  // NODE FACTORY
+  // =================================================================
+  function makeNode(opts) {
+    return {
+      x: opts.x || 200, y: opts.y || 200,
+      vx: 0, vy: 0, fx: 0, fy: 0,
+      color: opts.color ? hexRgb(opts.color) : [70, 75, 90],
+      tcolor: opts.color ? hexRgb(opts.color) : [70, 75, 90],
+      r: opts.r || 2, tr: opts.r || 2,
+      alpha: 0, talpha: opts.talpha || 0,
+      phase: Math.random() * Math.PI * 2,
+      // SLOW drift
+      driftSpeed: 0.12 + Math.random() * 0.2,
+      driftAmp: 0.8 + Math.random() * 1.2,
+      phaseX: Math.random() * 6.28,
+      phaseY: Math.random() * 6.28,
+      wigglePhase: Math.random() * 6.28,
+      type: opts.type || 'primary',
+      parent: opts.parent != null ? opts.parent : -1,
+      sensitive: opts.sensitive || false,
+      assessIdx: opts.assessIdx != null ? opts.assessIdx : null,
+      affinities: opts.affinities || null,
+      tier: opts.tier || 0,
+      birthTime: -1,
+      dying: false,
+      deathStart: -1,
+    };
+  }
+
+  // =================================================================
+  // BUILD ALL NODES (tier-aware)
+  // =================================================================
+  function buildAllNodes(tier) {
+    var da = deriveAnswers();
+    var colorAns = da.colorAns;
+    var posAns = da.posAns;
+    var CX = 200, CY = 200;
+    var result = [];
+    var seeds = primarySeedPositions(colorAns, posAns, CX, CY);
+
+    // 5 primaries (idx 0-4) — always built
+    for (var i = 0; i < 5; i++) {
+      var n = makeNode({
+        x: seeds[i].x, y: seeds[i].y,
+        r: 3.5, type: 'primary', sensitive: SENSITIVE[i],
+        talpha: 1,
+      });
+      if (colorAns[i] !== null) {
+        n.tcolor = hexRgb(NEURON_MAP[i].colors[colorAns[i]]);
+        n.color = n.tcolor.slice();
+        n.talpha = 1;
+      } else {
+        var c0 = hexRgb(NEURON_MAP[i].colors[0]);
+        var c1 = hexRgb(NEURON_MAP[i].colors[1]);
+        n.tcolor = [
+          Math.round((c0[0] + c1[0]) * 0.25 + 50 * 0.5),
+          Math.round((c0[1] + c1[1]) * 0.25 + 55 * 0.5),
+          Math.round((c0[2] + c1[2]) * 0.25 + 70 * 0.5),
+        ];
+        n.color = n.tcolor.slice();
+        n.talpha = 0.6;
+      }
+      result.push(n);
+    }
+
+    // tier 0 (Seed): primaries only
+    if (tier === 0) return result;
+
+    // 10 companions (idx 5-14): 2 per primary
+    for (var pi = 0; pi < 5; pi++) {
+      for (var ci = 0; ci < 2; ci++) {
+        var angle = Math.random() * Math.PI * 2;
+        var dist = 8 + Math.random() * 12; // scaled for 400
+        var cn = makeNode({
+          x: result[pi].x + Math.cos(angle) * dist,
+          y: result[pi].y + Math.sin(angle) * dist,
+          r: 2, type: 'companion', parent: pi,
+          talpha: 0.7,
+        });
+        cn.tcolor = result[pi].tcolor.slice();
+        cn.color = cn.tcolor.slice();
+        result.push(cn);
+      }
+    }
+
+    // 5 satellites (idx 15-19)
+    for (var si = 0; si < 5; si++) {
+      var px = (result[si].x + CX) / 2 + (Math.random() - 0.5) * 20;
+      var py = (result[si].y + CY) / 2 + (Math.random() - 0.5) * 20;
+      var sn = makeNode({
+        x: px, y: py,
+        r: 1.5, type: 'satellite', parent: si,
+        talpha: 0.5,
+      });
+      sn.tcolor = result[si].tcolor.slice();
+      sn.color = sn.tcolor.slice();
+      result.push(sn);
+    }
+
+    // Assessment nodes (idx 20+)
+    ASSESS_MAP.forEach(function(assess, ai) {
+      if (!assessState[ai]) return;
+      var rng = seededRng(ai * 137 + 42);
+      var affs = assess.affinities;
+      for (var ni = 0; ni < assess.nodes; ni++) {
+        var mx = 0, my = 0;
+        for (var k = 0; k < affs.length; k++) {
+          mx += result[affs[k]].x;
+          my += result[affs[k]].y;
+        }
+        mx /= affs.length;
+        my /= affs.length;
+        var ax = mx + (rng() - 0.5) * 37;
+        var ay = my + (rng() - 0.5) * 37;
+        var an = makeNode({
+          x: ax, y: ay,
+          r: 2 + rng() * 1, type: 'assess',
+          color: assess.color,
+          assessIdx: ai, tier: assess.tier,
+          parent: affs[0], affinities: affs,
+          talpha: 0.85,
+        });
+        if (affs.length >= 2) {
+          var ar = 0, ag = 0, ab = 0;
+          for (var k2 = 0; k2 < affs.length; k2++) {
+            ar += result[affs[k2]].tcolor[0];
+            ag += result[affs[k2]].tcolor[1];
+            ab += result[affs[k2]].tcolor[2];
+          }
+          var pn = affs.length;
+          var parentBlend = [ar / pn, ag / pn, ab / pn];
+          an.tcolor = lerpRgb(hexRgb(assess.color), parentBlend, 0.5);
+        }
+        an.color = an.tcolor.slice();
+        result.push(an);
+      }
+    });
+
+    return result;
+  }
+
+  // =================================================================
+  // BUILD EDGES
+  // =================================================================
+  function buildEdgesFromNodes(nodeList) {
+    var da = deriveAnswers();
+    var colorAns = da.colorAns;
+    var isAI = entityType === 'ai';
+    var edgeList = [];
+    var N = nodeList.length;
+    var edgeSet = new Set();
+
+    function addEdge(a, b, strength, restLen) {
+      if (a >= N || b >= N) return;
+      var key = Math.min(a, b) * 10000 + Math.max(a, b);
+      if (edgeSet.has(key)) return;
+      edgeSet.add(key);
+      edgeList.push({
+        a: a, b: b, strength: strength, restLen: restLen,
+        wigglePhase: Math.random() * Math.PI * 2,
+        wiggleSpeed: 0.3 + Math.random() * 0.5,
+        wiggleAmp: 1 + Math.random() * 2.5,
+      });
+    }
+
+    // Primary-to-primary
+    var primConns = isAI ? AI_CONNS : HUMAN_CONNS;
+    for (var pi = 0; pi < primConns.length; pi++) {
+      var a = primConns[pi][0], b = primConns[pi][1];
+      var aAns = colorAns[a], bAns = colorAns[b];
+      var bothAnswered = (aAns !== null) && (bAns !== null);
+      var sameColor = bothAnswered && aAns === bAns;
+      var strength = bothAnswered ? (sameColor ? 1.0 : 0.5) : 0.3;
+      // Scale rest lengths for 400 canvas
+      var rest = bothAnswered ? (sameColor ? 37 : 63) : 57;
+      addEdge(a, b, strength, rest);
+    }
+
+    // If tier 0 (Seed), only primaries exist
+    if (N <= 5) return edgeList;
+
+    // Primary-to-companion
+    for (var ci2 = 5; ci2 < Math.min(15, N); ci2++) {
+      var pri = nodeList[ci2].parent;
+      addEdge(pri, ci2, 1.5, 15);
+    }
+
+    // Companion-to-companion (same parent)
+    for (var i2 = 0; i2 < 5; i2++) {
+      var c1 = 5 + i2 * 2;
+      var c2 = 5 + i2 * 2 + 1;
+      if (c2 < N) addEdge(c1, c2, 0.8, 10);
+    }
+
+    // Cross-companion bridges
+    for (var i3 = 0; i3 < 5; i3++) {
+      var next = (i3 + 1) % 5;
+      var ca = 5 + i3 * 2 + 1;
+      var cb = 5 + next * 2;
+      if (ca < N && cb < N) addEdge(ca, cb, 0.2, 37);
+    }
+
+    // Satellite to parent
+    for (var si2 = 15; si2 < Math.min(20, N); si2++) {
+      addEdge(nodeList[si2].parent, si2, 0.5, 40);
+    }
+    // Satellite ring
+    for (var si3 = 0; si3 < 5; si3++) {
+      var sa = 15 + si3;
+      var sb = 15 + (si3 + 1) % 5;
+      if (sa < N && sb < N) addEdge(sa, sb, 0.15, 40);
+    }
+
+    // Assessment edges
+    for (var ai2 = 20; ai2 < N; ai2++) {
+      var an = nodeList[ai2];
+      if (an.affinities) {
+        for (var k = 0; k < an.affinities.length; k++) {
+          addEdge(an.affinities[k], ai2, 0.6, 33);
+        }
+      }
+      var nearby = [];
+      for (var bi = 0; bi < N; bi++) {
+        if (bi === ai2) continue;
+        var dx = nodeList[ai2].x - nodeList[bi].x;
+        var dy = nodeList[ai2].y - nodeList[bi].y;
+        nearby.push({ idx: bi, d: dx * dx + dy * dy });
+      }
+      nearby.sort(function(x, y) { return x.d - y.d; });
+      for (var k2 = 0; k2 < Math.min(2, nearby.length); k2++) {
+        addEdge(ai2, nearby[k2].idx, 0.15, 25);
+      }
+    }
+
+    return edgeList;
+  }
+
+  // =================================================================
+  // CONVEX HULL
+  // =================================================================
+  function convexHull(points) {
+    if (points.length < 3) return points.slice();
+    var sorted = points.slice().sort(function(a, b) { return a.x - b.x || a.y - b.y; });
+    var cross = function(O, A, B) { return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x); };
+    var lower = [];
+    for (var i = 0; i < sorted.length; i++) {
+      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], sorted[i]) <= 0) lower.pop();
+      lower.push(sorted[i]);
+    }
+    var upper = [];
+    for (var i2 = sorted.length - 1; i2 >= 0; i2--) {
+      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], sorted[i2]) <= 0) upper.pop();
+      upper.push(sorted[i2]);
+    }
+    return lower.slice(0, -1).concat(upper.slice(0, -1));
+  }
+
+  // Smooth hull with quadratic curves — center-relative padding
+  function drawSmoothedHull(ctx, hull, padding, scale, CX, CY) {
+    if (hull.length < 3) return;
+    var pts = [];
+    for (var i = 0; i < hull.length; i++) {
+      var dx = hull[i].x - CX;
+      var dy = hull[i].y - CY;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      pts.push({
+        x: CX + (dx / d) * (d + padding) * scale,
+        y: CY + (dy / d) * (d + padding) * scale,
+      });
+    }
+    var n = pts.length;
+    ctx.beginPath();
+    var startX = (pts[0].x + pts[n - 1].x) / 2;
+    var startY = (pts[0].y + pts[n - 1].y) / 2;
+    ctx.moveTo(startX, startY);
+    for (var j = 0; j < n; j++) {
+      var curr = pts[j];
+      var nextPt = pts[(j + 1) % n];
+      var midX = (curr.x + nextPt.x) / 2;
+      var midY = (curr.y + nextPt.y) / 2;
+      ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+    }
+    ctx.closePath();
+  }
+
+  // Extra-smooth hull with subdivision
+  function drawExtraSmoothedHull(ctx, hull, padding, scale, CX, CY) {
+    if (hull.length < 3) return;
+    var pts = [];
+    for (var i = 0; i < hull.length; i++) {
+      var dx = hull[i].x - CX;
+      var dy = hull[i].y - CY;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      pts.push({
+        x: CX + (dx / d) * (d + padding) * scale,
+        y: CY + (dy / d) * (d + padding) * scale,
+      });
+    }
+    // Subdivide: insert midpoints
+    var sub = [];
+    for (var j = 0; j < pts.length; j++) {
+      sub.push(pts[j]);
+      var nx = pts[(j + 1) % pts.length];
+      sub.push({ x: (pts[j].x + nx.x) / 2, y: (pts[j].y + nx.y) / 2 });
+    }
+    var n = sub.length;
+    ctx.beginPath();
+    var sx = (sub[0].x + sub[n - 1].x) / 2;
+    var sy = (sub[0].y + sub[n - 1].y) / 2;
+    ctx.moveTo(sx, sy);
+    for (var k = 0; k < n; k++) {
+      var curr2 = sub[k];
+      var nextPt2 = sub[(k + 1) % n];
+      ctx.quadraticCurveTo(curr2.x, curr2.y, (curr2.x + nextPt2.x) / 2, (curr2.y + nextPt2.y) / 2);
+    }
+    ctx.closePath();
+  }
+
+  // =================================================================
+  // COLOR HELPERS
+  // =================================================================
+  function blendConnectionColor(na, nb) {
+    return [
+      (na.color[0] + nb.color[0]) / 2,
+      (na.color[1] + nb.color[1]) / 2,
+      (na.color[2] + nb.color[2]) / 2,
+    ];
+  }
+
+  function avgPrimaryColor(nodes) {
+    var r = 0, g = 0, b = 0, count = 0;
+    for (var i = 0; i < Math.min(5, nodes.length); i++) {
+      if (nodes[i].alpha > 0.05) {
+        r += nodes[i].color[0];
+        g += nodes[i].color[1];
+        b += nodes[i].color[2];
+        count++;
+      }
+    }
+    if (count === 0) return [100, 100, 140];
+    return [r / count, g / count, b / count];
+  }
+
+  function nodeDistFromCenter(n, CX, CY) {
+    var dx = n.x - CX, dy = n.y - CY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // =================================================================
+  // ANIMATED POSITION (drift on top of force sim)
+  // =================================================================
+  function animPos(n, time) {
+    var isAI = entityType === 'ai';
+    var sp = n.driftSpeed;
+    var amp = n.driftAmp * (isAI ? 0.3 : 1.0);
+    var dx = Math.sin(time * sp + n.phaseX) * amp
+           + Math.sin(time * sp * 0.4 + n.phaseX * 2.1) * amp * 0.3;
+    var dy = Math.cos(time * sp * 0.75 + n.phaseY) * amp
+           + Math.cos(time * sp * 0.35 + n.phaseY * 1.7) * amp * 0.25;
+    return { x: n.x + dx, y: n.y + dy };
+  }
+
+  // =================================================================
+  // STARS
+  // =================================================================
+  function buildStars(count, W, H) {
+    var result = [];
+    for (var i = 0; i < count; i++) {
+      result.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: 0.2 + Math.random() * 0.5,
+        bright: 0.04 + Math.random() * 0.12,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.3 + Math.random() * 1.8,
+      });
+    }
+    return result;
+  }
+
+  // =================================================================
+  // FORCE SIMULATION (with radial roundness)
+  // =================================================================
+  function simulateForces(nodes, edges, config, dt) {
+    var CX = 200, CY = 200;
+    var N = nodes.length;
+    if (N === 0) return;
+    var isAI = entityType === 'ai';
+
+    // Reset forces
+    for (var i = 0; i < N; i++) { nodes[i].fx = 0; nodes[i].fy = 0; }
+
+    // Spring attraction along edges
+    for (var ei = 0; ei < edges.length; ei++) {
+      var e = edges[ei];
+      var na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.02 && nb.alpha < 0.02) continue;
+      var dx = nb.x - na.x, dy = nb.y - na.y;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+      var force = e.strength * (dist - e.restLen) / dist;
+      var fx = dx * force, fy = dy * force;
+      na.fx += fx; na.fy += fy;
+      nb.fx -= fx; nb.fy -= fy;
+    }
+
+    // Repulsion between all visible pairs
+    var repulse = isAI ? 2000 : 3000;
+    for (var i2 = 0; i2 < N; i2++) {
+      if (nodes[i2].alpha < 0.02) continue;
+      for (var j = i2 + 1; j < N; j++) {
+        if (nodes[j].alpha < 0.02) continue;
+        var dx2 = nodes[j].x - nodes[i2].x;
+        var dy2 = nodes[j].y - nodes[i2].y;
+        var dsq = dx2 * dx2 + dy2 * dy2;
+        var d2 = Math.sqrt(Math.max(dsq, 100));
+        var f2 = -repulse / (d2 * d2);
+        var fx2 = (dx2 / d2) * f2, fy2 = (dy2 / d2) * f2;
+        nodes[i2].fx += fx2; nodes[i2].fy += fy2;
+        nodes[j].fx -= fx2; nodes[j].fy -= fy2;
+      }
+    }
+
+    // Center gravity (slightly stronger: 0.07)
+    var gravity = 0.07;
+    for (var i3 = 0; i3 < N; i3++) {
+      if (nodes[i3].alpha < 0.02) continue;
+      nodes[i3].fx += (CX - nodes[i3].x) * gravity;
+      nodes[i3].fy += (CY - nodes[i3].y) * gravity;
+    }
+
+    // Radial roundness constraint
+    var targetR = config.targetRadius;
+    var roundness = config.roundness;
+    for (var i4 = 0; i4 < N; i4++) {
+      if (nodes[i4].alpha < 0.02) continue;
+      var rdx = nodes[i4].x - CX;
+      var rdy = nodes[i4].y - CY;
+      var rdist = Math.sqrt(rdx * rdx + rdy * rdy) || 1;
+      var radialForce = (rdist - targetR) * roundness;
+      nodes[i4].fx -= (rdx / rdist) * radialForce;
+      nodes[i4].fy -= (rdy / rdist) * radialForce;
+    }
+
+    // Apply forces -> velocity -> position
+    var damping = 0.96;
+    var maxSpeed = 1.5;
+    for (var i5 = 0; i5 < N; i5++) {
+      var nd = nodes[i5];
+      if (nd.alpha < 0.02) continue;
+      var mass = nd.type === 'primary' ? 3.0 : nd.type === 'companion' ? 0.8 : 1.2;
+      nd.vx = (nd.vx + nd.fx / mass * dt) * damping;
+      nd.vy = (nd.vy + nd.fy / mass * dt) * damping;
+      var speed = Math.sqrt(nd.vx * nd.vx + nd.vy * nd.vy);
+      if (speed > maxSpeed) { nd.vx *= maxSpeed / speed; nd.vy *= maxSpeed / speed; }
+      nd.x += nd.vx;
+      nd.y += nd.vy;
+      // Soft bounds for 400x400
+      var margin = 30;
+      if (nd.x < margin) nd.vx += 1.0;
+      if (nd.x > 400 - margin) nd.vx -= 1.0;
+      if (nd.y < margin) nd.vy += 1.0;
+      if (nd.y > 400 - margin) nd.vy -= 1.0;
+    }
+  }
+
+  // =================================================================
+  // ALPHA TRANSITIONS
+  // =================================================================
+  function updateAlphas(nodes, dt, time) {
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      // Birth: alpha fade from 0.3 to target over 0.8s, NO size animation
+      if (n.birthTime >= 0) {
+        var age = time - n.birthTime;
+        if (age < 0.8) {
+          var t = Math.max(0, age / 0.8);
+          var eased = t * t * (3 - 2 * t);
+          n.alpha = lerp(0.3 * n.talpha, n.talpha, eased);
+          // Radius stays at full target
+          n.r = n.tr;
+          continue;
+        } else {
+          n.birthTime = -1;
+        }
+      }
+      if (n.dying) {
+        var age2 = time - n.deathStart;
+        if (age2 < 1.0) {
+          var t2 = 1 - age2 / 1.0;
+          n.alpha = n.talpha * t2 * t2;
+          n.r = n.tr * t2 * t2;
+          continue;
+        } else {
+          n.alpha = 0; n.r = 0; continue;
+        }
+      }
+      var spd = 4 * dt;
+      n.alpha = lerp(n.alpha, n.talpha, spd);
+      n.r = lerp(n.r, n.tr, spd);
+      n.color = lerpRgb(n.color, n.tcolor, spd);
+    }
+  }
+
+  // =================================================================
+  // CARD CONFIGS
+  // =================================================================
+  var CARD_CONFIGS = [
+    { id: 'A', label: 'A \u2014 Clean Bubble', roundness: 0.06, targetRadius: 110,
+      membrane: 'cleanBubble', connAlphaMult: 1.0 },
+    { id: 'B', label: 'B \u2014 Soft Skin', roundness: 0.04, targetRadius: 120,
+      membrane: 'softSkin', connAlphaMult: 1.0 },
+    { id: 'C', label: 'C \u2014 Gradient Edge', roundness: 0.05, targetRadius: 115,
+      membrane: 'gradientEdge', connAlphaMult: 1.0 },
+    { id: 'D', label: 'D \u2014 No Membrane', roundness: 0.03, targetRadius: 130,
+      membrane: 'none', connAlphaMult: 1.0 },
+    { id: 'E', label: 'E \u2014 Smooth Bubble', roundness: 0.08, targetRadius: 105,
+      membrane: 'smoothBubble', connAlphaMult: 1.0 },
+    { id: 'F', label: 'F \u2014 Living Skin', roundness: 0.04, targetRadius: 125,
+      membrane: 'livingSkin', connAlphaMult: 1.0 },
+  ];
+
+  // =================================================================
+  // CARD INSTANCES
+  // =================================================================
+  var cards = [];
+
+  function createCard(config) {
+    var card = {
+      config: config,
+      nodes: [],
+      edges: [],
+      stars: buildStars(60, 400, 400),
+      canvas: null,
+      ctx: null,
+      animId: null,
+      lastTime: performance.now(),
+    };
+    return card;
+  }
+
+  function rebuildCard(card, animateIn) {
+    var time = performance.now() / 1000;
+    card.nodes = buildAllNodes(currentTier);
+    card.edges = buildEdgesFromNodes(card.nodes);
+
+    if (animateIn) {
+      for (var i = 0; i < card.nodes.length; i++) {
+        card.nodes[i].birthTime = time + Math.random() * 0.15;
+        card.nodes[i].alpha = card.nodes[i].talpha * 0.3;
+        card.nodes[i].r = card.nodes[i].tr; // full target size immediately
+        // Velocities start at 0 — no bouncing
+        card.nodes[i].vx = 0;
+        card.nodes[i].vy = 0;
+      }
+    } else {
+      for (var j = 0; j < card.nodes.length; j++) {
+        card.nodes[j].alpha = card.nodes[j].talpha;
+        card.nodes[j].r = card.nodes[j].tr;
+        card.nodes[j].vx = 0;
+        card.nodes[j].vy = 0;
+      }
+    }
+  }
+
+  function rebuildAll(animateIn) {
+    for (var i = 0; i < cards.length; i++) {
+      rebuildCard(cards[i], animateIn);
+    }
+  }
+
+  // =================================================================
+  // RENDER HELPERS
+  // =================================================================
+  function renderStars(ctx, stars, time) {
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var twinkle = s.bright * (0.4 + 0.6 * Math.sin(time * s.speed + s.phase));
+      if (twinkle < 0.01) continue;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr([180, 200, 255], twinkle);
+      ctx.fill();
+    }
+  }
+
+  function renderConnections(ctx, card, animPositions, time, breathAlpha) {
+    var nodes = card.nodes;
+    var edges = card.edges;
+    var config = card.config;
+    var CX = 200, CY = 200;
+    var isAI = entityType === 'ai';
+
+    for (var ei = 0; ei < edges.length; ei++) {
+      var e = edges[ei];
+      var na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+
+      var pa = animPositions[e.a];
+      var pb = animPositions[e.b];
+      var dx = pa.x - pb.x, dy = pa.y - pb.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      var distFade = Math.max(0, 1 - dist / 250);
+      var minA = Math.min(na.alpha, nb.alpha);
+      var connColor = blendConnectionColor(na, nb);
+
+      // AI: outer edge fade
+      var aiEdgeFade = 1;
+      if (isAI) {
+        var distA = nodeDistFromCenter(na, CX, CY);
+        var distB = nodeDistFromCenter(nb, CX, CY);
+        var maxDist = Math.max(distA, distB);
+        if (maxDist > 100) {
+          aiEdgeFade = Math.max(0.2, 1 - (maxDist - 100) / 80);
+        }
+      }
+
+      var baseAlpha = distFade * minA * aiEdgeFade * config.connAlphaMult;
+      if (baseAlpha < 0.005) continue;
+
+      // Card D: outer boost (nodes in outer 40% by distance from center)
+      var outerBoost = 1;
+      if (config.membrane === 'none') {
+        var allDists = [];
+        for (var ni = 0; ni < nodes.length; ni++) {
+          if (nodes[ni].alpha > 0.02) allDists.push(nodeDistFromCenter(nodes[ni], CX, CY));
+        }
+        allDists.sort(function(a2, b2) { return a2 - b2; });
+        var thresh60 = allDists[Math.floor(allDists.length * 0.6)] || 80;
+        var dA = nodeDistFromCenter(na, CX, CY);
+        var dB = nodeDistFromCenter(nb, CX, CY);
+        if (dA > thresh60 && dB > thresh60) outerBoost = 2.0;
+      }
+
+      // Wiggle
+      var midX = (pa.x + pb.x) / 2;
+      var midY = (pa.y + pb.y) / 2;
+      var len = dist || 1;
+      var perpX = -(pb.y - pa.y) / len;
+      var perpY = (pb.x - pa.x) / len;
+      var wiggle = Math.sin(time * e.wiggleSpeed + e.wigglePhase) * e.wiggleAmp;
+      var cpx = midX + perpX * wiggle;
+      var cpy = midY + perpY * wiggle;
+
+      // Card B: 2-pass only
+      if (config.membrane === 'softSkin') {
+        // Pass 1: soft wide
+        var glowA = baseAlpha * (0.18 + breathAlpha * 0.3) * outerBoost;
+        if (glowA > 0.002) {
+          ctx.beginPath(); ctx.moveTo(pa.x, pa.y);
+          ctx.quadraticCurveTo(cpx, cpy, pb.x, pb.y);
+          ctx.strokeStyle = rgbStr(connColor, glowA);
+          ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.stroke();
+        }
+        // Pass 2: sharp
+        var sharpA = baseAlpha * (0.48 + breathAlpha * 0.35) * outerBoost;
+        if (sharpA > 0.002) {
+          ctx.beginPath(); ctx.moveTo(pa.x, pa.y);
+          ctx.quadraticCurveTo(cpx, cpy, pb.x, pb.y);
+          ctx.strokeStyle = rgbStr(connColor, sharpA);
+          ctx.lineWidth = 1; ctx.lineCap = 'round'; ctx.stroke();
+        }
+        continue;
+      }
+
+      // Card E: connections slightly more transparent
+      var eMult = (config.membrane === 'smoothBubble') ? 0.8 : 1.0;
+
+      // Standard 3-pass
+      // Pass 1: wide soft glow
+      var gA = baseAlpha * (0.18 + breathAlpha * 0.3) * outerBoost * eMult;
+      if (gA > 0.002) {
+        ctx.beginPath(); ctx.moveTo(pa.x, pa.y);
+        ctx.quadraticCurveTo(cpx, cpy, pb.x, pb.y);
+        ctx.strokeStyle = rgbStr(connColor, gA);
+        ctx.lineWidth = 4.5; ctx.lineCap = 'round'; ctx.stroke();
+      }
+      // Pass 2: mid glow
+      var mA = baseAlpha * (0.24 + breathAlpha * 0.3) * outerBoost * eMult;
+      if (mA > 0.002) {
+        ctx.beginPath(); ctx.moveTo(pa.x, pa.y);
+        ctx.quadraticCurveTo(cpx, cpy, pb.x, pb.y);
+        ctx.strokeStyle = rgbStr(connColor, mA);
+        ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
+      }
+      // Pass 3: sharp
+      var sA = baseAlpha * (0.48 + breathAlpha * 0.35) * outerBoost * eMult;
+      if (sA > 0.002) {
+        ctx.beginPath(); ctx.moveTo(pa.x, pa.y);
+        ctx.quadraticCurveTo(cpx, cpy, pb.x, pb.y);
+        ctx.strokeStyle = rgbStr(connColor, sA);
+        ctx.lineWidth = 0.8; ctx.lineCap = 'round'; ctx.stroke();
+      }
+    }
+  }
+
+  function renderNodes(ctx, nodes, animPositions, time) {
+    var isAI = entityType === 'ai';
+    var CX = 200, CY = 200;
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.alpha < 0.02) continue;
+      var p = animPositions[i];
+      var c = n.color;
+      var na = n.alpha;
+      var pulseSizeOffset = 0.4 * Math.sin(time * Math.PI * 2 / 3 + n.phase);
+
+      var nodeAlpha = na;
+      if (isAI) {
+        var d = nodeDistFromCenter(n, CX, CY);
+        if (d > 100) {
+          nodeAlpha *= Math.max(0.5, 1 - (d - 100) / 100);
+        }
+      }
+
+      if (n.type === 'primary') {
+        var r = Math.max(0.1, n.r + pulseSizeOffset * 0.4);
+        // Tiny halo
+        var haloGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 12);
+        haloGrad.addColorStop(0, rgbStr(c, nodeAlpha * 0.1));
+        haloGrad.addColorStop(1, rgbStr(c, 0));
+        ctx.beginPath(); ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+        ctx.fillStyle = haloGrad; ctx.fill();
+        // Core
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(c, nodeAlpha * 0.9); ctx.fill();
+      } else if (n.type === 'companion') {
+        var r2 = Math.max(0.1, n.r + pulseSizeOffset * 0.3);
+        ctx.beginPath(); ctx.arc(p.x, p.y, r2, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(c, nodeAlpha * 0.7); ctx.fill();
+      } else if (n.type === 'assess') {
+        var r3 = Math.max(0.1, n.r + pulseSizeOffset * 0.35);
+        ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(c, nodeAlpha * 0.04); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, r3, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(c, nodeAlpha * 0.75); ctx.fill();
+      } else if (n.type === 'satellite') {
+        var r4 = Math.max(0.1, 1.5 + pulseSizeOffset * 0.2);
+        ctx.beginPath(); ctx.arc(p.x, p.y, r4, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(c, nodeAlpha * 0.5); ctx.fill();
+      }
+    }
+  }
+
+  // =================================================================
+  // MEMBRANE RENDERERS
+  // =================================================================
+
+  // A — Clean Bubble: single thin stroke, 1.2px, alpha 0.18
+  function renderMembrane_cleanBubble(ctx, nodes, animPositions, hull, time, breathAlpha, breathScale) {
+    if (!hull || hull.length < 3) return;
+    var memColor = avgPrimaryColor(nodes);
+    ctx.strokeStyle = rgbStr(memColor, 0.18 + breathAlpha * 0.3);
+    ctx.lineWidth = 1.2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    drawSmoothedHull(ctx, hull, 15, breathScale, 200, 200);
+    ctx.stroke();
+  }
+
+  // B — Soft Skin: single wider stroke, 3.5px, alpha 0.08
+  function renderMembrane_softSkin(ctx, nodes, animPositions, hull, time, breathAlpha, breathScale) {
+    if (!hull || hull.length < 3) return;
+    var memColor = avgPrimaryColor(nodes);
+    ctx.strokeStyle = rgbStr(memColor, 0.08 + breathAlpha * 0.2);
+    ctx.lineWidth = 3.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    drawSmoothedHull(ctx, hull, 18, breathScale, 200, 200);
+    ctx.stroke();
+  }
+
+  // C — Gradient Edge: filled shape with very low alpha + single stroke
+  function renderMembrane_gradientEdge(ctx, nodes, animPositions, hull, time, breathAlpha, breathScale) {
+    if (!hull || hull.length < 3) return;
+    var memColor = avgPrimaryColor(nodes);
+    // Filled shape
+    ctx.fillStyle = rgbStr(memColor, 0.03 + breathAlpha * 0.1);
+    drawSmoothedHull(ctx, hull, 16, breathScale, 200, 200);
+    ctx.fill();
+    // Stroke
+    ctx.strokeStyle = rgbStr(memColor, 0.12 + breathAlpha * 0.25);
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    drawSmoothedHull(ctx, hull, 16, breathScale, 200, 200);
+    ctx.stroke();
+  }
+
+  // D — No Membrane: nothing drawn
+  function renderMembrane_none() { /* no membrane */ }
+
+  // E — Smooth Bubble: extra hull subdivision, 1.5px, alpha 0.15
+  function renderMembrane_smoothBubble(ctx, nodes, animPositions, hull, time, breathAlpha, breathScale) {
+    if (!hull || hull.length < 3) return;
+    var memColor = avgPrimaryColor(nodes);
+    ctx.strokeStyle = rgbStr(memColor, 0.15 + breathAlpha * 0.3);
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    drawExtraSmoothedHull(ctx, hull, 14, breathScale, 200, 200);
+    ctx.stroke();
+  }
+
+  // F — Living Skin: wobbling hull, each point's padding oscillates
+  function renderMembrane_livingSkin(ctx, nodes, animPositions, hull, time, breathAlpha, breathScale) {
+    if (!hull || hull.length < 3) return;
+    var memColor = avgPrimaryColor(nodes);
+    var CX = 200, CY = 200;
+
+    // Build wobbling points
+    var pts = [];
+    for (var i = 0; i < hull.length; i++) {
+      var dx = hull[i].x - CX;
+      var dy = hull[i].y - CY;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      // Each point has unique wobble
+      var wobble = 2 + Math.sin(time * 0.8 + i * 1.7) * 3 + Math.sin(time * 1.3 + i * 2.9) * 2;
+      var pad = 16 + wobble;
+      pts.push({
+        x: CX + (dx / d) * (d + pad) * breathScale,
+        y: CY + (dy / d) * (d + pad) * breathScale,
+      });
+    }
+
+    var n = pts.length;
+    ctx.beginPath();
+    var startX = (pts[0].x + pts[n - 1].x) / 2;
+    var startY = (pts[0].y + pts[n - 1].y) / 2;
+    ctx.moveTo(startX, startY);
+    for (var j = 0; j < n; j++) {
+      var curr = pts[j];
+      var nextPt = pts[(j + 1) % n];
+      ctx.quadraticCurveTo(curr.x, curr.y, (curr.x + nextPt.x) / 2, (curr.y + nextPt.y) / 2);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = rgbStr(memColor, 0.14 + breathAlpha * 0.25);
+    ctx.lineWidth = 1.8;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+
+  var MEMBRANE_FNS = {
+    cleanBubble: renderMembrane_cleanBubble,
+    softSkin: renderMembrane_softSkin,
+    gradientEdge: renderMembrane_gradientEdge,
+    none: renderMembrane_none,
+    smoothBubble: renderMembrane_smoothBubble,
+    livingSkin: renderMembrane_livingSkin,
+  };
+
+  // =================================================================
+  // FULL CARD RENDER
+  // =================================================================
+  function renderCard(card, now) {
+    var dt = Math.min((now - card.lastTime) / 1000, 0.05);
+    card.lastTime = now;
+    var time = now / 1000;
+    var ctx = card.ctx;
+    var nodes = card.nodes;
+    var edges = card.edges;
+    var config = card.config;
+    var W = 400, H = 400;
+    var isAI = entityType === 'ai';
+
+    // Force sim
+    simulateForces(nodes, edges, config, dt);
+
+    // Alpha transitions
+    updateAlphas(nodes, dt, time);
+
+    // Set canvas size each frame
+    card.canvas.width = W;
+    card.canvas.height = H;
+
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    renderStars(ctx, card.stars, time);
+
+    // Collect animated positions
+    var animPositions = [];
+    for (var i = 0; i < nodes.length; i++) {
+      animPositions.push(animPos(nodes[i], time));
+    }
+
+    // Breathing
+    var breathPhase = Math.sin(time * 0.25 * Math.PI * 2 / 4);
+    var breathAlpha = 0.02 * breathPhase;
+    var breathScale = 1 + 0.018 * breathPhase;
+
+    // Membrane (human only, not 'none')
+    if (!isAI && nodes.length >= 3 && config.membrane !== 'none') {
+      var visiblePts = [];
+      for (var vi = 0; vi < nodes.length; vi++) {
+        if (nodes[vi].alpha > 0.05) visiblePts.push(animPositions[vi]);
+      }
+      if (visiblePts.length >= 3) {
+        var hull = convexHull(visiblePts);
+        if (hull.length >= 3) {
+          var membraneFn = MEMBRANE_FNS[config.membrane];
+          if (membraneFn) membraneFn(ctx, nodes, animPositions, hull, time, breathAlpha, breathScale);
+        }
+      }
+    }
+
+    // Connections
+    renderConnections(ctx, card, animPositions, time, breathAlpha);
+
+    // Nodes
+    renderNodes(ctx, nodes, animPositions, time);
+
+    ctx.restore();
+
+    card.animId = requestAnimationFrame(function(t) { renderCard(card, t); });
+  }
+
+  // =================================================================
+  // BUILD DOM
+  // =================================================================
+  var gridEl = document.getElementById('grid');
+
+  for (var ci = 0; ci < CARD_CONFIGS.length; ci++) {
+    var cfg = CARD_CONFIGS[ci];
+    var card = createCard(cfg);
+
+    var cardEl = document.createElement('div');
+    cardEl.className = 'card';
+
+    var canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 400;
+    card.canvas = canvas;
+    card.ctx = canvas.getContext('2d');
+
+    var label = document.createElement('div');
+    label.className = 'card-label';
+    label.textContent = cfg.label;
+
+    cardEl.appendChild(canvas);
+    cardEl.appendChild(label);
+    gridEl.appendChild(cardEl);
+
+    cards.push(card);
+  }
+
+  // =================================================================
+  // INIT
+  // =================================================================
+  rebuildAll(false);
+  for (var ci2 = 0; ci2 < cards.length; ci2++) {
+    (function(card) {
+      card.animId = requestAnimationFrame(function(t) { renderCard(card, t); });
+    })(cards[ci2]);
+  }
+
+  // =================================================================
+  // CONTROLS
+  // =================================================================
+  var presetBtns = {
+    seed: document.getElementById('btn-seed'),
+    young: document.getElementById('btn-young'),
+    full: document.getElementById('btn-full'),
+    random: document.getElementById('btn-random'),
+  };
+  var entityBtns = {
+    human: document.getElementById('btn-human'),
+    ai: document.getElementById('btn-ai'),
+  };
+
+  function setActivePreset(name) {
+    Object.keys(presetBtns).forEach(function(k) {
+      presetBtns[k].className = 'btn' + (k === name ? ' active' : '');
+    });
+  }
+  function setActiveEntity(name) {
+    Object.keys(entityBtns).forEach(function(k) {
+      entityBtns[k].className = 'btn' + (k === name ? ' active' : '');
+    });
+  }
+
+  presetBtns.seed.onclick = function() {
+    currentTier = 0;
+    assessState = {};
+    onboardingAnswers = {};
+    for (var i = 1; i <= 10; i++) onboardingAnswers['onboard-' + i] = (i % 3 === 0) ? 1 : 0;
+    setActivePreset('seed');
+    rebuildAll(true);
+  };
+
+  presetBtns.young.onclick = function() {
+    currentTier = 1;
+    onboardingAnswers = {};
+    for (var i = 1; i <= 10; i++) onboardingAnswers['onboard-' + i] = (i % 2 === 0) ? 1 : 0;
+    assessState = {};
+    ASSESS_MAP.forEach(function(a, idx) { if (a.tier === 1) assessState[idx] = true; });
+    setActivePreset('young');
+    rebuildAll(true);
+  };
+
+  presetBtns.full.onclick = function() {
+    currentTier = 2;
+    onboardingAnswers = {};
+    for (var i = 1; i <= 10; i++) onboardingAnswers['onboard-' + i] = Math.random() < 0.5 ? 0 : 1;
+    assessState = {};
+    ASSESS_MAP.forEach(function(a, idx) { assessState[idx] = true; });
+    setActivePreset('full');
+    rebuildAll(true);
+  };
+
+  presetBtns.random.onclick = function() {
+    currentTier = 2;
+    onboardingAnswers = {};
+    for (var i = 1; i <= 10; i++) {
+      if (Math.random() < 0.7) onboardingAnswers['onboard-' + i] = Math.random() < 0.5 ? 0 : 1;
+    }
+    assessState = {};
+    ASSESS_MAP.forEach(function(a, idx) { if (Math.random() < 0.45) assessState[idx] = true; });
+    setActivePreset('random');
+    rebuildAll(true);
+  };
+
+  entityBtns.human.onclick = function() {
+    if (entityType === 'human') return;
+    entityType = 'human';
+    setActiveEntity('human');
+    rebuildAll(true);
+  };
+
+  entityBtns.ai.onclick = function() {
+    if (entityType === 'ai') return;
+    entityType = 'ai';
+    setActiveEntity('ai');
+    rebuildAll(true);
+  };
+
+})();
+</script>
+</body>
+</html>
