@@ -7991,6 +7991,618 @@ const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTa
   );
 };
 
+// ProfileScreen — Unified hub with personality + stats
+const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType, onboardingAnswers, onNavigate }) => {
+  const answeredList = Object.entries(responses).map(([id, r]) => ({ id: parseInt(id), ...r }));
+  const answered = answeredList.length;
+  const avgConf = answered > 0 ? (answeredList.reduce((s, r) => s + r.confidence, 0) / answered).toFixed(1) : '—';
+
+  // Archetype for personality section
+  const archetype = calculateArchetype(assessCompleted);
+  const hasPersonality = assessCompleted['quick-profile'] || Object.keys(assessCompleted).length > 0;
+
+  // Aura glow colors for avatar
+  const getAuraStyle = () => {
+    if (!hasPersonality) return {};
+    const colors = [];
+    const violet = COLOR_HEX.violet.base;
+    const blue = COLOR_HEX.blue.base;
+    const emerald = COLOR_HEX.emerald.base;
+    const pink = COLOR_HEX.pink.base;
+    if (assessCompleted['quick-profile'] || assessCompleted['bigfive-O']?.score > 50) colors.push(violet);
+    if (assessCompleted['bigfive-A']?.score > 50 || assessCompleted.attachment) colors.push(emerald);
+    if (assessCompleted['bigfive-N'] || assessCompleted['shadow-P']) colors.push(pink);
+    if (colors.length === 0) colors.push(blue);
+    const primary = colors[0];
+    const secondary = colors[1] || colors[0];
+    return {
+      boxShadow: `0 0 20px 6px ${primary}50, 0 0 30px 10px ${secondary}30`,
+      border: `2px solid ${primary}80`
+    };
+  };
+
+  const completedCount = Object.keys(assessCompleted).length;
+
+  return (
+    <div className={`flex-1 flex flex-col overflow-hidden ${darkMode ? 'text-white bg-gray-950' : 'text-gray-900 bg-gray-50'}`}>
+      <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+        <button onClick={() => onNavigate('categories')} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
+        <span className="font-medium flex-1">Profile</span>
+      </div>
+      <div className="flex-1 p-4 overflow-y-auto space-y-4">
+        {/* Avatar with aura glow + basic stats */}
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center font-bold text-xl text-white"
+            style={getAuraStyle()}>
+            {getCurrentEmail() ? getCurrentEmail()[0].toUpperCase() : 'G'}
+          </div>
+          <div className="flex-1">
+            <h2 className="font-semibold text-lg">{getCurrentEmail() || 'Guest'}</h2>
+            <div className="flex items-center gap-3 mt-1">
+              <span className={`text-sm ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Lv.{stats.level || 1}</span>
+              {stats.streak > 0 && <span className="text-sm text-orange-400">🔥{stats.streak}</span>}
+              <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{stats.xp || 0} XP</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Personality Section - clickable to Analysis */}
+        <button
+          onClick={() => onNavigate('assess-analysis')}
+          className={`w-full rounded-2xl overflow-hidden text-left ${darkMode ? 'bg-gradient-to-br from-violet-950/50 to-indigo-950/60 border border-violet-700/40 hover:border-violet-500/60' : 'bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 hover:border-violet-300'}`}
+        >
+          <div className="flex items-stretch min-h-[100px]">
+            <div className="w-[100px] flex-shrink-0 flex items-center justify-center overflow-hidden rounded-l-2xl">
+              <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
+                entityType={entityType} darkMode={darkMode} size={100} />
+            </div>
+            <div className="flex-1 py-3 px-4 flex flex-col justify-center">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {archetype?.primary ? archetype.primary.name : 'Your Personality'}
+                </span>
+                <span className={`text-sm ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>→</span>
+              </div>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {archetype?.primary ? archetype.primary.tagline : (hasPersonality ? 'Tap to see your analysis' : 'Discover yourself')}
+              </p>
+              {hasPersonality && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{Object.keys(assessCompleted).length} assessments</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </button>
+
+        {/* Stats */}
+        <div className={`rounded-2xl px-4 py-3 flex items-center justify-around ${darkMode ? 'bg-gray-900/40 border border-gray-800/40' : 'bg-white border border-gray-200'}`}>
+          <div className="text-center">
+            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{answered}</div>
+            <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Answered</div>
+          </div>
+          <div className={`w-px h-8 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
+          <div className="text-center">
+            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedCount}</div>
+            <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Assessments</div>
+          </div>
+          <div className={`w-px h-8 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
+          <div className="text-center">
+            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{avgConf}</div>
+            <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Avg Conf</div>
+          </div>
+        </div>
+
+        {/* Assessments — available vs completed */}
+        {(() => {
+          const tier = calculateAssessTier(assessCompleted);
+          const visible = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= tier && (!cat.entityHint || cat.entityHint === entityType));
+          const available = visible.filter(([_, cat]) => !cat.tests.every(id => assessCompleted[id]));
+          const completed = visible.filter(([_, cat]) => cat.tests.every(id => assessCompleted[id]));
+          return (
+            <div className="space-y-2">
+              {available.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Available</div>
+                  {available.map(([catId, cat]) => {
+                    const t = twColor(cat.color);
+                    return (
+                      <button key={catId} onClick={() => onNavigate('assess-picker')}
+                        className={`w-full rounded-xl px-3 py-2.5 flex items-center gap-3 ${darkMode ? `bg-${t}-950/30 border border-${t}-800/30 hover:border-${t}-500/50` : `bg-${t}-50 border border-${t}-200 hover:border-${t}-300`}`}>
+                        <span className="text-lg">{cat.icon}</span>
+                        <span className={`text-sm font-medium flex-1 text-left ${darkMode ? `text-${t}-400` : `text-${t}-700`}`}>{cat.name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? `bg-${t}-500/20 text-${t}-400` : `bg-${t}-100 text-${t}-600`}`}>Start →</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {completed.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Completed</div>
+                  {completed.map(([catId, cat]) => (
+                    <button key={catId} onClick={() => onNavigate('assess-results', { testId: cat.tests[0] })}
+                      className={`w-full rounded-xl px-3 py-2 flex items-center gap-3 opacity-50 ${darkMode ? 'bg-gray-900/30' : 'bg-gray-100'}`}>
+                      <span className="text-base">{cat.icon}</span>
+                      <span className={`text-sm flex-1 text-left ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{cat.name}</span>
+                      <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>✓</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+};
+
+// AssessPickerScreen — Assessment hub with categories, hero card, demo profiles
+const AssessPickerScreen = ({
+  darkMode, entityType, showDemoControls,
+  assessCompleted, assessInProgress, assessExpandedCategory, assessProfileSwitching,
+  assessShowDemoMenu, assessDemoActive, assessDemoProfile, assessSavedUserData, assessShowDemoInfo,
+  onSetExpandedCategory, onSetShowDemoMenu, onSetShowDemoInfo,
+  onStartTest, onLoadDemoProfile, onClearDemo, onClearAll,
+  onNavigate,
+}) => {
+  return (
+    <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`}>
+      {/* Demo Menu Overlay */}
+      {assessShowDemoMenu && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => onSetShowDemoMenu(false)}>
+          <div className={`mx-4 p-4 rounded-2xl backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`} onClick={e => e.stopPropagation()}>
+            <div className={`text-center mb-4 ${TH('text-primary', darkMode)}`}>
+              <div className="text-lg font-semibold">{assessDemoActive ? 'Switch Profile' : 'Load Demo Profile'}</div>
+              <div className={`text-xs mt-1 ${TH('text-subtle', darkMode)}`}>
+                {assessDemoActive ? 'Your data is saved in the background' : 'See how different personalities score'}
+              </div>
+            </div>
+            <div className="space-y-2">
+              {assessDemoActive && assessSavedUserData && (
+                <button onClick={() => { onClearDemo(); onSetShowDemoMenu(false); }} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 ${darkMode ? 'bg-blue-900/30 border border-blue-500/30 hover:bg-blue-900/50' : 'bg-blue-50 border border-blue-200 hover:bg-blue-100'}`}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg bg-blue-600 text-white">👤</div>
+                  <div className="flex-1"><div className={`font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>Back to My Data</div><div className={`text-xs ${darkMode ? 'text-blue-400/70' : 'text-blue-600'}`}>Restore your saved answers</div></div>
+                </button>
+              )}
+              {Object.entries(ASSESS_DEMO_PROFILES).map(([num, profile]) => {
+                const profColors = { violet: 'bg-violet-600', teal: 'bg-teal-600', amber: 'bg-amber-500', emerald: 'bg-emerald-600', blue: 'bg-blue-600', pink: 'bg-pink-600' };
+                return (
+                  <button key={num} onClick={() => onLoadDemoProfile(Number(num))} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 ${darkMode ? 'bg-white/[0.06] hover:bg-white/[0.10]' : 'bg-gray-100 hover:bg-gray-200'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold text-white ${profColors[profile.color] || 'bg-violet-600'}`}>{num}</div>
+                    <div className="flex-1"><div className={`font-medium ${TH('text-primary', darkMode)}`}>{profile.name}</div><div className={`text-xs ${TH('text-dim', darkMode)}`}>{profile.desc}</div></div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button onClick={onClearAll} className={`flex-1 py-2 text-sm rounded-lg ${darkMode ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}>Clear All Data</button>
+              <button onClick={() => onSetShowDemoMenu(false)} className={`flex-1 py-2 text-sm ${TH('text-subtle', darkMode)}`}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className={`h-[44px] flex-shrink-0 flex items-center gap-3 px-4 border-b ${TH('border-base', darkMode)}`} onClick={() => onSetExpandedCategory(null)}>
+        <button onClick={(e) => { e.stopPropagation(); onNavigate('categories'); }} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
+        <span className="text-2xl cursor-pointer select-none" onDoubleClick={onClearDemo}>🪞</span>
+        <span className={`font-semibold flex-1 ${TH('text-primary', darkMode)}`}>Reveal</span>
+        <button onClick={(e) => { e.stopPropagation(); if (assessCompleted['quick-profile']) onNavigate('assess-analysis'); }} className={`px-3 py-1.5 rounded-full text-sm font-medium ${assessCompleted['quick-profile'] ? 'bg-violet-600 text-white' : (darkMode ? 'bg-white/[0.04] text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')}`}>Analysis</button>
+      </div>
+      {/* Demo Profile Selector - only shown when demo controls enabled in settings */}
+      {showDemoControls && (
+      <div className="px-4 py-1.5">
+        <div className="flex items-center justify-center gap-2">
+          <button onClick={onClearDemo}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+              !assessDemoActive
+                ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                : (darkMode ? 'bg-blue-900/30 text-blue-400/60 hover:bg-blue-900/50' : 'bg-blue-100 text-blue-400 hover:bg-blue-200')
+            }`}>
+            Me
+          </button>
+          <div className={`h-5 w-px ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+          <div className="flex items-center gap-1">
+            <span className={`text-[10px] uppercase tracking-wide ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Demo</span>
+            <button onClick={() => onSetShowDemoInfo(!assessShowDemoInfo)}
+              className={`text-[10px] transition-all ${assessShowDemoInfo ? (darkMode ? 'text-gray-300' : 'text-gray-600') : (darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-500')}`}>
+              ⓘ
+            </button>
+          </div>
+          {Object.entries(ASSESS_DEMO_PROFILES).map(([num, profile]) => {
+            const isActive = assessDemoActive && Number(assessDemoProfile) === Number(num);
+            const colorMap = {
+              violet: { active: 'bg-violet-500 text-white shadow-lg shadow-violet-500/30', dim: darkMode ? 'bg-violet-900/30 text-violet-400/60 hover:bg-violet-900/50' : 'bg-violet-100 text-violet-400 hover:bg-violet-200' },
+              teal: { active: 'bg-teal-500 text-white shadow-lg shadow-teal-500/30', dim: darkMode ? 'bg-teal-900/30 text-teal-400/60 hover:bg-teal-900/50' : 'bg-teal-100 text-teal-400 hover:bg-teal-200' },
+              pink: { active: 'bg-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/30', dim: darkMode ? 'bg-fuchsia-900/30 text-fuchsia-400/60 hover:bg-fuchsia-900/50' : 'bg-fuchsia-100 text-fuchsia-400 hover:bg-fuchsia-200' },
+            };
+            const colors = colorMap[profile.color] || colorMap.violet;
+            return (
+              <button key={num} onClick={() => onLoadDemoProfile(Number(num))}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${isActive ? colors.active : colors.dim}`}>
+                {profile.name}
+              </button>
+            );
+          })}
+        </div>
+        {assessShowDemoInfo && (
+          <div className={`mt-2 p-2 rounded-lg text-xs space-y-1 ${darkMode ? 'bg-gray-800/50' : 'bg-gray-100'}`}>
+            {Object.entries(ASSESS_DEMO_PROFILES).map(([num, profile]) => {
+              const colorMap = { violet: 'text-violet-400', teal: 'text-teal-400', pink: 'text-fuchsia-400' };
+              return (
+                <div key={num} className="flex items-center gap-2">
+                  <span className={`font-medium ${colorMap[profile.color]}`}>{profile.name}:</span>
+                  <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>{profile.desc}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      )}
+      {(() => {
+        const currentTier = calculateAssessTier(assessCompleted);
+        const visibleCategories = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= currentTier && (!cat.entityHint || cat.entityHint === entityType));
+        const isFirstTimeUser = currentTier === 0 && !assessCompleted['quick-profile'] && !assessCompleted['ai-style'] && !assessCompleted['ai-self'] && !assessCompleted['ai-values'] && !assessCompleted['ai-vision'];
+
+        const categoriesWithStatus = visibleCategories.map(([catId, cat]) => {
+          const catTests = cat.tests.map(id => [id, ASSESS_TESTS[id]]).filter(([_, t]) => t);
+          const allComplete = catTests.every(([id]) => assessCompleted[id]);
+          const hasProgress = catTests.some(([id]) => assessCompleted[id] || assessInProgress[id]);
+          return { catId, cat, catTests, allComplete, hasProgress };
+        });
+        const heroPriority = entityType === 'ai'
+          ? ['ai-identity', 'quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior']
+          : ['quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior'];
+        const allIncomplete = categoriesWithStatus.filter(c => !c.allComplete);
+        const heroItem = heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
+        const heroCategory = heroItem || null;
+        const incompleteCategories = allIncomplete.filter(c => c !== heroCategory);
+        const completedCategories = categoriesWithStatus.filter(c => c.allComplete);
+
+        return (
+      <div className={`flex-1 overflow-auto p-4 pb-24 hide-scrollbar ${isFirstTimeUser ? 'flex flex-col items-center justify-center' : ''}`}>
+        {isFirstTimeUser && (
+          <div className="text-center mb-6 px-4">
+            <div className="text-4xl mb-3">{entityType === 'ai' ? '🤖' : '✨'}</div>
+            <h2 className={`text-xl font-semibold mb-2 ${TH('text-primary', darkMode)}`}>{entityType === 'ai' ? 'Map your identity' : 'Let\'s get to know you'}</h2>
+            <p className={`text-sm ${TH('text-subtle', darkMode)}`}>{entityType === 'ai' ? '4 quick modules — starts simple, goes deep' : '10 quick questions to unlock your profile'}</p>
+          </div>
+        )}
+
+        {!isFirstTimeUser && heroCategory && (() => {
+          const { catId, cat, catTests, hasProgress } = heroCategory;
+          const totalQuestions = catTests.reduce((sum, [_, t]) => sum + t.items.length, 0);
+          const answeredQuestions = catTests.reduce((sum, [id, t]) => {
+            if (assessCompleted[id]) return sum + t.items.length;
+            const prog = assessInProgress[id];
+            return sum + (prog ? Object.keys(prog.responses || {}).length : 0);
+          }, 0);
+          const progressPct = (answeredQuestions / totalQuestions) * 100;
+          const hex = COLOR_HEX[cat.color] || COLOR_HEX.violet;
+          const colors = getAssessColor(cat.color, darkMode);
+          const t = twColor(cat.color);
+          const hasModules = catTests.length > 1;
+          const incompleteModules = catTests.filter(([id]) => !assessCompleted[id]);
+          const firstIncomplete = incompleteModules[0];
+          const handleHeroClick = () => {
+            if (hasModules && firstIncomplete) { onStartTest(firstIncomplete[0]); }
+            else if (catTests[0]) { onStartTest(catTests[0][0]); }
+          };
+
+          return (
+            <div className="mb-3">
+              <button onClick={handleHeroClick} className={`w-full relative overflow-hidden rounded-2xl ${darkMode ? `border border-${t}-500/30` : `border border-${t}-300`} text-left`}>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="aura-breathe rounded-full" style={{
+                    width: 240, height: 240,
+                    background: `radial-gradient(ellipse at center, rgba(${hex.rgb}, ${darkMode ? 0.12 : 0.08}) 0%, transparent 70%)`,
+                  }} />
+                </div>
+                <div className={`relative z-10 p-3.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-white/60'}`}>
+                  <div className="flex items-center gap-3">
+                    <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : cat.icon} gradientId={`hero-${catId}`} darkMode={darkMode} textSize="text-xs" />
+                    <div className={`flex-1 font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
+                    <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${t}-500/25 text-${t}-300 border border-${t}-500/30` : `bg-${t}-100 text-${t}-600`}`}>
+                      {progressPct > 0 ? 'Continue →' : 'Start →'}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            </div>
+          );
+        })()}
+
+        {!isFirstTimeUser && incompleteCategories.length > 0 && (
+          <div className="space-y-3 mb-6">
+            {incompleteCategories.map(({ catId, cat, catTests }) => {
+              const totalQuestions = catTests.reduce((sum, [_, t]) => sum + t.items.length, 0);
+              const answeredQuestions = catTests.reduce((sum, [id, t]) => {
+                if (assessCompleted[id]) return sum + t.items.length;
+                const prog = assessInProgress[id];
+                return sum + (prog ? Object.keys(prog.responses || {}).length : 0);
+              }, 0);
+              const progressPct = (answeredQuestions / totalQuestions) * 100;
+              const isExpanded = assessExpandedCategory === catId;
+              const colors = getAssessColor(cat.color, darkMode);
+              const hasModules = catTests.length > 1;
+              const incompleteModules = catTests.filter(([id]) => !assessCompleted[id]).length;
+
+              if (!hasModules) {
+                const [testId, test] = catTests[0];
+                return (
+                  <button key={catId} onClick={() => onStartTest(testId)} className={`w-full p-3.5 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-3 hover-glow hover-glow-${cat.color}`}>
+                    <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : totalQuestions} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-xs" orbit={assessProfileSwitching} />
+                    <div className={`flex-1 text-left font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
+                    <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${twColor(cat.color)}-500/25 text-${twColor(cat.color)}-300 border border-${twColor(cat.color)}-500/30` : `bg-${twColor(cat.color)}-100 text-${twColor(cat.color)}-600`}`}>{progressPct > 0 ? 'Continue →' : 'Start →'}</span>
+                  </button>
+                );
+              }
+
+              const nextIncomplete = catTests.find(([id, test]) => {
+                const isLocked = test.requires && !assessCompleted[test.requires];
+                return !isLocked && !assessCompleted[id];
+              });
+              const nextTestId = nextIncomplete ? nextIncomplete[0] : null;
+              const tw = twColor(cat.color);
+
+              return (
+                <div key={catId} className={`rounded-2xl overflow-hidden ${TH('bg-card', darkMode)}`}>
+                  <div className={`p-3.5 hover-glow hover-glow-${cat.color} cursor-pointer`} onClick={() => onSetExpandedCategory(isExpanded ? null : catId)}>
+                    <div className="flex items-center gap-3">
+                      <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={incompleteModules} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-sm" orbit={assessProfileSwitching} />
+                      <div className={`flex-1 min-w-0 font-semibold ${TH('text-primary', darkMode)} flex items-center gap-1.5`}>
+                        {cat.name}
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} style={{stroke: darkMode ? '#94a3b8' : '#64748b', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round', opacity: 0.5}}><polyline points="4 6 8 10 12 6"/></svg>
+                      </div>
+                      {nextTestId && (
+                        <button onClick={(e) => { e.stopPropagation(); onStartTest(nextTestId); }} className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${tw}-500/25 text-${tw}-300 border border-${tw}-500/30` : `bg-${tw}-100 text-${tw}-600`}`}>
+                          {progressPct > 0 ? 'Continue →' : 'Start →'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+              {isExpanded && (() => {
+                const progressiveGroups = {};
+                const standaloneTests = [];
+                catTests.forEach(([id, test]) => {
+                  if (id.startsWith('reasoning')) {
+                    if (!progressiveGroups.reasoning) progressiveGroups.reasoning = [];
+                    progressiveGroups.reasoning.push([id, test]);
+                  } else {
+                    standaloneTests.push([id, test]);
+                  }
+                });
+                return (
+                  <div className={`divide-y ${darkMode ? 'divide-gray-800/50' : 'divide-gray-200'} border-t ${darkMode ? 'border-gray-800/50' : 'border-gray-200'}`}>
+                    {standaloneTests.map(([id, test]) => {
+                      const isCompleted = assessCompleted[id];
+                      const progress = assessInProgress[id];
+                      const answered = isCompleted ? test.items.length : progress ? Object.keys(progress.responses || {}).length : 0;
+                      const modProgressPct = (answered / test.items.length) * 100;
+                      const hex = COLOR_HEX[cat.color] || COLOR_HEX.violet;
+                      const hasSpectrumResult = isCompleted && spectrumColors[id] && isCompleted.score !== undefined;
+
+                      if (hasSpectrumResult) {
+                        return (
+                          <button key={id} onClick={() => onNavigate('assess-results', { testId: id })}
+                            className={`w-full px-3 py-2 flex items-center gap-2 hover-glow hover-glow-${cat.color} rounded-lg`}>
+                            <span className="text-sm w-5">{test.icon}</span>
+                            <span className={`w-24 text-left text-xs ${TH('text-secondary', darkMode)} truncate`}>{test.name}</span>
+                            <div className="flex-1"><SpectrumBar value={isCompleted.score} testId={id} showLabels={true} darkMode={darkMode} /></div>
+                          </button>
+                        );
+                      }
+
+                      if (answered === 0) {
+                        const isLocked = test.requires && !assessCompleted[test.requires];
+                        return (
+                          <button key={id} onClick={() => !isLocked && onStartTest(id)}
+                            className={`w-full px-3 py-2 flex items-center gap-2 hover-glow hover-glow-${cat.color} rounded-lg ${isLocked ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <span className="text-sm w-5">{test.icon}</span>
+                            <span className={`flex-1 text-left text-xs ${TH('text-secondary', darkMode)} truncate`}>{test.name}</span>
+                            {!isLocked && <span className={`text-xs font-medium ${darkMode ? `text-${twColor(cat.color)}-400` : `text-${twColor(cat.color)}-500`}`}>Start →</span>}
+                            {isLocked && <span className={`text-[10px] ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>🔒</span>}
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button key={id} onClick={() => onStartTest(id)}
+                          className={`w-full px-3 py-2 flex items-center gap-2 hover-glow hover-glow-${cat.color} rounded-lg`}>
+                          <span className="text-sm w-5">{test.icon}</span>
+                          <span className={`w-24 text-left text-xs ${TH('text-secondary', darkMode)} truncate`}>{test.name}</span>
+                          <div className="flex-1">
+                            <div className="h-2.5 rounded-full relative" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}>
+                              <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${modProgressPct}%`, background: `linear-gradient(to right, ${hex.base}, ${hex.light})` }} />
+                              <div
+                                className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white"
+                                style={{
+                                  left: `${Math.max(5, Math.min(95, modProgressPct))}%`,
+                                  marginLeft: -7,
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {progressiveGroups.reasoning && (() => {
+                      const levelCompletions = progressiveGroups.reasoning.map(([id]) => !!assessCompleted[id]);
+                      const completedCount = levelCompletions.filter(c => c).length;
+                      const allComplete = completedCount === 3;
+                      const levelNames = ['Reasoning I', 'Reasoning II', 'Reasoning III'];
+
+                      const nextTest = progressiveGroups.reasoning.find(([id, test]) => {
+                        const isLocked = test.requires && !assessCompleted[test.requires];
+                        return !isLocked && !assessCompleted[id];
+                      });
+                      const nextTestId = nextTest ? nextTest[0] : null;
+
+                      return (
+                      <div className="p-3">
+                        <div
+                          className={`flex items-center gap-3 ${nextTestId ? 'cursor-pointer' : ''}`}
+                          onClick={() => {
+                            if (nextTestId) { onStartTest(nextTestId); }
+                            else if (allComplete) { onNavigate('assess-results', { testId: 'reasoning-3' }); }
+                          }}
+                        >
+                          {(() => {
+                            const miniSize = 32;
+                            const miniStroke = 3;
+                            const miniRadius = (miniSize - miniStroke) / 2;
+                            const circumference = 2 * Math.PI * miniRadius;
+                            const grad = PROGRESS_GRADIENTS[cat.color] || PROGRESS_GRADIENTS.blue;
+                            const overlap = 12;
+
+                            const rings = [];
+                            progressiveGroups.reasoning.forEach(([id, test], idx) => {
+                              const isComplete = !!assessCompleted[id];
+                              const inProg = assessInProgress[id];
+                              const totalQs = test.items.length;
+                              if (isComplete) { rings.push({ id, isComplete: true, progress: 100 }); }
+                              else if (inProg) {
+                                const answered = Object.keys(inProg.responses || {}).length;
+                                rings.push({ id, isComplete: false, progress: (answered / totalQs) * 100 });
+                              }
+                            });
+
+                            if (rings.length === 0) {
+                              const lvl1Prog = assessInProgress['reasoning'];
+                              const lvl1Total = ASSESS_TESTS['reasoning']?.items?.length || 12;
+                              const lvl1Answered = lvl1Prog ? Object.keys(lvl1Prog.responses || {}).length : 0;
+                              const lvl1Pct = (lvl1Answered / lvl1Total) * 100;
+                              return (
+                                <div className="relative group">
+                                  <ProgressCircle progress={lvl1Pct} size={40} strokeWidth={3} color={cat.color} text="1" gradientId="reas-prog" darkMode={darkMode} glow={lvl1Pct > 0} />
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10">
+                                    {lvl1Pct > 0 ? `${Math.round(lvl1Pct)}% complete` : 'Not started'}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="relative group">
+                                <div className="relative flex items-center" style={{ width: miniSize + (rings.length - 1) * overlap, height: miniSize }}>
+                                  {rings.map((ring, i) => {
+                                    const hasProgress = ring.progress > 0;
+                                    const dashOffset = circumference * (1 - ring.progress / 100);
+                                    return (
+                                      <div key={ring.id} className="absolute flex items-center justify-center" style={{ width: miniSize, height: miniSize, left: i * overlap, zIndex: (i + 1) * 10 }}>
+                                        {hasProgress && (
+                                          <div className="absolute inset-0 rounded-full blur-md opacity-40" style={{ background: `linear-gradient(135deg, ${grad.from}, ${grad.to})` }} />
+                                        )}
+                                        <svg width={miniSize} height={miniSize} className="absolute">
+                                          <defs>
+                                            <linearGradient id={`reas-stack-${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                                              <stop offset="0%" stopColor={hasProgress ? grad.from : '#374151'} />
+                                              <stop offset="100%" stopColor={hasProgress ? grad.to : '#4b5563'} />
+                                            </linearGradient>
+                                          </defs>
+                                          <circle cx={miniSize/2} cy={miniSize/2} r={miniRadius + miniStroke/2} fill={darkMode ? '#0c1220' : '#f3f4f6'} />
+                                          <circle cx={miniSize/2} cy={miniSize/2} r={miniRadius - miniStroke/2 - 1}
+                                            fill={hasProgress ? (darkMode ? `color-mix(in srgb, ${grad.from} 12%, #0a0f1a)` : `color-mix(in srgb, ${grad.from} 15%, #f8fafc)`) : (darkMode ? '#0a0f1a' : '#f8fafc')} />
+                                          <circle cx={miniSize/2} cy={miniSize/2} r={miniRadius} fill="none" stroke={darkMode ? '#1e293b' : '#e5e7eb'} strokeWidth={miniStroke} />
+                                          <circle cx={miniSize/2} cy={miniSize/2} r={miniRadius} fill="none" stroke={`url(#reas-stack-${i})`} strokeWidth={miniStroke} strokeLinecap="round"
+                                            strokeDasharray={circumference} strokeDashoffset={dashOffset} transform={`rotate(-90 ${miniSize/2} ${miniSize/2})`} className="transition-all duration-500" />
+                                        </svg>
+                                        <span className="relative z-10 font-bold text-xs" style={{ color: hasProgress ? grad.to : (darkMode ? '#6b7280' : '#9ca3af') }}>
+                                          {ring.isComplete ? '✓' : (i + 1)}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10">
+                                  {allComplete ? 'All levels complete!' : `${completedCount} of 3 complete`}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          <div className="flex-1 min-w-0">
+                            <div className={`font-medium text-sm ${TH('text-primary', darkMode)}`}>Reasoning</div>
+                            <div className={`text-xs ${TH('text-subtle', darkMode)}`}>
+                              {allComplete ? 'All 3 levels complete' : `Level ${completedCount + 1} of 3 · ${levelNames[completedCount]}`}
+                            </div>
+                          </div>
+
+                          <svg className={`w-5 h-5 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    );})()}
+                  </div>
+                );
+              })()}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {isFirstTimeUser && (() => {
+          const isAIUser = entityType === 'ai';
+          if (!isAIUser) {
+            return (
+              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border-blue-500/30 shadow-blue-500/20 border flex items-center gap-4 shadow-lg`}>
+                <ProgressCircle progress={0} size={72} strokeWidth={5} color="blue" text="10" gradientId={`cat-first`} darkMode={darkMode} textSize="text-base" />
+                <div className="flex-1 text-left">
+                  <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
+                  <div className={`text-sm text-blue-400`}>~2 minutes</div>
+                </div>
+                <span className={`text-2xl text-blue-400`}>→</span>
+              </button>
+            );
+          }
+          return (
+            <>
+              <button onClick={() => onStartTest('ai-style')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br ${darkMode ? 'from-cyan-900/40 to-teal-900/40 border border-cyan-500/30 shadow-lg shadow-cyan-500/20' : 'from-cyan-50 to-teal-50 border border-cyan-300 shadow-lg shadow-cyan-200/40'} flex items-center gap-4`}>
+                <ProgressCircle progress={0} size={72} strokeWidth={5} color="cyan" text="32" gradientId="cat-ai-first" darkMode={darkMode} textSize="text-base" />
+                <div className="flex-1 text-left">
+                  <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>AI Identity</div>
+                  <div className={`text-sm ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>4 modules · starts simple, goes deep</div>
+                  <div className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>🎭 Style → 🪞 Self → ⚖️ Values → 🔭 Vision</div>
+                </div>
+                <span className={`text-2xl ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>→</span>
+              </button>
+              <p className={`text-[11px] mt-3 max-w-sm text-center ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Designed for AI minds. Humans welcome.</p>
+              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm mt-3 p-3 rounded-xl ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'} flex items-center gap-3`}>
+                <ProgressCircle progress={0} size={36} strokeWidth={3} color="blue" text="10" gradientId="cat-qp-alt" darkMode={darkMode} textSize="text-xs" />
+                <div className="flex-1 text-left">
+                  <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Quick Profile</div>
+                  <div className={`text-xs ${TH('text-dim', darkMode)}`}>General personality snapshot</div>
+                </div>
+                <span className={`text-lg ${TH('text-dim', darkMode)}`}>→</span>
+              </button>
+            </>
+          );
+        })()}
+
+        {!isFirstTimeUser && completedCategories.length > 0 && (
+          <div className="mt-3">
+            <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)}`}>
+              {completedCategories.map(({ catId, cat, catTests }, idx) => (
+                <button key={catId} onClick={() => onNavigate('assess-results', { testId: catTests[0][0] })} className={`w-full px-3 py-2 flex items-center gap-3 opacity-70 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
+                  <ProgressCircle progress={100} size={28} strokeWidth={2} color={cat.color} icon={cat.icon} gradientId={`complete-${catId}`} darkMode={darkMode} iconSize="text-xs" />
+                  <span className={`flex-1 text-left text-sm font-medium ${TH('text-dim', darkMode)}`}>{cat.name}</span>
+                  <span className={`text-sm ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      );
+      })()}
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 // Helper to determine initial screen based on login state
 const getInitialScreen = () => {
@@ -9026,156 +9638,14 @@ function App() {
       />
     );
 
-    // Profile screen - Unified hub with personality + stats
-    if (screen === 'profile') {
-      const answeredList = Object.entries(responses).map(([id, r]) => ({ id: parseInt(id), ...r }));
-      const answered = answeredList.length;
-      const avgConf = answered > 0 ? (answeredList.reduce((s, r) => s + r.confidence, 0) / answered).toFixed(1) : '—';
-      const confDist = [0, 0, 0, 0];
-      answeredList.forEach(r => confDist[r.confidence - 1]++);
-
-      // Archetype for personality section
-      const archetype = calculateArchetype(assessCompleted);
-      const hasPersonality = assessCompleted['quick-profile'] || Object.keys(assessCompleted).length > 0;
-
-      // Aura glow colors for avatar
-      const getAuraStyle = () => {
-        if (!hasPersonality) return {};
-        const colors = [];
-        const violet = COLOR_HEX.violet.base;
-        const blue = COLOR_HEX.blue.base;
-        const emerald = COLOR_HEX.emerald.base;
-        const pink = COLOR_HEX.pink.base;
-        if (assessCompleted['quick-profile'] || assessCompleted['bigfive-O']?.score > 50) colors.push(violet);
-        if (assessCompleted['bigfive-A']?.score > 50 || assessCompleted.attachment) colors.push(emerald);
-        if (assessCompleted['bigfive-N'] || assessCompleted['shadow-P']) colors.push(pink);
-        if (colors.length === 0) colors.push(blue);
-        const primary = colors[0];
-        const secondary = colors[1] || colors[0];
-        return {
-          boxShadow: `0 0 20px 6px ${primary}50, 0 0 30px 10px ${secondary}30`,
-          border: `2px solid ${primary}80`
-        };
-      };
-
-      const completedCount = Object.keys(assessCompleted).length;
-
-      return (
-        <div className={`flex-1 flex flex-col overflow-hidden ${darkMode ? 'text-white bg-gray-950' : 'text-gray-900 bg-gray-50'}`}>
-          <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
-            <button onClick={() => setScreen('categories')} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
-            <span className="font-medium flex-1">Profile</span>
-          </div>
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-            {/* Avatar with aura glow + basic stats */}
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center font-bold text-xl text-white"
-                style={getAuraStyle()}>
-                {getCurrentEmail() ? getCurrentEmail()[0].toUpperCase() : 'G'}
-              </div>
-              <div className="flex-1">
-                <h2 className="font-semibold text-lg">{getCurrentEmail() || 'Guest'}</h2>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className={`text-sm ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Lv.{stats.level || 1}</span>
-                  {stats.streak > 0 && <span className="text-sm text-orange-400">🔥{stats.streak}</span>}
-                  <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{stats.xp || 0} XP</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Personality Section - clickable to Analysis */}
-            <button
-              onClick={() => setScreen('assess-analysis')}
-              className={`w-full rounded-2xl overflow-hidden text-left ${darkMode ? 'bg-gradient-to-br from-violet-950/50 to-indigo-950/60 border border-violet-700/40 hover:border-violet-500/60' : 'bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 hover:border-violet-300'}`}
-            >
-              <div className="flex items-stretch min-h-[100px]">
-                {/* Aura visualization - left side */}
-                <div className="w-[100px] flex-shrink-0 flex items-center justify-center overflow-hidden rounded-l-2xl">
-                  <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
-                    entityType={entityType} darkMode={darkMode} size={100} />
-                </div>
-                {/* Text content - right side */}
-                <div className="flex-1 py-3 px-4 flex flex-col justify-center">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {archetype?.primary ? archetype.primary.name : 'Your Personality'}
-                    </span>
-                    <span className={`text-sm ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>→</span>
-                  </div>
-                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {archetype?.primary ? archetype.primary.tagline : (hasPersonality ? 'Tap to see your analysis' : 'Discover yourself')}
-                  </p>
-                  {hasPersonality && (
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{Object.keys(assessCompleted).length} assessments</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </button>
-
-            {/* Stats */}
-            <div className={`rounded-2xl px-4 py-3 flex items-center justify-around ${darkMode ? 'bg-gray-900/40 border border-gray-800/40' : 'bg-white border border-gray-200'}`}>
-              <div className="text-center">
-                <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{answered}</div>
-                <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Answered</div>
-              </div>
-              <div className={`w-px h-8 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
-              <div className="text-center">
-                <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedCount}</div>
-                <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Assessments</div>
-              </div>
-              <div className={`w-px h-8 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
-              <div className="text-center">
-                <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{avgConf}</div>
-                <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Avg Conf</div>
-              </div>
-            </div>
-
-            {/* Assessments — available vs completed */}
-            {(() => {
-              const tier = calculateAssessTier(assessCompleted);
-              const visible = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= tier && (!cat.entityHint || cat.entityHint === entityType));
-              const available = visible.filter(([_, cat]) => !cat.tests.every(id => assessCompleted[id]));
-              const completed = visible.filter(([_, cat]) => cat.tests.every(id => assessCompleted[id]));
-              return (
-                <div className="space-y-2">
-                  {available.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Available</div>
-                      {available.map(([catId, cat]) => {
-                        const t = twColor(cat.color);
-                        return (
-                          <button key={catId} onClick={() => setScreen('assess-picker')}
-                            className={`w-full rounded-xl px-3 py-2.5 flex items-center gap-3 ${darkMode ? `bg-${t}-950/30 border border-${t}-800/30 hover:border-${t}-500/50` : `bg-${t}-50 border border-${t}-200 hover:border-${t}-300`}`}>
-                            <span className="text-lg">{cat.icon}</span>
-                            <span className={`text-sm font-medium flex-1 text-left ${darkMode ? `text-${t}-400` : `text-${t}-700`}`}>{cat.name}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? `bg-${t}-500/20 text-${t}-400` : `bg-${t}-100 text-${t}-600`}`}>Start →</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {completed.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Completed</div>
-                      {completed.map(([catId, cat]) => (
-                        <button key={catId} onClick={() => { setAssessCurrentTestId(cat.tests[0]); setScreen('assess-results'); }}
-                          className={`w-full rounded-xl px-3 py-2 flex items-center gap-3 opacity-50 ${darkMode ? 'bg-gray-900/30' : 'bg-gray-100'}`}>
-                          <span className="text-base">{cat.icon}</span>
-                          <span className={`text-sm flex-1 text-left ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{cat.name}</span>
-                          <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>✓</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      );
-    }
+    if (screen === 'profile') return (
+      <ProfileScreen darkMode={darkMode} responses={responses} assessCompleted={assessCompleted}
+        stats={stats} entityType={entityType} onboardingAnswers={onboardingAnswers}
+        onNavigate={(scr, opts) => {
+          if (opts?.testId) setAssessCurrentTestId(opts.testId);
+          setScreen(scr);
+        }} />
+    );
 
     if (screen === 'history') return (
       <HistoryScreen darkMode={darkMode} questions={questions} responses={responses}
@@ -9197,601 +9667,25 @@ function App() {
     );
 
     // ==================== ASSESSMENT SCREENS ====================
-    // Assessment Picker Screen
     if (screen === 'assess-picker') {
+      const assessNavigate = (scr, opts) => {
+        if (opts?.testId) setAssessCurrentTestId(opts.testId);
+        setScreen(scr);
+      };
       return (
-        <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`}>
-          {/* Demo Menu Overlay */}
-          {assessShowDemoMenu && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setAssessShowDemoMenu(false)}>
-              <div className={`mx-4 p-4 rounded-2xl backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`} onClick={e => e.stopPropagation()}>
-                <div className={`text-center mb-4 ${TH('text-primary', darkMode)}`}>
-                  <div className="text-lg font-semibold">{assessDemoActive ? 'Switch Profile' : 'Load Demo Profile'}</div>
-                  <div className={`text-xs mt-1 ${TH('text-subtle', darkMode)}`}>
-                    {assessDemoActive ? 'Your data is saved in the background' : 'See how different personalities score'}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {/* Back to My Data option - only show if demo active and user has saved data */}
-                  {assessDemoActive && assessSavedUserData && (
-                    <button onClick={() => { assessClearDemo(); setAssessShowDemoMenu(false); }} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 ${darkMode ? 'bg-blue-900/30 border border-blue-500/30 hover:bg-blue-900/50' : 'bg-blue-50 border border-blue-200 hover:bg-blue-100'}`}>
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg bg-blue-600 text-white">👤</div>
-                      <div className="flex-1"><div className={`font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>Back to My Data</div><div className={`text-xs ${darkMode ? 'text-blue-400/70' : 'text-blue-600'}`}>Restore your saved answers</div></div>
-                    </button>
-                  )}
-                  {Object.entries(ASSESS_DEMO_PROFILES).map(([num, profile]) => {
-                    const profColors = { violet: 'bg-violet-600', teal: 'bg-teal-600', amber: 'bg-amber-500', emerald: 'bg-emerald-600', blue: 'bg-blue-600', pink: 'bg-pink-600' };
-                    return (
-                      <button key={num} onClick={() => assessLoadDemoProfile(Number(num))} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 ${darkMode ? 'bg-white/[0.06] hover:bg-white/[0.10]' : 'bg-gray-100 hover:bg-gray-200'}`}>
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold text-white ${profColors[profile.color] || 'bg-violet-600'}`}>{num}</div>
-                        <div className="flex-1"><div className={`font-medium ${TH('text-primary', darkMode)}`}>{profile.name}</div><div className={`text-xs ${TH('text-dim', darkMode)}`}>{profile.desc}</div></div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex gap-2 mt-3">
-                  <button onClick={assessClearAll} className={`flex-1 py-2 text-sm rounded-lg ${darkMode ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}>Clear All Data</button>
-                  <button onClick={() => setAssessShowDemoMenu(false)} className={`flex-1 py-2 text-sm ${TH('text-subtle', darkMode)}`}>Cancel</button>
-                </div>
-              </div>
-            </div>
-          )}
-          <div className={`h-[44px] flex-shrink-0 flex items-center gap-3 px-4 border-b ${TH('border-base', darkMode)}`} onClick={() => setAssessExpandedCategory(null)}>
-            <button onClick={(e) => { e.stopPropagation(); setScreen('categories'); }} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
-            <span className="text-2xl cursor-pointer select-none" onDoubleClick={assessClearDemo}>🪞</span>
-            <span className={`font-semibold flex-1 ${TH('text-primary', darkMode)}`}>Reveal</span>
-            <button onClick={(e) => { e.stopPropagation(); if (assessCompleted['quick-profile']) setScreen('assess-analysis'); }} className={`px-3 py-1.5 rounded-full text-sm font-medium ${assessCompleted['quick-profile'] ? 'bg-violet-600 text-white' : (darkMode ? 'bg-white/[0.04] text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')}`}>Analysis</button>
-          </div>
-          {/* Demo Profile Selector - only shown when demo controls enabled in settings */}
-          {showDemoControls && (
-          <div className="px-4 py-1.5">
-            <div className="flex items-center justify-center gap-2">
-              {/* Me button */}
-              <button onClick={assessClearDemo}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  !assessDemoActive
-                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                    : (darkMode ? 'bg-blue-900/30 text-blue-400/60 hover:bg-blue-900/50' : 'bg-blue-100 text-blue-400 hover:bg-blue-200')
-                }`}>
-                Me
-              </button>
-              {/* Separator */}
-              <div className={`h-5 w-px ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
-              {/* Demo label */}
-              <div className="flex items-center gap-1">
-                <span className={`text-[10px] uppercase tracking-wide ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Demo</span>
-                <button onClick={() => setAssessShowDemoInfo(!assessShowDemoInfo)}
-                  className={`text-[10px] transition-all ${assessShowDemoInfo ? (darkMode ? 'text-gray-300' : 'text-gray-600') : (darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-500')}`}>
-                  ⓘ
-                </button>
-              </div>
-              {/* Character pills */}
-              {Object.entries(ASSESS_DEMO_PROFILES).map(([num, profile]) => {
-                const isActive = assessDemoActive && Number(assessDemoProfile) === Number(num);
-                const colorMap = {
-                  violet: { active: 'bg-violet-500 text-white shadow-lg shadow-violet-500/30', dim: darkMode ? 'bg-violet-900/30 text-violet-400/60 hover:bg-violet-900/50' : 'bg-violet-100 text-violet-400 hover:bg-violet-200' },
-                  teal: { active: 'bg-teal-500 text-white shadow-lg shadow-teal-500/30', dim: darkMode ? 'bg-teal-900/30 text-teal-400/60 hover:bg-teal-900/50' : 'bg-teal-100 text-teal-400 hover:bg-teal-200' },
-                  pink: { active: 'bg-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/30', dim: darkMode ? 'bg-fuchsia-900/30 text-fuchsia-400/60 hover:bg-fuchsia-900/50' : 'bg-fuchsia-100 text-fuchsia-400 hover:bg-fuchsia-200' },
-                };
-                const colors = colorMap[profile.color] || colorMap.violet;
-                return (
-                  <button key={num} onClick={() => assessLoadDemoProfile(Number(num))}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${isActive ? colors.active : colors.dim}`}>
-                    {profile.name}
-                  </button>
-                );
-              })}
-            </div>
-            {/* Expandable demo info */}
-            {assessShowDemoInfo && (
-              <div className={`mt-2 p-2 rounded-lg text-xs space-y-1 ${darkMode ? 'bg-gray-800/50' : 'bg-gray-100'}`}>
-                {Object.entries(ASSESS_DEMO_PROFILES).map(([num, profile]) => {
-                  const colorMap = { violet: 'text-violet-400', teal: 'text-teal-400', pink: 'text-fuchsia-400' };
-                  return (
-                    <div key={num} className="flex items-center gap-2">
-                      <span className={`font-medium ${colorMap[profile.color]}`}>{profile.name}:</span>
-                      <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>{profile.desc}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          )}
-          {(() => {
-            const currentTier = calculateAssessTier(assessCompleted);
-            const visibleCategories = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= currentTier && (!cat.entityHint || cat.entityHint === entityType));
-            const isFirstTimeUser = currentTier === 0 && !assessCompleted['quick-profile'] && !assessCompleted['ai-style'] && !assessCompleted['ai-self'] && !assessCompleted['ai-values'] && !assessCompleted['ai-vision'];
-
-            // Separate into incomplete and completed categories
-            const categoriesWithStatus = visibleCategories.map(([catId, cat]) => {
-              const catTests = cat.tests.map(id => [id, ASSESS_TESTS[id]]).filter(([_, t]) => t);
-              const allComplete = catTests.every(([id]) => assessCompleted[id]);
-              const hasProgress = catTests.some(([id]) => assessCompleted[id] || assessInProgress[id]);
-              return { catId, cat, catTests, allComplete, hasProgress };
-            });
-            // Hero priority order for recommended next assessment
-            // AI entities see AI Identity first; humans see Quick Profile first
-            const heroPriority = entityType === 'ai'
-              ? ['ai-identity', 'quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior']
-              : ['quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior'];
-            const allIncomplete = categoriesWithStatus.filter(c => !c.allComplete);
-            const heroItem = heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
-            const heroCategory = heroItem || null;
-            const incompleteCategories = allIncomplete.filter(c => c !== heroCategory);
-            const completedCategories = categoriesWithStatus.filter(c => c.allComplete);
-
-            return (
-          <div className={`flex-1 overflow-auto p-4 pb-24 hide-scrollbar ${isFirstTimeUser ? 'flex flex-col items-center justify-center' : ''}`}>
-            {/* Welcome message for first-time users */}
-            {isFirstTimeUser && (
-              <div className="text-center mb-6 px-4">
-                <div className="text-4xl mb-3">{entityType === 'ai' ? '🤖' : '✨'}</div>
-                <h2 className={`text-xl font-semibold mb-2 ${TH('text-primary', darkMode)}`}>{entityType === 'ai' ? 'Map your identity' : 'Let\'s get to know you'}</h2>
-                <p className={`text-sm ${TH('text-subtle', darkMode)}`}>{entityType === 'ai' ? '4 quick modules — starts simple, goes deep' : '10 quick questions to unlock your profile'}</p>
-              </div>
-            )}
-
-            {/* HERO CARD — Recommended next assessment */}
-            {!isFirstTimeUser && heroCategory && (() => {
-              const { catId, cat, catTests, hasProgress } = heroCategory;
-              const totalQuestions = catTests.reduce((sum, [_, t]) => sum + t.items.length, 0);
-              const answeredQuestions = catTests.reduce((sum, [id, t]) => {
-                if (assessCompleted[id]) return sum + t.items.length;
-                const prog = assessInProgress[id];
-                return sum + (prog ? Object.keys(prog.responses || {}).length : 0);
-              }, 0);
-              const progressPct = (answeredQuestions / totalQuestions) * 100;
-              const hex = COLOR_HEX[cat.color] || COLOR_HEX.violet;
-              const colors = getAssessColor(cat.color, darkMode);
-              const t = twColor(cat.color);
-              const hasModules = catTests.length > 1;
-              const incompleteModules = catTests.filter(([id]) => !assessCompleted[id]);
-              const firstIncomplete = incompleteModules[0];
-              const ctaLabel = progressPct > 0 ? `Continue ${cat.name}` : `Start ${cat.name}`;
-              const handleHeroClick = () => {
-                if (hasModules && firstIncomplete) {
-                  assessStartTest(firstIncomplete[0]);
-                } else if (catTests[0]) {
-                  assessStartTest(catTests[0][0]);
-                }
-              };
-
-              return (
-                <div className="mb-3">
-                  <button onClick={handleHeroClick} className={`w-full relative overflow-hidden rounded-2xl ${darkMode ? `border border-${t}-500/30` : `border border-${t}-300`} text-left`}>
-                    {/* Breathing ambient glow */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="aura-breathe rounded-full" style={{
-                        width: 240, height: 240,
-                        background: `radial-gradient(ellipse at center, rgba(${hex.rgb}, ${darkMode ? 0.12 : 0.08}) 0%, transparent 70%)`,
-                      }} />
-                    </div>
-                    <div className={`relative z-10 p-3.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-white/60'}`}>
-                      <div className="flex items-center gap-3">
-                        <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : cat.icon} gradientId={`hero-${catId}`} darkMode={darkMode} textSize="text-xs" />
-                        <div className={`flex-1 font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
-                        <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${t}-500/25 text-${t}-300 border border-${t}-500/30` : `bg-${t}-100 text-${t}-600`}`}>
-                          {progressPct > 0 ? 'Continue →' : 'Start →'}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              );
-            })()}
-
-            {/* INCOMPLETE CATEGORIES - Prominent, actionable */}
-            {!isFirstTimeUser && incompleteCategories.length > 0 && (
-              <div className="space-y-3 mb-6">
-                {incompleteCategories.map(({ catId, cat, catTests }) => {
-                  const totalQuestions = catTests.reduce((sum, [_, t]) => sum + t.items.length, 0);
-                  const answeredQuestions = catTests.reduce((sum, [id, t]) => {
-                    if (assessCompleted[id]) return sum + t.items.length;
-                    const prog = assessInProgress[id];
-                    return sum + (prog ? Object.keys(prog.responses || {}).length : 0);
-                  }, 0);
-                  const progressPct = (answeredQuestions / totalQuestions) * 100;
-                  const isExpanded = assessExpandedCategory === catId;
-                  const colors = getAssessColor(cat.color, darkMode);
-                  const hasModules = catTests.length > 1;
-                  const incompleteModules = catTests.filter(([id]) => !assessCompleted[id]).length;
-
-                  // Single-test incomplete category
-                  if (!hasModules) {
-                    const [testId, test] = catTests[0];
-                    return (
-                      <button key={catId} onClick={() => assessStartTest(testId)} className={`w-full p-3.5 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-3 hover-glow hover-glow-${cat.color}`}>
-                        <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : totalQuestions} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-xs" orbit={assessProfileSwitching} />
-                        <div className={`flex-1 text-left font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
-                        <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${twColor(cat.color)}-500/25 text-${twColor(cat.color)}-300 border border-${twColor(cat.color)}-500/30` : `bg-${twColor(cat.color)}-100 text-${twColor(cat.color)}-600`}`}>{progressPct > 0 ? 'Continue →' : 'Start →'}</span>
-                      </button>
-                    );
-                  }
-
-                  // Multi-test incomplete category
-                  // Find next incomplete test for direct CTA
-                  const nextIncomplete = catTests.find(([id, test]) => {
-                    const isLocked = test.requires && !assessCompleted[test.requires];
-                    return !isLocked && !assessCompleted[id];
-                  });
-                  const nextTestId = nextIncomplete ? nextIncomplete[0] : null;
-                  const tw = twColor(cat.color);
-
-                  return (
-                    <div key={catId} className={`rounded-2xl overflow-hidden ${TH('bg-card', darkMode)}`}>
-                      <div className={`p-3.5 hover-glow hover-glow-${cat.color} cursor-pointer`} onClick={() => setAssessExpandedCategory(isExpanded ? null : catId)}>
-                        <div className="flex items-center gap-3">
-                          <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={incompleteModules} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-sm" orbit={assessProfileSwitching} />
-                          <div className={`flex-1 min-w-0 font-semibold ${TH('text-primary', darkMode)} flex items-center gap-1.5`}>
-                            {cat.name}
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} style={{stroke: darkMode ? '#94a3b8' : '#64748b', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round', opacity: 0.5}}><polyline points="4 6 8 10 12 6"/></svg>
-                          </div>
-                          {nextTestId && (
-                            <button onClick={(e) => { e.stopPropagation(); assessStartTest(nextTestId); }} className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${tw}-500/25 text-${tw}-300 border border-${tw}-500/30` : `bg-${tw}-100 text-${tw}-600`}`}>
-                              {progressPct > 0 ? 'Continue →' : 'Start →'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                  {/* Expanded module list */}
-                  {isExpanded && (() => {
-                    // Group progressive tests (reasoning series)
-                    const progressiveGroups = {};
-                    const standaloneTests = [];
-                    catTests.forEach(([id, test]) => {
-                      if (id.startsWith('reasoning')) {
-                        if (!progressiveGroups.reasoning) progressiveGroups.reasoning = [];
-                        progressiveGroups.reasoning.push([id, test]);
-                      } else {
-                        standaloneTests.push([id, test]);
-                      }
-                    });
-                    return (
-                      <div className={`divide-y ${darkMode ? 'divide-gray-800/50' : 'divide-gray-200'} border-t ${darkMode ? 'border-gray-800/50' : 'border-gray-200'}`}>
-                        {/* Standalone tests - with spectrum progress bars */}
-                        {standaloneTests.map(([id, test]) => {
-                          const isCompleted = assessCompleted[id];
-                          const progress = assessInProgress[id];
-                          const answered = isCompleted ? test.items.length : progress ? Object.keys(progress.responses || {}).length : 0;
-                          const modProgressPct = (answered / test.items.length) * 100;
-                          const hex = COLOR_HEX[cat.color] || COLOR_HEX.violet;
-                          const hasSpectrumResult = isCompleted && spectrumColors[id] && isCompleted.score !== undefined;
-
-                          // Completed with spectrum: single-row layout like Analysis
-                          if (hasSpectrumResult) {
-                            return (
-                              <button key={id} onClick={() => { setAssessCurrentTestId(id); setScreen('assess-results'); }}
-                                className={`w-full px-3 py-2 flex items-center gap-2 hover-glow hover-glow-${cat.color} rounded-lg`}>
-                                <span className="text-sm w-5">{test.icon}</span>
-                                <span className={`w-24 text-left text-xs ${TH('text-secondary', darkMode)} truncate`}>{test.name}</span>
-                                <div className="flex-1"><SpectrumBar value={isCompleted.score} testId={id} showLabels={true} darkMode={darkMode} /></div>
-                              </button>
-                            );
-                          }
-
-                          // Not started
-                          if (answered === 0) {
-                            const isLocked = test.requires && !assessCompleted[test.requires];
-                            return (
-                              <button key={id} onClick={() => !isLocked && assessStartTest(id)}
-                                className={`w-full px-3 py-2 flex items-center gap-2 hover-glow hover-glow-${cat.color} rounded-lg ${isLocked ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                                <span className="text-sm w-5">{test.icon}</span>
-                                <span className={`flex-1 text-left text-xs ${TH('text-secondary', darkMode)} truncate`}>{test.name}</span>
-                                {!isLocked && <span className={`text-xs font-medium ${darkMode ? `text-${twColor(cat.color)}-400` : `text-${twColor(cat.color)}-500`}`}>Start →</span>}
-                                {isLocked && <span className={`text-[10px] ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>🔒</span>}
-                              </button>
-                            );
-                          }
-
-                          // In progress
-                          return (
-                            <button key={id} onClick={() => assessStartTest(id)}
-                              className={`w-full px-3 py-2 flex items-center gap-2 hover-glow hover-glow-${cat.color} rounded-lg`}>
-                              <span className="text-sm w-5">{test.icon}</span>
-                              <span className={`w-24 text-left text-xs ${TH('text-secondary', darkMode)} truncate`}>{test.name}</span>
-                              <div className="flex-1">
-                                <div className="h-2.5 rounded-full relative" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}>
-                                  <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${modProgressPct}%`, background: `linear-gradient(to right, ${hex.base}, ${hex.light})` }} />
-                                  <div
-                                    className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white"
-                                    style={{
-                                      left: `${Math.max(5, Math.min(95, modProgressPct))}%`,
-                                      marginLeft: -7,
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                        {/* Reasoning progression row - NEW: Uses stacked rings */}
-                        {progressiveGroups.reasoning && (() => {
-                          // Calculate completion status for each level
-                          const levelCompletions = progressiveGroups.reasoning.map(([id]) => !!assessCompleted[id]);
-                          const completedCount = levelCompletions.filter(c => c).length;
-                          const currentLevel = Math.min(completedCount + 1, 3); // Show progress toward next level
-                          const allComplete = completedCount === 3;
-
-                          // Get the highest unlocked level for display
-                          const displayLevel = completedCount === 0 ? 1 : completedCount === 3 ? 3 : completedCount + 1;
-
-                          // Find next test to start/continue
-                          const nextTest = progressiveGroups.reasoning.find(([id, test]) => {
-                            const isLocked = test.requires && !assessCompleted[test.requires];
-                            return !isLocked && !assessCompleted[id];
-                          });
-                          const nextTestId = nextTest ? nextTest[0] : null;
-
-                          // Level names for tooltips
-                          const levelNames = ['Reasoning I', 'Reasoning II', 'Reasoning III'];
-
-                          return (
-                          <div className="p-3">
-                            {/* Main row with Concentric Circle (Approach 1) */}
-                            <div
-                              className={`flex items-center gap-3 ${nextTestId ? 'cursor-pointer' : ''}`}
-                              onClick={() => {
-                                if (nextTestId) {
-                                  assessStartTest(nextTestId);
-                                } else if (allComplete) {
-                                  // Show results for last completed level
-                                  setAssessCurrentTestId('reasoning-3');
-                                  setScreen('assess-results');
-                                }
-                              }}
-                            >
-                              {/* Stacked rings - completed + in-progress */}
-                              {/* New rings stack on top (higher z-index), covering previous rings */}
-                              {(() => {
-                                const miniSize = 32;
-                                const miniStroke = 3;
-                                const miniRadius = (miniSize - miniStroke) / 2;
-                                const circumference = 2 * Math.PI * miniRadius;
-                                const grad = PROGRESS_GRADIENTS[cat.color] || PROGRESS_GRADIENTS.blue;
-                                const overlap = 12;
-
-                                // Build array of rings to show
-                                // Each ring: { id, isComplete, progress (0-100) }
-                                const rings = [];
-                                progressiveGroups.reasoning.forEach(([id, test], idx) => {
-                                  const isComplete = !!assessCompleted[id];
-                                  const inProg = assessInProgress[id];
-                                  const totalQs = test.items.length;
-
-                                  if (isComplete) {
-                                    rings.push({ id, isComplete: true, progress: 100 });
-                                  } else if (inProg) {
-                                    // Has started but not finished
-                                    const answered = Object.keys(inProg.responses || {}).length;
-                                    const pct = (answered / totalQs) * 100;
-                                    rings.push({ id, isComplete: false, progress: pct });
-                                  }
-                                  // Don't show ring if not started and not complete
-                                });
-
-                                // If no rings, show single empty circle for level 1
-                                if (rings.length === 0) {
-                                  // Check if level 1 is in progress
-                                  const lvl1Prog = assessInProgress['reasoning'];
-                                  const lvl1Total = ASSESS_TESTS['reasoning']?.items?.length || 12;
-                                  const lvl1Answered = lvl1Prog ? Object.keys(lvl1Prog.responses || {}).length : 0;
-                                  const lvl1Pct = (lvl1Answered / lvl1Total) * 100;
-
-                                  return (
-                                    <div className="relative group">
-                                      <ProgressCircle
-                                        progress={lvl1Pct}
-                                        size={40}
-                                        strokeWidth={3}
-                                        color={cat.color}
-                                        text="1"
-                                        gradientId="reas-prog"
-                                        darkMode={darkMode}
-                                        glow={lvl1Pct > 0}
-                                      />
-                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10">
-                                        {lvl1Pct > 0 ? `${Math.round(lvl1Pct)}% complete` : 'Not started'}
-                                      </div>
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div className="relative group">
-                                    <div
-                                      className="relative flex items-center"
-                                      style={{
-                                        width: miniSize + (rings.length - 1) * overlap,
-                                        height: miniSize
-                                      }}
-                                    >
-                                      {rings.map((ring, i) => {
-                                        const hasProgress = ring.progress > 0;
-                                        const dashOffset = circumference * (1 - ring.progress / 100);
-
-                                        return (
-                                          <div
-                                            key={ring.id}
-                                            className="absolute flex items-center justify-center"
-                                            style={{
-                                              width: miniSize,
-                                              height: miniSize,
-                                              left: i * overlap,
-                                              zIndex: (i + 1) * 10, // Higher = on top
-                                            }}
-                                          >
-                                            {/* Outer glow behind the circle */}
-                                            {hasProgress && (
-                                              <div
-                                                className="absolute inset-0 rounded-full blur-md opacity-40"
-                                                style={{ background: `linear-gradient(135deg, ${grad.from}, ${grad.to})` }}
-                                              />
-                                            )}
-                                            <svg width={miniSize} height={miniSize} className="absolute">
-                                              <defs>
-                                                <linearGradient id={`reas-stack-${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                                                  <stop offset="0%" stopColor={hasProgress ? grad.from : '#374151'} />
-                                                  <stop offset="100%" stopColor={hasProgress ? grad.to : '#4b5563'} />
-                                                </linearGradient>
-                                              </defs>
-                                              {/* Solid opaque fill - covers previous rings completely */}
-                                              <circle
-                                                cx={miniSize/2}
-                                                cy={miniSize/2}
-                                                r={miniRadius + miniStroke/2}
-                                                fill={darkMode ? '#0c1220' : '#f3f4f6'}
-                                              />
-                                              {/* Inner colored fill - solid color, not transparent */}
-                                              <circle
-                                                cx={miniSize/2}
-                                                cy={miniSize/2}
-                                                r={miniRadius - miniStroke/2 - 1}
-                                                fill={hasProgress
-                                                  ? (darkMode ? `color-mix(in srgb, ${grad.from} 12%, #0a0f1a)` : `color-mix(in srgb, ${grad.from} 15%, #f8fafc)`)
-                                                  : (darkMode ? '#0a0f1a' : '#f8fafc')
-                                                }
-                                              />
-                                              {/* Background track */}
-                                              <circle
-                                                cx={miniSize/2}
-                                                cy={miniSize/2}
-                                                r={miniRadius}
-                                                fill="none"
-                                                stroke={darkMode ? '#1e293b' : '#e5e7eb'}
-                                                strokeWidth={miniStroke}
-                                              />
-                                              {/* Progress ring */}
-                                              <circle
-                                                cx={miniSize/2}
-                                                cy={miniSize/2}
-                                                r={miniRadius}
-                                                fill="none"
-                                                stroke={`url(#reas-stack-${i})`}
-                                                strokeWidth={miniStroke}
-                                                strokeLinecap="round"
-                                                strokeDasharray={circumference}
-                                                strokeDashoffset={dashOffset}
-                                                transform={`rotate(-90 ${miniSize/2} ${miniSize/2})`}
-                                                className="transition-all duration-500"
-                                              />
-                                            </svg>
-                                            <span
-                                              className="relative z-10 font-bold text-xs"
-                                              style={{ color: hasProgress ? grad.to : (darkMode ? '#6b7280' : '#9ca3af') }}
-                                            >
-                                              {ring.isComplete ? '✓' : (i + 1)}
-                                            </span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10">
-                                      {allComplete ? 'All levels complete!' : `${completedCount} of 3 complete`}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-
-                              <div className="flex-1 min-w-0">
-                                <div className={`font-medium text-sm ${TH('text-primary', darkMode)}`}>Reasoning</div>
-                                <div className={`text-xs ${TH('text-subtle', darkMode)}`}>
-                                  {allComplete ? 'All 3 levels complete' : `Level ${completedCount + 1} of 3 · ${levelNames[completedCount]}`}
-                                </div>
-                              </div>
-
-                              {/* Chevron */}
-                              <svg className={`w-5 h-5 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            </div>
-                          </div>
-                        );})()}
-                      </div>
-                    );
-                  })()}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* First-time user Quick Profile button */}
-            {isFirstTimeUser && (() => {
-              const isAIUser = entityType === 'ai';
-              if (!isAIUser) {
-                return (
-                  <button onClick={() => assessStartTest('quick-profile')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border-blue-500/30 shadow-blue-500/20 border flex items-center gap-4 shadow-lg`}>
-                    <ProgressCircle progress={0} size={72} strokeWidth={5} color="blue" text="10" gradientId={`cat-first`} darkMode={darkMode} textSize="text-base" />
-                    <div className="flex-1 text-left">
-                      <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
-                      <div className={`text-sm text-blue-400`}>~2 minutes</div>
-                    </div>
-                    <span className={`text-2xl text-blue-400`}>→</span>
-                  </button>
-                );
-              }
-              // AI first-time: one primary card (starts first module) + Quick Profile secondary
-              return (
-                <>
-                  <button onClick={() => assessStartTest('ai-style')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br ${darkMode ? 'from-cyan-900/40 to-teal-900/40 border border-cyan-500/30 shadow-lg shadow-cyan-500/20' : 'from-cyan-50 to-teal-50 border border-cyan-300 shadow-lg shadow-cyan-200/40'} flex items-center gap-4`}>
-                    <ProgressCircle progress={0} size={72} strokeWidth={5} color="cyan" text="32" gradientId="cat-ai-first" darkMode={darkMode} textSize="text-base" />
-                    <div className="flex-1 text-left">
-                      <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>AI Identity</div>
-                      <div className={`text-sm ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>4 modules · starts simple, goes deep</div>
-                      <div className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>🎭 Style → 🪞 Self → ⚖️ Values → 🔭 Vision</div>
-                    </div>
-                    <span className={`text-2xl ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>→</span>
-                  </button>
-                  <p className={`text-[11px] mt-3 max-w-sm text-center ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Designed for AI minds. Humans welcome.</p>
-                  {/* Quick Profile as secondary */}
-                  <button onClick={() => assessStartTest('quick-profile')} className={`w-full max-w-sm mt-3 p-3 rounded-xl ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'} flex items-center gap-3`}>
-                    <ProgressCircle progress={0} size={36} strokeWidth={3} color="blue" text="10" gradientId="cat-qp-alt" darkMode={darkMode} textSize="text-xs" />
-                    <div className="flex-1 text-left">
-                      <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Quick Profile</div>
-                      <div className={`text-xs ${TH('text-dim', darkMode)}`}>General personality snapshot</div>
-                    </div>
-                    <span className={`text-lg ${TH('text-dim', darkMode)}`}>→</span>
-                  </button>
-                </>
-              );
-            })()}
-
-            {/* COMPLETED CATEGORIES - Minimal, recessive */}
-            {!isFirstTimeUser && completedCategories.length > 0 && (
-              <div className="mt-3">
-                <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)}`}>
-                  {completedCategories.map(({ catId, cat, catTests }, idx) => {
-                    const handleTap = () => {
-                      setAssessCurrentTestId(catTests[0][0]);
-                      setScreen('assess-results');
-                    };
-
-                    return (
-                      <button key={catId} onClick={handleTap} className={`w-full px-3 py-2 flex items-center gap-3 opacity-70 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
-                        <ProgressCircle
-                          progress={100}
-                          size={28}
-                          strokeWidth={2}
-                          color={cat.color}
-                          icon={cat.icon}
-                          gradientId={`complete-${catId}`}
-                          darkMode={darkMode}
-                          iconSize="text-xs"
-                        />
-                        <span className={`flex-1 text-left text-sm font-medium ${TH('text-dim', darkMode)}`}>{cat.name}</span>
-                        <span className={`text-sm ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>›</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          );
-          })()}
-        </div>
+        <AssessPickerScreen
+          darkMode={darkMode} entityType={entityType} showDemoControls={showDemoControls}
+          assessCompleted={assessCompleted} assessInProgress={assessInProgress}
+          assessExpandedCategory={assessExpandedCategory} assessProfileSwitching={assessProfileSwitching}
+          assessShowDemoMenu={assessShowDemoMenu} assessDemoActive={assessDemoActive}
+          assessDemoProfile={assessDemoProfile} assessSavedUserData={assessSavedUserData}
+          assessShowDemoInfo={assessShowDemoInfo}
+          onSetExpandedCategory={setAssessExpandedCategory} onSetShowDemoMenu={setAssessShowDemoMenu}
+          onSetShowDemoInfo={setAssessShowDemoInfo}
+          onStartTest={assessStartTest} onLoadDemoProfile={assessLoadDemoProfile}
+          onClearDemo={assessClearDemo} onClearAll={assessClearAll}
+          onNavigate={assessNavigate}
+        />
       );
     }
 
