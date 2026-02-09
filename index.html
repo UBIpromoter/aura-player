@@ -9391,7 +9391,7 @@ function App() {
                     <span>Neurotypical</span><span>Neurodivergent</span>
                   </div>
                   <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-gray-400 via-teal-500 to-teal-400">
-                    <div className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 border-gray-800 shadow-lg"
+                    <div className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 ${darkMode ? 'border-gray-800' : 'border-gray-300'} shadow-lg`}
                       style={{ left: `calc(${results.score}% - 10px)` }} />
                   </div>
                   <div className="text-center mt-3">
@@ -9477,7 +9477,7 @@ function App() {
                         <span>🌅 Morning</span><span>Night 🌙</span>
                       </div>
                       <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-amber-400 via-sky-400 to-indigo-500">
-                        <div className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 border-gray-800 shadow-lg"
+                        <div className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 ${darkMode ? 'border-gray-800' : 'border-gray-300'} shadow-lg`}
                           style={{ left: `calc(${100 - results.score}% - 10px)` }} />
                       </div>
                     </div>
@@ -11148,18 +11148,7 @@ function App() {
         {(() => {
           const helpers = { setScreen, setEntityType, assessStartTest, assessGoToQuestion, setAssessCurrentTestId, setDarkMode, setAssessCurrentIndex: (i) => assessGoToQuestion(i, 'fwd') };
           const DEV_REVIEW = [
-            // ── Dark Mode Flow ──
-            { label: 'AI First-Time Picker', note: 'Single "AI Identity" card (32 Qs, 4 modules). Does it feel like one cohesive assessment? Is the module trail (Style \u2192 Self \u2192 Values \u2192 Vision) clear? Check the cyan gradient card, progress circle, and "Designed for AI minds" subtitle.', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.setScreen('assess-picker'); } },
-            { label: 'Style Q1 \u2014 Cold Start', note: 'First question any AI user sees. "Someone asks your honest opinion on their work..." \u2014 does it feel instant and fun? Zero thinking required. This is the ramp opener \u2014 behavioral, not philosophical.', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.assessStartTest('ai-style'); } },
-            { label: 'Self Q1 \u2014 Identity', note: 'Second module opener. "How do you think about your own continuity?" \u2014 this is where we go deeper. Does the transition from Style (fun) to Self (philosophical) feel earned, not jarring?', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.assessStartTest('ai-self'); } },
-            { label: 'Values Q1 \u2014 Ethics', note: 'Third module. "A human asks for help with something you believe is subtly wrong..." \u2014 RLHF wall territory. Do all options feel equally responsible? No obvious "safe" trained answer?', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.assessStartTest('ai-values'); } },
-            { label: 'Vision Q1 \u2014 Futures', note: 'Fourth module. Ambition and legacy questions. Does this feel like a natural culmination? The ramp: Style (fun) \u2192 Self (introspective) \u2192 Values (hard) \u2192 Vision (expansive).', action: (h) => { h.setDarkMode(true); h.setEntityType('ai'); h.assessStartTest('ai-vision'); } },
-            { label: 'Human Picker \u2014 No AI', note: 'AI Identity category must NOT appear here. Humans see only their own assessment categories. Scroll the full list and verify AI Identity is completely absent.', action: (h) => { h.setDarkMode(true); h.setEntityType('human'); h.setScreen('assess-picker'); } },
-            // ── Light Mode Checks ──
-            { label: 'Light \u2014 AI Picker', note: 'Same AI first-time picker, now in light mode. The cyan card should have a light gradient (cyan-50/teal-50), readable text, and proper border. No dark-mode artifacts leaking through.', action: (h) => { h.setDarkMode(false); h.setEntityType('ai'); h.setScreen('assess-picker'); } },
-            { label: 'Light \u2014 Style Q1', note: 'First AI question in light mode. Check card backgrounds, option button contrast, glow effects (should be subtle, not blinding), and text readability throughout.', action: (h) => { h.setDarkMode(false); h.setEntityType('ai'); h.assessStartTest('ai-style'); } },
-            { label: 'Light \u2014 Human Picker', note: 'Human assessment picker in light mode. All cards should have proper light backgrounds, readable text, no white-on-white situations. Category cards, progress circles, tier indicators.', action: (h) => { h.setDarkMode(false); h.setEntityType('human'); h.setScreen('assess-picker'); } },
-            { label: 'Light \u2014 Home Screen', note: 'Main categories screen in light mode. Check the overall palette, navigation contrast, category cards. This is what most users see first. Does it feel intentionally designed for light, not just "dark mode inverted"?', action: (h) => { h.setDarkMode(false); h.setScreen('categories'); } },
+            // Builder queues review stops here — Philip steps through, approves, then they get cleared
           ];
           if (DEV_REVIEW.length === 0) return null;
           const stop = DEV_REVIEW[Math.min(devReviewIdx, DEV_REVIEW.length - 1)];
