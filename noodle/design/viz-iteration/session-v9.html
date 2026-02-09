@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz — Session v9 — Cellular Arena</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000000; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px 10px; }
+  h1 { font-size: 16px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px; }
+  .controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
+  .controls button { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+  .controls button:hover { background: #334155; color: #e2e8f0; }
+  .controls button.active { background: #4ECDC4; color: #030712; border-color: #4ECDC4; font-weight: 600; }
+  .divider { width: 1px; background: #334155; margin: 0 4px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 960px; width: 100%; }
+  .card { background: #020510; border: 1px solid #1a1f35; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; align-items: center; }
+  .card canvas { border-radius: 4px; width: 280px; height: 280px; }
+  .card-label { font-size: 11px; color: #64748b; margin-top: 6px; letter-spacing: 1px; text-align: center; }
+  .card-label span { color: #94a3b8; font-weight: 600; }
+  .card-label .sub { display: block; font-size: 9px; color: #475569; margin-top: 2px; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+<h1>Aura Organism — v9 Cellular Arena</h1>
+<div class="controls">
+  <button onclick="setTier('seed')" id="btn-seed">Seed</button>
+  <button onclick="setTier('young')" id="btn-young">Young</button>
+  <button onclick="setTier('full')" id="btn-full" class="active">Full</button>
+  <button onclick="setTier('random')" id="btn-random">Random</button>
+  <div class="divider"></div>
+  <button onclick="setMode('human')" id="btn-human" class="active">Human</button>
+  <button onclick="setMode('ai')" id="btn-ai">AI</button>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+// ─── DATA ───
+const NEURON_MAP = {
+  N: { label: 'Openness', color: '#4ECDC4' },
+  E: { label: 'Conscientiousness', color: '#45B7D1' },
+  A: { label: 'Extraversion', color: '#96E6A1' },
+  O: { label: 'Agreeableness', color: '#DDA0DD' },
+  C: { label: 'Neuroticism', color: '#F7DC6F' }
+};
+const ASSESS_MAP = {
+  a1: { label: 'Curiosity', color: '#7FDBCA', link: 'N' },
+  a2: { label: 'Imagination', color: '#6BC5B0', link: 'N' },
+  a3: { label: 'Discipline', color: '#5DADE2', link: 'E' },
+  a4: { label: 'Reliability', color: '#3498DB', link: 'E' },
+  a5: { label: 'Warmth', color: '#82E0AA', link: 'A' },
+  a6: { label: 'Assertiveness', color: '#58D68D', link: 'A' },
+  a7: { label: 'Empathy', color: '#C39BD3', link: 'O' },
+  a8: { label: 'Trust', color: '#AF7AC5', link: 'O' },
+  a9: { label: 'Resilience', color: '#F9E154', link: 'C' },
+  a10: { label: 'Calm', color: '#F4D03F', link: 'C' }
+};
+
+const CARD_DEFS = [
+  { id: 'A', name: 'Mitochondrial Garden', sub: 'Capsule organelles with cristae folds, ER tubes' },
+  { id: 'B', name: 'Nucleus Focus', sub: 'Central nucleus, orbiting unique organelles' },
+  { id: 'C', name: 'Watercolor Cell', sub: 'Soft painterly rendering, flowing streams' },
+  { id: 'D', name: 'Deep Sea Specimen', sub: 'Rich luminescence, branching tube network' },
+  { id: 'E', name: 'Generative Code Cell', sub: 'Parametric shapes, algorithmic precision' },
+  { id: 'F', name: 'Bioluminescent Bloom', sub: 'Maximum controlled glow, pulsing bodies' }
+];
+
+let currentTier = 'full';
+let currentMode = 'human';
+const states = {};
+const DPR = window.devicePixelRatio || 1;
+const CW = 280, CH = 280;
+const CX = CW / 2, CY = CH / 2;
+let startTime = performance.now();
+
+// ─── HELPERS ───
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return { r, g, b };
+}
+function rgba(hex, a) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function rnd(lo, hi) { return lo + Math.random() * (hi - lo); }
+function avgColor(colors) {
+  let r = 0, g = 0, b = 0;
+  colors.forEach(c => { const rgb = hexToRgb(c); r += rgb.r; g += rgb.g; b += rgb.b; });
+  const n = colors.length || 1;
+  return `rgb(${Math.round(r/n)},${Math.round(g/n)},${Math.round(b/n)})`;
+}
+function avgColorObj(colors) {
+  let r = 0, g = 0, b = 0;
+  colors.forEach(c => { const rgb = hexToRgb(c); r += rgb.r; g += rgb.g; b += rgb.b; });
+  const n = colors.length || 1;
+  return { r: Math.round(r/n), g: Math.round(g/n), b: Math.round(b/n) };
+}
+function rgbaObj(rgb, a) { return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`; }
+
+// ─── NODE GENERATION ───
+function generateNodes(tier) {
+  const nodes = [];
+  const primaries = Object.entries(NEURON_MAP);
+  const angleStep = (Math.PI * 2) / primaries.length;
+
+  primaries.forEach(([id, d], i) => {
+    const angle = angleStep * i - Math.PI / 2;
+    const r = 55;
+    nodes.push({
+      id, label: d.label, color: d.color, type: 'primary',
+      x: CX + Math.cos(angle) * r, y: CY + Math.sin(angle) * r,
+      bx: CX + Math.cos(angle) * r, by: CY + Math.sin(angle) * r,
+      radius: 14, driftPhase: Math.random() * Math.PI * 2,
+      driftSpeed: 0.3 + Math.random() * 0.3, driftAmp: 3 + Math.random() * 2,
+      driftPhase2: Math.random() * Math.PI * 2,
+      breathPhase: Math.random() * Math.PI * 2
+    });
+  });
+  if (tier === 'seed') return nodes;
+
+  // Assessment nodes
+  const assessEntries = Object.entries(ASSESS_MAP);
+  if (tier === 'random') {
+    const count = 3 + Math.floor(Math.random() * 8);
+    const shuffled = assessEntries.sort(() => Math.random() - 0.5).slice(0, count);
+    shuffled.forEach(([id, d]) => {
+      const parent = nodes.find(n => n.id === d.link);
+      if (!parent) return;
+      const ang = Math.atan2(parent.by - CY, parent.bx - CX) + rnd(-0.8, 0.8);
+      const rad = 80 + rnd(0, 25);
+      nodes.push({
+        id, label: d.label, color: d.color, type: 'assessment', link: d.link,
+        x: CX + Math.cos(ang) * rad, y: CY + Math.sin(ang) * rad,
+        bx: CX + Math.cos(ang) * rad, by: CY + Math.sin(ang) * rad,
+        radius: 8, driftPhase: Math.random() * Math.PI * 2,
+        driftSpeed: 0.2 + Math.random() * 0.3, driftAmp: 2 + Math.random() * 2,
+        driftPhase2: Math.random() * Math.PI * 2,
+        breathPhase: Math.random() * Math.PI * 2
+      });
+    });
+  } else {
+    assessEntries.forEach(([id, d]) => {
+      const parent = nodes.find(n => n.id === d.link);
+      if (!parent) return;
+      const ang = Math.atan2(parent.by - CY, parent.bx - CX) + rnd(-0.6, 0.6);
+      const rad = 80 + rnd(0, 25);
+      nodes.push({
+        id, label: d.label, color: d.color, type: 'assessment', link: d.link,
+        x: CX + Math.cos(ang) * rad, y: CY + Math.sin(ang) * rad,
+        bx: CX + Math.cos(ang) * rad, by: CY + Math.sin(ang) * rad,
+        radius: 8, driftPhase: Math.random() * Math.PI * 2,
+        driftSpeed: 0.2 + Math.random() * 0.3, driftAmp: 2 + Math.random() * 2,
+        driftPhase2: Math.random() * Math.PI * 2,
+        breathPhase: Math.random() * Math.PI * 2
+      });
+    });
+  }
+
+  // Full tier: extra satellite particles
+  if (tier === 'full') {
+    for (let i = 0; i < 8; i++) {
+      const ang = rnd(0, Math.PI * 2);
+      const rad = 90 + rnd(0, 30);
+      const parentIdx = Math.floor(Math.random() * primaries.length);
+      const parent = primaries[parentIdx];
+      nodes.push({
+        id: 'sat' + i, label: '', color: parent[1].color, type: 'satellite',
+        link: parent[0],
+        x: CX + Math.cos(ang) * rad, y: CY + Math.sin(ang) * rad,
+        bx: CX + Math.cos(ang) * rad, by: CY + Math.sin(ang) * rad,
+        radius: 4, driftPhase: Math.random() * Math.PI * 2,
+        driftSpeed: 0.15 + Math.random() * 0.2, driftAmp: 2 + Math.random() * 3,
+        driftPhase2: Math.random() * Math.PI * 2,
+        breathPhase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  return nodes;
+}
+
+// ─── PARTICLE GENERATION ───
+function generateParticles(count) {
+  const p = [];
+  for (let i = 0; i < count; i++) {
+    const ang = rnd(0, Math.PI * 2);
+    const rad = rnd(5, 125);
+    p.push({
+      x: CX + Math.cos(ang) * rad,
+      y: CY + Math.sin(ang) * rad,
+      size: rnd(0.5, 2.5),
+      alpha: rnd(0.15, 0.5),
+      driftPhase: rnd(0, Math.PI * 2),
+      driftSpeed: rnd(0.1, 0.4),
+      driftAmp: rnd(1, 4),
+      color: ['#4ECDC4','#45B7D1','#DDA0DD','#96E6A1','#F7DC6F','#6688aa'][Math.floor(Math.random()*6)]
+    });
+  }
+  return p;
+}
+
+// ─── UPDATE NODE POSITIONS ───
+function updateNodes(nodes, t) {
+  nodes.forEach(n => {
+    const dx = Math.sin(t * n.driftSpeed + n.driftPhase) * n.driftAmp;
+    const dy = Math.cos(t * n.driftSpeed * 0.7 + n.driftPhase2) * n.driftAmp;
+    n.x = n.bx + dx;
+    n.y = n.by + dy;
+  });
+}
+
+// ─── DRAW MEMBRANE ───
+function drawMembrane(ctx, mode, t, color) {
+  if (mode === 'ai') return;
+  const memR = 118;
+  const breathR = memR + Math.sin(t * 0.3) * 3;
+  // Outer glow
+  for (let i = 3; i >= 0; i--) {
+    const r = breathR + i * 6;
+    const alpha = 0.06 - i * 0.012;
+    ctx.beginPath();
+    ctx.arc(CX, CY, r, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(color || '#4488aa', Math.max(0.01, alpha));
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  // Main membrane — double line
+  ctx.beginPath();
+  ctx.arc(CX, CY, breathR, 0, Math.PI * 2);
+  ctx.strokeStyle = rgba(color || '#4488aa', 0.25);
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(CX, CY, breathR - 4, 0, Math.PI * 2);
+  ctx.strokeStyle = rgba(color || '#4488aa', 0.12);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+// ─── DRAW PARTICLES ───
+function drawParticles(ctx, particles, t) {
+  particles.forEach(p => {
+    const px = p.x + Math.sin(t * p.driftSpeed + p.driftPhase) * p.driftAmp;
+    const py = p.y + Math.cos(t * p.driftSpeed * 0.8 + p.driftPhase) * p.driftAmp;
+    const d = Math.hypot(px - CX, py - CY);
+    if (d > 125) return;
+    const fadeFactor = d > 100 ? 1 - (d - 100) / 25 : 1;
+    ctx.beginPath();
+    ctx.arc(px, py, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(p.color, p.alpha * fadeFactor * (0.5 + 0.5 * Math.sin(t * 0.5 + p.driftPhase)));
+    ctx.fill();
+  });
+}
+
+// ═════════════════════════════════════════════════
+// CARD A: MITOCHONDRIAL GARDEN
+// ═════════════════════════════════════════════════
+function drawCardA(ctx, nodes, t, mode) {
+  // Background
+  const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 140);
+  bg.addColorStop(0, '#050a15');
+  bg.addColorStop(0.7, '#020812');
+  bg.addColorStop(1, '#000205');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, CW, CH);
+
+  drawMembrane(ctx, mode, t, '#3a7db8');
+
+  // ER tubes connecting nearby organelles
+  const primaries = nodes.filter(n => n.type === 'primary');
+  const assessments = nodes.filter(n => n.type === 'assessment');
+  const allMain = [...primaries, ...assessments];
+
+  for (let i = 0; i < allMain.length; i++) {
+    for (let j = i + 1; j < allMain.length; j++) {
+      const d = dist(allMain[i], allMain[j]);
+      if (d < 80) {
+        const mx = (allMain[i].x + allMain[j].x) / 2;
+        const my = (allMain[i].y + allMain[j].y) / 2;
+        const off = Math.sin(t * 0.3 + i + j) * 8;
+        ctx.beginPath();
+        ctx.moveTo(allMain[i].x, allMain[i].y);
+        ctx.quadraticCurveTo(mx + off, my - off, allMain[j].x, allMain[j].y);
+        ctx.strokeStyle = rgba('#4466aa', 0.12);
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.strokeStyle = rgba('#6688cc', 0.06);
+        ctx.lineWidth = 5;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Draw primaries as mitochondria (capsule shapes with cristae)
+  primaries.forEach(n => {
+    ctx.save();
+    ctx.translate(n.x, n.y);
+    const angle = Math.atan2(n.y - CY, n.x - CX) + Math.sin(t * 0.2 + n.driftPhase) * 0.3;
+    ctx.rotate(angle);
+
+    const w = n.radius * 2.2;
+    const h = n.radius * 1.1;
+    const breath = 1 + Math.sin(t * 0.4 + n.breathPhase) * 0.05;
+
+    // Outer glow
+    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 1.8);
+    glow.addColorStop(0, rgba(n.color, 0.15));
+    glow.addColorStop(0.5, rgba(n.color, 0.05));
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-w * 2, -w * 2, w * 4, w * 4);
+
+    // Capsule body
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w * breath, h * breath, 0, 0, Math.PI * 2);
+    const bodyGrad = ctx.createRadialGradient(-w * 0.3, -h * 0.2, 0, 0, 0, w);
+    bodyGrad.addColorStop(0, rgba(n.color, 0.45));
+    bodyGrad.addColorStop(0.6, rgba(n.color, 0.2));
+    bodyGrad.addColorStop(1, rgba(n.color, 0.08));
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+
+    // Capsule border
+    ctx.strokeStyle = rgba(n.color, 0.5);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Cristae folds (wavy internal lines)
+    for (let ci = 0; ci < 4; ci++) {
+      const cy_off = -h * 0.6 + (h * 1.2 / 3) * ci;
+      ctx.beginPath();
+      for (let sx = -w * 0.7; sx <= w * 0.7; sx += 2) {
+        const sy = cy_off + Math.sin(sx * 0.4 + t * 0.5 + ci) * (h * 0.15);
+        if (sx === -w * 0.7) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+      ctx.strokeStyle = rgba(n.color, 0.3);
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  });
+
+  // Assessment nodes as vesicles with granular texture
+  assessments.forEach(n => {
+    const breath = 1 + Math.sin(t * 0.5 + n.breathPhase) * 0.06;
+    const r = n.radius * breath;
+
+    // Glow
+    const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 2.5);
+    glow.addColorStop(0, rgba(n.color, 0.12));
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    const bodyGrad = ctx.createRadialGradient(n.x - r * 0.2, n.y - r * 0.2, 0, n.x, n.y, r);
+    bodyGrad.addColorStop(0, rgba(n.color, 0.5));
+    bodyGrad.addColorStop(0.7, rgba(n.color, 0.2));
+    bodyGrad.addColorStop(1, rgba(n.color, 0.08));
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+    ctx.strokeStyle = rgba(n.color, 0.4);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Internal granules
+    const seed = n.id.charCodeAt(1) || 42;
+    for (let gi = 0; gi < 5; gi++) {
+      const ga = (seed + gi * 1.3) % (Math.PI * 2);
+      const gr = r * 0.4 * ((seed * gi + 7) % 10) / 10;
+      const gx = n.x + Math.cos(ga + t * 0.2) * gr;
+      const gy = n.y + Math.sin(ga + t * 0.2) * gr;
+      ctx.beginPath();
+      ctx.arc(gx, gy, 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(n.color, 0.45);
+      ctx.fill();
+    }
+  });
+
+  // Satellites as tiny ribosomes
+  nodes.filter(n => n.type === 'satellite').forEach(n => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.35);
+    ctx.fill();
+  });
+
+  // Ribosomes (free particles)
+  const stA = states.A;
+  drawParticles(ctx, stA.particles, t);
+}
+
+// ═════════════════════════════════════════════════
+// CARD B: NUCLEUS FOCUS
+// ═════════════════════════════════════════════════
+function drawCardB(ctx, nodes, t, mode) {
+  const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 140);
+  bg.addColorStop(0, '#080812');
+  bg.addColorStop(0.7, '#040610');
+  bg.addColorStop(1, '#010208');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, CW, CH);
+
+  drawMembrane(ctx, mode, t, '#5566aa');
+
+  const primaries = nodes.filter(n => n.type === 'primary');
+  const assessments = nodes.filter(n => n.type === 'assessment');
+
+  // Central nucleus — blend of all primary colors
+  const nucleusR = 22 + Math.sin(t * 0.25) * 2;
+  const nGrad = ctx.createRadialGradient(CX - 3, CY - 3, 0, CX, CY, nucleusR);
+  const blendColor = avgColorObj(primaries.map(n => n.color));
+  nGrad.addColorStop(0, rgbaObj(blendColor, 0.6));
+  nGrad.addColorStop(0.5, rgbaObj(blendColor, 0.25));
+  nGrad.addColorStop(1, rgbaObj(blendColor, 0.05));
+  ctx.beginPath();
+  ctx.arc(CX, CY, nucleusR, 0, Math.PI * 2);
+  ctx.fillStyle = nGrad;
+  ctx.fill();
+
+  // Nucleus border
+  ctx.strokeStyle = rgbaObj(blendColor, 0.4);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Chromatin strands inside nucleus
+  for (let ci = 0; ci < 5; ci++) {
+    ctx.beginPath();
+    const startA = ci * Math.PI * 2 / 5 + t * 0.1;
+    const startR = nucleusR * 0.3;
+    const endR = nucleusR * 0.8;
+    ctx.moveTo(
+      CX + Math.cos(startA) * startR,
+      CY + Math.sin(startA) * startR
+    );
+    for (let s = 0; s <= 8; s++) {
+      const frac = s / 8;
+      const a = startA + frac * 1.5 + Math.sin(t * 0.3 + ci) * 0.3;
+      const r = startR + (endR - startR) * frac;
+      ctx.lineTo(
+        CX + Math.cos(a) * r + Math.sin(t * 0.4 + s) * 2,
+        CY + Math.sin(a) * r + Math.cos(t * 0.35 + s) * 2
+      );
+    }
+    ctx.strokeStyle = rgba(primaries[ci % primaries.length].color, 0.2);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Cytoskeleton filaments connecting nucleus to organelles
+  primaries.forEach((n, i) => {
+    const mx = (CX + n.x) / 2;
+    const my = (CY + n.y) / 2;
+    const off = Math.sin(t * 0.25 + i) * 10;
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.quadraticCurveTo(mx + off, my - off * 0.5, n.x, n.y);
+    ctx.strokeStyle = rgba('#667799', 0.1);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Dotted overlay
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = rgba(n.color, 0.08);
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Draw primaries as unique organelle shapes
+  primaries.forEach((n, i) => {
+    const breath = 1 + Math.sin(t * 0.4 + n.breathPhase) * 0.06;
+    const r = n.radius * breath;
+
+    // Outer glow
+    const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 2.5);
+    glow.addColorStop(0, rgba(n.color, 0.15));
+    glow.addColorStop(0.6, rgba(n.color, 0.04));
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(n.x, n.y);
+    const rot = Math.sin(t * 0.15 + n.driftPhase) * 0.3;
+    ctx.rotate(rot);
+
+    if (i === 0) {
+      // N (teal): Elongated ER with parallel lines
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.8, r * 0.8, 0, 0, Math.PI * 2);
+      const g1 = ctx.createRadialGradient(-r * 0.4, 0, 0, 0, 0, r * 1.8);
+      g1.addColorStop(0, rgba(n.color, 0.5));
+      g1.addColorStop(1, rgba(n.color, 0.1));
+      ctx.fillStyle = g1;
+      ctx.fill();
+      ctx.strokeStyle = rgba(n.color, 0.5);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      for (let li = 0; li < 5; li++) {
+        const ly = -r * 0.5 + (r / 5) * li * 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-r * 1.2, ly);
+        ctx.lineTo(r * 1.2, ly);
+        ctx.strokeStyle = rgba(n.color, 0.2);
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+      }
+    } else if (i === 1) {
+      // E (blue): Round lysosome with internal dots
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      const g2 = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 0, 0, 0, r);
+      g2.addColorStop(0, rgba(n.color, 0.55));
+      g2.addColorStop(1, rgba(n.color, 0.1));
+      ctx.fillStyle = g2;
+      ctx.fill();
+      ctx.strokeStyle = rgba(n.color, 0.5);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      for (let di = 0; di < 7; di++) {
+        const da = di * Math.PI * 2 / 7 + t * 0.15;
+        const dr = r * 0.5;
+        ctx.beginPath();
+        ctx.arc(Math.cos(da) * dr, Math.sin(da) * dr, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = rgba(n.color, 0.5);
+        ctx.fill();
+      }
+    } else if (i === 2) {
+      // A (green): Bean-shaped mitochondria with folds
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.5, r * 0.9, 0, 0, Math.PI * 2);
+      const g3 = ctx.createRadialGradient(-r * 0.3, -r * 0.1, 0, 0, 0, r * 1.5);
+      g3.addColorStop(0, rgba(n.color, 0.45));
+      g3.addColorStop(1, rgba(n.color, 0.08));
+      ctx.fillStyle = g3;
+      ctx.fill();
+      ctx.strokeStyle = rgba(n.color, 0.45);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      for (let fi = 0; fi < 3; fi++) {
+        const fy = -r * 0.4 + fi * r * 0.4;
+        ctx.beginPath();
+        for (let fx = -r; fx <= r; fx += 2) {
+          const sy = fy + Math.sin(fx * 0.5 + t * 0.4 + fi) * r * 0.12;
+          if (fx === -r) ctx.moveTo(fx, sy);
+          else ctx.lineTo(fx, sy);
+        }
+        ctx.strokeStyle = rgba(n.color, 0.25);
+        ctx.lineWidth = 0.7;
+        ctx.stroke();
+      }
+    } else if (i === 3) {
+      // O (purple): Golgi apparatus — stacked curved plates
+      for (let gi = 0; gi < 4; gi++) {
+        const gy = -r * 0.6 + gi * r * 0.4;
+        const gw = r * (1.3 - Math.abs(gi - 1.5) * 0.2);
+        ctx.beginPath();
+        ctx.ellipse(0, gy, gw, r * 0.18, 0, 0, Math.PI * 2);
+        ctx.fillStyle = rgba(n.color, 0.25 - gi * 0.03);
+        ctx.fill();
+        ctx.strokeStyle = rgba(n.color, 0.35);
+        ctx.lineWidth = 0.7;
+        ctx.stroke();
+      }
+    } else {
+      // C (yellow): Vesicle cluster — small spheres
+      for (let vi = 0; vi < 6; vi++) {
+        const va = vi * Math.PI * 2 / 6 + t * 0.1;
+        const vr = r * 0.5;
+        const vx = Math.cos(va) * vr;
+        const vy = Math.sin(va) * vr;
+        const vs = r * 0.35;
+        const vg = ctx.createRadialGradient(vx - 1, vy - 1, 0, vx, vy, vs);
+        vg.addColorStop(0, rgba(n.color, 0.55));
+        vg.addColorStop(1, rgba(n.color, 0.1));
+        ctx.beginPath();
+        ctx.arc(vx, vy, vs, 0, Math.PI * 2);
+        ctx.fillStyle = vg;
+        ctx.fill();
+        ctx.strokeStyle = rgba(n.color, 0.3);
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+      // Central vesicle
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(n.color, 0.4);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  });
+
+  // Assessment nodes as tiny bodies near parent
+  assessments.forEach(n => {
+    const r = n.radius * 0.7;
+    const bodyGrad = ctx.createRadialGradient(n.x - 1, n.y - 1, 0, n.x, n.y, r);
+    bodyGrad.addColorStop(0, rgba(n.color, 0.5));
+    bodyGrad.addColorStop(1, rgba(n.color, 0.08));
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+    ctx.strokeStyle = rgba(n.color, 0.3);
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    // Dot inside
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.6);
+    ctx.fill();
+  });
+
+  // Satellites
+  nodes.filter(n => n.type === 'satellite').forEach(n => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.3);
+    ctx.fill();
+  });
+
+  drawParticles(ctx, states.B.particles, t);
+}
+
+// ═════════════════════════════════════════════════
+// CARD C: WATERCOLOR CELL
+// ═════════════════════════════════════════════════
+function drawCardC(ctx, nodes, t, mode) {
+  const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 145);
+  bg.addColorStop(0, '#060a18');
+  bg.addColorStop(0.6, '#030815');
+  bg.addColorStop(1, '#010310');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Soft membrane wash (not a hard line)
+  if (mode !== 'ai') {
+    const memR = 116 + Math.sin(t * 0.3) * 2;
+    for (let i = 0; i < 5; i++) {
+      const r = memR + i * 4;
+      const grad = ctx.createRadialGradient(CX, CY, r - 8, CX, CY, r + 8);
+      grad.addColorStop(0, 'transparent');
+      grad.addColorStop(0.4, rgba('#4466aa', 0.04 - i * 0.006));
+      grad.addColorStop(0.6, rgba('#4466aa', 0.04 - i * 0.006));
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CW, CH);
+    }
+  }
+
+  const primaries = nodes.filter(n => n.type === 'primary');
+  const assessments = nodes.filter(n => n.type === 'assessment');
+
+  // Watercolor stream connections
+  for (let i = 0; i < primaries.length; i++) {
+    for (let j = i + 1; j < primaries.length; j++) {
+      const d = dist(primaries[i], primaries[j]);
+      if (d < 100) {
+        const a = primaries[i], b = primaries[j];
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const off1 = Math.sin(t * 0.2 + i * 3) * 15;
+        const off2 = Math.cos(t * 0.25 + j * 2) * 10;
+
+        // Wide soft wash
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.bezierCurveTo(
+          mx + off1, my + off2,
+          mx - off2, my + off1,
+          b.x, b.y
+        );
+        ctx.strokeStyle = rgba(a.color, 0.04);
+        ctx.lineWidth = 12;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Thinner color stream
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.bezierCurveTo(
+          mx + off1, my + off2,
+          mx - off2, my + off1,
+          b.x, b.y
+        );
+        const streamGrad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        streamGrad.addColorStop(0, rgba(a.color, 0.08));
+        streamGrad.addColorStop(0.5, rgba('#334477', 0.04));
+        streamGrad.addColorStop(1, rgba(b.color, 0.08));
+        ctx.strokeStyle = streamGrad;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Link assessment to parent
+  assessments.forEach(n => {
+    const parent = primaries.find(p => p.id === n.link);
+    if (!parent) return;
+    const mx = (n.x + parent.x) / 2;
+    const my = (n.y + parent.y) / 2;
+    ctx.beginPath();
+    ctx.moveTo(parent.x, parent.y);
+    ctx.quadraticCurveTo(mx + Math.sin(t * 0.3) * 5, my + Math.cos(t * 0.3) * 5, n.x, n.y);
+    ctx.strokeStyle = rgba(n.color, 0.06);
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.strokeStyle = rgba(n.color, 0.1);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+
+  // Primaries: layered circle — outer glow ring, translucent fill, inner texture
+  primaries.forEach(n => {
+    const breath = 1 + Math.sin(t * 0.35 + n.breathPhase) * 0.08;
+    const r = n.radius * breath;
+
+    // Outer glow ring (large, soft)
+    for (let gi = 3; gi >= 0; gi--) {
+      const gr = r + gi * 5 + 3;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, gr, 0, Math.PI * 2);
+      ctx.strokeStyle = rgba(n.color, 0.06 - gi * 0.01);
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // Translucent fill with soft gradient
+    const fillGrad = ctx.createRadialGradient(n.x - r * 0.2, n.y - r * 0.2, 0, n.x, n.y, r * 1.2);
+    fillGrad.addColorStop(0, rgba(n.color, 0.35));
+    fillGrad.addColorStop(0.5, rgba(n.color, 0.15));
+    fillGrad.addColorStop(1, rgba(n.color, 0.03));
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r * 1.1, 0, Math.PI * 2);
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+
+    // Inner texture: soft concentric rings
+    for (let ri = 1; ri <= 3; ri++) {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r * ri / 4, 0, Math.PI * 2);
+      ctx.strokeStyle = rgba(n.color, 0.12);
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // Small highlight
+    ctx.beginPath();
+    ctx.arc(n.x - r * 0.25, n.y - r * 0.25, r * 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.3);
+    ctx.fill();
+  });
+
+  // Assessment nodes — softer, smaller versions
+  assessments.forEach(n => {
+    const r = n.radius * (1 + Math.sin(t * 0.5 + n.breathPhase) * 0.06);
+
+    // Soft halo
+    const halo = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 2);
+    halo.addColorStop(0, rgba(n.color, 0.2));
+    halo.addColorStop(0.5, rgba(n.color, 0.05));
+    halo.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r * 2, 0, Math.PI * 2);
+    ctx.fillStyle = halo;
+    ctx.fill();
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r * 0.8, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.25);
+    ctx.fill();
+  });
+
+  // Satellites like floating pigment
+  nodes.filter(n => n.type === 'satellite').forEach(n => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.15);
+    ctx.fill();
+  });
+
+  drawParticles(ctx, states.C.particles, t);
+}
+
+// ═════════════════════════════════════════════════
+// CARD D: DEEP SEA SPECIMEN
+// ═════════════════════════════════════════════════
+function drawCardD(ctx, nodes, t, mode) {
+  // Deep dark blue-black background
+  const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 150);
+  bg.addColorStop(0, '#030818');
+  bg.addColorStop(0.5, '#020510');
+  bg.addColorStop(1, '#000208');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Multi-ring membrane
+  if (mode !== 'ai') {
+    const memR = 118 + Math.sin(t * 0.25) * 2;
+    for (let ri = 0; ri < 4; ri++) {
+      const r = memR + ri * 3;
+      const alpha = 0.18 - ri * 0.04;
+      ctx.beginPath();
+      ctx.arc(CX, CY, r, 0, Math.PI * 2);
+      ctx.strokeStyle = rgba('#3355aa', alpha);
+      ctx.lineWidth = 1.5 - ri * 0.3;
+      ctx.stroke();
+    }
+    // Inner fill subtle
+    const memFill = ctx.createRadialGradient(CX, CY, memR - 10, CX, CY, memR + 5);
+    memFill.addColorStop(0, 'transparent');
+    memFill.addColorStop(0.5, rgba('#2244aa', 0.03));
+    memFill.addColorStop(1, 'transparent');
+    ctx.fillStyle = memFill;
+    ctx.beginPath();
+    ctx.arc(CX, CY, memR + 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const primaries = nodes.filter(n => n.type === 'primary');
+  const assessments = nodes.filter(n => n.type === 'assessment');
+  const allMain = [...primaries, ...assessments];
+
+  // Branching ER tube network (bezier curves with gradient fill)
+  for (let i = 0; i < allMain.length; i++) {
+    for (let j = i + 1; j < allMain.length; j++) {
+      const d = dist(allMain[i], allMain[j]);
+      if (d < 90) {
+        const a = allMain[i], b = allMain[j];
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        const perpX = -(b.y - a.y) / d * 12;
+        const perpY = (b.x - a.x) / d * 12;
+        const off = Math.sin(t * 0.2 + i + j) * 8;
+
+        // ER tube with gradient
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.bezierCurveTo(
+          mx + perpX + off, my + perpY,
+          mx - perpX, my - perpY + off,
+          b.x, b.y
+        );
+        const tubeGrad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        tubeGrad.addColorStop(0, rgba(a.color, 0.1));
+        tubeGrad.addColorStop(0.5, rgba('#4466bb', 0.06));
+        tubeGrad.addColorStop(1, rgba(b.color, 0.1));
+        ctx.strokeStyle = tubeGrad;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Inner bright core of tube
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.bezierCurveTo(
+          mx + perpX + off, my + perpY,
+          mx - perpX, my - perpY + off,
+          b.x, b.y
+        );
+        ctx.strokeStyle = rgba('#5577cc', 0.04);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Primaries: richly colored with internal luminescence
+  primaries.forEach(n => {
+    const breath = 1 + Math.sin(t * 0.3 + n.breathPhase) * 0.05;
+    const r = n.radius * breath;
+
+    // Wide glow halo
+    const glow = ctx.createRadialGradient(n.x, n.y, r * 0.3, n.x, n.y, r * 3);
+    glow.addColorStop(0, rgba(n.color, 0.18));
+    glow.addColorStop(0.4, rgba(n.color, 0.06));
+    glow.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r * 3, 0, Math.PI * 2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+
+    // Dark body with bright border
+    const bodyGrad = ctx.createRadialGradient(n.x - r * 0.15, n.y - r * 0.15, 0, n.x, n.y, r);
+    bodyGrad.addColorStop(0, rgba(n.color, 0.25));
+    bodyGrad.addColorStop(0.4, rgba(n.color, 0.1));
+    bodyGrad.addColorStop(0.8, rgba(n.color, 0.05));
+    bodyGrad.addColorStop(1, rgba(n.color, 0.2));
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+
+    // Bright border ring (1-2px)
+    ctx.strokeStyle = rgba(n.color, 0.6);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Internal luminescent detail
+    ctx.save();
+    ctx.translate(n.x, n.y);
+    // Bright core
+    const core = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.4);
+    core.addColorStop(0, rgba(n.color, 0.4));
+    core.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = core;
+    ctx.fill();
+
+    // Internal structure lines
+    for (let li = 0; li < 3; li++) {
+      const la = li * Math.PI * 2 / 3 + t * 0.12;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      const ex = Math.cos(la) * r * 0.7;
+      const ey = Math.sin(la) * r * 0.7;
+      ctx.lineTo(ex, ey);
+      ctx.strokeStyle = rgba(n.color, 0.15);
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+      // Dot at end
+      ctx.beginPath();
+      ctx.arc(ex, ey, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(n.color, 0.35);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  // Assessment nodes: smaller, same style
+  assessments.forEach(n => {
+    const r = n.radius * (1 + Math.sin(t * 0.45 + n.breathPhase) * 0.05);
+
+    // Glow
+    const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 2.2);
+    glow.addColorStop(0, rgba(n.color, 0.14));
+    glow.addColorStop(0.5, rgba(n.color, 0.04));
+    glow.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r * 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+
+    // Dark body with bright border
+    const bodyGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+    bodyGrad.addColorStop(0, rgba(n.color, 0.2));
+    bodyGrad.addColorStop(0.7, rgba(n.color, 0.06));
+    bodyGrad.addColorStop(1, rgba(n.color, 0.15));
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+    ctx.strokeStyle = rgba(n.color, 0.5);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Internal bright core
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.35);
+    ctx.fill();
+  });
+
+  // Satellites
+  nodes.filter(n => n.type === 'satellite').forEach(n => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.3);
+    ctx.fill();
+    ctx.strokeStyle = rgba(n.color, 0.4);
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  });
+
+  // Deep-sea plankton particles — brighter than other cards
+  const stD = states.D;
+  stD.particles.forEach(p => {
+    const px = p.x + Math.sin(t * p.driftSpeed + p.driftPhase) * p.driftAmp;
+    const py = p.y + Math.cos(t * p.driftSpeed * 0.8 + p.driftPhase) * p.driftAmp;
+    const d = Math.hypot(px - CX, py - CY);
+    if (d > 125) return;
+    const fadeFactor = d > 100 ? 1 - (d - 100) / 25 : 1;
+    const flicker = 0.4 + 0.6 * Math.sin(t * 0.8 + p.driftPhase);
+
+    // Tiny bright dot with subtle glow
+    ctx.beginPath();
+    ctx.arc(px, py, p.size * 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(p.color, p.alpha * 0.15 * fadeFactor * flicker);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, p.size * 0.6, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(p.color, p.alpha * fadeFactor * flicker);
+    ctx.fill();
+  });
+}
+
+// ═════════════════════════════════════════════════
+// CARD E: GENERATIVE CODE CELL
+// ═════════════════════════════════════════════════
+function drawCardE(ctx, nodes, t, mode) {
+  const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 145);
+  bg.addColorStop(0, '#050810');
+  bg.addColorStop(0.7, '#030508');
+  bg.addColorStop(1, '#010204');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Subtle grid undertone
+  ctx.strokeStyle = rgba('#334466', 0.04);
+  ctx.lineWidth = 0.5;
+  for (let gx = 0; gx < CW; gx += 20) {
+    ctx.beginPath();
+    ctx.moveTo(gx, 0);
+    ctx.lineTo(gx, CH);
+    ctx.stroke();
+  }
+  for (let gy = 0; gy < CH; gy += 20) {
+    ctx.beginPath();
+    ctx.moveTo(0, gy);
+    ctx.lineTo(CW, gy);
+    ctx.stroke();
+  }
+
+  // Membrane: dashed/stippled circle
+  if (mode !== 'ai') {
+    const memR = 118 + Math.sin(t * 0.3) * 2;
+    const segments = 60;
+    for (let si = 0; si < segments; si++) {
+      if (si % 3 === 0) continue; // Skip every 3rd for dashed look
+      const a1 = (si / segments) * Math.PI * 2;
+      const a2 = ((si + 0.7) / segments) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(CX, CY, memR, a1, a2);
+      ctx.strokeStyle = rgba('#5577aa', 0.2);
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+    // Stipple dots on membrane
+    for (let di = 0; di < 30; di++) {
+      const da = (di / 30) * Math.PI * 2 + t * 0.02;
+      const dx = CX + Math.cos(da) * memR;
+      const dy = CY + Math.sin(da) * memR;
+      ctx.beginPath();
+      ctx.arc(dx, dy, 1, 0, Math.PI * 2);
+      ctx.fillStyle = rgba('#5577aa', 0.15);
+      ctx.fill();
+    }
+  }
+
+  const primaries = nodes.filter(n => n.type === 'primary');
+  const assessments = nodes.filter(n => n.type === 'assessment');
+
+  // Connections: curved lines with hash marks
+  primaries.forEach((n, i) => {
+    const next = primaries[(i + 1) % primaries.length];
+    const mx = (n.x + next.x) / 2;
+    const my = (n.y + next.y) / 2;
+
+    ctx.beginPath();
+    ctx.moveTo(n.x, n.y);
+    ctx.quadraticCurveTo(mx + Math.sin(t * 0.2 + i) * 6, my + Math.cos(t * 0.2 + i) * 6, next.x, next.y);
+    ctx.strokeStyle = rgba('#6688aa', 0.12);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Hash marks along connection
+    const d = dist(n, next);
+    const steps = Math.floor(d / 10);
+    for (let s = 1; s < steps; s++) {
+      const frac = s / steps;
+      // Approximate point on quadratic
+      const bx = (1-frac)*(1-frac)*n.x + 2*(1-frac)*frac*(mx + Math.sin(t * 0.2 + i) * 6) + frac*frac*next.x;
+      const by = (1-frac)*(1-frac)*n.y + 2*(1-frac)*frac*(my + Math.cos(t * 0.2 + i) * 6) + frac*frac*next.y;
+      // Perpendicular hash
+      const dx = next.x - n.x;
+      const dy2 = next.y - n.y;
+      const len = Math.hypot(dx, dy2) || 1;
+      const px = -dy2 / len * 3;
+      const py = dx / len * 3;
+      ctx.beginPath();
+      ctx.moveTo(bx + px, by + py);
+      ctx.lineTo(bx - px, by - py);
+      ctx.strokeStyle = rgba('#6688aa', 0.1);
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  });
+
+  // Connect assessments to parents with dotted lines
+  assessments.forEach(n => {
+    const parent = primaries.find(p => p.id === n.link);
+    if (!parent) return;
+    ctx.setLineDash([2, 4]);
+    ctx.beginPath();
+    ctx.moveTo(parent.x, parent.y);
+    ctx.lineTo(n.x, n.y);
+    ctx.strokeStyle = rgba(n.color, 0.12);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Dots along line
+    const d = dist(n, parent);
+    const dots = Math.floor(d / 12);
+    for (let di = 1; di < dots; di++) {
+      const frac = di / dots;
+      const dx = lerp(parent.x, n.x, frac);
+      const dy = lerp(parent.y, n.y, frac);
+      ctx.beginPath();
+      ctx.arc(dx, dy, 0.8, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(n.color, 0.15);
+      ctx.fill();
+    }
+  });
+
+  // Primaries: parametric / Lissajous / spirograph internal shapes
+  primaries.forEach((n, i) => {
+    const breath = 1 + Math.sin(t * 0.35 + n.breathPhase) * 0.04;
+    const r = n.radius * breath;
+
+    // Clean circular boundary
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(n.color, 0.45);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Very subtle fill
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.06);
+    ctx.fill();
+
+    // Parametric internal shape — each primary gets different parameters
+    ctx.save();
+    ctx.translate(n.x, n.y);
+
+    const params = [
+      { a: 3, b: 2, d: 1 },   // N — trefoil-ish
+      { a: 5, b: 3, d: 2 },   // E — pentagonal
+      { a: 4, b: 3, d: 1 },   // A — four-leaf
+      { a: 7, b: 4, d: 3 },   // O — complex rosette
+      { a: 2, b: 3, d: 5 }    // C — spirograph
+    ][i];
+
+    ctx.beginPath();
+    const steps = 200;
+    for (let s = 0; s <= steps; s++) {
+      const angle = (s / steps) * Math.PI * 2;
+      const R = r * 0.75;
+      const rr = r * 0.25;
+      const px = (R - rr) * Math.cos(angle * params.a + t * 0.2) + params.d * Math.cos((R/rr - 1) * angle * params.b);
+      const py = (R - rr) * Math.sin(angle * params.a + t * 0.2) - params.d * Math.sin((R/rr - 1) * angle * params.b);
+      const scale = 0.35;
+      if (s === 0) ctx.moveTo(px * scale, py * scale);
+      else ctx.lineTo(px * scale, py * scale);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = rgba(n.color, 0.35);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.fillStyle = rgba(n.color, 0.05);
+    ctx.fill();
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.6);
+    ctx.fill();
+
+    ctx.restore();
+  });
+
+  // Assessment nodes — smaller circles with simple internal cross
+  assessments.forEach(n => {
+    const r = n.radius * 0.7;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(n.color, 0.35);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.fillStyle = rgba(n.color, 0.05);
+    ctx.fill();
+
+    // Internal cross
+    const cr = r * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(n.x - cr, n.y);
+    ctx.lineTo(n.x + cr, n.y);
+    ctx.moveTo(n.x, n.y - cr);
+    ctx.lineTo(n.x, n.y + cr);
+    ctx.strokeStyle = rgba(n.color, 0.2);
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  });
+
+  // Satellites with tiny plus marks
+  nodes.filter(n => n.type === 'satellite').forEach(n => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 2, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(n.color, 0.25);
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(n.x - 2, n.y);
+    ctx.lineTo(n.x + 2, n.y);
+    ctx.moveTo(n.x, n.y - 2);
+    ctx.lineTo(n.x, n.y + 2);
+    ctx.strokeStyle = rgba(n.color, 0.15);
+    ctx.lineWidth = 0.3;
+    ctx.stroke();
+  });
+
+  drawParticles(ctx, states.E.particles, t);
+}
+
+// ═════════════════════════════════════════════════
+// CARD F: BIOLUMINESCENT BLOOM
+// ═════════════════════════════════════════════════
+function drawCardF(ctx, nodes, t, mode) {
+  // Darkest background
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, CW, CH);
+  // Very subtle radial tone
+  const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 140);
+  bg.addColorStop(0, 'rgba(5,8,20,0.5)');
+  bg.addColorStop(1, 'transparent');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Membrane — slow pulse
+  if (mode !== 'ai') {
+    const memR = 118 + Math.sin(t * 0.2) * 3;
+    // Very subtle membrane glow
+    for (let ri = 0; ri < 3; ri++) {
+      const r = memR + ri * 5;
+      ctx.beginPath();
+      ctx.arc(CX, CY, r, 0, Math.PI * 2);
+      ctx.strokeStyle = rgba('#334488', 0.08 - ri * 0.02);
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  const primaries = nodes.filter(n => n.type === 'primary');
+  const assessments = nodes.filter(n => n.type === 'assessment');
+
+  // Connections — thin lines that glow when "active"
+  // Random activation pulses
+  primaries.forEach((n, i) => {
+    const next = primaries[(i + 1) % primaries.length];
+    const mx = (n.x + next.x) / 2;
+    const my = (n.y + next.y) / 2;
+
+    // Base connection line
+    ctx.beginPath();
+    ctx.moveTo(n.x, n.y);
+    ctx.quadraticCurveTo(mx, my, next.x, next.y);
+    ctx.strokeStyle = rgba('#445577', 0.06);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Pulse traveling along the connection
+    const pulsePhase = (t * 0.4 + i * 1.7) % (Math.PI * 2);
+    const pulseFrac = (Math.sin(pulsePhase) + 1) / 2;
+    const pulseX = lerp(n.x, next.x, pulseFrac);
+    const pulseY = lerp(n.y, next.y, pulseFrac);
+    const pulseAlpha = Math.max(0, Math.sin(pulsePhase * 2)) * 0.3;
+
+    if (pulseAlpha > 0.05) {
+      const pulseGlow = ctx.createRadialGradient(pulseX, pulseY, 0, pulseX, pulseY, 8);
+      pulseGlow.addColorStop(0, rgba(n.color, pulseAlpha));
+      pulseGlow.addColorStop(1, 'transparent');
+      ctx.fillStyle = pulseGlow;
+      ctx.beginPath();
+      ctx.arc(pulseX, pulseY, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+
+  // Connect assessments
+  assessments.forEach(n => {
+    const parent = primaries.find(p => p.id === n.link);
+    if (!parent) return;
+    ctx.beginPath();
+    ctx.moveTo(parent.x, parent.y);
+    ctx.lineTo(n.x, n.y);
+    ctx.strokeStyle = rgba(n.color, 0.05);
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    // Pulse on assessment connections
+    const pulsePhase = (t * 0.3 + n.breathPhase) % (Math.PI * 2);
+    const pulseFrac = (Math.sin(pulsePhase) + 1) / 2;
+    const px = lerp(parent.x, n.x, pulseFrac);
+    const py = lerp(parent.y, n.y, pulseFrac);
+    const pa = Math.max(0, Math.sin(pulsePhase * 2)) * 0.15;
+    if (pa > 0.03) {
+      const pg = ctx.createRadialGradient(px, py, 0, px, py, 5);
+      pg.addColorStop(0, rgba(n.color, pa));
+      pg.addColorStop(1, 'transparent');
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+
+  // Primaries: maximum controlled glow, independent pulses
+  primaries.forEach(n => {
+    // Each pulses at its own frequency
+    const pulseFreq = 0.3 + (n.id.charCodeAt(0) % 5) * 0.08;
+    const pulse = 0.6 + 0.4 * Math.sin(t * pulseFreq + n.breathPhase);
+    const breath = 1 + Math.sin(t * 0.35 + n.breathPhase) * 0.07;
+    const r = n.radius * breath;
+
+    // 3 concentric glow rings
+    for (let gi = 2; gi >= 0; gi--) {
+      const gr = r + (gi + 1) * 10;
+      const ga = (0.08 - gi * 0.02) * pulse;
+      const glowGrad = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, gr);
+      glowGrad.addColorStop(0, rgba(n.color, ga));
+      glowGrad.addColorStop(1, 'transparent');
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, gr, 0, Math.PI * 2);
+      ctx.fillStyle = glowGrad;
+      ctx.fill();
+    }
+
+    // Body: bright core dimming toward edges
+    const bodyGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+    bodyGrad.addColorStop(0, rgba(n.color, 0.7 * pulse));
+    bodyGrad.addColorStop(0.3, rgba(n.color, 0.4 * pulse));
+    bodyGrad.addColorStop(0.7, rgba(n.color, 0.15 * pulse));
+    bodyGrad.addColorStop(1, rgba(n.color, 0.05));
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+
+    // Thin bright border
+    ctx.strokeStyle = rgba(n.color, 0.4 * pulse);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Internal luminous detail — small bright spots
+    ctx.save();
+    ctx.translate(n.x, n.y);
+    for (let di = 0; di < 4; di++) {
+      const da = di * Math.PI * 2 / 4 + t * 0.15 + n.driftPhase;
+      const dr = r * 0.45;
+      const dx = Math.cos(da) * dr;
+      const dy = Math.sin(da) * dr;
+      const dotGrad = ctx.createRadialGradient(dx, dy, 0, dx, dy, 2.5);
+      dotGrad.addColorStop(0, rgba(n.color, 0.5 * pulse));
+      dotGrad.addColorStop(1, 'transparent');
+      ctx.beginPath();
+      ctx.arc(dx, dy, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = dotGrad;
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  // Assessment nodes: similar glow, smaller
+  assessments.forEach(n => {
+    const pulseFreq = 0.25 + (n.id.charCodeAt(1) % 5) * 0.06;
+    const pulse = 0.5 + 0.5 * Math.sin(t * pulseFreq + n.breathPhase);
+    const r = n.radius * (1 + Math.sin(t * 0.45 + n.breathPhase) * 0.05);
+
+    // 2 glow rings
+    for (let gi = 1; gi >= 0; gi--) {
+      const gr = r + (gi + 1) * 6;
+      const ga = (0.07 - gi * 0.025) * pulse;
+      const glowGrad = ctx.createRadialGradient(n.x, n.y, r * 0.5, n.x, n.y, gr);
+      glowGrad.addColorStop(0, rgba(n.color, ga));
+      glowGrad.addColorStop(1, 'transparent');
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, gr, 0, Math.PI * 2);
+      ctx.fillStyle = glowGrad;
+      ctx.fill();
+    }
+
+    // Body
+    const bodyGrad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+    bodyGrad.addColorStop(0, rgba(n.color, 0.55 * pulse));
+    bodyGrad.addColorStop(0.5, rgba(n.color, 0.2 * pulse));
+    bodyGrad.addColorStop(1, rgba(n.color, 0.04));
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+    ctx.strokeStyle = rgba(n.color, 0.3 * pulse);
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+  });
+
+  // Satellites — faint glowing specks
+  nodes.filter(n => n.type === 'satellite').forEach(n => {
+    const pulse = 0.4 + 0.6 * Math.sin(t * 0.5 + n.breathPhase);
+    const sg = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, 4);
+    sg.addColorStop(0, rgba(n.color, 0.35 * pulse));
+    sg.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = sg;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 1, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.5 * pulse);
+    ctx.fill();
+  });
+
+  // Particles — very sparse, very dim
+  const stF = states.F;
+  stF.particles.forEach(p => {
+    const px = p.x + Math.sin(t * p.driftSpeed + p.driftPhase) * p.driftAmp;
+    const py = p.y + Math.cos(t * p.driftSpeed * 0.8 + p.driftPhase) * p.driftAmp;
+    const d = Math.hypot(px - CX, py - CY);
+    if (d > 125) return;
+    const fadeFactor = d > 100 ? 1 - (d - 100) / 25 : 1;
+    const flicker = 0.3 + 0.7 * Math.sin(t * 0.7 + p.driftPhase);
+    ctx.beginPath();
+    ctx.arc(px, py, p.size * 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(p.color, p.alpha * 0.6 * fadeFactor * flicker);
+    ctx.fill();
+  });
+}
+
+
+// ═════════════════════════════════════════════════
+// SETUP & LOOP
+// ═════════════════════════════════════════════════
+
+const cardRenderers = [drawCardA, drawCardB, drawCardC, drawCardD, drawCardE, drawCardF];
+const grid = document.getElementById('grid');
+
+CARD_DEFS.forEach((def, i) => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  const canvas = document.createElement('canvas');
+  canvas.width = CW * DPR;
+  canvas.height = CH * DPR;
+  canvas.style.width = CW + 'px';
+  canvas.style.height = CH + 'px';
+  card.appendChild(canvas);
+  const label = document.createElement('div');
+  label.className = 'card-label';
+  label.innerHTML = `<span>${def.id}. ${def.name}</span><span class="sub">${def.sub}</span>`;
+  card.appendChild(label);
+  grid.appendChild(card);
+
+  const ctx = canvas.getContext('2d');
+  states[def.id] = {
+    canvas, ctx,
+    nodes: generateNodes(currentTier),
+    particles: generateParticles(35)
+  };
+});
+
+function setTier(tier) {
+  currentTier = tier;
+  document.querySelectorAll('.controls button').forEach(b => {
+    if (['btn-seed','btn-young','btn-full','btn-random'].includes(b.id)) {
+      b.classList.toggle('active', b.id === 'btn-' + tier);
+    }
+  });
+  CARD_DEFS.forEach(def => {
+    states[def.id].nodes = generateNodes(tier);
+  });
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.controls button').forEach(b => {
+    if (['btn-human','btn-ai'].includes(b.id)) {
+      b.classList.toggle('active', b.id === 'btn-' + mode);
+    }
+  });
+}
+
+function animate() {
+  const now = performance.now();
+  const t = (now - startTime) / 1000;
+
+  CARD_DEFS.forEach((def, i) => {
+    const st = states[def.id];
+    const ctx = st.ctx;
+    const canvas = st.canvas;
+
+    // Reset canvas state each frame
+    canvas.width = CW * DPR;
+    canvas.height = CH * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    updateNodes(st.nodes, t);
+    cardRenderers[i](ctx, st.nodes, t, currentMode);
+  });
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>

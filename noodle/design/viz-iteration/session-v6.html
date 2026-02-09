@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz — Session v6 — Macro Arena</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #030712; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px 10px; }
+  h1 { font-size: 16px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px; }
+  .controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
+  .controls button { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+  .controls button:hover { background: #334155; color: #e2e8f0; }
+  .controls button.active { background: #4ECDC4; color: #030712; border-color: #4ECDC4; font-weight: 600; }
+  .divider { width: 1px; background: #334155; margin: 0 4px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 960px; width: 100%; }
+  .card { background: #0a1020; border: 1px solid #1e293b; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; align-items: center; }
+  .card canvas { border-radius: 4px; width: 290px; height: 290px; }
+  .card-label { font-size: 11px; color: #64748b; margin-top: 6px; letter-spacing: 1px; }
+  .card-label span { color: #94a3b8; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Aura Organism — Macro Design Arena</h1>
+<div class="controls">
+  <button onclick="setTier('seed')" id="btn-seed">Seed</button>
+  <button onclick="setTier('young')" id="btn-young">Young</button>
+  <button onclick="setTier('full')" id="btn-full" class="active">Full</button>
+  <button onclick="setTier('random')" id="btn-random">Random</button>
+  <div class="divider"></div>
+  <button onclick="setMode('human')" id="btn-human" class="active">Human</button>
+  <button onclick="setMode('ai')" id="btn-ai">AI</button>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+// ─── DATA ───
+const NEURON_MAP = {
+  N: { label: 'Openness', color: '#4ECDC4' },
+  E: { label: 'Conscientiousness', color: '#45B7D1' },
+  A: { label: 'Extraversion', color: '#96E6A1' },
+  O: { label: 'Agreeableness', color: '#DDA0DD' },
+  C: { label: 'Neuroticism', color: '#F7DC6F' }
+};
+const ASSESS_MAP = {
+  a1: { label: 'Curiosity', color: '#7FDBCA', link: 'N' },
+  a2: { label: 'Imagination', color: '#6BC5B0', link: 'N' },
+  a3: { label: 'Discipline', color: '#5DADE2', link: 'E' },
+  a4: { label: 'Reliability', color: '#3498DB', link: 'E' },
+  a5: { label: 'Warmth', color: '#82E0AA', link: 'A' },
+  a6: { label: 'Assertiveness', color: '#58D68D', link: 'A' },
+  a7: { label: 'Empathy', color: '#C39BD3', link: 'O' },
+  a8: { label: 'Trust', color: '#AF7AC5', link: 'O' },
+  a9: { label: 'Resilience', color: '#F9E154', link: 'C' },
+  a10: { label: 'Calm', color: '#F4D03F', link: 'C' }
+};
+
+const CARD_DEFS = [
+  { id: 'A', name: 'Crisp Web' },
+  { id: 'B', name: 'Watercolor Pools' },
+  { id: 'C', name: 'Circuit Board' },
+  { id: 'D', name: 'Particle Cloud' },
+  { id: 'E', name: 'Concentric Rings' },
+  { id: 'F', name: 'Terrain Map' },
+  { id: 'G', name: 'Neural Pulses' },
+  { id: 'H', name: 'Stained Glass' },
+  { id: 'I', name: 'Organic Tendrils' }
+];
+
+let currentTier = 'full';
+let currentMode = 'human';
+const canvases = {};
+const DPR = window.devicePixelRatio || 1;
+const CW = 290, CH = 290;
+const CX = CW / 2, CY = CH / 2;
+
+// ─── HELPERS ───
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return { r, g, b };
+}
+function rgba(hex, a) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+// ─── TOPOLOGY ───
+function generateNodes(tier) {
+  const nodes = [];
+  const primaries = Object.entries(NEURON_MAP);
+  const angleStep = (Math.PI * 2) / primaries.length;
+  // Primaries in a pentagon
+  primaries.forEach(([id, d], i) => {
+    const angle = angleStep * i - Math.PI / 2;
+    const r = 65;
+    nodes.push({
+      id, label: d.label, color: d.color, type: 'primary',
+      x: CX + Math.cos(angle) * r, y: CY + Math.sin(angle) * r,
+      bx: CX + Math.cos(angle) * r, by: CY + Math.sin(angle) * r,
+      radius: 6, alpha: 0, birthTime: 0, driftPhase: Math.random() * Math.PI * 2,
+      driftSpeed: 3 + Math.random() * 3, driftAmp: 2 + Math.random() * 2
+    });
+  });
+  if (tier === 'seed') return nodes;
+
+  // Companions — 2 per primary, orbiting nearby
+  primaries.forEach(([pid], pi) => {
+    for (let j = 0; j < 2; j++) {
+      const angle = angleStep * pi - Math.PI / 2 + (j === 0 ? -0.4 : 0.4);
+      const r = 100;
+      const id = `comp_${pid}_${j}`;
+      nodes.push({
+        id, label: '', color: NEURON_MAP[pid].color, type: 'companion', parent: pid,
+        x: CX + Math.cos(angle) * r, y: CY + Math.sin(angle) * r,
+        bx: CX + Math.cos(angle) * r, by: CY + Math.sin(angle) * r,
+        radius: 3.5, alpha: 0, birthTime: 0.3, driftPhase: Math.random() * Math.PI * 2,
+        driftSpeed: 4 + Math.random() * 3, driftAmp: 2 + Math.random() * 2
+      });
+    }
+  });
+
+  // Satellites — 1 per primary, outer ring
+  primaries.forEach(([pid], pi) => {
+    const angle = angleStep * pi - Math.PI / 2 + 0.15;
+    const r = 125;
+    const id = `sat_${pid}`;
+    nodes.push({
+      id, label: '', color: NEURON_MAP[pid].color, type: 'satellite', parent: pid,
+      x: CX + Math.cos(angle) * r, y: CY + Math.sin(angle) * r,
+      bx: CX + Math.cos(angle) * r, by: CY + Math.sin(angle) * r,
+      radius: 2.5, alpha: 0, birthTime: 0.5, driftPhase: Math.random() * Math.PI * 2,
+      driftSpeed: 5 + Math.random() * 3, driftAmp: 1.5 + Math.random() * 2
+    });
+  });
+
+  if (tier !== 'full') return nodes;
+
+  // Assessment nodes
+  Object.entries(ASSESS_MAP).forEach(([id, d], i) => {
+    const parentIdx = nodes.findIndex(n => n.id === d.link);
+    const parent = nodes[parentIdx];
+    const offset = (i % 2 === 0 ? -1 : 1) * (18 + Math.random() * 15);
+    nodes.push({
+      id, label: d.label, color: d.color, type: 'assess', parent: d.link,
+      x: parent.bx + offset + (Math.random() - 0.5) * 20,
+      y: parent.by + offset + (Math.random() - 0.5) * 20,
+      bx: parent.bx + offset + (Math.random() - 0.5) * 20,
+      by: parent.by + offset + (Math.random() - 0.5) * 20,
+      radius: 2, alpha: 0, birthTime: 0.6 + Math.random() * 0.3, driftPhase: Math.random() * Math.PI * 2,
+      driftSpeed: 4 + Math.random() * 4, driftAmp: 1.5 + Math.random() * 1.5
+    });
+  });
+
+  return nodes;
+}
+
+function generateConnections(nodes) {
+  const conns = [];
+  const ids = new Set(nodes.map(n => n.id));
+  // Primary ring
+  const primKeys = Object.keys(NEURON_MAP);
+  for (let i = 0; i < primKeys.length; i++) {
+    const next = (i + 1) % primKeys.length;
+    conns.push({ from: primKeys[i], to: primKeys[next], alpha: 1 });
+  }
+  // Parent links
+  nodes.forEach(n => {
+    if (n.parent && ids.has(n.parent)) {
+      conns.push({ from: n.id, to: n.parent, alpha: 1 });
+    }
+  });
+  // Some cross links for density in full
+  if (nodes.length > 20) {
+    conns.push({ from: 'a1', to: 'a3', alpha: 0.5 });
+    conns.push({ from: 'a5', to: 'a7', alpha: 0.5 });
+    conns.push({ from: 'a9', to: 'a1', alpha: 0.5 });
+    conns.push({ from: 'a2', to: 'a8', alpha: 0.5 });
+  }
+  return conns.filter(c => ids.has(c.from) && ids.has(c.to));
+}
+
+// ─── CARD STATE ───
+const cardStates = {};
+
+function initCard(cardId) {
+  const nodes = generateNodes(currentTier);
+  const conns = generateConnections(nodes);
+  const startTime = performance.now();
+  // Living connections state
+  const livingConns = conns.map(c => ({ ...c, visible: true, fadeAlpha: 1 }));
+  cardStates[cardId] = { nodes, conns, livingConns, startTime, particles: null, pulses: null, voronoiCache: null };
+  // Init particles for D
+  if (cardId === 'D') initParticles(cardStates[cardId]);
+  // Init pulses for G
+  if (cardId === 'G') initPulses(cardStates[cardId]);
+}
+
+function initParticles(state) {
+  state.particles = {};
+  state.nodes.forEach(n => {
+    const count = 15 + Math.floor(Math.random() * 16);
+    state.particles[n.id] = [];
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = 3 + Math.random() * 18;
+      state.particles[n.id].push({
+        ox: Math.cos(angle) * r, oy: Math.sin(angle) * r,
+        phase: Math.random() * Math.PI * 2, speed: 0.3 + Math.random() * 0.7
+      });
+    }
+  });
+}
+
+function initPulses(state) {
+  state.pulses = state.conns.map((c, i) => ({
+    conn: c, t: -Math.random() * 5, speed: 0.15 + Math.random() * 0.2, active: true
+  }));
+}
+
+// ─── DRIFT ───
+function applyDrift(node, time) {
+  const t = time / 1000;
+  const dx = Math.sin(t / node.driftSpeed + node.driftPhase) * node.driftAmp;
+  const dy = Math.cos(t / node.driftSpeed * 0.7 + node.driftPhase + 1) * node.driftAmp;
+  node.x = node.bx + dx;
+  node.y = node.by + dy;
+}
+
+function getNodeAlpha(node, elapsed) {
+  const t = (elapsed - node.birthTime * 1000);
+  if (t < 0) return 0;
+  return Math.min(1, t / 1000);
+}
+
+// ─── LIVING CONNECTIONS ───
+function updateLivingConns(state, elapsed) {
+  const lc = state.livingConns;
+  // Every 4-7 seconds, randomly toggle one
+  if (!state.nextConnEvent) state.nextConnEvent = 3000 + Math.random() * 4000;
+  if (elapsed > state.nextConnEvent) {
+    state.nextConnEvent = elapsed + 3000 + Math.random() * 5000;
+    const idx = Math.floor(Math.random() * lc.length);
+    lc[idx].visible = !lc[idx].visible;
+  }
+  lc.forEach(c => {
+    const target = c.visible ? 1 : 0;
+    c.fadeAlpha += (target - c.fadeAlpha) * 0.03;
+  });
+}
+
+// ─── RENDERERS ───
+function findNode(nodes, id) { return nodes.find(n => n.id === id); }
+
+// A — Crisp Web
+function renderA(ctx, state, elapsed, time, mode) {
+  const { nodes, livingConns } = state;
+  updateLivingConns(state, elapsed);
+  nodes.forEach(n => { applyDrift(n, time); n.alpha = getNodeAlpha(n, elapsed); });
+  // Connections
+  livingConns.forEach(c => {
+    const a = findNode(nodes, c.from), b = findNode(nodes, c.to);
+    if (!a || !b) return;
+    const al = Math.min(a.alpha, b.alpha) * c.fadeAlpha * 0.4;
+    if (al < 0.01) return;
+    ctx.strokeStyle = rgba('#ffffff', al);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  });
+  // Nodes
+  nodes.forEach(n => {
+    if (n.alpha < 0.01) return;
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, n.alpha);
+    ctx.fill();
+  });
+  // Membrane
+  if (mode === 'human') {
+    ctx.beginPath(); ctx.arc(CX, CY, 135, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba('#4ECDC4', 0.15);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+
+// B — Watercolor Pools
+function renderB(ctx, state, elapsed, time, mode) {
+  const { nodes } = state;
+  nodes.forEach(n => { applyDrift(n, time); n.alpha = getNodeAlpha(n, elapsed); });
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  nodes.forEach(n => {
+    if (n.alpha < 0.01) return;
+    const r = n.type === 'primary' ? 70 : n.type === 'companion' ? 45 : n.type === 'satellite' ? 35 : 30;
+    const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+    const { r: cr, g: cg, b: cb } = hexToRgb(n.color);
+    const baseA = n.type === 'primary' ? 0.1 : 0.06;
+    grad.addColorStop(0, `rgba(${cr},${cg},${cb},${baseA * n.alpha})`);
+    grad.addColorStop(0.5, `rgba(${cr},${cg},${cb},${baseA * 0.5 * n.alpha})`);
+    grad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(n.x - r, n.y - r, r * 2, r * 2);
+  });
+  ctx.restore();
+  if (mode === 'human') {
+    const grad = ctx.createRadialGradient(CX, CY, 100, CX, CY, 140);
+    grad.addColorStop(0, 'rgba(78,205,196,0)');
+    grad.addColorStop(0.7, 'rgba(78,205,196,0.03)');
+    grad.addColorStop(1, 'rgba(78,205,196,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(CX, CY, 140, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+// C — Circuit Board
+function renderC(ctx, state, elapsed, time, mode) {
+  const { nodes, livingConns } = state;
+  updateLivingConns(state, elapsed);
+  nodes.forEach(n => { applyDrift(n, time); n.alpha = getNodeAlpha(n, elapsed); });
+  // Connections — Manhattan routing
+  livingConns.forEach(c => {
+    const a = findNode(nodes, c.from), b = findNode(nodes, c.to);
+    if (!a || !b) return;
+    const al = Math.min(a.alpha, b.alpha) * c.fadeAlpha * 0.5;
+    if (al < 0.01) return;
+    const mx = a.x, my = b.y; // go horizontal from A, then vertical to B
+    ctx.strokeStyle = rgba('#22d3ee', al);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mx, my); ctx.lineTo(b.x, b.y); ctx.stroke();
+    // Solder joints at corners
+    ctx.fillStyle = rgba('#22d3ee', al * 0.8);
+    ctx.fillRect(mx - 1.5, my - 1.5, 3, 3);
+  });
+  // Nodes — squares
+  nodes.forEach(n => {
+    if (n.alpha < 0.01) return;
+    const s = n.radius * 1.4;
+    ctx.fillStyle = rgba(n.color, n.alpha);
+    ctx.fillRect(n.x - s, n.y - s, s * 2, s * 2);
+    // Inner dot
+    ctx.fillStyle = rgba('#ffffff', n.alpha * 0.6);
+    ctx.fillRect(n.x - 1, n.y - 1, 2, 2);
+  });
+  // Membrane — rectangular
+  if (mode === 'human') {
+    ctx.strokeStyle = rgba('#22d3ee', 0.2);
+    ctx.lineWidth = 1;
+    const m = 18;
+    const notch = 8;
+    ctx.beginPath();
+    ctx.moveTo(m + notch, m); ctx.lineTo(CW - m - notch, m);
+    ctx.lineTo(CW - m, m + notch); ctx.lineTo(CW - m, CH - m - notch);
+    ctx.lineTo(CW - m - notch, CH - m); ctx.lineTo(m + notch, CH - m);
+    ctx.lineTo(m, CH - m - notch); ctx.lineTo(m, m + notch);
+    ctx.closePath(); ctx.stroke();
+  }
+}
+
+// D — Particle Cloud
+function renderD(ctx, state, elapsed, time, mode) {
+  const { nodes, conns } = state;
+  if (!state.particles) initParticles(state);
+  nodes.forEach(n => { applyDrift(n, time); n.alpha = getNodeAlpha(n, elapsed); });
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const t = time / 1000;
+  // Draw particles
+  nodes.forEach(n => {
+    if (n.alpha < 0.01) return;
+    const parts = state.particles[n.id];
+    if (!parts) return;
+    parts.forEach(p => {
+      const angle = t * p.speed + p.phase;
+      const px = n.x + Math.cos(angle) * Math.abs(p.ox) + p.ox * 0.3;
+      const py = n.y + Math.sin(angle) * Math.abs(p.oy) + p.oy * 0.3;
+      ctx.fillStyle = rgba(n.color, 0.35 * n.alpha);
+      ctx.fillRect(px, py, 1.5, 1.5);
+    });
+  });
+  // Bridge particles between connected nodes
+  conns.forEach(c => {
+    const a = findNode(nodes, c.from), b = findNode(nodes, c.to);
+    if (!a || !b || a.alpha < 0.01 || b.alpha < 0.01) return;
+    const d = dist(a, b);
+    const count = Math.floor(d / 8);
+    for (let i = 0; i < count; i++) {
+      const frac = (i + 0.5) / count;
+      const px = lerp(a.x, b.x, frac) + Math.sin(t * 1.5 + i) * 3;
+      const py = lerp(a.y, b.y, frac) + Math.cos(t * 1.2 + i * 0.7) * 3;
+      const col = frac < 0.5 ? a.color : b.color;
+      ctx.fillStyle = rgba(col, 0.2 * Math.min(a.alpha, b.alpha));
+      ctx.fillRect(px, py, 1, 1);
+    }
+  });
+  ctx.restore();
+  // Membrane — particle density boundary
+  if (mode === 'human') {
+    ctx.beginPath(); ctx.arc(CX, CY, 135, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba('#94a3b8', 0.08);
+    ctx.lineWidth = 8;
+    ctx.stroke();
+  }
+}
+
+// E — Concentric Rings
+function renderE(ctx, state, elapsed, time, mode) {
+  const { nodes } = state;
+  nodes.forEach(n => { applyDrift(n, time); n.alpha = getNodeAlpha(n, elapsed); });
+  const primaries = nodes.filter(n => n.type === 'primary');
+  const assessments = nodes.filter(n => n.type === 'assess');
+  const t = time / 1000;
+  // Each primary gets its OWN set of concentric rings, offset from center by trait angle
+  primaries.forEach((n, i) => {
+    if (n.alpha < 0.01) return;
+    const angle = (Math.PI * 2 / primaries.length) * i - Math.PI / 2;
+    const offsetX = Math.cos(angle) * 25;
+    const offsetY = Math.sin(angle) * 25;
+    const cx = CX + offsetX, cy = CY + offsetY;
+    // 3 rings per trait, thin stroked, breathing radius
+    for (let r = 1; r <= 3; r++) {
+      const breathe = Math.sin(t * 0.5 + i * 1.2 + r) * 3;
+      const radius = 25 + r * 28 + breathe;
+      ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = rgba(n.color, (0.18 - r * 0.04) * n.alpha);
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    // Filled center dot
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, 0.6 * n.alpha);
+    ctx.fill();
+  });
+  // Assessment nodes as small filled arcs on parent rings
+  assessments.forEach((n, ai) => {
+    if (n.alpha < 0.01) return;
+    const parent = findNode(nodes, n.parent);
+    if (!parent) return;
+    const pIdx = primaries.indexOf(parent);
+    const pAngle = (Math.PI * 2 / primaries.length) * pIdx - Math.PI / 2;
+    const cx = CX + Math.cos(pAngle) * 25, cy = CY + Math.sin(pAngle) * 25;
+    const arcAngle = pAngle + (ai % 2 === 0 ? 0.6 : -0.6) + ai * 0.12;
+    const r = 53 + (ai % 3) * 28;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, arcAngle - 0.12, arcAngle + 0.12);
+    ctx.strokeStyle = rgba(n.color, 0.5 * n.alpha);
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+  });
+  // Membrane — outermost ring glow
+  if (mode === 'human') {
+    ctx.beginPath(); ctx.arc(CX, CY, 135, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba('#ffffff', 0.06);
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+}
+
+// F — Terrain Map (elevation heatmap + contour lines)
+function renderF(ctx, state, elapsed, time, mode) {
+  const { nodes } = state;
+  nodes.forEach(n => { applyDrift(n, time); n.alpha = getNodeAlpha(n, elapsed); });
+  const activeNodes = nodes.filter(n => n.alpha > 0.01);
+  if (activeNodes.length === 0) return;
+  // Compute elevation field and render as colored heatmap
+  const step = 3;
+  const elevData = [];
+  for (let y = 0; y < CH; y += step) {
+    for (let x = 0; x < CW; x += step) {
+      let elev = 0;
+      let colR = 0, colG = 0, colB = 0, colW = 0;
+      activeNodes.forEach(n => {
+        const d = Math.hypot(n.x - x, n.y - y);
+        const falloff = n.type === 'primary' ? 60 : n.type === 'companion' ? 40 : 30;
+        const e = Math.max(0, 1 - d / falloff) * n.alpha;
+        if (e > 0) {
+          const { r, g, b } = hexToRgb(n.color);
+          colR += r * e; colG += g * e; colB += b * e; colW += e;
+        }
+        elev += e;
+      });
+      if (elev > 0.05 && colW > 0) {
+        const a = Math.min(0.25, elev * 0.12);
+        ctx.fillStyle = `rgba(${Math.round(colR/colW)},${Math.round(colG/colW)},${Math.round(colB/colW)},${a})`;
+        ctx.fillRect(x, y, step, step);
+      }
+      elevData.push({ x, y, elev });
+    }
+  }
+  // Contour lines at specific elevation thresholds
+  const cols = Math.ceil(CW / step);
+  const thresholds = [0.3, 0.6, 1.0, 1.5];
+  thresholds.forEach((thresh, ti) => {
+    ctx.strokeStyle = rgba('#94a3b8', 0.12 + ti * 0.04);
+    ctx.lineWidth = ti === 0 ? 0.5 : 0.8;
+    // Simple horizontal scan for contour crossings
+    for (let yi = 0; yi < Math.floor(CH / step) - 1; yi++) {
+      for (let xi = 0; xi < cols - 1; xi++) {
+        const idx = yi * cols + xi;
+        const e0 = elevData[idx]?.elev || 0;
+        const e1 = elevData[idx + 1]?.elev || 0;
+        const e2 = elevData[idx + cols]?.elev || 0;
+        // Horizontal crossing
+        if ((e0 < thresh) !== (e1 < thresh)) {
+          const frac = (thresh - e0) / (e1 - e0);
+          const cx = elevData[idx].x + frac * step;
+          const cy = elevData[idx].y;
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.fillRect(cx, cy, 1, 1);
+        }
+        // Vertical crossing
+        if ((e0 < thresh) !== (e2 < thresh)) {
+          const frac = (thresh - e0) / (e2 - e0);
+          const cx = elevData[idx].x;
+          const cy = elevData[idx].y + frac * step;
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.fillRect(cx, cy, 1, 1);
+        }
+      }
+    }
+  });
+  // Elevation markers (triangles at node positions)
+  activeNodes.forEach(n => {
+    if (n.type !== 'primary') return;
+    ctx.fillStyle = rgba(n.color, n.alpha * 0.8);
+    ctx.beginPath();
+    ctx.moveTo(n.x, n.y - 3); ctx.lineTo(n.x + 2.5, n.y + 2); ctx.lineTo(n.x - 2.5, n.y + 2);
+    ctx.closePath(); ctx.fill();
+    // Tiny elevation number
+    ctx.fillStyle = rgba(n.color, n.alpha * 0.5);
+    ctx.font = '6px monospace';
+    ctx.fillText(Math.round(n.bx), n.x + 4, n.y + 1);
+  });
+  // Membrane — outermost contour boundary
+  if (mode === 'human') {
+    ctx.strokeStyle = rgba('#94a3b8', 0.12);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let angle = 0; angle <= Math.PI * 2; angle += 0.05) {
+      const wobble = Math.sin(angle * 5 + time / 3000) * 4;
+      const r = 138 + wobble;
+      const px = CX + Math.cos(angle) * r, py = CY + Math.sin(angle) * r;
+      if (angle === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.stroke();
+  }
+}
+
+// G — Neural Pulses (dark synaptic network — connections nearly invisible, pulses are the show)
+function renderG(ctx, state, elapsed, time, mode) {
+  const { nodes, conns } = state;
+  if (!state.pulses) initPulses(state);
+  nodes.forEach(n => { applyDrift(n, time); n.alpha = getNodeAlpha(n, elapsed); });
+  const t = time / 1000;
+  // Track brightness from incoming pulses
+  const nodeBright = {};
+  nodes.forEach(n => { nodeBright[n.id] = 0; });
+  // Connections — barely visible dark lines, but BRIGHT traveling pulses
+  conns.forEach((c, ci) => {
+    const a = findNode(nodes, c.from), b = findNode(nodes, c.to);
+    if (!a || !b) return;
+    const al = Math.min(a.alpha, b.alpha);
+    if (al < 0.01) return;
+    // Very faint underlying path
+    ctx.strokeStyle = rgba('#1e293b', al * 0.5);
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    // Multiple pulses per connection at different phases
+    for (let p = 0; p < 2; p++) {
+      const speed = 0.2 + ci * 0.03 + p * 0.1;
+      const pt = ((t * speed + ci * 1.3 + p * 3.5) % 3.5);
+      if (pt >= 0 && pt <= 1) {
+        const px = lerp(a.x, b.x, pt);
+        const py = lerp(a.y, b.y, pt);
+        // Bright glow trail
+        const col = pt < 0.5 ? a.color : b.color;
+        // Trail behind the pulse
+        const trailLen = 0.15;
+        for (let tr = 0; tr < 4; tr++) {
+          const tpt = Math.max(0, pt - tr * trailLen * 0.25);
+          const tx = lerp(a.x, b.x, tpt);
+          const ty = lerp(a.y, b.y, tpt);
+          const grad = ctx.createRadialGradient(tx, ty, 0, tx, ty, 6 - tr);
+          grad.addColorStop(0, rgba(col, (0.7 - tr * 0.15) * al));
+          grad.addColorStop(1, rgba(col, 0));
+          ctx.fillStyle = grad;
+          ctx.beginPath(); ctx.arc(tx, ty, 6 - tr, 0, Math.PI * 2); ctx.fill();
+        }
+        // Main bright pulse head
+        const grad = ctx.createRadialGradient(px, py, 0, px, py, 10);
+        grad.addColorStop(0, rgba('#ffffff', 0.9 * al));
+        grad.addColorStop(0.3, rgba(col, 0.7 * al));
+        grad.addColorStop(1, rgba(col, 0));
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fill();
+        // Illuminate the line segment around the pulse
+        ctx.strokeStyle = rgba(col, 0.3 * al);
+        ctx.lineWidth = 3;
+        const segStart = Math.max(0, pt - 0.15);
+        ctx.beginPath();
+        ctx.moveTo(lerp(a.x, b.x, segStart), lerp(a.y, b.y, segStart));
+        ctx.lineTo(px, py);
+        ctx.stroke();
+        // Brighten endpoints
+        if (pt > 0.8) nodeBright[c.to] = 1;
+        if (pt < 0.2) nodeBright[c.from] = Math.max(nodeBright[c.from], 0.5);
+      }
+    }
+  });
+  // Nodes — dim until pulsed, then they flash
+  nodes.forEach(n => {
+    if (n.alpha < 0.01) return;
+    const bright = nodeBright[n.id] || 0;
+    const baseR = n.radius * 0.5;
+    // Dim ambient glow
+    const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, baseR + 6);
+    grad.addColorStop(0, rgba(n.color, (0.15 + bright * 0.7) * n.alpha));
+    grad.addColorStop(1, rgba(n.color, 0));
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(n.x, n.y, baseR + 6 + bright * 8, 0, Math.PI * 2); ctx.fill();
+    // Hard center dot
+    ctx.beginPath(); ctx.arc(n.x, n.y, baseR, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, (0.3 + bright * 0.7) * n.alpha);
+    ctx.fill();
+  });
+  // Membrane — pulsing ring
+  if (mode === 'human') {
+    const pulse = 0.08 + Math.sin(t * 2) * 0.04;
+    ctx.beginPath(); ctx.arc(CX, CY, 135, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba('#4ECDC4', pulse);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+
+// H — Stained Glass (Voronoi — use offscreen buffer for crisp cells)
+function renderH(ctx, state, elapsed, time, mode) {
+  const { nodes, conns } = state;
+  nodes.forEach(n => { applyDrift(n, time); n.alpha = getNodeAlpha(n, elapsed); });
+  const activeNodes = nodes.filter(n => n.alpha > 0.1);
+  if (activeNodes.length === 0) return;
+  // Build grid of nearest-node assignments
+  const step = 3;
+  const cols = Math.ceil(CW / step), rows = Math.ceil(CH / step);
+  const grid = new Array(rows * cols);
+  const connSet = new Set();
+  conns.forEach(c => { connSet.add(c.from + '|' + c.to); connSet.add(c.to + '|' + c.from); });
+  for (let yi = 0; yi < rows; yi++) {
+    for (let xi = 0; xi < cols; xi++) {
+      const px = xi * step, py = yi * step;
+      let minD = Infinity, closestIdx = 0;
+      for (let ni = 0; ni < activeNodes.length; ni++) {
+        const n = activeNodes[ni];
+        const d = (n.x - px) ** 2 + (n.y - py) ** 2;
+        if (d < minD) { minD = d; closestIdx = ni; }
+      }
+      grid[yi * cols + xi] = closestIdx;
+    }
+  }
+  // Fill cells with low-alpha color
+  for (let yi = 0; yi < rows; yi++) {
+    for (let xi = 0; xi < cols; xi++) {
+      const ni = grid[yi * cols + xi];
+      const n = activeNodes[ni];
+      ctx.fillStyle = rgba(n.color, 0.07 * n.alpha);
+      ctx.fillRect(xi * step, yi * step, step, step);
+    }
+  }
+  // Draw edges where cell assignment changes
+  for (let yi = 0; yi < rows; yi++) {
+    for (let xi = 0; xi < cols; xi++) {
+      const idx = yi * cols + xi;
+      const cur = grid[idx];
+      let isEdge = false;
+      // Check right and down neighbors
+      if (xi < cols - 1 && grid[idx + 1] !== cur) isEdge = true;
+      if (yi < rows - 1 && grid[idx + cols] !== cur) isEdge = true;
+      if (isEdge) {
+        // Determine if this edge is between connected nodes (brighter lead)
+        let neighbor = -1;
+        if (xi < cols - 1 && grid[idx + 1] !== cur) neighbor = grid[idx + 1];
+        else if (yi < rows - 1 && grid[idx + cols] !== cur) neighbor = grid[idx + cols];
+        const n1 = activeNodes[cur], n2 = neighbor >= 0 ? activeNodes[neighbor] : null;
+        const connected = n2 && connSet.has(n1.id + '|' + n2.id);
+        const brightness = connected ? 0.45 : 0.18;
+        const edgeColor = connected ? '#e2e8f0' : '#64748b';
+        ctx.fillStyle = rgba(edgeColor, brightness * n1.alpha);
+        ctx.fillRect(xi * step, yi * step, step, step);
+      }
+    }
+  }
+  // Node center gems
+  activeNodes.forEach(n => {
+    // Diamond shape for stained glass feel
+    ctx.fillStyle = rgba(n.color, n.alpha * 0.95);
+    ctx.beginPath();
+    ctx.moveTo(n.x, n.y - 3); ctx.lineTo(n.x + 2.5, n.y);
+    ctx.lineTo(n.x, n.y + 3); ctx.lineTo(n.x - 2.5, n.y);
+    ctx.closePath(); ctx.fill();
+  });
+  // Membrane — outer boundary
+  if (mode === 'human') {
+    ctx.strokeStyle = rgba('#cbd5e1', 0.12);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    // Faceted boundary (hexagonal feel)
+    for (let i = 0; i < 12; i++) {
+      const angle = (Math.PI * 2 / 12) * i;
+      const r = 136 + (i % 2) * 4;
+      const px = CX + Math.cos(angle) * r, py = CY + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.stroke();
+  }
+}
+
+// I — Organic Tendrils (bioluminescent deep-sea creature)
+function renderI(ctx, state, elapsed, time, mode) {
+  const { nodes, livingConns } = state;
+  updateLivingConns(state, elapsed);
+  nodes.forEach(n => { applyDrift(n, time); n.alpha = getNodeAlpha(n, elapsed); });
+  const t = time / 1000;
+  ctx.save();
+  ctx.lineCap = 'round';
+  // Connections — thick, wavy, bioluminescent tendrils with undulation
+  livingConns.forEach(c => {
+    const a = findNode(nodes, c.from), b = findNode(nodes, c.to);
+    if (!a || !b) return;
+    const al = Math.min(a.alpha, b.alpha) * c.fadeAlpha;
+    if (al < 0.01) return;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    const nx = -dy / len, ny = dx / len; // perpendicular normal
+    // Draw 3 parallel tendrils with different wave phases
+    for (let strand = -1; strand <= 1; strand++) {
+      const spread = strand * 5;
+      const phaseOff = strand * 1.8;
+      // Use cubic bezier with two control points for S-curve
+      const wave1 = Math.sin(t * 0.8 + phaseOff) * 15;
+      const wave2 = Math.sin(t * 0.8 + phaseOff + 2) * 15;
+      const cp1x = lerp(a.x, b.x, 0.33) + nx * (wave1 + spread);
+      const cp1y = lerp(a.y, b.y, 0.33) + ny * (wave1 + spread);
+      const cp2x = lerp(a.x, b.x, 0.66) + nx * (wave2 - spread);
+      const cp2y = lerp(a.y, b.y, 0.66) + ny * (wave2 - spread);
+      // Outer glow pass
+      ctx.strokeStyle = rgba(a.color, al * 0.08);
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y);
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, b.x, b.y);
+      ctx.stroke();
+      // Inner bright pass
+      ctx.strokeStyle = rgba(a.color, al * 0.25);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y);
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, b.x, b.y);
+      ctx.stroke();
+      // Core bright line
+      const mixColor = strand <= 0 ? a.color : b.color;
+      ctx.strokeStyle = rgba(mixColor, al * 0.4);
+      ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y);
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, b.x, b.y);
+      ctx.stroke();
+    }
+  });
+  ctx.restore();
+  // Nodes — large soft bioluminescent orbs
+  nodes.forEach(n => {
+    if (n.alpha < 0.01) return;
+    const r = n.type === 'primary' ? 18 : n.type === 'companion' ? 12 : 8;
+    // Outer haze
+    const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+    grad.addColorStop(0, rgba(n.color, 0.5 * n.alpha));
+    grad.addColorStop(0.3, rgba(n.color, 0.2 * n.alpha));
+    grad.addColorStop(0.7, rgba(n.color, 0.05 * n.alpha));
+    grad.addColorStop(1, rgba(n.color, 0));
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
+    // White-hot center
+    const grad2 = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, 3);
+    grad2.addColorStop(0, rgba('#ffffff', 0.7 * n.alpha));
+    grad2.addColorStop(1, rgba(n.color, 0));
+    ctx.fillStyle = grad2;
+    ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, Math.PI * 2); ctx.fill();
+  });
+  // Membrane — organic breathing boundary
+  if (mode === 'human') {
+    ctx.save(); ctx.lineCap = 'round';
+    ctx.strokeStyle = rgba('#96E6A1', 0.1);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let angle = 0; angle <= Math.PI * 2; angle += 0.04) {
+      const wobble = Math.sin(angle * 3 + t * 0.8) * 8 + Math.sin(angle * 7 + t * 1.2) * 4;
+      const r = 130 + wobble;
+      const px = CX + Math.cos(angle) * r, py = CY + Math.sin(angle) * r;
+      if (angle === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+const RENDERERS = { A: renderA, B: renderB, C: renderC, D: renderD, E: renderE, F: renderF, G: renderG, H: renderH, I: renderI };
+
+// ─── SETUP ───
+function setupGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  CARD_DEFS.forEach(def => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const canvas = document.createElement('canvas');
+    canvas.width = CW * DPR;
+    canvas.height = CH * DPR;
+    canvas.style.width = CW + 'px';
+    canvas.style.height = CH + 'px';
+    canvases[def.id] = canvas;
+    card.appendChild(canvas);
+    const label = document.createElement('div');
+    label.className = 'card-label';
+    label.innerHTML = `<span>${def.id}</span> — ${def.name}`;
+    card.appendChild(label);
+    grid.appendChild(card);
+    initCard(def.id);
+  });
+}
+
+function setTier(tier) {
+  currentTier = tier === 'random' ? ['seed','young','full'][Math.floor(Math.random()*3)] : tier;
+  document.querySelectorAll('.controls button').forEach(b => {
+    if (['btn-seed','btn-young','btn-full','btn-random'].includes(b.id)) {
+      b.classList.toggle('active', b.id === 'btn-' + tier);
+    }
+  });
+  CARD_DEFS.forEach(def => initCard(def.id));
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('btn-human').classList.toggle('active', mode === 'human');
+  document.getElementById('btn-ai').classList.toggle('active', mode === 'ai');
+}
+
+// ─── ANIMATION LOOP ───
+let startTime = performance.now();
+
+function animate(time) {
+  const elapsed = time - startTime;
+  CARD_DEFS.forEach(def => {
+    const canvas = canvases[def.id];
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, CW, CH);
+    const state = cardStates[def.id];
+    if (!state) return;
+    RENDERERS[def.id](ctx, state, elapsed, time, currentMode);
+  });
+  requestAnimationFrame(animate);
+}
+
+setupGrid();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

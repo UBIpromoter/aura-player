@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Organism — Macro v4</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  .header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px 10px;
+    background: #0e0e16;
+    border-bottom: 1px solid #1e1e2e;
+    z-index: 10;
+  }
+  .title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #c0c0d0;
+    letter-spacing: 0.5px;
+  }
+  .ctrl-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .btn {
+    padding: 5px 14px;
+    border: 1px solid #2a2a3e;
+    border-radius: 6px;
+    background: transparent;
+    color: #8b8ba0;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .btn:hover { border-color: #6b7280; color: #d1d5db; }
+  .btn.active { border-color: #8b5cf6; color: #fff; background: rgba(139,92,246,0.12); }
+  .ctrl-sep {
+    width: 1px;
+    height: 18px;
+    background: #2a2a3e;
+    margin: 0 4px;
+  }
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 6px;
+    padding: 6px;
+    min-height: 0;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    background: #0a0a0f;
+    border: 1px solid #1a1a2a;
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 0;
+    position: relative;
+  }
+  .card canvas {
+    display: block;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+  }
+  .card-label {
+    text-align: center;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #6a6a80;
+    letter-spacing: 0.3px;
+    background: #0e0e16;
+    border-top: 1px solid #1a1a2a;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">Aura Organism — Macro v4</div>
+  <div class="ctrl-row">
+    <button class="btn active" id="btn-seed">Seed</button>
+    <button class="btn" id="btn-young">Young</button>
+    <button class="btn" id="btn-full">Full</button>
+    <button class="btn" id="btn-random">Random</button>
+    <div class="ctrl-sep"></div>
+    <button class="btn active" id="btn-human">Human</button>
+    <button class="btn" id="btn-ai">AI</button>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  // =================================================================
+  // PALETTE & HELPERS
+  // =================================================================
+  var C = {
+    violet: '#8b5cf6', indigo: '#6366f1', cyan: '#06b6d4',
+    rose: '#f43f5e', pink: '#ec4899', emerald: '#10b981', amber: '#f59e0b',
+  };
+
+  function hexRgb(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpRgb(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+  function rgbStr(c, a) { return 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + Math.max(0, Math.min(1, a)).toFixed(4) + ')'; }
+
+  function seededRng(seed) {
+    var s = Math.abs(seed) || 1;
+    return function() { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
+  }
+
+  // =================================================================
+  // DATA MAPS
+  // =================================================================
+  var SENSITIVE = [false, true, true, false, false];
+
+  var NEURON_MAP = [
+    { colorQ: 'onboard-1', posQ: 'onboard-2', colors: ['#a78bfa', '#c4b5fd'] },
+    { colorQ: 'onboard-3', posQ: 'onboard-4', colors: ['#818cf8', '#a5b4fc'] },
+    { colorQ: 'onboard-5', posQ: 'onboard-6', colors: ['#22d3ee', '#67e8f9'] },
+    { colorQ: 'onboard-7', posQ: 'onboard-8', colors: ['#fb7185', '#fda4af'] },
+    { colorQ: 'onboard-9', posQ: 'onboard-10', colors: ['#34d399', '#6ee7b7'] },
+  ];
+
+  var HUMAN_CONNS = [[0,1],[1,2],[2,3],[3,4],[4,0],[0,2],[1,3],[2,4],[3,0],[4,1]];
+  var AI_CONNS = [[0,1],[0,2],[0,3],[0,4],[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]];
+
+  var ASSESS_MAP = [
+    { ids: ['starter-personality'], name: 'Personality', color: C.violet, tier: 1, nodes: 3, affinities: [0, 1] },
+    { ids: ['starter-motivation'], name: 'Motivation', color: C.amber, tier: 1, nodes: 3, affinities: [4, 0] },
+    { ids: ['starter-thinking'], name: 'Thinking', color: C.cyan, tier: 1, nodes: 4, affinities: [2, 4] },
+    { ids: ['starter-connection'], name: 'Connection', color: C.pink, tier: 1, nodes: 3, affinities: [2, 3] },
+    { ids: ['starter-strategy'], name: 'Strategy', color: C.emerald, tier: 1, nodes: 3, affinities: [1, 4] },
+    { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: C.violet, tier: 2, nodes: 5, affinities: [0, 2, 4] },
+    { ids: ['integrity'], name: 'Character', color: C.emerald, tier: 2, nodes: 3, affinities: [3, 1] },
+    { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: C.indigo, tier: 2, nodes: 4, affinities: [3, 4] },
+    { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: C.cyan, tier: 2, nodes: 4, affinities: [4, 0] },
+    { ids: ['attachment'], name: 'Relationships', color: C.rose, tier: 2, nodes: 3, affinities: [2, 3] },
+    { ids: ['risk'], name: 'Behavior', color: C.amber, tier: 2, nodes: 3, affinities: [1, 4] },
+  ];
+
+  // =================================================================
+  // SHARED STATE
+  // =================================================================
+  var entityType = 'human';
+  var currentTier = 0;
+  var onboardingAnswers = {};
+  var assessState = {};
+
+  for (var qi = 1; qi <= 10; qi++) {
+    onboardingAnswers['onboard-' + qi] = (qi % 3 === 0) ? 1 : 0;
+  }
+
+  // =================================================================
+  // DERIVE HELPERS
+  // =================================================================
+  function deriveAnswers() {
+    var colorAns = new Array(5).fill(null);
+    var posAns = new Array(5).fill(null);
+    for (var i = 0; i < 5; i++) {
+      var nm = NEURON_MAP[i];
+      if (nm.colorQ in onboardingAnswers) colorAns[i] = onboardingAnswers[nm.colorQ];
+      if (nm.posQ in onboardingAnswers) posAns[i] = onboardingAnswers[nm.posQ];
+    }
+    return { colorAns: colorAns, posAns: posAns };
+  }
+
+  // =================================================================
+  // ANSWER HASH + SEED POSITIONS (400x400 canvas)
+  // =================================================================
+  function answerHash(colorAns, posAns) {
+    var h = 0;
+    for (var i = 0; i < 5; i++) {
+      h = h * 31 + (colorAns[i] !== null ? colorAns[i] + 1 : 0);
+      h = h * 37 + (posAns[i] !== null ? posAns[i] + 1 : 0);
+    }
+    return h;
+  }
+
+  function primarySeedPositions(colorAns, posAns) {
+    var CX = 200, CY = 200;
+    var hash = answerHash(colorAns, posAns);
+    var rng = seededRng(hash + 7919);
+    var positions = [];
+    var baseAngles = [0, 1, 2, 3, 4].map(function(i) {
+      var angle = (i / 5) * Math.PI * 2;
+      if (posAns[i] !== null) angle += (posAns[i] === 0 ? -0.7 : 0.7);
+      if (colorAns[i] !== null) angle += (colorAns[i] === 0 ? -0.35 : 0.35);
+      angle += (hash % 628) / 100;
+      return angle;
+    });
+    for (var i = 0; i < 5; i++) {
+      var answered = colorAns[i] !== null || posAns[i] !== null;
+      var baseR = answered ? 55 + rng() * 35 : 35 + rng() * 25;
+      positions.push({
+        x: CX + Math.cos(baseAngles[i]) * baseR,
+        y: CY + Math.sin(baseAngles[i]) * baseR,
+      });
+    }
+    return positions;
+  }
+
+  // =================================================================
+  // NODE FACTORY
+  // =================================================================
+  function makeNode(opts) {
+    return {
+      x: opts.x || 200, y: opts.y || 200,
+      vx: 0, vy: 0, fx: 0, fy: 0,
+      color: opts.color ? hexRgb(opts.color) : [70, 75, 90],
+      tcolor: opts.color ? hexRgb(opts.color) : [70, 75, 90],
+      r: opts.r || 2, tr: opts.r || 2,
+      alpha: 0, talpha: opts.talpha || 0,
+      phase: Math.random() * Math.PI * 2,
+      driftSpeed: 0.12 + Math.random() * 0.2,
+      driftAmp: 0.8 + Math.random() * 1.2,
+      phaseX: Math.random() * 6.28,
+      phaseY: Math.random() * 6.28,
+      type: opts.type || 'primary',
+      parent: opts.parent != null ? opts.parent : -1,
+      sensitive: opts.sensitive || false,
+      assessIdx: opts.assessIdx != null ? opts.assessIdx : null,
+      affinities: opts.affinities || null,
+      tier: opts.tier || 0,
+      birthTime: -1,
+      dying: false,
+      deathStart: -1,
+    };
+  }
+
+  // =================================================================
+  // BUILD ALL NODES (tier-aware)
+  // tier 0 = Seed (5 primaries)
+  // tier 1 = Young (5 primaries + 10 companions + 5 satellites + tier1 assessments)
+  // tier 2 = Full (all above + ALL assessments)
+  // =================================================================
+  function buildAllNodes(tier) {
+    var da = deriveAnswers();
+    var colorAns = da.colorAns;
+    var posAns = da.posAns;
+    var CX = 200, CY = 200;
+    var result = [];
+    var seeds = primarySeedPositions(colorAns, posAns);
+
+    // 5 primaries (idx 0-4)
+    for (var i = 0; i < 5; i++) {
+      var n = makeNode({
+        x: seeds[i].x, y: seeds[i].y,
+        r: 3.5, type: 'primary', sensitive: SENSITIVE[i],
+        talpha: 1,
+      });
+      if (colorAns[i] !== null) {
+        n.tcolor = hexRgb(NEURON_MAP[i].colors[colorAns[i]]);
+        n.color = n.tcolor.slice();
+        n.talpha = 1;
+      } else {
+        var c0 = hexRgb(NEURON_MAP[i].colors[0]);
+        var c1 = hexRgb(NEURON_MAP[i].colors[1]);
+        n.tcolor = [
+          Math.round((c0[0] + c1[0]) * 0.25 + 50 * 0.5),
+          Math.round((c0[1] + c1[1]) * 0.25 + 55 * 0.5),
+          Math.round((c0[2] + c1[2]) * 0.25 + 70 * 0.5),
+        ];
+        n.color = n.tcolor.slice();
+        n.talpha = 0.6;
+      }
+      result.push(n);
+    }
+
+    // Seed: only primaries
+    if (tier === 0) return result;
+
+    // 10 companions (idx 5-14): 2 per primary
+    for (var pi = 0; pi < 5; pi++) {
+      for (var ci = 0; ci < 2; ci++) {
+        var angle = Math.random() * Math.PI * 2;
+        var dist = 8 + Math.random() * 12;
+        var cn = makeNode({
+          x: result[pi].x + Math.cos(angle) * dist,
+          y: result[pi].y + Math.sin(angle) * dist,
+          r: 2, type: 'companion', parent: pi,
+          talpha: 0.7,
+        });
+        cn.tcolor = result[pi].tcolor.slice();
+        cn.color = cn.tcolor.slice();
+        result.push(cn);
+      }
+    }
+
+    // 5 satellites (idx 15-19)
+    for (var si = 0; si < 5; si++) {
+      var px = (result[si].x + CX) / 2 + (Math.random() - 0.5) * 20;
+      var py = (result[si].y + CY) / 2 + (Math.random() - 0.5) * 20;
+      var sn = makeNode({
+        x: px, y: py,
+        r: 1.5, type: 'satellite', parent: si,
+        talpha: 0.5,
+      });
+      sn.tcolor = result[si].tcolor.slice();
+      sn.color = sn.tcolor.slice();
+      result.push(sn);
+    }
+
+    // Assessment nodes (idx 20+)
+    ASSESS_MAP.forEach(function(assess, ai) {
+      if (!assessState[ai]) return;
+      var rng = seededRng(ai * 137 + 42);
+      var affs = assess.affinities;
+      for (var ni = 0; ni < assess.nodes; ni++) {
+        var mx = 0, my = 0;
+        for (var k = 0; k < affs.length; k++) {
+          mx += result[affs[k]].x;
+          my += result[affs[k]].y;
+        }
+        mx /= affs.length;
+        my /= affs.length;
+        var ax = mx + (rng() - 0.5) * 37;
+        var ay = my + (rng() - 0.5) * 37;
+        var an = makeNode({
+          x: ax, y: ay,
+          r: 2 + rng() * 1, type: 'assess',
+          color: assess.color,
+          assessIdx: ai, tier: assess.tier,
+          parent: affs[0], affinities: affs,
+          talpha: 0.85,
+        });
+        if (affs.length >= 2) {
+          var ar = 0, ag = 0, ab = 0;
+          for (var k2 = 0; k2 < affs.length; k2++) {
+            ar += result[affs[k2]].tcolor[0];
+            ag += result[affs[k2]].tcolor[1];
+            ab += result[affs[k2]].tcolor[2];
+          }
+          var pn = affs.length;
+          var parentBlend = [ar / pn, ag / pn, ab / pn];
+          an.tcolor = lerpRgb(hexRgb(assess.color), parentBlend, 0.5);
+        }
+        an.color = an.tcolor.slice();
+        result.push(an);
+      }
+    });
+
+    return result;
+  }
+
+  // =================================================================
+  // BUILD EDGES
+  // =================================================================
+  function buildEdgesFromNodes(nodeList) {
+    var da = deriveAnswers();
+    var colorAns = da.colorAns;
+    var isAI = entityType === 'ai';
+    var edgeList = [];
+    var N = nodeList.length;
+    var edgeSet = new Set();
+
+    function addEdge(a, b, strength, restLen) {
+      if (a >= N || b >= N) return;
+      var key = Math.min(a, b) * 10000 + Math.max(a, b);
+      if (edgeSet.has(key)) return;
+      edgeSet.add(key);
+      edgeList.push({
+        a: a, b: b, strength: strength, restLen: restLen,
+        wigglePhase: Math.random() * Math.PI * 2,
+        wiggleSpeed: 0.3 + Math.random() * 0.5,
+        wiggleAmp: 1 + Math.random() * 2.5,
+        flowPhase: Math.random(),
+        flowSpeed: 0.15 + Math.random() * 0.15,
+      });
+    }
+
+    var primConns = isAI ? AI_CONNS : HUMAN_CONNS;
+    for (var pi = 0; pi < primConns.length; pi++) {
+      var a = primConns[pi][0], b = primConns[pi][1];
+      var aAns = colorAns[a], bAns = colorAns[b];
+      var bothAnswered = (aAns !== null) && (bAns !== null);
+      var sameColor = bothAnswered && aAns === bAns;
+      var strength = bothAnswered ? (sameColor ? 1.0 : 0.5) : 0.3;
+      var rest = bothAnswered ? (sameColor ? 37 : 63) : 57;
+      addEdge(a, b, strength, rest);
+    }
+
+    if (N <= 5) return edgeList;
+
+    // Primary-to-companion
+    for (var ci2 = 5; ci2 < Math.min(15, N); ci2++) {
+      addEdge(nodeList[ci2].parent, ci2, 1.5, 15);
+    }
+    // Companion-to-companion (same parent)
+    for (var i2 = 0; i2 < 5; i2++) {
+      var c1 = 5 + i2 * 2, c2 = 5 + i2 * 2 + 1;
+      if (c2 < N) addEdge(c1, c2, 0.8, 10);
+    }
+    // Cross-companion bridges
+    for (var i3 = 0; i3 < 5; i3++) {
+      var next = (i3 + 1) % 5;
+      var ca = 5 + i3 * 2 + 1, cb = 5 + next * 2;
+      if (ca < N && cb < N) addEdge(ca, cb, 0.2, 37);
+    }
+    // Satellite to parent
+    for (var si2 = 15; si2 < Math.min(20, N); si2++) {
+      addEdge(nodeList[si2].parent, si2, 0.5, 40);
+    }
+    // Satellite ring
+    for (var si3 = 0; si3 < 5; si3++) {
+      var sa = 15 + si3, sb = 15 + (si3 + 1) % 5;
+      if (sa < N && sb < N) addEdge(sa, sb, 0.15, 40);
+    }
+    // Assessment edges
+    for (var ai2 = 20; ai2 < N; ai2++) {
+      var an = nodeList[ai2];
+      if (an.affinities) {
+        for (var k = 0; k < an.affinities.length; k++) {
+          addEdge(an.affinities[k], ai2, 0.6, 33);
+        }
+      }
+      var nearby = [];
+      for (var bi = 0; bi < N; bi++) {
+        if (bi === ai2) continue;
+        var dx = nodeList[ai2].x - nodeList[bi].x;
+        var dy = nodeList[ai2].y - nodeList[bi].y;
+        nearby.push({ idx: bi, d: dx * dx + dy * dy });
+      }
+      nearby.sort(function(x, y) { return x.d - y.d; });
+      for (var k2 = 0; k2 < Math.min(2, nearby.length); k2++) {
+        addEdge(ai2, nearby[k2].idx, 0.15, 25);
+      }
+    }
+
+    return edgeList;
+  }
+
+  // =================================================================
+  // CONVEX HULL (Graham scan)
+  // =================================================================
+  function convexHull(points) {
+    if (points.length < 3) return points.slice();
+    var sorted = points.slice().sort(function(a, b) { return a.x - b.x || a.y - b.y; });
+    var cross = function(O, A, B) { return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x); };
+    var lower = [];
+    for (var i = 0; i < sorted.length; i++) {
+      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], sorted[i]) <= 0) lower.pop();
+      lower.push(sorted[i]);
+    }
+    var upper = [];
+    for (var i2 = sorted.length - 1; i2 >= 0; i2--) {
+      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], sorted[i2]) <= 0) upper.pop();
+      upper.push(sorted[i2]);
+    }
+    return lower.slice(0, -1).concat(upper.slice(0, -1));
+  }
+
+  // Draw smoothed hull with outward padding from centroid
+  function drawSmoothedHull(ctx, hull, padding, CX, CY) {
+    if (hull.length < 3) return;
+    var pts = [];
+    for (var i = 0; i < hull.length; i++) {
+      var dx = hull[i].x - CX;
+      var dy = hull[i].y - CY;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      pts.push({
+        x: CX + (dx / d) * (d + padding),
+        y: CY + (dy / d) * (d + padding),
+      });
+    }
+    var n = pts.length;
+    ctx.beginPath();
+    var startX = (pts[0].x + pts[n - 1].x) / 2;
+    var startY = (pts[0].y + pts[n - 1].y) / 2;
+    ctx.moveTo(startX, startY);
+    for (var j = 0; j < n; j++) {
+      var curr = pts[j];
+      var nextPt = pts[(j + 1) % n];
+      ctx.quadraticCurveTo(curr.x, curr.y, (curr.x + nextPt.x) / 2, (curr.y + nextPt.y) / 2);
+    }
+    ctx.closePath();
+  }
+
+  // =================================================================
+  // COLOR HELPERS
+  // =================================================================
+  function blendConnectionColor(na, nb) {
+    return [
+      (na.color[0] + nb.color[0]) / 2,
+      (na.color[1] + nb.color[1]) / 2,
+      (na.color[2] + nb.color[2]) / 2,
+    ];
+  }
+
+  function avgPrimaryColor(nodes) {
+    var r = 0, g = 0, b = 0, count = 0;
+    for (var i = 0; i < Math.min(5, nodes.length); i++) {
+      if (nodes[i].alpha > 0.05) {
+        r += nodes[i].color[0]; g += nodes[i].color[1]; b += nodes[i].color[2];
+        count++;
+      }
+    }
+    if (count === 0) return [100, 100, 140];
+    return [r / count, g / count, b / count];
+  }
+
+  // =================================================================
+  // ANIMATED POSITION
+  // =================================================================
+  function animPos(n, time) {
+    var sp = n.driftSpeed;
+    var amp = n.driftAmp * (entityType === 'ai' ? 0.3 : 1.0);
+    var dx = Math.sin(time * sp + n.phaseX) * amp
+           + Math.sin(time * sp * 0.4 + n.phaseX * 2.1) * amp * 0.3;
+    var dy = Math.cos(time * sp * 0.75 + n.phaseY) * amp
+           + Math.cos(time * sp * 0.35 + n.phaseY * 1.7) * amp * 0.25;
+    return { x: n.x + dx, y: n.y + dy };
+  }
+
+  // =================================================================
+  // STARS
+  // =================================================================
+  function buildStars(count, W, H) {
+    var result = [];
+    for (var i = 0; i < count; i++) {
+      result.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: 0.2 + Math.random() * 0.5,
+        bright: 0.04 + Math.random() * 0.12,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.3 + Math.random() * 1.8,
+      });
+    }
+    return result;
+  }
+
+  // =================================================================
+  // FORCE SIMULATION
+  // =================================================================
+  function simulateForces(nodes, edges, config, dt) {
+    var CX = 200, CY = 200;
+    var N = nodes.length;
+    if (N === 0) return;
+
+    for (var i = 0; i < N; i++) { nodes[i].fx = 0; nodes[i].fy = 0; }
+
+    // Springs
+    for (var ei = 0; ei < edges.length; ei++) {
+      var e = edges[ei];
+      var na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.02 && nb.alpha < 0.02) continue;
+      var dx = nb.x - na.x, dy = nb.y - na.y;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+      var force = e.strength * (dist - e.restLen) / dist;
+      na.fx += dx * force; na.fy += dy * force;
+      nb.fx -= dx * force; nb.fy -= dy * force;
+    }
+
+    // Repulsion
+    var repulse = config.repulsion || 3000;
+    for (var i2 = 0; i2 < N; i2++) {
+      if (nodes[i2].alpha < 0.02) continue;
+      for (var j = i2 + 1; j < N; j++) {
+        if (nodes[j].alpha < 0.02) continue;
+        var dx2 = nodes[j].x - nodes[i2].x;
+        var dy2 = nodes[j].y - nodes[i2].y;
+        var d2 = Math.sqrt(Math.max(dx2 * dx2 + dy2 * dy2, 100));
+        var f2 = -repulse / (d2 * d2);
+        nodes[i2].fx += (dx2 / d2) * f2; nodes[i2].fy += (dy2 / d2) * f2;
+        nodes[j].fx -= (dx2 / d2) * f2; nodes[j].fy -= (dy2 / d2) * f2;
+      }
+    }
+
+    // Center gravity
+    var gravity = config.gravity || 0.07;
+    for (var i3 = 0; i3 < N; i3++) {
+      if (nodes[i3].alpha < 0.02) continue;
+      nodes[i3].fx += (CX - nodes[i3].x) * gravity;
+      nodes[i3].fy += (CY - nodes[i3].y) * gravity;
+    }
+
+    // Radial roundness constraint
+    var targetR = config.targetRadius || 80;
+    var roundness = config.roundness || 0.04;
+    for (var i4 = 0; i4 < N; i4++) {
+      if (nodes[i4].alpha < 0.02) continue;
+      var rdx = nodes[i4].x - CX;
+      var rdy = nodes[i4].y - CY;
+      var rdist = Math.sqrt(rdx * rdx + rdy * rdy) || 1;
+      var radialForce = (rdist - targetR) * roundness;
+      nodes[i4].fx -= (rdx / rdist) * radialForce;
+      nodes[i4].fy -= (rdy / rdist) * radialForce;
+    }
+
+    // Apply forces
+    var damping = config.damping || 0.96;
+    var maxSpeed = config.maxSpeed || 1.5;
+    for (var i5 = 0; i5 < N; i5++) {
+      var nd = nodes[i5];
+      if (nd.alpha < 0.02) continue;
+      var mass = nd.type === 'primary' ? 3.0 : nd.type === 'companion' ? 0.8 : 1.2;
+      nd.vx = (nd.vx + nd.fx / mass * dt) * damping;
+      nd.vy = (nd.vy + nd.fy / mass * dt) * damping;
+      var speed = Math.sqrt(nd.vx * nd.vx + nd.vy * nd.vy);
+      if (speed > maxSpeed) { nd.vx *= maxSpeed / speed; nd.vy *= maxSpeed / speed; }
+      nd.x += nd.vx;
+      nd.y += nd.vy;
+      var margin = 25;
+      if (nd.x < margin) nd.vx += 1.0;
+      if (nd.x > 400 - margin) nd.vx -= 1.0;
+      if (nd.y < margin) nd.vy += 1.0;
+      if (nd.y > 400 - margin) nd.vy -= 1.0;
+    }
+  }
+
+  // =================================================================
+  // ALPHA TRANSITIONS
+  // =================================================================
+  function updateAlphas(nodes, dt, time) {
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.birthTime >= 0) {
+        var age = time - n.birthTime;
+        if (age < 0.8) {
+          var t = Math.max(0, age / 0.8);
+          var eased = t * t * (3 - 2 * t);
+          n.alpha = lerp(0.3 * n.talpha, n.talpha, eased);
+          n.r = n.tr;
+          continue;
+        } else {
+          n.birthTime = -1;
+        }
+      }
+      if (n.dying) {
+        var age2 = time - n.deathStart;
+        if (age2 < 1.0) {
+          var t2 = 1 - age2 / 1.0;
+          n.alpha = n.talpha * t2 * t2;
+          n.r = n.tr * t2 * t2;
+          continue;
+        } else {
+          n.alpha = 0; n.r = 0; continue;
+        }
+      }
+      var spd = 4 * dt;
+      n.alpha = lerp(n.alpha, n.talpha, spd);
+      n.r = lerp(n.r, n.tr, spd);
+      n.color = lerpRgb(n.color, n.tcolor, spd);
+    }
+  }
+
+  // =================================================================
+  // SHARED: RENDER STARS
+  // =================================================================
+  function renderStars(ctx, stars, time) {
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var twinkle = s.bright * (0.4 + 0.6 * Math.sin(time * s.speed + s.phase));
+      if (twinkle < 0.01) continue;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr([180, 200, 255], twinkle);
+      ctx.fill();
+    }
+  }
+
+  // =================================================================
+  // SHARED: BOUNDARY GLOW (convex hull + concentric outlines)
+  // =================================================================
+  function renderBoundaryGlow(ctx, nodes, animPositions, time) {
+    var visiblePts = [];
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].alpha > 0.05) visiblePts.push(animPositions[i]);
+    }
+    if (visiblePts.length < 3) return;
+    var hull = convexHull(visiblePts);
+    if (hull.length < 3) return;
+
+    var avgColor = avgPrimaryColor(nodes);
+    var CX = 200, CY = 200;
+
+    // 4 concentric outlines: outermost first
+    var layers = [
+      { padding: 40, alpha: 0.02, lineWidth: 20 },
+      { padding: 25, alpha: 0.04, lineWidth: 12 },
+      { padding: 15, alpha: 0.08, lineWidth: 6 },
+      { padding: 8,  alpha: 0.12, lineWidth: 2 },
+    ];
+
+    for (var li = 0; li < layers.length; li++) {
+      var layer = layers[li];
+      ctx.save();
+      ctx.strokeStyle = rgbStr(avgColor, layer.alpha);
+      ctx.lineWidth = layer.lineWidth;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      drawSmoothedHull(ctx, hull, layer.padding, CX, CY);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // =================================================================
+  // FIND TRIANGLES (for Card B - Fabric)
+  // =================================================================
+  function findTriangles(nodes, edges) {
+    // Build adjacency set
+    var adj = new Set();
+    for (var i = 0; i < edges.length; i++) {
+      var a = edges[i].a, b = edges[i].b;
+      adj.add(Math.min(a, b) * 10000 + Math.max(a, b));
+    }
+    function hasEdge(a, b) {
+      return adj.has(Math.min(a, b) * 10000 + Math.max(a, b));
+    }
+    // Build adjacency list
+    var neighbors = {};
+    for (var i2 = 0; i2 < edges.length; i2++) {
+      var ea = edges[i2].a, eb = edges[i2].b;
+      if (!neighbors[ea]) neighbors[ea] = [];
+      if (!neighbors[eb]) neighbors[eb] = [];
+      neighbors[ea].push(eb);
+      neighbors[eb].push(ea);
+    }
+    var triangles = [];
+    var triSet = new Set();
+    var N = nodes.length;
+    for (var u = 0; u < N; u++) {
+      if (!neighbors[u]) continue;
+      var nbrs = neighbors[u];
+      for (var ni = 0; ni < nbrs.length; ni++) {
+        var v = nbrs[ni];
+        if (v <= u) continue;
+        for (var nj = ni + 1; nj < nbrs.length; nj++) {
+          var w = nbrs[nj];
+          if (w <= v) continue;
+          if (hasEdge(v, w)) {
+            var triKey = u * 100000000 + v * 10000 + w;
+            if (!triSet.has(triKey)) {
+              triSet.add(triKey);
+              triangles.push([u, v, w]);
+            }
+          }
+        }
+      }
+    }
+    return triangles;
+  }
+
+  // =================================================================
+  // CARD CONFIGS — 6 radically different visual concepts
+  // =================================================================
+  var CARD_CONFIGS = [
+    { id: 'A', label: 'A — Web Organism',     roundness: 0.04, targetRadius: 80, maxSpeed: 1.5, damping: 0.96, gravity: 0.07, repulsion: 3000, starCount: 60 },
+    { id: 'B', label: 'B — Fabric / Tissue',   roundness: 0.04, targetRadius: 80, maxSpeed: 1.5, damping: 0.96, gravity: 0.07, repulsion: 3000, starCount: 60 },
+    { id: 'C', label: 'C — Constellation Map',  roundness: 0.04, targetRadius: 80, maxSpeed: 1.5, damping: 0.96, gravity: 0.07, repulsion: 3000, starCount: 150 },
+    { id: 'D', label: 'D — Flowing Channels',   roundness: 0.04, targetRadius: 80, maxSpeed: 1.5, damping: 0.96, gravity: 0.07, repulsion: 3000, starCount: 60 },
+    { id: 'E', label: 'E — Layered Depth',      roundness: 0.04, targetRadius: 80, maxSpeed: 1.5, damping: 0.96, gravity: 0.07, repulsion: 3000, starCount: 60 },
+    { id: 'F', label: 'F — Bioluminescent',     roundness: 0.04, targetRadius: 80, maxSpeed: 1.5, damping: 0.96, gravity: 0.07, repulsion: 3000, starCount: 60 },
+  ];
+
+  // =================================================================
+  // CARD INSTANCES
+  // =================================================================
+  var cards = [];
+
+  function createCard(config) {
+    return {
+      config: config,
+      nodes: [],
+      edges: [],
+      triangles: [],
+      stars: buildStars(config.starCount, 400, 400),
+      canvas: null,
+      ctx: null,
+      animId: null,
+      lastTime: performance.now(),
+    };
+  }
+
+  function rebuildCard(card, animateIn) {
+    var time = performance.now() / 1000;
+    card.nodes = buildAllNodes(currentTier);
+    card.edges = buildEdgesFromNodes(card.nodes);
+    // Pre-compute triangles for Card B
+    if (card.config.id === 'B') {
+      card.triangles = findTriangles(card.nodes, card.edges);
+    }
+
+    if (animateIn) {
+      for (var i = 0; i < card.nodes.length; i++) {
+        card.nodes[i].birthTime = time + Math.random() * 0.2;
+        card.nodes[i].alpha = card.nodes[i].talpha * 0.3;
+        card.nodes[i].r = card.nodes[i].tr;
+        card.nodes[i].vx = 0;
+        card.nodes[i].vy = 0;
+      }
+    } else {
+      for (var j = 0; j < card.nodes.length; j++) {
+        card.nodes[j].alpha = card.nodes[j].talpha;
+        card.nodes[j].r = card.nodes[j].tr;
+        card.nodes[j].vx = 0;
+        card.nodes[j].vy = 0;
+      }
+    }
+  }
+
+  function rebuildAll(animateIn) {
+    for (var i = 0; i < cards.length; i++) {
+      rebuildCard(cards[i], animateIn);
+    }
+  }
+
+  // =================================================================
+  // RENDERER A — Web Organism (reference baseline)
+  // Sharp two-tone connections, solid dot nodes, thin hull stroke
+  // =================================================================
+  function renderCardA(ctx, card, animPositions, time) {
+    var nodes = card.nodes;
+    var edges = card.edges;
+
+    // Human membrane: single thin convex hull stroke
+    if (entityType === 'human' && nodes.length >= 3) {
+      var visiblePts = [];
+      for (var vi = 0; vi < nodes.length; vi++) {
+        if (nodes[vi].alpha > 0.05) visiblePts.push(animPositions[vi]);
+      }
+      if (visiblePts.length >= 3) {
+        var hull = convexHull(visiblePts);
+        if (hull.length >= 3) {
+          var memColor = avgPrimaryColor(nodes);
+          ctx.strokeStyle = rgbStr(memColor, 0.2);
+          ctx.lineWidth = 1;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          drawSmoothedHull(ctx, hull, 12, 200, 200);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Connections: single crisp line per connection, blended color
+    for (var ei = 0; ei < edges.length; ei++) {
+      var e = edges[ei];
+      var na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+      var pa = animPositions[e.a];
+      var pb = animPositions[e.b];
+      var dx = pa.x - pb.x, dy = pa.y - pb.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      var distFade = Math.max(0, 1 - dist / 250);
+      var minA = Math.min(na.alpha, nb.alpha);
+      var connColor = blendConnectionColor(na, nb);
+      var baseAlpha = distFade * minA * 0.5;
+      if (baseAlpha < 0.005) continue;
+
+      // Wiggle
+      var midX = (pa.x + pb.x) / 2;
+      var midY = (pa.y + pb.y) / 2;
+      var len = dist || 1;
+      var perpX = -(pb.y - pa.y) / len;
+      var perpY = (pb.x - pa.x) / len;
+      var wiggle = Math.sin(time * e.wiggleSpeed + e.wigglePhase) * e.wiggleAmp;
+      var cpx = midX + perpX * wiggle;
+      var cpy = midY + perpY * wiggle;
+
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.quadraticCurveTo(cpx, cpy, pb.x, pb.y);
+      ctx.strokeStyle = rgbStr(connColor, baseAlpha);
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    // Nodes: solid colored dots
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.alpha < 0.02) continue;
+      var p = animPositions[i];
+      var c = n.color;
+
+      if (n.type === 'primary') {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(c, n.alpha * 0.9);
+        ctx.fill();
+      } else if (n.type === 'companion') {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(c, n.alpha * 0.7);
+        ctx.fill();
+      } else if (n.type === 'satellite' || n.type === 'assess') {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(c, n.alpha * 0.6);
+        ctx.fill();
+      }
+    }
+  }
+
+  // =================================================================
+  // RENDERER B — Fabric / Tissue
+  // Filled triangles create tissue membrane, thin connections, tiny nodes
+  // =================================================================
+  function renderCardB(ctx, card, animPositions, time) {
+    var nodes = card.nodes;
+    var edges = card.edges;
+    var triangles = card.triangles;
+
+    // Draw filled triangles first (the visual star)
+    for (var ti = 0; ti < triangles.length; ti++) {
+      var tri = triangles[ti];
+      var n0 = nodes[tri[0]], n1 = nodes[tri[1]], n2 = nodes[tri[2]];
+      if (n0.alpha < 0.03 || n1.alpha < 0.03 || n2.alpha < 0.03) continue;
+      var p0 = animPositions[tri[0]];
+      var p1 = animPositions[tri[1]];
+      var p2 = animPositions[tri[2]];
+
+      // Blend color of 3 nodes
+      var triColor = [
+        (n0.color[0] + n1.color[0] + n2.color[0]) / 3,
+        (n0.color[1] + n1.color[1] + n2.color[1]) / 3,
+        (n0.color[2] + n1.color[2] + n2.color[2]) / 3,
+      ];
+      var triAlpha = Math.min(n0.alpha, n1.alpha, n2.alpha);
+      // More triangles = denser, but each is faint
+      var fillAlpha = triAlpha * 0.055;
+
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.closePath();
+      ctx.fillStyle = rgbStr(triColor, fillAlpha);
+      ctx.fill();
+    }
+
+    // Connections: thin, low alpha
+    for (var ei = 0; ei < edges.length; ei++) {
+      var e = edges[ei];
+      var na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+      var pa = animPositions[e.a];
+      var pb = animPositions[e.b];
+      var dx = pa.x - pb.x, dy = pa.y - pb.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      var distFade = Math.max(0, 1 - dist / 250);
+      var minA = Math.min(na.alpha, nb.alpha);
+      var connColor = blendConnectionColor(na, nb);
+      var baseAlpha = distFade * minA * 0.2;
+      if (baseAlpha < 0.003) continue;
+
+      var midX = (pa.x + pb.x) / 2;
+      var midY = (pa.y + pb.y) / 2;
+      var len = dist || 1;
+      var perpX = -(pb.y - pa.y) / len;
+      var perpY = (pb.x - pa.x) / len;
+      var wiggle = Math.sin(time * e.wiggleSpeed + e.wigglePhase) * e.wiggleAmp;
+
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.quadraticCurveTo(midX + perpX * wiggle, midY + perpY * wiggle, pb.x, pb.y);
+      ctx.strokeStyle = rgbStr(connColor, baseAlpha);
+      ctx.lineWidth = 0.5;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    // Nodes: tiny
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.alpha < 0.02) continue;
+      var p = animPositions[i];
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr(n.color, n.alpha * 0.6);
+      ctx.fill();
+    }
+  }
+
+  // =================================================================
+  // RENDERER C — Constellation Map
+  // Dashed connections, star-shaped nodes, crosshairs on primaries
+  // =================================================================
+  function drawStarShape(ctx, x, y, r, color, alpha) {
+    // 4-pointed star
+    ctx.beginPath();
+    for (var i = 0; i < 4; i++) {
+      var angle = (i / 4) * Math.PI * 2 - Math.PI / 2;
+      var outerX = x + Math.cos(angle) * r;
+      var outerY = y + Math.sin(angle) * r;
+      var innerAngle = angle + Math.PI / 4;
+      var innerX = x + Math.cos(innerAngle) * r * 0.3;
+      var innerY = y + Math.sin(innerAngle) * r * 0.3;
+      if (i === 0) ctx.moveTo(outerX, outerY);
+      else ctx.lineTo(outerX, outerY);
+      ctx.lineTo(innerX, innerY);
+    }
+    ctx.closePath();
+    ctx.fillStyle = rgbStr(color, alpha);
+    ctx.fill();
+  }
+
+  function renderCardC(ctx, card, animPositions, time) {
+    var nodes = card.nodes;
+    var edges = card.edges;
+
+    // Dashed connections
+    for (var ei = 0; ei < edges.length; ei++) {
+      var e = edges[ei];
+      var na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+      var pa = animPositions[e.a];
+      var pb = animPositions[e.b];
+      var dx = pa.x - pb.x, dy = pa.y - pb.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      var distFade = Math.max(0, 1 - dist / 250);
+      var minA = Math.min(na.alpha, nb.alpha);
+      var connColor = blendConnectionColor(na, nb);
+      var baseAlpha = distFade * minA * 0.3;
+      if (baseAlpha < 0.003) continue;
+
+      ctx.save();
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.strokeStyle = rgbStr(connColor, baseAlpha);
+      ctx.lineWidth = 0.8;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Faint dashed circular boundary at mean radius of outermost nodes
+    if (nodes.length >= 3) {
+      var maxDist = 0;
+      var count = 0;
+      var sumDist = 0;
+      for (var oi = 0; oi < nodes.length; oi++) {
+        if (nodes[oi].alpha > 0.05) {
+          var odx = animPositions[oi].x - 200;
+          var ody = animPositions[oi].y - 200;
+          var od = Math.sqrt(odx * odx + ody * ody);
+          if (od > maxDist) maxDist = od;
+          sumDist += od;
+          count++;
+        }
+      }
+      if (count > 0) {
+        var meanR = (sumDist / count + maxDist) / 2 + 15;
+        ctx.save();
+        ctx.setLineDash([5, 7]);
+        ctx.beginPath();
+        ctx.arc(200, 200, meanR, 0, Math.PI * 2);
+        ctx.strokeStyle = rgbStr(avgPrimaryColor(nodes), 0.1);
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // Star-shaped nodes
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.alpha < 0.02) continue;
+      var p = animPositions[i];
+
+      if (n.type === 'primary') {
+        drawStarShape(ctx, p.x, p.y, 5, n.color, n.alpha * 0.9);
+        // Crosshair
+        var chLen = 8;
+        ctx.strokeStyle = rgbStr(n.color, n.alpha * 0.4);
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(p.x - chLen, p.y); ctx.lineTo(p.x + chLen, p.y);
+        ctx.moveTo(p.x, p.y - chLen); ctx.lineTo(p.x, p.y + chLen);
+        ctx.stroke();
+      } else if (n.type === 'companion') {
+        drawStarShape(ctx, p.x, p.y, 3, n.color, n.alpha * 0.7);
+      } else {
+        drawStarShape(ctx, p.x, p.y, 2, n.color, n.alpha * 0.5);
+      }
+    }
+  }
+
+  // =================================================================
+  // RENDERER D — Flowing Channels
+  // Tapered channel connections with flow pulse, small halo nodes
+  // =================================================================
+  function renderCardD(ctx, card, animPositions, time) {
+    var nodes = card.nodes;
+    var edges = card.edges;
+
+    // Channels
+    for (var ei = 0; ei < edges.length; ei++) {
+      var e = edges[ei];
+      var na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+      var pa = animPositions[e.a];
+      var pb = animPositions[e.b];
+      var dx = pa.x - pb.x, dy = pa.y - pb.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 1) continue;
+      var distFade = Math.max(0, 1 - dist / 250);
+      var minA = Math.min(na.alpha, nb.alpha);
+      var connColor = blendConnectionColor(na, nb);
+      var baseAlpha = distFade * minA * 0.35;
+      if (baseAlpha < 0.003) continue;
+
+      // Determine max width based on connection type
+      var bothPrimary = (na.type === 'primary' && nb.type === 'primary');
+      var maxWidth = bothPrimary ? 4 : 2;
+
+      // Flow pulse position
+      var flowPos = (time * e.flowSpeed + e.flowPhase) % 1;
+
+      // Wiggle midpoint
+      var midX = (pa.x + pb.x) / 2;
+      var midY = (pa.y + pb.y) / 2;
+      var len = dist;
+      var perpX = -(pb.y - pa.y) / len;
+      var perpY = (pb.x - pa.x) / len;
+      var wiggle = Math.sin(time * e.wiggleSpeed + e.wigglePhase) * e.wiggleAmp;
+      var cpx = midX + perpX * wiggle;
+      var cpy = midY + perpY * wiggle;
+
+      // Draw tapered channel as segments along bezier
+      var segments = 18;
+      var prevPt = null;
+      for (var si = 0; si <= segments; si++) {
+        var t = si / segments;
+        // Quadratic bezier point
+        var u = 1 - t;
+        var bx = u * u * pa.x + 2 * u * t * cpx + t * t * pb.x;
+        var by = u * u * pa.y + 2 * u * t * cpy + t * t * pb.y;
+
+        if (prevPt) {
+          var segWidth = Math.sin(t * Math.PI) * maxWidth;
+          if (segWidth < 0.3) segWidth = 0.3;
+
+          // Flow pulse: boost alpha near flowPos
+          var flowDist = Math.abs(t - flowPos);
+          if (flowDist > 0.5) flowDist = 1 - flowDist;
+          var flowBoost = Math.max(0, 1 - flowDist * 8) * 0.2;
+
+          ctx.beginPath();
+          ctx.moveTo(prevPt.x, prevPt.y);
+          ctx.lineTo(bx, by);
+          ctx.strokeStyle = rgbStr(connColor, baseAlpha + flowBoost);
+          ctx.lineWidth = segWidth;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+        }
+        prevPt = { x: bx, y: by };
+      }
+    }
+
+    // Nodes: small with tiny radial gradient halo
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.alpha < 0.02) continue;
+      var p = animPositions[i];
+      var c = n.color;
+
+      // Tiny halo
+      var haloR = n.type === 'primary' ? 10 : 6;
+      var haloGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, haloR);
+      haloGrad.addColorStop(0, rgbStr(c, n.alpha * 0.06));
+      haloGrad.addColorStop(1, rgbStr(c, 0));
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, haloR, 0, Math.PI * 2);
+      ctx.fillStyle = haloGrad;
+      ctx.fill();
+
+      // Core dot
+      var nr = n.type === 'primary' ? 2.5 : 1.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, nr, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr(c, n.alpha * 0.8);
+      ctx.fill();
+    }
+  }
+
+  // =================================================================
+  // RENDERER E — Layered Depth
+  // 3 distinct depth layers: back(satellites+assess), mid(companions), front(primaries)
+  // =================================================================
+  function renderCardE(ctx, card, animPositions, time) {
+    var nodes = card.nodes;
+    var edges = card.edges;
+
+    // Categorize nodes by layer
+    var backNodes = [];   // satellites + assess
+    var midNodes = [];    // companions
+    var frontNodes = [];  // primaries
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].type === 'satellite' || nodes[i].type === 'assess') backNodes.push(i);
+      else if (nodes[i].type === 'companion') midNodes.push(i);
+      else frontNodes.push(i);
+    }
+
+    // Categorize edges by layer
+    var backEdges = [];
+    var midEdges = [];
+    var frontEdges = [];
+    for (var ei = 0; ei < edges.length; ei++) {
+      var e = edges[ei];
+      var typeA = nodes[e.a].type;
+      var typeB = nodes[e.b].type;
+      if (typeA === 'primary' && typeB === 'primary') {
+        frontEdges.push(ei);
+      } else if ((typeA === 'companion' || typeB === 'companion') &&
+                 typeA !== 'satellite' && typeB !== 'satellite' &&
+                 typeA !== 'assess' && typeB !== 'assess') {
+        midEdges.push(ei);
+      } else {
+        backEdges.push(ei);
+      }
+    }
+
+    // Helper to draw edges for a layer
+    function drawLayerEdges(edgeIndices, alpha, lineWidth, doPseudoBlur) {
+      for (var i = 0; i < edgeIndices.length; i++) {
+        var e = edges[edgeIndices[i]];
+        var na = nodes[e.a], nb = nodes[e.b];
+        if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+        var pa = animPositions[e.a];
+        var pb = animPositions[e.b];
+        var dx = pa.x - pb.x, dy = pa.y - pb.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var distFade = Math.max(0, 1 - dist / 250);
+        var minA = Math.min(na.alpha, nb.alpha);
+        var connColor = blendConnectionColor(na, nb);
+        var baseAlpha = distFade * minA * alpha;
+        if (baseAlpha < 0.003) continue;
+
+        var midX = (pa.x + pb.x) / 2;
+        var midY = (pa.y + pb.y) / 2;
+        var len = dist || 1;
+        var perpX = -(pb.y - pa.y) / len;
+        var perpY = (pb.x - pa.x) / len;
+        var wiggle = Math.sin(time * e.wiggleSpeed + e.wigglePhase) * e.wiggleAmp;
+        var cpx = midX + perpX * wiggle;
+        var cpy = midY + perpY * wiggle;
+
+        if (doPseudoBlur) {
+          // Draw offset lines for pseudo-blur effect
+          var offsets = [-0.5, 0, 0.5];
+          for (var oi = 0; oi < offsets.length; oi++) {
+            var off = offsets[oi];
+            var offAlpha = off === 0 ? baseAlpha : baseAlpha * 0.5;
+            ctx.beginPath();
+            ctx.moveTo(pa.x + perpX * off, pa.y + perpY * off);
+            ctx.quadraticCurveTo(cpx + perpX * off, cpy + perpY * off, pb.x + perpX * off, pb.y + perpY * off);
+            ctx.strokeStyle = rgbStr(connColor, offAlpha);
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+          }
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(pa.x, pa.y);
+          ctx.quadraticCurveTo(cpx, cpy, pb.x, pb.y);
+          ctx.strokeStyle = rgbStr(connColor, baseAlpha);
+          ctx.lineWidth = lineWidth;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Helper to draw nodes for a layer
+    function drawLayerNodes(nodeIndices, alphaMult, radius) {
+      for (var i = 0; i < nodeIndices.length; i++) {
+        var idx = nodeIndices[i];
+        var n = nodes[idx];
+        if (n.alpha < 0.02) continue;
+        var p = animPositions[idx];
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(n.color, n.alpha * alphaMult);
+        ctx.fill();
+      }
+    }
+
+    // BACK layer: very faint, pseudo-blur
+    drawLayerEdges(backEdges, 0.15, 0.5, true);
+    drawLayerNodes(backNodes, 0.15, 1.5);
+
+    // MID layer: moderate
+    drawLayerEdges(midEdges, 0.5, 1, false);
+    drawLayerNodes(midNodes, 0.5, 2);
+
+    // FRONT layer: full brightness
+    drawLayerEdges(frontEdges, 0.7, 2, false);
+    drawLayerNodes(frontNodes, 0.9, 5);
+  }
+
+  // =================================================================
+  // RENDERER F — Bioluminescent
+  // Radial glow pools per node (source-over), white vein connections over top
+  // =================================================================
+  function renderCardF(ctx, card, animPositions, time) {
+    var nodes = card.nodes;
+    var edges = card.edges;
+
+    // Glow pools first (underneath everything)
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.alpha < 0.02) continue;
+      var p = animPositions[i];
+      var c = n.color;
+      var glowR, glowAlpha;
+
+      if (n.type === 'primary') {
+        glowR = 40;
+        glowAlpha = 0.15;
+      } else if (n.type === 'companion') {
+        glowR = 20;
+        glowAlpha = 0.08;
+      } else if (n.type === 'assess') {
+        glowR = 15;
+        glowAlpha = 0.06;
+      } else {
+        glowR = 12;
+        glowAlpha = 0.04;
+      }
+
+      var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+      grad.addColorStop(0, rgbStr(c, n.alpha * glowAlpha));
+      grad.addColorStop(0.6, rgbStr(c, n.alpha * glowAlpha * 0.4));
+      grad.addColorStop(1, rgbStr(c, 0));
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Connections: thin white lines OVER glow pools — "veins through tissue"
+    for (var ei = 0; ei < edges.length; ei++) {
+      var e = edges[ei];
+      var na = nodes[e.a], nb = nodes[e.b];
+      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
+      var pa = animPositions[e.a];
+      var pb = animPositions[e.b];
+      var dx = pa.x - pb.x, dy = pa.y - pb.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      var distFade = Math.max(0, 1 - dist / 250);
+      var minA = Math.min(na.alpha, nb.alpha);
+      var baseAlpha = distFade * minA * 0.25;
+      if (baseAlpha < 0.003) continue;
+
+      var midX = (pa.x + pb.x) / 2;
+      var midY = (pa.y + pb.y) / 2;
+      var len = dist || 1;
+      var perpX = -(pb.y - pa.y) / len;
+      var perpY = (pb.x - pa.x) / len;
+      var wiggle = Math.sin(time * e.wiggleSpeed + e.wigglePhase) * e.wiggleAmp;
+
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.quadraticCurveTo(midX + perpX * wiggle, midY + perpY * wiggle, pb.x, pb.y);
+      ctx.strokeStyle = rgbStr([220, 225, 240], baseAlpha);
+      ctx.lineWidth = 0.8;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    // Node cores: tiny bright dots at center of each glow
+    for (var ni = 0; ni < nodes.length; ni++) {
+      var nd = nodes[ni];
+      if (nd.alpha < 0.02) continue;
+      var pp = animPositions[ni];
+      var nr = nd.type === 'primary' ? 2.5 : 1.2;
+      ctx.beginPath();
+      ctx.arc(pp.x, pp.y, nr, 0, Math.PI * 2);
+      ctx.fillStyle = rgbStr(nd.color, nd.alpha * 0.7);
+      ctx.fill();
+    }
+  }
+
+  // =================================================================
+  // RENDERER DISPATCH
+  // =================================================================
+  var RENDERERS = {
+    'A': renderCardA,
+    'B': renderCardB,
+    'C': renderCardC,
+    'D': renderCardD,
+    'E': renderCardE,
+    'F': renderCardF,
+  };
+
+  // =================================================================
+  // FULL CARD RENDER
+  // =================================================================
+  function renderCard(card, now) {
+    var dt = Math.min((now - card.lastTime) / 1000, 0.05);
+    card.lastTime = now;
+    var time = now / 1000;
+    var ctx = card.ctx;
+    var nodes = card.nodes;
+    var edges = card.edges;
+    var config = card.config;
+    var W = 400, H = 400;
+
+    // Force sim
+    simulateForces(nodes, edges, config, dt);
+
+    // Alpha transitions
+    updateAlphas(nodes, dt, time);
+
+    // Set canvas size each frame (DPR)
+    var dpr = window.devicePixelRatio || 1;
+    card.canvas.width = W * dpr;
+    card.canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    renderStars(ctx, card.stars, time);
+
+    // Collect animated positions
+    var animPositions = [];
+    for (var i = 0; i < nodes.length; i++) {
+      animPositions.push(animPos(nodes[i], time));
+    }
+
+    // Card-specific renderer
+    var renderFn = RENDERERS[config.id];
+    if (renderFn) renderFn(ctx, card, animPositions, time);
+
+    // Shared boundary glow — AFTER all card content
+    renderBoundaryGlow(ctx, nodes, animPositions, time);
+
+    ctx.restore();
+
+    card.animId = requestAnimationFrame(function(t) { renderCard(card, t); });
+  }
+
+  // =================================================================
+  // BUILD DOM
+  // =================================================================
+  var gridEl = document.getElementById('grid');
+
+  for (var ci = 0; ci < CARD_CONFIGS.length; ci++) {
+    var cfg = CARD_CONFIGS[ci];
+    var card = createCard(cfg);
+
+    var cardEl = document.createElement('div');
+    cardEl.className = 'card';
+
+    var canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 400;
+    card.canvas = canvas;
+    card.ctx = canvas.getContext('2d');
+
+    var label = document.createElement('div');
+    label.className = 'card-label';
+    label.textContent = cfg.label;
+
+    cardEl.appendChild(canvas);
+    cardEl.appendChild(label);
+    gridEl.appendChild(cardEl);
+
+    cards.push(card);
+  }
+
+  // =================================================================
+  // INIT
+  // =================================================================
+  rebuildAll(false);
+  for (var ci2 = 0; ci2 < cards.length; ci2++) {
+    (function(card) {
+      card.animId = requestAnimationFrame(function(t) { renderCard(card, t); });
+    })(cards[ci2]);
+  }
+
+  // =================================================================
+  // CONTROLS
+  // =================================================================
+  var presetBtns = {
+    seed: document.getElementById('btn-seed'),
+    young: document.getElementById('btn-young'),
+    full: document.getElementById('btn-full'),
+    random: document.getElementById('btn-random'),
+  };
+  var entityBtns = {
+    human: document.getElementById('btn-human'),
+    ai: document.getElementById('btn-ai'),
+  };
+
+  function setActivePreset(name) {
+    Object.keys(presetBtns).forEach(function(k) {
+      presetBtns[k].className = 'btn' + (k === name ? ' active' : '');
+    });
+  }
+  function setActiveEntity(name) {
+    Object.keys(entityBtns).forEach(function(k) {
+      entityBtns[k].className = 'btn' + (k === name ? ' active' : '');
+    });
+  }
+
+  presetBtns.seed.onclick = function() {
+    currentTier = 0;
+    assessState = {};
+    onboardingAnswers = {};
+    for (var i = 1; i <= 10; i++) onboardingAnswers['onboard-' + i] = (i % 3 === 0) ? 1 : 0;
+    setActivePreset('seed');
+    rebuildAll(true);
+  };
+
+  presetBtns.young.onclick = function() {
+    currentTier = 1;
+    onboardingAnswers = {};
+    for (var i = 1; i <= 10; i++) onboardingAnswers['onboard-' + i] = (i % 2 === 0) ? 1 : 0;
+    assessState = {};
+    ASSESS_MAP.forEach(function(a, idx) { if (a.tier === 1) assessState[idx] = true; });
+    setActivePreset('young');
+    rebuildAll(true);
+  };
+
+  presetBtns.full.onclick = function() {
+    currentTier = 2;
+    onboardingAnswers = {};
+    for (var i = 1; i <= 10; i++) onboardingAnswers['onboard-' + i] = Math.random() < 0.5 ? 0 : 1;
+    assessState = {};
+    ASSESS_MAP.forEach(function(a, idx) { assessState[idx] = true; });
+    setActivePreset('full');
+    rebuildAll(true);
+  };
+
+  presetBtns.random.onclick = function() {
+    currentTier = 2;
+    onboardingAnswers = {};
+    for (var i = 1; i <= 10; i++) {
+      if (Math.random() < 0.7) onboardingAnswers['onboard-' + i] = Math.random() < 0.5 ? 0 : 1;
+    }
+    assessState = {};
+    ASSESS_MAP.forEach(function(a, idx) { if (Math.random() < 0.45) assessState[idx] = true; });
+    setActivePreset('random');
+    rebuildAll(true);
+  };
+
+  entityBtns.human.onclick = function() {
+    if (entityType === 'human') return;
+    entityType = 'human';
+    setActiveEntity('human');
+    rebuildAll(true);
+  };
+
+  entityBtns.ai.onclick = function() {
+    if (entityType === 'ai') return;
+    entityType = 'ai';
+    setActiveEntity('ai');
+    rebuildAll(true);
+  };
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Macro Arena — Question Answering — F1 Stress Test</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --bg: #0a0a0f; --card: #12121a; --border: #1e1e2e; --text: #e0e0e8; --dim: #6a6a80; --keep: #2ecc71; --remix: #c89b3c; --kill: #e74c3c; --radius: 10px; --transition: 0.25s ease; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif; line-height: 1.5; min-height: 100vh; padding: 32px 32px 120px; -webkit-font-smoothing: antialiased; }
+  .header { max-width: 1400px; margin: 0 auto 28px; }
+  .header-top { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .mode-label { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .mode-verb { color: var(--dim); font-weight: 500; }
+  .mode-element { color: var(--text); }
+  .round-badge { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--dim); border: 1px solid var(--border); border-radius: 20px; padding: 3px 12px; }
+  .header-desc { color: var(--dim); font-size: 14px; margin-bottom: 4px; }
+  .header-instruction { color: var(--dim); font-size: 13px; font-style: italic; opacity: 0.7; }
+  .master-toggle { display: flex; gap: 4px; align-items: center; }
+  .master-toggle button { font-size: 12px; padding: 3px 14px; border-radius: 14px; border: 1px solid var(--border); background: transparent; color: var(--dim); cursor: pointer; transition: all 0.2s; font-family: inherit; }
+  .master-toggle button.active { background: rgba(200, 155, 60, 0.15); border-color: rgba(200, 155, 60, 0.4); color: var(--text); }
+  .toggle-label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } body { padding: 20px 16px 120px; } }
+  .arena-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); position: relative; overflow: hidden; transition: transform var(--transition), border-color var(--transition), opacity var(--transition), box-shadow var(--transition); }
+  .arena-card:hover { transform: translateY(-2px); border-color: #2a2a3e; }
+  .arena-card.is-reference { border-left: 3px solid rgba(200, 155, 60, 0.3); }
+  .arena-card.state-kept { border-color: rgba(46, 204, 113, 0.4); box-shadow: 0 0 20px rgba(46, 204, 113, 0.08); }
+  .arena-card.state-remix { border-color: rgba(200, 155, 60, 0.4); box-shadow: 0 0 20px rgba(200, 155, 60, 0.08); }
+  .arena-card.state-killed { display: none; }
+  .phone-frame-wrapper { padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .phone-toggle { display: flex; gap: 4px; justify-content: center; }
+  .phone-toggle button { font-size: 11px; padding: 2px 10px; border-radius: 12px; border: 1px solid var(--border); background: transparent; color: var(--dim); cursor: pointer; transition: all 0.2s; }
+  .phone-toggle button.active { background: rgba(200, 155, 60, 0.15); border-color: rgba(200, 155, 60, 0.4); color: var(--text); }
+  :root { --phone-w: 360px; --phone-ar: 430/932; }
+  .phone-frame { width: var(--phone-w); max-width: 100%; aspect-ratio: var(--phone-ar); border-radius: 36px; overflow: hidden; position: relative; border: 2px solid #2a2a2e; transition: width 0.3s ease, aspect-ratio 0.3s ease; }
+  .phone-screen { width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+  .card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; opacity: 0; transition: opacity var(--transition); z-index: 50; }
+  .arena-card:hover .card-actions { opacity: 1; }
+  .arena-card.state-kept .card-actions, .arena-card.state-remix .card-actions { opacity: 1; }
+  .action-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: rgba(10, 10, 15, 0.85); color: var(--dim); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition); backdrop-filter: blur(8px); line-height: 1; }
+  .action-btn:hover { transform: scale(1.1); }
+  .action-btn[data-action="keep"]:hover, .arena-card.state-kept .action-btn[data-action="keep"] { background: var(--keep); border-color: var(--keep); color: #fff; }
+  .action-btn[data-action="remix"]:hover, .arena-card.state-remix .action-btn[data-action="remix"] { background: var(--remix); border-color: var(--remix); color: #fff; }
+  .action-btn[data-action="kill"]:hover { background: var(--kill); border-color: var(--kill); color: #fff; }
+  .card-label { display: flex; align-items: center; gap: 10px; padding: 10px 14px 6px; }
+  .label-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--dim); background: rgba(106, 106, 128, 0.12); border-radius: 4px; padding: 2px 8px; }
+  .arena-card.is-reference .label-badge { color: var(--remix); background: rgba(200, 155, 60, 0.1); }
+  .label-desc { font-size: 13px; color: var(--dim); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card-note { padding: 4px 14px 12px; }
+  .card-note input { width: 100%; background: transparent; border: none; border-bottom: 1px solid transparent; color: var(--text); font-size: 12px; font-family: inherit; padding: 4px 0; outline: none; transition: border-color var(--transition); }
+  .card-note input::placeholder { color: var(--dim); opacity: 0.5; }
+  .card-note input:focus { border-bottom-color: var(--border); }
+  .card-note input.has-value { color: var(--remix); border-bottom-color: rgba(200, 155, 60, 0.2); }
+  .feedback-toggle { position: fixed; bottom: 20px; right: 24px; z-index: 100; background: var(--card); border: 1px solid var(--border); color: var(--dim); font-family: inherit; font-size: 13px; font-weight: 500; padding: 8px 18px; border-radius: 24px; cursor: pointer; transition: all var(--transition); backdrop-filter: blur(12px); }
+  .feedback-toggle:hover { border-color: #2a2a3e; color: var(--text); }
+  .feedback-toggle.panel-open { bottom: 140px; }
+  .toggle-count { color: var(--text); font-weight: 600; }
+  .feedback-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #0d0d14; border-top: 1px solid var(--border); padding: 20px 32px 24px; z-index: 90; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+  .feedback-panel.open { transform: translateY(0); }
+  .feedback-columns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; max-width: 1400px; margin: 0 auto 16px; }
+  .feedback-col h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .feedback-col h3 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .col-keep h3 { color: var(--keep); } .col-keep h3 .dot { background: var(--keep); }
+  .col-remix h3 { color: var(--remix); } .col-remix h3 .dot { background: var(--remix); }
+  .col-kill h3 { color: var(--kill); } .col-kill h3 .dot { background: var(--kill); }
+  .feedback-list { list-style: none; font-size: 13px; min-height: 24px; }
+  .feedback-list li { padding: 2px 0; display: flex; gap: 6px; }
+  .col-keep .feedback-list li { color: var(--keep); }
+  .col-remix .feedback-list li { color: var(--remix); }
+  .col-kill .feedback-list li { color: var(--kill); }
+  .feedback-list .note-text { opacity: 0.7; font-style: italic; }
+  .feedback-list .undo-inline { background: none; border: 1px solid rgba(231, 76, 60, 0.3); color: var(--kill); font-size: 11px; padding: 1px 8px; border-radius: 10px; cursor: pointer; font-family: inherit; margin-left: 6px; transition: all 0.2s; }
+  .feedback-list .undo-inline:hover { background: rgba(231, 76, 60, 0.15); border-color: var(--kill); }
+  .feedback-footer { display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto; }
+  .rated-count { font-size: 12px; color: var(--dim); }
+  .send-btn { background: var(--keep); color: #fff; border: none; font-family: inherit; font-size: 15px; font-weight: 600; padding: 12px 36px; border-radius: 8px; cursor: pointer; transition: all var(--transition); }
+  .send-btn:hover { background: #27ae60; transform: translateY(-1px); }
+  .send-btn.copied { background: #1a8a4a; pointer-events: none; }
+  @keyframes aura-breathe { 0%, 100% { transform: scale(0.94); opacity: 0.85; } 50% { transform: scale(1.06); opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="mode-label"><span class="mode-verb">Stress Test:</span> <span class="mode-element">F1 Across Contexts</span></div>
+    <span class="round-badge">Round 5</span>
+    <div class="master-toggle" id="themeToggle"><button class="active" data-master="dark">Dark</button><button data-master="light">Light</button></div>
+    <div class="master-toggle" id="phoneToggle"><span class="toggle-label">Phone</span><button data-phone="small">SE</button><button data-phone="medium">15</button><button class="active" data-phone="large">Max</button></div>
+  </div>
+  <div class="header-desc">Same F1 language (2px pill, bold, strong glow) applied to binary, MC, long text, selected state, and full chrome. Does it hold?</div>
+  <div class="header-instruction">Rate each: + keep, ↻ remix, × kill. Notes on what breaks.</div>
+</div>
+
+<div class="grid" id="grid"></div>
+<button class="feedback-toggle" id="feedbackToggle">Feedback (<span class="toggle-count">0</span>)</button>
+<div class="feedback-panel" id="feedbackPanel">
+  <div class="feedback-columns">
+    <div class="feedback-col col-keep"><h3><span class="dot"></span> Keep</h3><ul class="feedback-list" data-col="keep"></ul></div>
+    <div class="feedback-col col-remix"><h3><span class="dot"></span> Remix</h3><ul class="feedback-list" data-col="remix"></ul></div>
+    <div class="feedback-col col-kill"><h3><span class="dot"></span> Kill</h3><ul class="feedback-list" data-col="kill"></ul></div>
+  </div>
+  <div class="feedback-footer"><span class="rated-count"></span><button class="send-btn" id="sendBtn">Copy Feedback</button></div>
+</div>
+
+<script>
+const C = {
+  blue:    { base: '#3b82f6', light: '#60a5fa', rgb: '59, 130, 246' },
+  emerald: { base: '#10b981', light: '#34d399', rgb: '16, 185, 129' },
+  violet:  { base: '#8b5cf6', light: '#a78bfa', rgb: '139, 92, 246' },
+  amber:   { base: '#f59e0b', light: '#fbbf24', rgb: '245, 158, 11' },
+  rose:    { base: '#f43f5e', light: '#fb7185', rgb: '244, 63, 94' },
+  teal:    { base: '#14b8a6', light: '#2dd4bf', rgb: '20, 184, 166' },
+  cyan:    { base: '#06b6d4', light: '#67e8f9', rgb: '6, 182, 212' },
+  pink:    { base: '#d946ef', light: '#e879f9', rgb: '217, 70, 239' },
+};
+
+const OPTIONS = [
+  { id: 'binary', label: 'Binary', description: 'Dogs or cats? — the proven baseline', isCurrent: true },
+  { id: 'mc4', label: 'MC 4-Option', description: 'What gives life the most meaning? — single category color (violet)' },
+  { id: 'mc5', label: 'MC 5-Option', description: "What's the ideal city size? — 5 pills stacked, vertical pressure" },
+  { id: 'long', label: 'Long Text', description: 'Binary with wordy options that wrap to 2 lines' },
+  { id: 'selected', label: 'Selected State', description: 'One pill chosen — stronger glow + border. Unselected dims.' },
+  { id: 'chrome', label: 'Full Chrome', description: 'Track selector + question + pills + action bar (Can\'t/Explain/Skip/Save)' },
+];
+
+const state = {};
+OPTIONS.forEach(opt => { state[opt.id] = { status: 'neutral', note: '', theme: 'dark' }; });
+
+// ── Shared helpers ──
+function stars(dark) {
+  if (!dark) return '';
+  return `<div style="position:absolute;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(1px 1px at 50px 100px,rgba(255,255,255,0.25),transparent),radial-gradient(1px 1px at 150px 200px,rgba(255,255,255,0.15),transparent),radial-gradient(1px 1px at 250px 150px,rgba(255,255,255,0.20),transparent),radial-gradient(1px 1px at 100px 350px,rgba(255,255,255,0.15),transparent),radial-gradient(1px 1px at 300px 400px,rgba(255,255,255,0.25),transparent),radial-gradient(1px 1px at 80px 500px,rgba(255,255,255,0.15),transparent),radial-gradient(1px 1px at 200px 250px,rgba(255,255,255,0.20),transparent),radial-gradient(1px 1px at 350px 300px,rgba(255,255,255,0.15),transparent),radial-gradient(1px 1px at 20px 450px,rgba(255,255,255,0.25),transparent),radial-gradient(1px 1px at 280px 180px,rgba(255,255,255,0.15),transparent),radial-gradient(1.5px 1.5px at 180px 290px,rgba(255,255,255,0.30),transparent)"></div>`;
+}
+function breathingGlow(c0, c1, dark, s0=460, s1=380) {
+  return `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;margin-top:-8%;z-index:1">
+    <div style="position:absolute;width:${s0}px;height:${s0}px;border-radius:50%;background:radial-gradient(circle,rgba(${c0.rgb},${dark?0.14:0.12}) 0%,rgba(${c0.rgb},${dark?0.05:0.06}) 35%,transparent 65%);animation:aura-breathe 8s ease-in-out infinite"></div>
+    <div style="position:absolute;width:${s1}px;height:${s1}px;border-radius:50%;background:radial-gradient(circle,rgba(${c1.rgb},${dark?0.10:0.10}) 0%,rgba(${c1.rgb},${dark?0.04:0.05}) 40%,transparent 65%);animation:aura-breathe 6s ease-in-out infinite 1s"></div>
+  </div>`;
+}
+function questionGlow(c, dark) {
+  return `<div style="position:absolute;width:200%;height:200%;left:-50%;top:-50%;pointer-events:none;background:radial-gradient(ellipse at center,rgba(${c.rgb},${dark?0.12:0.08}) 0%,rgba(${c.rgb},${dark?0.04:0.02}) 40%,transparent 70%);z-index:0"></div>`;
+}
+function shell(dark, inner) {
+  return `<div style="background:${dark?'#030712':'#f9fafb'};width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;position:relative;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">${inner}</div>`;
+}
+function vortex(dark) {
+  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px 4px;flex-shrink:0;position:relative;z-index:10"><span style="font-size:24px">🌀</span><span style="font-size:18px;color:${dark?'#6b7280':'#9ca3af'}">☰</span></div>`;
+}
+
+// ── F1 pill button ──
+function f1Pill(c, dark, text, icon, h=56) {
+  const r = Math.round(h/2);
+  return `<div style="width:100%;height:${h}px;border-radius:${r}px;display:flex;align-items:center;justify-content:center;gap:14px;
+    border:2px solid ${dark?`rgba(${c.rgb},0.50)`:`rgba(${c.rgb},0.40)`};
+    background:${dark?`rgba(${c.rgb},0.06)`:`rgba(${c.rgb},0.04)`};
+    box-shadow:${dark?`0 0 22px rgba(${c.rgb},0.18),0 0 50px rgba(${c.rgb},0.08)`:`0 0 16px rgba(${c.rgb},0.12),0 0 35px rgba(${c.rgb},0.06)`}">
+    ${icon?`<span style="font-size:${h>=56?20:17}px">${icon}</span>`:''}<span style="font-size:${h>=56?16:14}px;font-weight:700;color:${dark?c.light:c.base}">${text}</span></div>`;
+}
+
+// ── F1 pill: selected state ──
+function f1PillSelected(c, dark, text, icon, h=56) {
+  const r = Math.round(h/2);
+  return `<div style="width:100%;height:${h}px;border-radius:${r}px;display:flex;align-items:center;justify-content:center;gap:14px;
+    border:2px solid ${dark?`rgba(${c.rgb},0.80)`:`rgba(${c.rgb},0.65)`};
+    background:${dark?`linear-gradient(135deg,rgba(${c.rgb},0.20) 0%,rgba(${c.rgb},0.10) 100%)`:`linear-gradient(135deg,rgba(${c.rgb},0.15) 0%,rgba(${c.rgb},0.06) 100%)`};
+    box-shadow:${dark?`0 0 28px rgba(${c.rgb},0.30),0 0 60px rgba(${c.rgb},0.14)`:`0 0 22px rgba(${c.rgb},0.20),0 0 50px rgba(${c.rgb},0.10)`}">
+    ${icon?`<span style="font-size:20px">${icon}</span>`:''}<span style="font-size:16px;font-weight:700;color:${dark?'#fff':c.base}">${text}</span></div>`;
+}
+
+// ── F1 pill: dimmed (unselected when another is selected) ──
+function f1PillDimmed(c, dark, text, icon, h=56) {
+  const r = Math.round(h/2);
+  return `<div style="width:100%;height:${h}px;border-radius:${r}px;display:flex;align-items:center;justify-content:center;gap:14px;
+    border:1px solid ${dark?`rgba(${c.rgb},0.18)`:`rgba(${c.rgb},0.20)`};
+    background:${dark?`rgba(${c.rgb},0.02)`:`rgba(${c.rgb},0.02)`};
+    box-shadow:none;opacity:0.55">
+    ${icon?`<span style="font-size:20px">${icon}</span>`:''}<span style="font-size:16px;font-weight:600;color:${dark?c.light:c.base}">${text}</span></div>`;
+}
+
+// ── F1 pill: MC (single color, text only, no icon) ──
+function f1PillMC(c, dark, text, h=50) {
+  const r = Math.round(h/2);
+  return `<div style="width:100%;height:${h}px;border-radius:${r}px;display:flex;align-items:center;justify-content:center;padding:0 20px;
+    border:2px solid ${dark?`rgba(${c.rgb},0.50)`:`rgba(${c.rgb},0.40)`};
+    background:${dark?`rgba(${c.rgb},0.06)`:`rgba(${c.rgb},0.04)`};
+    box-shadow:${dark?`0 0 22px rgba(${c.rgb},0.18),0 0 50px rgba(${c.rgb},0.08)`:`0 0 16px rgba(${c.rgb},0.12),0 0 35px rgba(${c.rgb},0.06)`}">
+    <span style="font-size:14px;font-weight:700;color:${dark?c.light:c.base};text-align:center">${text}</span></div>`;
+}
+
+// ═══════════════════════════════════
+// RENDERERS
+// ═══════════════════════════════════
+
+// Binary — Dogs or cats? (proven F1)
+function renderBinary(dark) {
+  const q = { text: 'Dogs or cats?', opts: ['Dogs','Cats'], icons: ['🐕','🐈'], colors: [C.blue, C.emerald] };
+  return shell(dark, `${stars(dark)}${breathingGlow(q.colors[0],q.colors[1],dark)}${vortex(dark)}
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;position:relative;z-index:2">
+      <div style="max-width:320px;padding:0 16px;position:relative">${questionGlow(q.colors[0],dark)}
+        <h2 style="text-align:center;font-weight:500;position:relative;z-index:10;color:${dark?'#fff':'#111827'};font-size:clamp(22px,6vw,28px);line-height:1.3;text-wrap:balance">${q.text}</h2>
+      </div>
+    </div>
+    <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:0 24px 32px;position:relative;z-index:2">
+      <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px">
+        ${f1Pill(q.colors[0],dark,q.opts[0],q.icons[0])}
+        ${f1Pill(q.colors[1],dark,q.opts[1],q.icons[1])}
+      </div>
+    </div>`);
+}
+
+// MC 4-option — each option gets its own color
+function renderMC4(dark) {
+  const q = { text: 'What gives life the most meaning?', opts: ['Relationships','Achievement','Pleasure','Purpose'], colors: [C.rose, C.amber, C.emerald, C.violet] };
+  return shell(dark, `${stars(dark)}${breathingGlow(q.colors[0],q.colors[2],dark)}${vortex(dark)}
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;position:relative;z-index:2">
+      <div style="max-width:320px;padding:0 16px;position:relative">${questionGlow(q.colors[0],dark)}
+        <h2 style="text-align:center;font-weight:500;position:relative;z-index:10;color:${dark?'#fff':'#111827'};font-size:clamp(20px,5.5vw,26px);line-height:1.3;text-wrap:balance">${q.text}</h2>
+      </div>
+    </div>
+    <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:0 24px 28px;position:relative;z-index:2">
+      <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px">
+        ${q.opts.map((o,i) => f1PillMC(q.colors[i],dark,o)).join('')}
+      </div>
+    </div>`);
+}
+
+// MC 5-option — vertical pressure test
+function renderMC5(dark) {
+  const q = { text: "What's the ideal city size to live in?", opts: ['Small town (<50k)','Medium city (50–500k)','Large city (500k–2M)','Major metro (2M+)','Rural / countryside'], colors: [C.teal, C.blue, C.violet, C.rose, C.amber] };
+  return shell(dark, `${stars(dark)}${breathingGlow(q.colors[0],q.colors[2],dark)}${vortex(dark)}
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;position:relative;z-index:2">
+      <div style="max-width:320px;padding:0 16px;position:relative">${questionGlow(q.colors[0],dark)}
+        <h2 style="text-align:center;font-weight:500;position:relative;z-index:10;color:${dark?'#fff':'#111827'};font-size:clamp(18px,5vw,24px);line-height:1.3;text-wrap:balance">${q.text}</h2>
+      </div>
+    </div>
+    <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:0 24px 24px;position:relative;z-index:2">
+      <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:8px">
+        ${q.opts.map((o,i) => f1PillMC(q.colors[i],dark,o,46)).join('')}
+      </div>
+    </div>`);
+}
+
+// Long text binary — wrapping options
+function renderLong(dark) {
+  const q = { text: 'Getting around the city in 2035:', opts: ['Human-driven cars','Self-driving vehicles'], icons: ['🧑','🤖'], colors: [C.amber, C.cyan] };
+  return shell(dark, `${stars(dark)}${breathingGlow(q.colors[0],q.colors[1],dark)}${vortex(dark)}
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;position:relative;z-index:2">
+      <div style="max-width:320px;padding:0 16px;position:relative">${questionGlow(q.colors[0],dark)}
+        <h2 style="text-align:center;font-weight:500;position:relative;z-index:10;color:${dark?'#fff':'#111827'};font-size:clamp(22px,6vw,28px);line-height:1.3;text-wrap:balance">${q.text}</h2>
+      </div>
+    </div>
+    <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:0 24px 32px;position:relative;z-index:2">
+      <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px">
+        ${f1Pill(q.colors[0],dark,q.opts[0],q.icons[0])}
+        ${f1Pill(q.colors[1],dark,q.opts[1],q.icons[1])}
+      </div>
+    </div>`);
+}
+
+// Selected state — one chosen, other dimmed
+function renderSelected(dark) {
+  const q = { text: 'Dogs or cats?', opts: ['Dogs','Cats'], icons: ['🐕','🐈'], colors: [C.blue, C.emerald] };
+  return shell(dark, `${stars(dark)}${breathingGlow(q.colors[0],q.colors[1],dark)}${vortex(dark)}
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;position:relative;z-index:2">
+      <div style="max-width:320px;padding:0 16px;position:relative">${questionGlow(q.colors[0],dark)}
+        <h2 style="text-align:center;font-weight:500;position:relative;z-index:10;color:${dark?'#fff':'#111827'};font-size:clamp(22px,6vw,28px);line-height:1.3;text-wrap:balance">${q.text}</h2>
+      </div>
+    </div>
+    <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:0 24px 32px;position:relative;z-index:2">
+      <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px">
+        ${f1PillSelected(q.colors[0],dark,q.opts[0],q.icons[0])}
+        ${f1PillDimmed(q.colors[1],dark,q.opts[1],q.icons[1])}
+      </div>
+    </div>`);
+}
+
+// Full chrome — track selector + pills + action bar
+function renderChrome(dark) {
+  const q = { text: 'Is a hot dog a sandwich?', opts: ['Yes, obviously','No way'], icons: ['🌭','🙅'], colors: [C.emerald, C.violet] };
+  const accentC = q.colors[0];
+  const dbg = dark ? '#030712' : '#f9fafb';
+  const trackBg = dark ? 'rgba(17,24,39,0.5)' : 'rgba(255,255,255,0.9)';
+  const trackBdr = dark ? `rgba(${accentC.rgb},0.15)` : `rgba(${accentC.rgb},0.20)`;
+  const circBg = dark ? '#030712' : '#fff';
+  const circTxt = dark ? '#fff' : '#111';
+  const dimClr = dark ? '#6b7280' : '#9ca3af';
+  const actionBg = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const actionClr = dark ? '#6b7280' : '#9ca3af';
+
+  // Track circles
+  const circStyle = (active) => `width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;
+    ${active ? `border:2px solid ${dark?accentC.light:accentC.base};color:${dark?accentC.light:accentC.base}` : `border:1px solid ${dark?'rgba(255,255,255,0.10)':'rgba(0,0,0,0.10)'};color:${dimClr}`};
+    background:${circBg}`;
+
+  return shell(dark, `${stars(dark)}${breathingGlow(q.colors[0],q.colors[1],dark)}
+    <!-- Track selector -->
+    <div style="height:54px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 12px;position:relative;z-index:10;background:${trackBg};border-bottom:1px solid ${trackBdr}">
+      <button style="width:32px;height:32px;border-radius:50%;border:1px solid ${dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)'};background:transparent;color:${dimClr};font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">◀</button>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:12px">
+        <div style="${circStyle(true)}">Y/N</div>
+        <div style="${circStyle(false)}">ABC</div>
+        <div style="${circStyle(false)}">Mix</div>
+      </div>
+      <button style="width:32px;height:32px;border-radius:50%;border:1px solid ${dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)'};background:transparent;color:${dimClr};font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
+    </div>
+
+    <!-- Question zone -->
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;position:relative;z-index:2">
+      <div style="max-width:320px;padding:0 16px;position:relative">${questionGlow(q.colors[0],dark)}
+        <h2 style="text-align:center;font-weight:500;position:relative;z-index:10;color:${dark?'#fff':'#111827'};font-size:clamp(22px,6vw,28px);line-height:1.3;text-wrap:balance">${q.text}</h2>
+      </div>
+    </div>
+
+    <!-- F1 pills -->
+    <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:0 24px 12px;position:relative;z-index:2">
+      <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px">
+        ${f1Pill(q.colors[0],dark,q.opts[0],q.icons[0])}
+        ${f1Pill(q.colors[1],dark,q.opts[1],q.icons[1])}
+      </div>
+    </div>
+
+    <!-- Action bar -->
+    <div style="flex-shrink:0;display:flex;gap:8px;padding:6px 16px 20px;position:relative;z-index:2">
+      ${["Can't",'Explain','Skip','Save'].map(label =>
+        `<div style="flex:1;padding:8px 0;border-radius:8px;background:${actionBg};text-align:center;font-size:12px;font-weight:500;color:${actionClr}">${label}</div>`
+      ).join('')}
+    </div>`);
+}
+
+const RENDERERS = { binary: renderBinary, mc4: renderMC4, mc5: renderMC5, long: renderLong, selected: renderSelected, chrome: renderChrome };
+
+// ═══════════════════════════════════
+// ARENA ENGINE
+// ═══════════════════════════════════
+function buildGrid() {
+  const grid = document.getElementById('grid'); grid.innerHTML = '';
+  OPTIONS.forEach(opt => {
+    const isRef = opt.isCurrent === true;
+    const card = document.createElement('div');
+    card.className = 'arena-card'; card.dataset.id = opt.id;
+    if (isRef) card.classList.add('is-reference');
+    const theme = state[opt.id].theme;
+    card.innerHTML = `
+      <div class="card-actions"><button class="action-btn" data-action="keep" title="Keep">+</button><button class="action-btn" data-action="remix" title="Remix">\u21BB</button><button class="action-btn" data-action="kill" title="Kill">\u00D7</button></div>
+      <div class="phone-frame-wrapper">
+        <div class="phone-toggle"><button class="${theme==='dark'?'active':''}" data-theme="dark">Dark</button><button class="${theme==='light'?'active':''}" data-theme="light">Light</button></div>
+        <div class="phone-frame"><div class="phone-screen" id="screen-${opt.id}">${RENDERERS[opt.id](theme==='dark')}</div></div>
+      </div>
+      <div class="card-label"><span class="label-badge">${isRef?'Reference':opt.label}</span><span class="label-desc">${opt.description}</span></div>
+      <div class="card-note"><input type="text" placeholder="What breaks?" data-note-for="${opt.id}"></div>`;
+    grid.appendChild(card);
+  });
+}
+function applyState() {
+  document.querySelectorAll('.arena-card').forEach(card => {
+    const id=card.dataset.id,s=state[id];
+    card.classList.remove('state-kept','state-remix','state-killed');
+    if(s.status!=='neutral')card.classList.add('state-'+s.status);
+    const input=card.querySelector('input');
+    if(s.note){input.value=s.note;input.classList.add('has-value');}else input.classList.remove('has-value');
+  }); updateFeedback();
+}
+document.getElementById('grid').addEventListener('click',e=>{
+  const tb=e.target.closest('[data-theme]');
+  if(tb){const card=tb.closest('.arena-card'),id=card.dataset.id;state[id].theme=tb.dataset.theme;card.querySelector('.phone-screen').innerHTML=RENDERERS[id](tb.dataset.theme==='dark');card.querySelectorAll('.phone-toggle button').forEach(b=>b.classList.toggle('active',b.dataset.theme===state[id].theme));return;}
+  const btn=e.target.closest('[data-action]');if(!btn)return;
+  const card=btn.closest('.arena-card'),id=card.dataset.id,a=btn.dataset.action;
+  if(a==='keep')state[id].status=state[id].status==='kept'?'neutral':'kept';
+  else if(a==='remix')state[id].status=state[id].status==='remix'?'neutral':'remix';
+  else if(a==='kill')state[id].status=state[id].status==='killed'?'neutral':'killed';
+  applyState();
+});
+document.getElementById('grid').addEventListener('input',e=>{if(!e.target.matches('input[data-note-for]'))return;state[e.target.dataset.noteFor].note=e.target.value;e.target.classList.toggle('has-value',!!e.target.value);updateFeedback();});
+function updateFeedback(){
+  const cols={keep:[],remix:[],kill:[]},sm={kept:'keep',remix:'remix',killed:'kill'};
+  OPTIONS.forEach(opt=>{const s=state[opt.id],col=sm[s.status];if(!col)return;cols[col].push({id:opt.id,label:opt.isCurrent?'Reference':opt.label,note:s.note});});
+  ['keep','remix','kill'].forEach(col=>{const ul=document.querySelector(`.feedback-list[data-col="${col}"]`);ul.innerHTML='';cols[col].forEach(item=>{const li=document.createElement('li');li.innerHTML=`<span>${item.label}</span>${item.note?` <span class="note-text">\u2014 "${item.note}"</span>`:''}${col==='kill'?` <button class="undo-inline" data-restore="${item.id}">undo</button>`:''}`;ul.appendChild(li);});});
+  const rated=OPTIONS.filter(opt=>state[opt.id].status!=='neutral').length;
+  document.querySelector('.rated-count').textContent=`${rated} of ${OPTIONS.length} rated`;
+  document.querySelector('.toggle-count').textContent=rated;
+}
+// Theme master toggle
+document.getElementById('themeToggle').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-master]');if(!btn)return;
+  const theme=btn.dataset.master;
+  document.querySelectorAll('#themeToggle button').forEach(b=>b.classList.toggle('active',b.dataset.master===theme));
+  OPTIONS.forEach(opt=>{
+    state[opt.id].theme=theme;
+    const screen=document.getElementById('screen-'+opt.id);
+    if(screen)screen.innerHTML=RENDERERS[opt.id](theme==='dark');
+    const card=screen?.closest('.arena-card');
+    if(card)card.querySelectorAll('.phone-toggle button').forEach(b=>b.classList.toggle('active',b.dataset.theme===theme));
+  });
+});
+// Phone size master toggle
+const PHONE_SIZES = {
+  small:  { w: '270px', ar: '375/667',  label: 'iPhone SE' },
+  medium: { w: '310px', ar: '393/852',  label: 'iPhone 15' },
+  large:  { w: '360px', ar: '430/932',  label: 'iPhone 15 Pro Max' },
+};
+document.getElementById('phoneToggle').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-phone]');if(!btn)return;
+  const size=btn.dataset.phone, cfg=PHONE_SIZES[size];
+  document.querySelectorAll('#phoneToggle button').forEach(b=>b.classList.toggle('active',b.dataset.phone===size));
+  document.documentElement.style.setProperty('--phone-w', cfg.w);
+  document.documentElement.style.setProperty('--phone-ar', cfg.ar);
+});
+document.getElementById('feedbackPanel').addEventListener('click',e=>{const btn=e.target.closest('.undo-inline');if(!btn)return;const id=btn.dataset.restore;state[id].status='neutral';applyState();});
+let panelOpen=false;
+document.getElementById('feedbackToggle').addEventListener('click',()=>{panelOpen=!panelOpen;document.getElementById('feedbackPanel').classList.toggle('open',panelOpen);document.getElementById('feedbackToggle').classList.toggle('panel-open',panelOpen);});
+document.getElementById('sendBtn').addEventListener('click',()=>{
+  const lines=['macro — Question Answering (F1 Stress Test)'],groups={KEEP:[],REMIX:[],KILL:[]},sg={kept:'KEEP',remix:'REMIX',killed:'KILL'};
+  OPTIONS.forEach(opt=>{const s=state[opt.id],g=sg[s.status];if(!g)return;let e=opt.isCurrent?'Reference (Binary)':opt.label;if(s.note)e+=` \u2014 "${s.note}"`;groups[g].push(e);});
+  ['KEEP','REMIX','KILL'].forEach(g=>{if(groups[g].length>0)lines.push(`${g}: ${groups[g].join(', ')}`);});
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>{const btn=document.getElementById('sendBtn');btn.textContent='Copied!';btn.classList.add('copied');setTimeout(()=>{btn.textContent='Copy Feedback';btn.classList.remove('copied');},3000);});
+});
+buildGrid();applyState();
+</script>
+</body>
+</html>

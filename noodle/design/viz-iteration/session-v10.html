@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Viz — Session v10 — Cellular Arena</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #050A18; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px 10px; }
+  h1 { font-size: 16px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px; }
+  .controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
+  .controls button { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+  .controls button:hover { background: #334155; color: #e2e8f0; }
+  .controls button.active { background: #4ECDC4; color: #030712; border-color: #4ECDC4; font-weight: 600; }
+  .divider { width: 1px; background: #334155; margin: 0 4px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 960px; width: 100%; }
+  .card { background: #020510; border: 1px solid #1a1f35; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; align-items: center; }
+  .card canvas { border-radius: 4px; width: 280px; height: 280px; }
+  .card-label { font-size: 11px; color: #64748b; margin-top: 6px; letter-spacing: 1px; text-align: center; }
+  .card-label span { color: #94a3b8; font-weight: 600; }
+  .card-label .sub { display: block; font-size: 9px; color: #475569; margin-top: 2px; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+<h1>Aura Organism — v10 Cellular Arena</h1>
+<div class="controls">
+  <button onclick="setTier('seed')" id="btn-seed">Seed</button>
+  <button onclick="setTier('young')" id="btn-young">Young</button>
+  <button onclick="setTier('full')" id="btn-full" class="active">Full</button>
+  <button onclick="setTier('random')" id="btn-random">Random</button>
+  <div class="divider"></div>
+  <button onclick="setMode('human')" id="btn-human" class="active">Human</button>
+  <button onclick="setMode('ai')" id="btn-ai">AI</button>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+// ─── DATA ───
+const NEURON_MAP = {
+  N: { label: 'Openness', color: '#4ECDC4' },
+  E: { label: 'Conscientiousness', color: '#45B7D1' },
+  A: { label: 'Extraversion', color: '#96E6A1' },
+  O: { label: 'Agreeableness', color: '#DDA0DD' },
+  C: { label: 'Neuroticism', color: '#F7DC6F' }
+};
+const ASSESS_MAP = {
+  a1: { label: 'Curiosity', color: '#7FDBCA', link: 'N' },
+  a2: { label: 'Imagination', color: '#6BC5B0', link: 'N' },
+  a3: { label: 'Discipline', color: '#5DADE2', link: 'E' },
+  a4: { label: 'Reliability', color: '#3498DB', link: 'E' },
+  a5: { label: 'Warmth', color: '#82E0AA', link: 'A' },
+  a6: { label: 'Assertiveness', color: '#58D68D', link: 'A' },
+  a7: { label: 'Empathy', color: '#C39BD3', link: 'O' },
+  a8: { label: 'Trust', color: '#AF7AC5', link: 'O' },
+  a9: { label: 'Resilience', color: '#F9E154', link: 'C' },
+  a10: { label: 'Calm', color: '#F4D03F', link: 'C' }
+};
+
+const CARD_DEFS = [
+  { id: 'A', name: 'Fluorescence Cell', sub: 'Vivid organelles, ER network, bright membrane' },
+  { id: 'B', name: 'Compartment Map', sub: 'Distinct chambers, unique organelle shapes' },
+  { id: 'C', name: 'Neon Microscopy', sub: 'Maximum contrast neon outlines on black' },
+  { id: 'D', name: 'Dense Colony', sub: 'Packed bodies teeming with activity' },
+  { id: 'E', name: 'Specimen Slide', sub: 'Clinical precision, depth-of-field' },
+  { id: 'F', name: 'Generative Art Cell', sub: 'Spirograph internals, algorithmic biology' }
+];
+
+let currentTier = 'full';
+let currentMode = 'human';
+const cardStates = {};
+const DPR = window.devicePixelRatio || 1;
+const CW = 280, CH = 280;
+const CX = CW / 2, CY = CH / 2;
+let startTime = performance.now();
+
+// ─── HELPERS ───
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return { r, g, b };
+}
+function rgba(hex, a) {
+  const {r,g,b} = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function lighten(hex, amt) {
+  const {r,g,b} = hexToRgb(hex);
+  return `rgb(${Math.min(255,r+amt)},${Math.min(255,g+amt)},${Math.min(255,b+amt)})`;
+}
+function lightenA(hex, amt, a) {
+  const {r,g,b} = hexToRgb(hex);
+  return `rgba(${Math.min(255,r+amt)},${Math.min(255,g+amt)},${Math.min(255,b+amt)},${a})`;
+}
+function darken(hex, amt) {
+  const {r,g,b} = hexToRgb(hex);
+  return `rgb(${Math.max(0,r-amt)},${Math.max(0,g-amt)},${Math.max(0,b-amt)})`;
+}
+function darkenA(hex, amt, a) {
+  const {r,g,b} = hexToRgb(hex);
+  return `rgba(${Math.max(0,r-amt)},${Math.max(0,g-amt)},${Math.max(0,b-amt)},${a})`;
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function rnd(lo, hi) { return lo + Math.random() * (hi - lo); }
+function rndInt(lo, hi) { return Math.floor(rnd(lo, hi + 1)); }
+function avgColorHex(colors) {
+  let r=0, g=0, b=0;
+  colors.forEach(c => { const rgb = hexToRgb(c); r+=rgb.r; g+=rgb.g; b+=rgb.b; });
+  const n = colors.length||1;
+  return `rgb(${Math.round(r/n)},${Math.round(g/n)},${Math.round(b/n)})`;
+}
+function avgColorObj(colors) {
+  let r=0, g=0, b=0;
+  colors.forEach(c => { const rgb = hexToRgb(c); r+=rgb.r; g+=rgb.g; b+=rgb.b; });
+  const n = colors.length||1;
+  return { r: Math.round(r/n), g: Math.round(g/n), b: Math.round(b/n) };
+}
+function rgbaObj(o, a) { return `rgba(${o.r},${o.g},${o.b},${a})`; }
+
+// Seeded random for stable node layouts
+function seededRng(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+// ─── NODE GENERATION ───
+function generateNodes(tier, cardSeed) {
+  const nodes = [];
+  const rng = seededRng(cardSeed);
+  const primaries = Object.entries(NEURON_MAP);
+  const angleStep = (Math.PI * 2) / primaries.length;
+
+  primaries.forEach(([id, d], i) => {
+    const angle = angleStep * i - Math.PI / 2;
+    const r = 58 + rng() * 10;
+    nodes.push({
+      id, label: d.label, color: d.color, type: 'primary',
+      x: CX + Math.cos(angle) * r, y: CY + Math.sin(angle) * r,
+      bx: CX + Math.cos(angle) * r, by: CY + Math.sin(angle) * r,
+      radius: 18 + rng() * 8,
+      driftPhase: rng() * Math.PI * 2, driftSpeed: 0.25 + rng() * 0.25,
+      driftAmp: 3 + rng() * 3, driftPhase2: rng() * Math.PI * 2,
+      breathPhase: rng() * Math.PI * 2
+    });
+  });
+
+  if (tier === 'young' || tier === 'full' || tier === 'random') {
+    let assessEntries = Object.entries(ASSESS_MAP);
+    if (tier === 'random') {
+      assessEntries = assessEntries.filter(() => rng() > 0.3);
+    }
+    assessEntries.forEach(([id, d]) => {
+      const parent = nodes.find(n => n.id === d.link);
+      if (!parent) return;
+      const angle = Math.atan2(parent.by - CY, parent.bx - CX) + (rng() - 0.5) * 1.2;
+      const r2 = 85 + rng() * 20;
+      nodes.push({
+        id, label: d.label, color: d.color, type: 'assess', link: d.link,
+        x: CX + Math.cos(angle) * r2, y: CY + Math.sin(angle) * r2,
+        bx: CX + Math.cos(angle) * r2, by: CY + Math.sin(angle) * r2,
+        radius: 10 + rng() * 5,
+        driftPhase: rng() * Math.PI * 2, driftSpeed: 0.3 + rng() * 0.3,
+        driftAmp: 2 + rng() * 2, driftPhase2: rng() * Math.PI * 2,
+        breathPhase: rng() * Math.PI * 2
+      });
+    });
+  }
+
+  if (tier === 'full' || tier === 'random') {
+    const satCount = tier === 'random' ? rndInt(5, 15) : 12;
+    for (let i = 0; i < satCount; i++) {
+      const angle = rng() * Math.PI * 2;
+      const r3 = 90 + rng() * 30;
+      const parentNode = nodes[Math.floor(rng() * Math.min(5, nodes.length))];
+      nodes.push({
+        id: `s${i}`, label: '', color: parentNode.color, type: 'satellite',
+        x: CX + Math.cos(angle) * r3, y: CY + Math.sin(angle) * r3,
+        bx: CX + Math.cos(angle) * r3, by: CY + Math.sin(angle) * r3,
+        radius: 4 + rng() * 4,
+        driftPhase: rng() * Math.PI * 2, driftSpeed: 0.4 + rng() * 0.4,
+        driftAmp: 2 + rng() * 3, driftPhase2: rng() * Math.PI * 2,
+        breathPhase: rng() * Math.PI * 2
+      });
+    }
+  }
+
+  return nodes;
+}
+
+// ─── PARTICLES (background cytoplasm particles) ───
+function generateParticles(count, rng) {
+  const particles = [];
+  const colors = Object.values(NEURON_MAP).map(n => n.color);
+  for (let i = 0; i < count; i++) {
+    const angle = rng() * Math.PI * 2;
+    const r = rng() * 125;
+    particles.push({
+      x: CX + Math.cos(angle) * r,
+      y: CY + Math.sin(angle) * r,
+      vx: (rng() - 0.5) * 0.3,
+      vy: (rng() - 0.5) * 0.3,
+      radius: 1.5 + rng() * 2.5,
+      color: colors[Math.floor(rng() * colors.length)],
+      alpha: 0.5 + rng() * 0.4,
+      phase: rng() * Math.PI * 2
+    });
+  }
+  return particles;
+}
+
+// ─── DRIFT ───
+function applyDrift(nodes, t) {
+  nodes.forEach(n => {
+    const s = t * n.driftSpeed;
+    n.x = n.bx + Math.sin(n.driftPhase + s) * n.driftAmp + Math.cos(n.driftPhase2 + s * 0.7) * n.driftAmp * 0.5;
+    n.y = n.by + Math.cos(n.driftPhase + s * 0.8) * n.driftAmp + Math.sin(n.driftPhase2 + s * 0.6) * n.driftAmp * 0.5;
+  });
+}
+
+// ─── PARTICLE DRIFT ───
+function driftParticles(particles, t) {
+  particles.forEach(p => {
+    p.x += p.vx + Math.sin(p.phase + t * 0.5) * 0.15;
+    p.y += p.vy + Math.cos(p.phase + t * 0.4) * 0.15;
+    const dx = p.x - CX, dy = p.y - CY;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (d > 125) {
+      p.x = CX + dx/d * 125 * 0.95;
+      p.y = CY + dy/d * 125 * 0.95;
+      p.vx *= -0.5; p.vy *= -0.5;
+    }
+  });
+}
+
+// ─── BLOB SHAPE (organic irregular circle) ───
+function drawBlobPath(ctx, cx, cy, radius, points, seed) {
+  const rng = seededRng(seed);
+  ctx.beginPath();
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * Math.PI * 2;
+    const wobble = radius * (0.85 + rng() * 0.3);
+    const px = cx + Math.cos(angle) * wobble;
+    const py = cy + Math.sin(angle) * wobble;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+// Smoother blob using quadratic curves
+function drawSmoothBlob(ctx, cx, cy, radius, points, seed) {
+  const rng = seededRng(seed);
+  const pts = [];
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * Math.PI * 2;
+    const wobble = radius * (0.85 + rng() * 0.3);
+    pts.push({ x: cx + Math.cos(angle) * wobble, y: cy + Math.sin(angle) * wobble });
+  }
+  ctx.beginPath();
+  ctx.moveTo((pts[0].x + pts[1].x)/2, (pts[0].y + pts[1].y)/2);
+  for (let i = 0; i < points; i++) {
+    const next = (i + 1) % points;
+    const mx = (pts[next].x + pts[(next+1)%points].x) / 2;
+    const my = (pts[next].y + pts[(next+1)%points].y) / 2;
+    ctx.quadraticCurveTo(pts[next].x, pts[next].y, mx, my);
+  }
+  ctx.closePath();
+}
+
+// ─── DRAW MEMBRANE ───
+function drawMembrane(ctx, t, mode, color, alpha) {
+  if (mode !== 'human') return;
+  const memColor = color || '#55BBEE';
+  const r = 122;
+  // Glow passes
+  ctx.save();
+  for (let i = 3; i >= 1; i--) {
+    ctx.beginPath();
+    ctx.arc(CX, CY, r + i * 4, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(memColor, (alpha || 0.3) * (0.4 / i));
+    ctx.lineWidth = 6 + i * 3;
+    ctx.stroke();
+  }
+  // Main membrane
+  const pulse = 0.7 + 0.15 * Math.sin(t * 0.8);
+  ctx.beginPath();
+  ctx.arc(CX, CY, r, 0, Math.PI * 2);
+  ctx.strokeStyle = rgba(memColor, (alpha || 0.7) * pulse);
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  // Inner bright line
+  ctx.beginPath();
+  ctx.arc(CX, CY, r - 3, 0, Math.PI * 2);
+  ctx.strokeStyle = rgba(memColor, (alpha || 0.4) * pulse * 0.6);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ─── DRAW GLOW (general glow around a point) ───
+function drawGlow(ctx, x, y, radius, color, passes, baseAlpha) {
+  for (let i = 0; i < passes; i++) {
+    const grad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius + i * radius * 0.6);
+    grad.addColorStop(0, rgba(color, baseAlpha * (1 - i * 0.25)));
+    grad.addColorStop(1, rgba(color, 0));
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, radius + i * radius * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ─── DRAW PARTICLES ───
+function drawParticles(ctx, particles, t) {
+  particles.forEach(p => {
+    const flicker = 0.7 + 0.3 * Math.sin(p.phase + t * 2);
+    // Mini glow
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 2.5);
+    g.addColorStop(0, rgba(p.color, p.alpha * flicker * 0.4));
+    g.addColorStop(1, rgba(p.color, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Body
+    ctx.fillStyle = rgba(p.color, p.alpha * flicker);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+// ═══════════════════════════════════════════
+// CARD A: FLUORESCENCE CELL
+// ═══════════════════════════════════════════
+function initCardA(nodes) {
+  const rng = seededRng(101);
+  const particles = generateParticles(40, rng);
+  // Pre-generate stipple patterns per node
+  const stipples = {};
+  nodes.forEach(n => {
+    const count = n.type === 'primary' ? rndInt(15, 25) : rndInt(6, 12);
+    const dots = [];
+    for (let i = 0; i < count; i++) {
+      const angle = rng() * Math.PI * 2;
+      const r = rng() * n.radius * 0.75;
+      dots.push({ ox: Math.cos(angle) * r, oy: Math.sin(angle) * r, alpha: 0.3 + rng() * 0.4, size: 0.8 + rng() * 1.2 });
+    }
+    stipples[n.id] = dots;
+  });
+  // ER network connections
+  const erLinks = [];
+  nodes.forEach(n => {
+    if (n.type === 'assess') {
+      const parent = nodes.find(p => p.id === n.link);
+      if (parent) erLinks.push({ from: n.id, to: parent.id });
+    }
+  });
+  // Cross-links between primaries
+  const pNodes = nodes.filter(n => n.type === 'primary');
+  for (let i = 0; i < pNodes.length; i++) {
+    const j = (i + 1) % pNodes.length;
+    erLinks.push({ from: pNodes[i].id, to: pNodes[j].id });
+  }
+  return { particles, stipples, erLinks };
+}
+
+function drawCardA(ctx, nodes, state, t) {
+  const { particles, stipples, erLinks } = state;
+  // Background
+  ctx.fillStyle = '#050A18';
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Drift
+  applyDrift(nodes, t);
+  driftParticles(particles, t);
+
+  // ER network tubes
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+  ctx.save();
+  erLinks.forEach(link => {
+    const a = nodeMap[link.from], b = nodeMap[link.to];
+    if (!a || !b) return;
+    const mx = (a.x + b.x) / 2 + Math.sin(t * 0.5 + a.x) * 8;
+    const my = (a.y + b.y) / 2 + Math.cos(t * 0.4 + a.y) * 8;
+    // Glow tube
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo(mx, my, b.x, b.y);
+    ctx.strokeStyle = rgba('#6688DD', 0.25);
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    // Bright tube
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo(mx, my, b.x, b.y);
+    ctx.strokeStyle = rgba('#7799EE', 0.6);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  // Floating particles
+  drawParticles(ctx, particles, t);
+
+  // Nucleus (center, blended color)
+  const allColors = nodes.filter(n => n.type === 'primary').map(n => n.color);
+  const nucleusColor = avgColorObj(allColors);
+  const nucleusR = 22;
+  // Nucleus glow
+  drawGlow(ctx, CX, CY, nucleusR, rgbaObj(nucleusColor, 1).replace(/rgba?\((\d+),(\d+),(\d+).*/, '#$1$2$3') || '#5588AA', 3, 0.35);
+  // Nucleus body
+  drawSmoothBlob(ctx, CX, CY, nucleusR, 10, 999);
+  ctx.fillStyle = rgbaObj(nucleusColor, 0.85);
+  ctx.fill();
+  // Nucleus border
+  drawSmoothBlob(ctx, CX, CY, nucleusR, 10, 999);
+  ctx.strokeStyle = rgbaObj({r:Math.min(255,nucleusColor.r+60), g:Math.min(255,nucleusColor.g+60), b:Math.min(255,nucleusColor.b+60)}, 1.0);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Chromatin wavy lines inside nucleus
+  ctx.save();
+  ctx.clip();
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    const yOff = CY - nucleusR * 0.5 + i * nucleusR * 0.3;
+    ctx.moveTo(CX - nucleusR * 0.7, yOff);
+    for (let x = -nucleusR * 0.7; x <= nucleusR * 0.7; x += 4) {
+      ctx.lineTo(CX + x, yOff + Math.sin(x * 0.3 + t + i) * 4);
+    }
+    ctx.strokeStyle = rgbaObj({r:Math.min(255,nucleusColor.r+80),g:Math.min(255,nucleusColor.g+80),b:Math.min(255,nucleusColor.b+80)}, 0.5);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Organelles
+  nodes.forEach(n => {
+    const bodyAlpha = n.type === 'primary' ? 0.85 : (n.type === 'assess' ? 0.75 : 0.7);
+    const r = n.radius * (1 + 0.04 * Math.sin(n.breathPhase + t * 1.2));
+    const blobSeed = n.id.charCodeAt(0) * 137 + (n.id.charCodeAt(1) || 0) * 31;
+    const blobPts = n.type === 'primary' ? 10 : 8;
+
+    // Outer glow
+    drawGlow(ctx, n.x, n.y, r * 1.2, n.color, 3, 0.35);
+
+    // Body fill (darker version of color for interior, then bright overlay)
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    ctx.fillStyle = darkenA(n.color, 40, bodyAlpha);
+    ctx.fill();
+
+    // Bright border
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    ctx.strokeStyle = lightenA(n.color, 70, 1.0);
+    ctx.lineWidth = n.type === 'primary' ? 2.5 : 1.8;
+    ctx.stroke();
+
+    // Internal stipple texture
+    const dots = stipples[n.id];
+    if (dots) {
+      dots.forEach(d => {
+        ctx.fillStyle = lightenA(n.color, 90, d.alpha);
+        ctx.beginPath();
+        ctx.arc(n.x + d.ox, n.y + d.oy, d.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+  });
+
+  // Membrane
+  drawMembrane(ctx, t, currentMode, '#55CCEE', 0.7);
+}
+
+
+// ═══════════════════════════════════════════
+// CARD B: COMPARTMENT MAP
+// ═══════════════════════════════════════════
+function initCardB(nodes) {
+  const rng = seededRng(202);
+  const particles = generateParticles(25, rng);
+  return { particles };
+}
+
+function drawCapsule(ctx, cx, cy, w, h, color, borderColor) {
+  const r = Math.min(w, h) / 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - w/2 + r, cy - h/2);
+  ctx.lineTo(cx + w/2 - r, cy - h/2);
+  ctx.arc(cx + w/2 - r, cy, r, -Math.PI/2, Math.PI/2);
+  ctx.lineTo(cx - w/2 + r, cy + h/2);
+  ctx.arc(cx - w/2 + r, cy, r, Math.PI/2, -Math.PI/2);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawBeanShape(ctx, cx, cy, r, color, borderColor) {
+  ctx.beginPath();
+  ctx.moveTo(cx + r * 0.8, cy);
+  ctx.bezierCurveTo(cx + r, cy - r * 0.9, cx - r * 0.2, cy - r * 1.1, cx - r * 0.7, cy - r * 0.3);
+  ctx.bezierCurveTo(cx - r * 1.1, cy + r * 0.2, cx - r * 0.3, cy + r * 1.2, cx + r * 0.3, cy + r * 0.6);
+  ctx.bezierCurveTo(cx + r * 0.7, cy + r * 0.3, cx + r * 0.6, cy + r * 0.1, cx + r * 0.8, cy);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawGolgi(ctx, cx, cy, r, color, borderColor) {
+  for (let i = 0; i < 4; i++) {
+    const yOff = (i - 1.5) * r * 0.45;
+    const w = r * (1.3 - Math.abs(i - 1.5) * 0.2);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + yOff, w, r * 0.18, 0, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(color, 0.8 - i * 0.05);
+    ctx.fill();
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+
+function drawBullseye(ctx, cx, cy, r, color, borderColor) {
+  for (let i = 3; i >= 0; i--) {
+    const cr = r * ((i + 1) / 4);
+    ctx.beginPath();
+    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(color, 0.5 + i * 0.12);
+    ctx.fill();
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = i === 3 ? 2 : 1;
+    ctx.stroke();
+  }
+}
+
+function drawVesicleCluster(ctx, cx, cy, r, color, borderColor) {
+  const positions = [
+    { ox: 0, oy: -r*0.35, s: 0.55 },
+    { ox: -r*0.4, oy: r*0.2, s: 0.5 },
+    { ox: r*0.35, oy: r*0.3, s: 0.45 },
+    { ox: r*0.1, oy: -r*0.1, s: 0.35 }
+  ];
+  positions.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(cx + p.ox, cy + p.oy, r * p.s, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(color, 0.85);
+    ctx.fill();
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+  });
+}
+
+function drawCardB(ctx, nodes, state, t) {
+  const { particles } = state;
+  ctx.fillStyle = '#050A18';
+  ctx.fillRect(0, 0, CW, CH);
+
+  applyDrift(nodes, t);
+  driftParticles(particles, t);
+
+  // Branching network
+  const pNodes = nodes.filter(n => n.type === 'primary');
+  ctx.save();
+  pNodes.forEach((n, i) => {
+    const next = pNodes[(i + 1) % pNodes.length];
+    const mx = (n.x + next.x) / 2 + Math.sin(t * 0.3 + i) * 6;
+    const my = (n.y + next.y) / 2 + Math.cos(t * 0.35 + i) * 6;
+    ctx.beginPath();
+    ctx.moveTo(n.x, n.y);
+    ctx.quadraticCurveTo(mx, my, next.x, next.y);
+    ctx.strokeStyle = rgba('#4477BB', 0.4);
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(n.x, n.y);
+    ctx.quadraticCurveTo(mx, my, next.x, next.y);
+    ctx.strokeStyle = rgba('#5599DD', 0.7);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  drawParticles(ctx, particles, t);
+
+  // Draw each primary with unique shape
+  nodes.forEach(n => {
+    const breath = 1 + 0.03 * Math.sin(n.breathPhase + t * 1.1);
+    const r = n.radius * breath;
+    const brightBorder = lighten(n.color, 70);
+
+    // Glow
+    drawGlow(ctx, n.x, n.y, r * 1.3, n.color, 2, 0.3);
+
+    if (n.id === 'N') {
+      // Elongated capsule with cristae
+      drawCapsule(ctx, n.x, n.y, r * 2.2, r * 1.1, darkenA(n.color, 30, 0.85), lightenA(n.color, 70, 1.0));
+      // Cristae lines
+      for (let i = 0; i < 5; i++) {
+        const xOff = -r * 0.7 + i * r * 0.35;
+        ctx.beginPath();
+        ctx.moveTo(n.x + xOff, n.y - r * 0.35);
+        ctx.lineTo(n.x + xOff, n.y + r * 0.35);
+        ctx.strokeStyle = lightenA(n.color, 50, 0.6);
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
+    } else if (n.id === 'E') {
+      // Bullseye
+      drawBullseye(ctx, n.x, n.y, r, darken(n.color, 20), lightenA(n.color, 70, 1.0));
+    } else if (n.id === 'A') {
+      // Bean with folds
+      drawBeanShape(ctx, n.x, n.y, r, darkenA(n.color, 30, 0.85), lightenA(n.color, 70, 1.0));
+      // Fold lines
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        const y0 = n.y - r * 0.4 + i * r * 0.35;
+        ctx.moveTo(n.x - r * 0.4, y0);
+        ctx.quadraticCurveTo(n.x, y0 + 4 * Math.sin(t + i), n.x + r * 0.4, y0);
+        ctx.strokeStyle = lightenA(n.color, 50, 0.5);
+        ctx.lineWidth = 0.7;
+        ctx.stroke();
+      }
+    } else if (n.id === 'O') {
+      // Golgi stacks
+      drawGolgi(ctx, n.x, n.y, r, n.color, lightenA(n.color, 70, 1.0));
+    } else if (n.id === 'C') {
+      // Vesicle cluster
+      drawVesicleCluster(ctx, n.x, n.y, r, n.color, lightenA(n.color, 70, 1.0));
+    } else if (n.type === 'assess') {
+      // Smaller versions
+      const parentId = n.link;
+      drawGlow(ctx, n.x, n.y, r * 1.1, n.color, 2, 0.25);
+      if (parentId === 'N') {
+        drawCapsule(ctx, n.x, n.y, r * 1.8, r * 0.9, darkenA(n.color, 30, 0.75), lightenA(n.color, 60, 0.9));
+      } else if (parentId === 'E') {
+        drawBullseye(ctx, n.x, n.y, r * 0.8, darken(n.color, 20), lightenA(n.color, 60, 0.9));
+      } else if (parentId === 'A') {
+        drawBeanShape(ctx, n.x, n.y, r * 0.8, darkenA(n.color, 30, 0.75), lightenA(n.color, 60, 0.9));
+      } else if (parentId === 'O') {
+        drawGolgi(ctx, n.x, n.y, r * 0.7, n.color, lightenA(n.color, 60, 0.9));
+      } else if (parentId === 'C') {
+        drawVesicleCluster(ctx, n.x, n.y, r * 0.7, n.color, lightenA(n.color, 60, 0.9));
+      } else {
+        drawSmoothBlob(ctx, n.x, n.y, r, 8, n.id.charCodeAt(0) * 37);
+        ctx.fillStyle = darkenA(n.color, 30, 0.75);
+        ctx.fill();
+        ctx.strokeStyle = lightenA(n.color, 60, 0.9);
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    } else if (n.type === 'satellite') {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(n.color, 0.7);
+      ctx.fill();
+      ctx.strokeStyle = lightenA(n.color, 50, 0.8);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  });
+
+  // Membrane
+  drawMembrane(ctx, t, currentMode, '#4499CC', 0.65);
+  // Subtle interior fill
+  if (currentMode === 'human') {
+    ctx.beginPath();
+    ctx.arc(CX, CY, 122, 0, Math.PI * 2);
+    ctx.fillStyle = rgba('#4499CC', 0.03);
+    ctx.fill();
+  }
+}
+
+
+// ═══════════════════════════════════════════
+// CARD C: NEON MICROSCOPY
+// ═══════════════════════════════════════════
+function initCardC(nodes) {
+  const rng = seededRng(303);
+  const particles = generateParticles(30, rng);
+  return { particles };
+}
+
+function drawCardC(ctx, nodes, state, t) {
+  const { particles } = state;
+  // Pure black background for maximum contrast
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, CW, CH);
+
+  applyDrift(nodes, t);
+  driftParticles(particles, t);
+
+  // Neon connections
+  nodes.forEach(n => {
+    if (n.type === 'assess') {
+      const parent = nodes.find(p => p.id === n.link);
+      if (!parent) return;
+      // Glow line
+      ctx.beginPath();
+      ctx.moveTo(n.x, n.y);
+      ctx.lineTo(parent.x, parent.y);
+      ctx.strokeStyle = rgba(n.color, 0.15);
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      // Bright line
+      ctx.beginPath();
+      ctx.moveTo(n.x, n.y);
+      ctx.lineTo(parent.x, parent.y);
+      ctx.strokeStyle = rgba(n.color, 0.6);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  });
+
+  // Particles with neon glow
+  particles.forEach(p => {
+    const flicker = 0.7 + 0.3 * Math.sin(p.phase + t * 2.5);
+    // Wide glow
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 4);
+    g.addColorStop(0, rgba(p.color, p.alpha * flicker * 0.3));
+    g.addColorStop(1, rgba(p.color, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius * 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Bright core
+    ctx.fillStyle = lightenA(p.color, 80, p.alpha * flicker);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Organelles — NEON SIGN style
+  nodes.forEach(n => {
+    const breath = 1 + 0.04 * Math.sin(n.breathPhase + t * 1.3);
+    const r = n.radius * breath;
+    const blobSeed = n.id.charCodeAt(0) * 137 + (n.id.charCodeAt(1) || 0) * 31;
+    const blobPts = n.type === 'primary' ? 10 : 8;
+
+    // Large glow bloom (3 passes)
+    drawGlow(ctx, n.x, n.y, r * 1.8, n.color, 3, 0.2);
+
+    // Dark interior (barely tinted)
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    ctx.fillStyle = darkenA(n.color, 120, 0.4);
+    ctx.fill();
+
+    // SUPER BRIGHT border — the star of the show
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    ctx.strokeStyle = lighten(n.color, 80);
+    ctx.lineWidth = n.type === 'primary' ? 3 : 2;
+    ctx.stroke();
+
+    // Secondary glow stroke right on the border
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    ctx.strokeStyle = rgba(n.color, 0.4);
+    ctx.lineWidth = (n.type === 'primary' ? 3 : 2) + 4;
+    ctx.stroke();
+    // Redraw bright on top
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    ctx.strokeStyle = lighten(n.color, 80);
+    ctx.lineWidth = n.type === 'primary' ? 3 : 2;
+    ctx.stroke();
+
+    // Internal bright detail dots and lines
+    if (n.type !== 'satellite') {
+      const rng2 = seededRng(blobSeed + 50);
+      const dotCount = n.type === 'primary' ? 8 : 4;
+      for (let i = 0; i < dotCount; i++) {
+        const angle = rng2() * Math.PI * 2;
+        const dr = rng2() * r * 0.6;
+        const dx = n.x + Math.cos(angle) * dr;
+        const dy = n.y + Math.sin(angle) * dr;
+        ctx.fillStyle = lightenA(n.color, 60, 0.8);
+        ctx.beginPath();
+        ctx.arc(dx, dy, 0.8 + rng2() * 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Internal line
+      if (n.type === 'primary') {
+        ctx.beginPath();
+        ctx.moveTo(n.x - r * 0.4, n.y);
+        ctx.quadraticCurveTo(n.x, n.y - r * 0.3 + Math.sin(t + blobSeed) * 2, n.x + r * 0.4, n.y);
+        ctx.strokeStyle = lightenA(n.color, 50, 0.6);
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
+    }
+  });
+
+  // Neon membrane
+  if (currentMode === 'human') {
+    const r = 122;
+    const pulse = 0.8 + 0.2 * Math.sin(t * 0.7);
+    // Big glow
+    for (let i = 3; i >= 1; i--) {
+      ctx.beginPath();
+      ctx.arc(CX, CY, r + i * 5, 0, Math.PI * 2);
+      ctx.strokeStyle = rgba('#44CCFF', 0.15 / i * pulse);
+      ctx.lineWidth = 8 + i * 4;
+      ctx.stroke();
+    }
+    // Bright neon ring
+    ctx.beginPath();
+    ctx.arc(CX, CY, r, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba('#66DDFF', 0.9 * pulse);
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  }
+}
+
+
+// ═══════════════════════════════════════════
+// CARD D: DENSE COLONY
+// ═══════════════════════════════════════════
+function initCardD(nodes) {
+  const rng = seededRng(404);
+  const particles = generateParticles(50, rng);
+  // Generate many packed small bodies
+  const bodies = [];
+  const primaries = Object.entries(NEURON_MAP);
+  const assessEntries = Object.entries(ASSESS_MAP);
+
+  // Cluster regions per primary
+  const angleStep = (Math.PI * 2) / primaries.length;
+  primaries.forEach(([id, d], pi) => {
+    const clusterAngle = angleStep * pi - Math.PI / 2;
+    const clusterCx = CX + Math.cos(clusterAngle) * 50;
+    const clusterCy = CY + Math.sin(clusterAngle) * 50;
+    // 5-8 bodies per primary cluster
+    const count = 5 + Math.floor(rng() * 4);
+    for (let i = 0; i < count; i++) {
+      const angle = rng() * Math.PI * 2;
+      const dist = rng() * 30;
+      bodies.push({
+        x: clusterCx + Math.cos(angle) * dist,
+        y: clusterCy + Math.sin(angle) * dist,
+        bx: clusterCx + Math.cos(angle) * dist,
+        by: clusterCy + Math.sin(angle) * dist,
+        radius: 6 + rng() * 8,
+        color: d.color,
+        driftPhase: rng() * Math.PI * 2,
+        driftSpeed: 0.2 + rng() * 0.3,
+        driftAmp: 1.5 + rng() * 2,
+        breathPhase: rng() * Math.PI * 2,
+        seed: Math.floor(rng() * 10000)
+      });
+    }
+    // Assessment bodies in cluster
+    const relatedAssess = assessEntries.filter(([, a]) => a.link === id);
+    relatedAssess.forEach(([aId, aData]) => {
+      const aCount = 2 + Math.floor(rng() * 2);
+      for (let i = 0; i < aCount; i++) {
+        const angle = rng() * Math.PI * 2;
+        const dist = 15 + rng() * 35;
+        bodies.push({
+          x: clusterCx + Math.cos(angle) * dist,
+          y: clusterCy + Math.sin(angle) * dist,
+          bx: clusterCx + Math.cos(angle) * dist,
+          by: clusterCy + Math.sin(angle) * dist,
+          radius: 4 + rng() * 5,
+          color: aData.color,
+          driftPhase: rng() * Math.PI * 2,
+          driftSpeed: 0.3 + rng() * 0.4,
+          driftAmp: 1 + rng() * 2,
+          breathPhase: rng() * Math.PI * 2,
+          seed: Math.floor(rng() * 10000)
+        });
+      }
+    });
+  });
+
+  // Extra fill bodies
+  for (let i = 0; i < 15; i++) {
+    const angle = rng() * Math.PI * 2;
+    const dist = rng() * 100;
+    const colorSrc = primaries[Math.floor(rng() * primaries.length)][1];
+    bodies.push({
+      x: CX + Math.cos(angle) * dist,
+      y: CY + Math.sin(angle) * dist,
+      bx: CX + Math.cos(angle) * dist,
+      by: CY + Math.sin(angle) * dist,
+      radius: 3 + rng() * 5,
+      color: colorSrc.color,
+      driftPhase: rng() * Math.PI * 2,
+      driftSpeed: 0.35 + rng() * 0.4,
+      driftAmp: 1 + rng() * 2.5,
+      breathPhase: rng() * Math.PI * 2,
+      seed: Math.floor(rng() * 10000)
+    });
+  }
+
+  return { particles, bodies };
+}
+
+function drawCardD(ctx, nodes, state, t) {
+  const { particles, bodies } = state;
+  ctx.fillStyle = '#050A18';
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Drift bodies
+  bodies.forEach(b => {
+    const s = t * b.driftSpeed;
+    b.x = b.bx + Math.sin(b.driftPhase + s) * b.driftAmp;
+    b.y = b.by + Math.cos(b.driftPhase + s * 0.8) * b.driftAmp;
+  });
+  driftParticles(particles, t);
+
+  // Fast-moving particles
+  drawParticles(ctx, particles, t);
+
+  // Draw all bodies
+  bodies.forEach(b => {
+    const breath = 1 + 0.03 * Math.sin(b.breathPhase + t * 1.5);
+    const r = b.radius * breath;
+
+    // Small glow
+    const g = ctx.createRadialGradient(b.x, b.y, r * 0.3, b.x, b.y, r * 2);
+    g.addColorStop(0, rgba(b.color, 0.25));
+    g.addColorStop(1, rgba(b.color, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, r * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Solid body
+    drawSmoothBlob(ctx, b.x, b.y, r, 7, b.seed);
+    ctx.fillStyle = rgba(b.color, 0.85);
+    ctx.fill();
+
+    // Bright border
+    drawSmoothBlob(ctx, b.x, b.y, r, 7, b.seed);
+    ctx.strokeStyle = lightenA(b.color, 60, 0.95);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // Membrane (slightly hidden by density)
+  if (currentMode === 'human') {
+    const r = 122;
+    const pulse = 0.5 + 0.15 * Math.sin(t * 0.6);
+    ctx.beginPath();
+    ctx.arc(CX, CY, r, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba('#44AACC', 0.4 * pulse);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Faint glow
+    ctx.beginPath();
+    ctx.arc(CX, CY, r + 3, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba('#44AACC', 0.15 * pulse);
+    ctx.lineWidth = 5;
+    ctx.stroke();
+  }
+}
+
+
+// ═══════════════════════════════════════════
+// CARD E: SPECIMEN SLIDE
+// ═══════════════════════════════════════════
+function initCardE(nodes) {
+  const rng = seededRng(505);
+  const particles = generateParticles(20, rng);
+  // Assign depth layers
+  const depths = {};
+  nodes.forEach(n => {
+    depths[n.id] = rng() > 0.5 ? 'sharp' : 'blur';
+  });
+  return { particles, depths };
+}
+
+function drawCardE(ctx, nodes, state, t) {
+  const { particles, depths } = state;
+
+  // Vignette background
+  const vg = ctx.createRadialGradient(CX, CY, 0, CX, CY, CW * 0.75);
+  vg.addColorStop(0, '#0A1228');
+  vg.addColorStop(0.6, '#070E20');
+  vg.addColorStop(1, '#030810');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Very fine grid dots
+  ctx.fillStyle = rgba('#334466', 0.15);
+  for (let gx = 10; gx < CW; gx += 20) {
+    for (let gy = 10; gy < CH; gy += 20) {
+      ctx.fillRect(gx, gy, 0.5, 0.5);
+    }
+  }
+
+  applyDrift(nodes, t);
+  driftParticles(particles, t);
+
+  drawParticles(ctx, particles, t);
+
+  // Organelles with depth-of-field
+  nodes.forEach(n => {
+    const breath = 1 + 0.03 * Math.sin(n.breathPhase + t * 1.0);
+    const r = n.radius * breath;
+    const isSharp = depths[n.id] === 'sharp';
+    const blobSeed = n.id.charCodeAt(0) * 137 + (n.id.charCodeAt(1) || 0) * 31;
+    const blobPts = n.type === 'primary' ? 10 : 8;
+
+    ctx.save();
+    if (!isSharp) {
+      // Simulate blur via multiple offset draws
+      ctx.globalAlpha = 0.7;
+    }
+
+    // Realistic radial gradient fill (bright center → darker edge)
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    const bodyGrad = ctx.createRadialGradient(n.x - r*0.2, n.y - r*0.2, 0, n.x, n.y, r);
+    bodyGrad.addColorStop(0, lightenA(n.color, 30, 0.9));
+    bodyGrad.addColorStop(0.6, rgba(n.color, 0.85));
+    bodyGrad.addColorStop(1, darkenA(n.color, 40, 0.8));
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+
+    // Dark outline (just outside bright border — "mounted specimen" look)
+    if (isSharp) {
+      drawSmoothBlob(ctx, n.x, n.y, r + 1.5, blobPts, blobSeed);
+      ctx.strokeStyle = rgba('#0A1228', 0.6);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Bright border
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    ctx.strokeStyle = lightenA(n.color, 50, isSharp ? 1.0 : 0.6);
+    ctx.lineWidth = isSharp ? 1.8 : 1.2;
+    ctx.stroke();
+
+    // Subtle glow for blurred ones (out of focus glow)
+    if (!isSharp) {
+      drawGlow(ctx, n.x, n.y, r * 1.5, n.color, 2, 0.2);
+    } else {
+      // Sharp ones get tighter glow
+      drawGlow(ctx, n.x, n.y, r * 1.1, n.color, 2, 0.25);
+    }
+
+    ctx.restore();
+  });
+
+  // Membrane
+  drawMembrane(ctx, t, currentMode, '#5599BB', 0.5);
+
+  // Scale bar
+  ctx.fillStyle = rgba('#FFFFFF', 0.5);
+  ctx.fillRect(CW - 55, CH - 18, 40, 1.5);
+  ctx.font = '7px -apple-system, sans-serif';
+  ctx.fillStyle = rgba('#FFFFFF', 0.4);
+  ctx.textAlign = 'center';
+  ctx.fillText('10 μm', CW - 35, CH - 22);
+}
+
+
+// ═══════════════════════════════════════════
+// CARD F: GENERATIVE ART CELL
+// ═══════════════════════════════════════════
+function initCardF(nodes) {
+  const rng = seededRng(606);
+  const particles = generateParticles(15, rng);
+  // Pre-compute spirograph parameters per node
+  const spiroParams = {};
+  nodes.forEach(n => {
+    spiroParams[n.id] = {
+      a: 2 + rng() * 5,
+      b: 1 + rng() * 4,
+      d: rng() * 3,
+      phase: rng() * Math.PI * 2,
+      points: n.type === 'primary' ? 180 : 100
+    };
+  });
+  return { particles, spiroParams };
+}
+
+function drawCardF(ctx, nodes, state, t) {
+  const { particles, spiroParams } = state;
+
+  ctx.fillStyle = '#050A18';
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Subtle grid background
+  ctx.strokeStyle = rgba('#0A1225', 0.4);
+  ctx.lineWidth = 0.3;
+  for (let gx = 0; gx < CW; gx += 20) {
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, CH); ctx.stroke();
+  }
+  for (let gy = 0; gy < CH; gy += 20) {
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(CW, gy); ctx.stroke();
+  }
+
+  applyDrift(nodes, t);
+  driftParticles(particles, t);
+
+  // Connections: straight lines with junction circles
+  nodes.forEach(n => {
+    if (n.type === 'assess') {
+      const parent = nodes.find(p => p.id === n.link);
+      if (!parent) return;
+      ctx.beginPath();
+      ctx.moveTo(n.x, n.y);
+      ctx.lineTo(parent.x, parent.y);
+      ctx.strokeStyle = rgba(n.color, 0.5);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // Junction circle at midpoint
+      const mx = (n.x + parent.x) / 2, my = (n.y + parent.y) / 2;
+      ctx.beginPath();
+      ctx.arc(mx, my, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(n.color, 0.7);
+      ctx.fill();
+      ctx.strokeStyle = lightenA(n.color, 40, 0.9);
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+  });
+
+  // Primary cross-links
+  const pNodes = nodes.filter(n => n.type === 'primary');
+  for (let i = 0; i < pNodes.length; i++) {
+    const j = (i + 2) % pNodes.length;
+    ctx.beginPath();
+    ctx.moveTo(pNodes[i].x, pNodes[i].y);
+    ctx.lineTo(pNodes[j].x, pNodes[j].y);
+    ctx.strokeStyle = rgba('#334466', 0.3);
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    const mx = (pNodes[i].x + pNodes[j].x) / 2;
+    const my = (pNodes[i].y + pNodes[j].y) / 2;
+    ctx.beginPath();
+    ctx.arc(mx, my, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba('#667799', 0.5);
+    ctx.fill();
+  }
+
+  drawParticles(ctx, particles, t);
+
+  // Organelles with spirograph interiors
+  nodes.forEach(n => {
+    if (n.type === 'satellite') {
+      // Small plain dot
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(n.color, 0.7);
+      ctx.fill();
+      ctx.strokeStyle = lightenA(n.color, 50, 0.9);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      return;
+    }
+
+    const breath = 1 + 0.03 * Math.sin(n.breathPhase + t * 1.1);
+    const r = n.radius * breath;
+    const blobSeed = n.id.charCodeAt(0) * 137 + (n.id.charCodeAt(1) || 0) * 31;
+    const blobPts = n.type === 'primary' ? 10 : 8;
+    const sp = spiroParams[n.id];
+
+    // Glow
+    drawGlow(ctx, n.x, n.y, r * 1.2, n.color, 2, 0.25);
+
+    // Body fill — dark tinted
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    ctx.fillStyle = darkenA(n.color, 80, 0.65);
+    ctx.fill();
+
+    // Spirograph / Lissajous internal pattern
+    ctx.save();
+    drawSmoothBlob(ctx, n.x, n.y, r * 0.95, blobPts, blobSeed);
+    ctx.clip();
+
+    ctx.beginPath();
+    const tOffset = t * 0.2 + sp.phase;
+    for (let i = 0; i <= sp.points; i++) {
+      const theta = (i / sp.points) * Math.PI * 2 * sp.a;
+      const sr = r * 0.7 * (0.4 + 0.6 * Math.abs(Math.sin(theta * sp.b / sp.a + tOffset)));
+      const px = n.x + Math.cos(theta + tOffset * 0.1) * sr * Math.cos(sp.d + theta * 0.3);
+      const py = n.y + Math.sin(theta + tOffset * 0.1) * sr * Math.sin(sp.d + theta * 0.3 + sp.phase);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = lightenA(n.color, 40, 0.65);
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    // Second spirograph layer (rotated)
+    ctx.beginPath();
+    for (let i = 0; i <= sp.points; i++) {
+      const theta = (i / sp.points) * Math.PI * 2 * (sp.a + 1);
+      const sr = r * 0.6 * (0.3 + 0.7 * Math.abs(Math.cos(theta * sp.b / (sp.a + 1) + tOffset * 1.5)));
+      const px = n.x + Math.cos(theta + tOffset * 0.15 + 1) * sr;
+      const py = n.y + Math.sin(theta + tOffset * 0.15 + 1) * sr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = lightenA(n.color, 60, 0.4);
+    ctx.lineWidth = 0.4;
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Solid border
+    drawSmoothBlob(ctx, n.x, n.y, r, blobPts, blobSeed);
+    ctx.strokeStyle = lightenA(n.color, 60, 1.0);
+    ctx.lineWidth = n.type === 'primary' ? 2 : 1.5;
+    ctx.stroke();
+  });
+
+  // Stippled membrane (dashed circle)
+  if (currentMode === 'human') {
+    const r = 122;
+    ctx.save();
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath();
+    ctx.arc(CX, CY, r, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba('#55AACC', 0.6);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Subtle glow
+    ctx.beginPath();
+    ctx.arc(CX, CY, r + 2, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba('#55AACC', 0.1);
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+
+// ═══════════════════════════════════════════
+// CARD SETUP & ANIMATION
+// ═══════════════════════════════════════════
+const DRAW_FNS = {
+  A: { init: initCardA, draw: drawCardA },
+  B: { init: initCardB, draw: drawCardB },
+  C: { init: initCardC, draw: drawCardC },
+  D: { init: initCardD, draw: drawCardD },
+  E: { init: initCardE, draw: drawCardE },
+  F: { init: initCardF, draw: drawCardF }
+};
+
+function setupCards() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  Object.keys(cardStates).forEach(k => delete cardStates[k]);
+
+  CARD_DEFS.forEach(def => {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = CW * DPR;
+    canvas.height = CH * DPR;
+    canvas.style.width = CW + 'px';
+    canvas.style.height = CH + 'px';
+    card.appendChild(canvas);
+
+    const label = document.createElement('div');
+    label.className = 'card-label';
+    label.innerHTML = `<span>${def.id}: ${def.name}</span><span class="sub">${def.sub}</span>`;
+    card.appendChild(label);
+
+    grid.appendChild(card);
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(DPR, DPR);
+
+    const seed = def.id.charCodeAt(0) * 1000;
+    const nodes = generateNodes(currentTier, seed);
+    const fn = DRAW_FNS[def.id];
+    const extraState = fn.init(nodes);
+
+    cardStates[def.id] = { ctx, nodes, state: extraState, draw: fn.draw };
+  });
+}
+
+function animate() {
+  const t = (performance.now() - startTime) / 1000;
+  Object.values(cardStates).forEach(cs => {
+    cs.ctx.save();
+    cs.draw(cs.ctx, cs.nodes, cs.state, t);
+    cs.ctx.restore();
+  });
+  requestAnimationFrame(animate);
+}
+
+function setTier(tier) {
+  currentTier = tier;
+  document.querySelectorAll('.controls button').forEach(b => {
+    if (['btn-seed','btn-young','btn-full','btn-random'].includes(b.id)) {
+      b.classList.toggle('active', b.id === `btn-${tier}`);
+    }
+  });
+  setupCards();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.controls button').forEach(b => {
+    if (['btn-human','btn-ai'].includes(b.id)) {
+      b.classList.toggle('active', b.id === `btn-${mode}`);
+    }
+  });
+}
+
+// Boot
+setupCards();
+animate();
+</script>
+</body>
+</html>

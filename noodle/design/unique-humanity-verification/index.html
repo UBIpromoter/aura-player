@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aura — Unique Humanity Verification</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; width: 100%; overflow: auto; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #111; color: #e2e8f0; }
+
+    @keyframes aura-breathe {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+      50% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+    }
+    @keyframes aura-breathe-secondary {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+      50% { transform: translate(-50%, -50%) scale(1.06); opacity: 0.8; }
+    }
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes shimmer-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .animate-fadeSlideIn {
+      animation: fadeSlideIn 0.4s ease-out both;
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-out both;
+    }
+
+    .breathing-glow-primary {
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: aura-breathe 8s ease-in-out infinite;
+      transition: background 1s ease;
+    }
+    .breathing-glow-secondary {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      width: 350px;
+      height: 350px;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: aura-breathe-secondary 6s ease-in-out infinite;
+      transition: background 1s ease;
+    }
+
+    .btn-shine {
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-shine::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%; width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+      animation: shimmer-pulse 3s ease-in-out infinite;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .btn-shine:hover::after {
+      opacity: 1;
+      left: 0;
+    }
+
+    .question-text {
+      font-size: clamp(20px, 6vw, 28px);
+      line-height: 1.35;
+      text-wrap: balance;
+      text-align: center;
+    }
+
+    .card-surface {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .custom-scroll::-webkit-scrollbar { width: 4px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+    /* Phone frame */
+    .phone-frame {
+      border-radius: 55px;
+      background: #1a1a1c;
+      padding: 12px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 25px 80px rgba(0,0,0,0.6);
+      position: relative;
+      margin: 0 auto;
+    }
+    .phone-frame-inner {
+      border-radius: 44px;
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #030712;
+    }
+
+    /* Dev panel */
+    .dev-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 280px;
+      height: 100vh;
+      background: rgba(15, 15, 20, 0.97);
+      border-left: 1px solid rgba(255,255,255,0.06);
+      z-index: 9999;
+      overflow-y: auto;
+      backdrop-filter: blur(20px);
+    }
+    .dev-panel::-webkit-scrollbar { width: 4px; }
+    .dev-panel::-webkit-scrollbar-track { background: transparent; }
+    .dev-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+    .dev-toggle {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 10000;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.4);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .dev-toggle:hover {
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.7);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+    /* ─── Color System ─── */
+    const COLOR_HEX = {
+      violet:  { base: '#8b5cf6', light: '#a78bfa', rgb: '139, 92, 246' },
+      blue:    { base: '#3b82f6', light: '#60a5fa', rgb: '59, 130, 246' },
+      teal:    { base: '#14b8a6', light: '#2dd4bf', rgb: '20, 184, 166' },
+      rose:    { base: '#f43f5e', light: '#fb7185', rgb: '244, 63, 94' },
+      pink:    { base: '#d946ef', light: '#e879f9', rgb: '217, 70, 239' },
+      emerald: { base: '#10b981', light: '#34d399', rgb: '16, 185, 129' },
+      slate:   { base: '#64748b', light: '#94a3b8', rgb: '100, 116, 139' },
+      amber:   { base: '#f59e0b', light: '#fbbf24', rgb: '245, 158, 11' },
+      indigo:  { base: '#6366f1', light: '#818cf8', rgb: '99, 102, 241' },
+      cyan:    { base: '#06b6d4', light: '#67e8f9', rgb: '6, 182, 212' },
+      gray:    { base: '#6b7280', light: '#9ca3af', rgb: '107, 114, 128' },
+    };
+
+    /* ─── Phone Frame Sizes ─── */
+    const PHONE_SIZES = [
+      { label: 'iPhone SE', width: 375, height: 667 },
+      { label: 'iPhone 14', width: 390, height: 844 },
+      { label: 'iPhone 14 Pro Max', width: 430, height: 932 },
+    ];
+
+    /* ─── Screen Registry for Dev Panel ─── */
+    const SCREEN_REGISTRY = {
+      landing: { label: 'Landing', group: 'Main' },
+      /* Subject */
+      's1-name': { label: 'S1: Name', group: 'Subject' },
+      's1-country': { label: 'S1: Country', group: 'Subject' },
+      's1-city': { label: 'S1: City', group: 'Subject' },
+      's1-source': { label: 'S1: How found Aura', group: 'Subject' },
+      's1-referrer': { label: 'S1: Who referred', group: 'Subject' },
+      's1-account-type': { label: 'S1: Account type', group: 'Subject' },
+      's2-social': { label: 'S2: Social connect', group: 'Subject' },
+      's2-delight': { label: 'S2: Delight moment', group: 'Subject' },
+      's2-contacts': { label: 'S2: Check contacts', group: 'Subject' },
+      's2-know-anyone': { label: 'S2: Know anyone', group: 'Subject' },
+      's2-connection-name': { label: 'S2: Who?', group: 'Subject' },
+      's3-attest': { label: 'S3: Account status', group: 'Subject' },
+      's4-availability': { label: 'S4: Availability', group: 'Subject' },
+      'subject-card': { label: 'Profile Card', group: 'Subject' },
+      /* Evaluator */
+      'eval-gate': { label: 'Relationship Gate', group: 'Evaluator' },
+      'eval-fit': { label: 'Fit Check', group: 'Evaluator' },
+      /* Path A */
+      'a1-relationship': { label: 'A1: Relationship', group: 'Path A' },
+      'a1-duration': { label: 'A1: Duration', group: 'Path A' },
+      'a1-last-interact': { label: 'A1: Last interaction', group: 'Path A' },
+      'a2a': { label: 'A2a: Real person?', group: 'Path A' },
+      'a2b': { label: 'A2b: Only account?', group: 'Path A' },
+      'a2c': { label: 'A2c: Sybil risk', group: 'Path A' },
+      'a3-confidence': { label: 'A3: Confidence', group: 'Path A' },
+      'a4-doubt': { label: 'A4: Doubt check', group: 'Path A' },
+      'eval-summary-A': { label: 'Summary A', group: 'Path A' },
+      /* Path B */
+      'b1-how-meet': { label: 'B1: How met', group: 'Path B' },
+      'b1-who-init': { label: 'B1: Who initiated', group: 'Path B' },
+      'b1-context': { label: 'B1: Context', group: 'Path B' },
+      'b2-evidence-direct': { label: 'B2: Direct evidence', group: 'Path B' },
+      'b2-evidence-support': { label: 'B2: Supporting evidence', group: 'Path B' },
+      'b3-red-flags': { label: 'B3: Red flags', group: 'Path B' },
+      'b4a': { label: 'B4a: Real person?', group: 'Path B' },
+      'b4b': { label: 'B4b: Only account?', group: 'Path B' },
+      'b4c': { label: 'B4c: Sybil risk', group: 'Path B' },
+      'b5-confidence': { label: 'B5: Confidence', group: 'Path B' },
+      'b6-doubt': { label: 'B6: Doubt check', group: 'Path B' },
+      'eval-summary-B': { label: 'Summary B', group: 'Path B' },
+      /* Path C */
+      'c1-sources': { label: 'C1: Sources', group: 'Path C' },
+      'c2-looks-real': { label: 'C2: Looks real?', group: 'Path C' },
+      'c3-strongest': { label: 'C3: Strongest signal', group: 'Path C' },
+      'c3-weakest': { label: 'C3: Weakest point', group: 'Path C' },
+      'c4-red-flags': { label: 'C4: Red flags', group: 'Path C' },
+      'c6-confidence': { label: 'C6: Confidence', group: 'Path C' },
+      'eval-summary-C': { label: 'Summary C', group: 'Path C' },
+    };
+
+    /* ─── Mock Data for Dev Panel Jumps ─── */
+    const MOCK_SUBJECT_ANSWERS = {
+      's1-name': 'Alex Rivera',
+      's1-country': 'United States',
+      's1-city': 'Portland, OR',
+      's1-source': ['A friend told me about it', 'Just checking it out'],
+      's1-referrer': 'Jordan Chen',
+      's1-account-type': 'Setting up a new account',
+      's2-social': ['LinkedIn', 'Facebook'],
+      's2-know-anyone': "I'm sure they're here",
+      's2-connection-name': 'Ravi Kumar',
+      's2-contacts': 'Sure, check my contacts',
+      's3-attest': 'Nope, this is my only one',
+      's4-video': true,
+      's4-meet': false,
+      's4-vouch': true,
+    };
+
+    const MOCK_EVAL_ANSWERS = {
+      'gate': 'I know them personally',
+      'fit': 'Very well — I\'m a good judge here',
+      'a1-relationship': ['Friend', 'Colleague'],
+      'a1-duration': '1-5 years',
+      'a1-last-interact': 'This week',
+      'a2a': 'Definitely',
+      'a2b': "I'd be very surprised if not",
+      'a2c': ['Unlikely — simple, local life'],
+      'a3-confidence': 3,
+      'b1-how-meet': 'In person',
+      'b1-who-init': 'Mutual',
+      'b1-context': 'Coffee shop downtown, last Tuesday',
+      'b2-evidence-direct': ['Physically present — clearly a real person', 'Spoke about their life with specific details'],
+      'b2-evidence-support': ['Social graph looks authentic', 'Connected to people already in Aura'],
+      'b3-red-flags': ['Nothing concerning'],
+      'b4a': 'Definitely',
+      'b4b': "I'd be very surprised if not",
+      'b4c': ['Unlikely — simple, local life'],
+      'b5-confidence': 3,
+      'c1-sources': ['Connection graph / social imports', "Other evaluators' assessments"],
+      'c2-looks-real': 3,
+      'c3-strongest': ['Rich connections with verified users', 'Strong referral chain'],
+      'c3-weakest': ['New profile, little history'],
+      'c4-red-flags': ['Nothing concerning'],
+      'c6-confidence': 2,
+    };
+
+
+    /* ─── Question Data ─── */
+
+    /* Subject Flow */
+    const SUBJECT_QUESTIONS = [
+      /* S1: Basics */
+      { id: 's1-name', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What name do you go by?', type: 'text', placeholder: 'Your name' },
+      { id: 's1-country', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What country or region?', type: 'single',
+        options: ['United States', 'Europe', 'South America', 'Southeast Asia', 'India', 'Africa', 'Middle East', 'Other'] },
+      { id: 's1-city', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What city or area?', type: 'text', placeholder: 'City or area' },
+      { id: 's1-source', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'How did you find Aura?', type: 'multi',
+        options: ['A friend told me about it', 'Just checking it out', 'I want to prove my identity', 'I want to become an Aura player'] },
+      { id: 's1-referrer', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'Who told you about Aura?', type: 'text', placeholder: 'Their name or username',
+        conditional: (a) => Array.isArray(a['s1-source']) && a['s1-source'].includes('A friend told me about it') },
+
+      /* S1b: Account Type */
+      { id: 's1-account-type', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What brings you here?', type: 'single',
+        options: ['Setting up a new account', 'Recovering an account I lost access to', 'Replacing an old account with a new one'] },
+
+      /* S2: Connections */
+      { id: 's2-social', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Connect your social accounts to find people you already know', type: 'multi',
+        subtitle: 'Select as many as you like. Not for auto-verification — gives evaluators a map.',
+        options: ['LinkedIn', 'Facebook'] },
+      { id: 's2-delight', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: '__DELIGHT__', type: 'delight',
+        conditional: (a) => Array.isArray(a['s2-social']) && a['s2-social'].length > 0 },
+      { id: 's2-contacts', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Want us to check your contacts too?', type: 'single',
+        subtitle: 'We only check for matches with Aura users. Nothing is stored or shared.',
+        options: ['Sure, check my contacts', 'No thanks'],
+        conditional: (a) => Array.isArray(a['s2-social']) && a['s2-social'].length > 0 },
+      { id: 's2-know-anyone', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Do you know anyone already using Aura?', type: 'single',
+        options: ["I'm sure they're here", "I think they might be", "No, I don't know anyone"],
+        conditional: (a) => !Array.isArray(a['s2-social']) || a['s2-social'].length === 0 },
+      { id: 's2-connection-name', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Who?', type: 'text', placeholder: 'Their name or username',
+        conditional: (a) => a['s2-know-anyone'] === "I'm sure they're here" || a['s2-know-anyone'] === "I think they might be" },
+
+      /* S3: Attestation */
+      { id: 's3-attest', section: 'S3', sectionLabel: 'Account', color: 'emerald', text: 'Do you have any other accounts in Aura or BrightID?', type: 'single',
+        subtitle: 'One person, one account — that\'s how Aura stays fair. If you have an old account, an Aura player can help you sort it out.',
+        options: ['Nope, this is my only one', 'Yes, I have an old one I don\'t use', 'I\'m not sure'] },
+
+      /* S4: Availability */
+      { id: 's4-availability', section: 'S4', sectionLabel: 'Availability', color: 'teal', text: '__AVAILABILITY__', type: 'availability' },
+    ];
+
+    /* Evaluator shared question fragments */
+    const Q_REAL_HUMAN = {
+      text: 'Is this a real, biological person?', type: 'single',
+      subtitle: 'Not AI, not virtual, not a deepfake.',
+      options: ['Definitely', 'I believe so', 'I have some doubt']
+    };
+
+    const Q_REAL_HUMAN_IN_PERSON = {
+      text: 'Is this a real, biological person?', type: 'single',
+      subtitle: 'Not AI, not virtual, not a deepfake.',
+      options: ['Definitely', 'I believe so']
+    };
+
+    const Q_ONLY_ACCOUNT = {
+      text: 'Is this their only account in Aura?', type: 'single',
+      options: ["I'd be very surprised if not", "Probably", 'I have some doubt', 'I suspect another exists']
+    };
+
+    const Q_SYBIL = {
+      text: 'Could they maintain more than one identity?', type: 'multi',
+      subtitle: 'Select all that apply.',
+      options: [
+        'Has separate social circles that may not overlap',
+        'Technically savvy',
+        'Networks spread across multiple cities or communities',
+        'Unlikely — simple, local life',
+      ]
+    };
+
+    const Q_RED_FLAGS = {
+      text: 'Did you notice any red flags?', type: 'multi',
+      options: [
+        'Vague or inconsistent',
+        'Evasive about basics',
+        'Seemed rushed or pushy',
+        'Connections didn\'t check out',
+        'Nothing concerning',
+      ]
+    };
+
+    const CONFIDENCE_LABELS = [
+      '1 — Notable gaps in my knowledge',
+      '2 — Fairly confident, some uncertainty',
+      '3 — Very confident, no reason to doubt',
+      '4 — Certain, I\'d stake my reputation',
+    ];
+
+    /* Path A questions */
+    const PATH_A_QUESTIONS = [
+      { id: 'a1-relationship', text: 'How do you know them?', type: 'multi',
+        subtitle: 'Select all that apply.',
+        options: ['Family', 'Friend', 'Colleague', 'Neighbor', 'Community member', 'Other'],
+        hasOtherInput: true },
+      { id: 'a1-duration', text: 'How long have you known them?', type: 'single',
+        options: ['Less than 1 year', '1-5 years', '5+ years'] },
+      { id: 'a1-last-interact', text: 'When did you last interact?', type: 'single',
+        options: ['This week', 'This month', 'This year', 'Longer'] },
+      { id: 'a2a', ...Q_REAL_HUMAN },
+      { id: 'a2b', ...Q_ONLY_ACCOUNT },
+      { id: 'a2c', ...Q_SYBIL },
+      { id: 'a3-confidence', text: 'Overall, how strongly would you vouch for this person?', type: 'star-confidence' },
+      { id: 'a4-doubt', text: "What's the source of your uncertainty?", type: 'multi',
+        subtitle: 'Select all that apply.',
+        options: [
+          "I haven't seen them recently",
+          'I know them only in one context',
+          "Something feels off but I can't pinpoint it",
+          'Other'
+        ],
+        conditional: (a) => { const c = a['a3-confidence']; return c !== undefined && c <= 2; }
+      },
+    ];
+
+    /* Path B questions */
+    const PATH_B_QUESTIONS = [
+      { id: 'b1-how-meet', text: 'How did you meet?', type: 'single',
+        options: ['In person', 'Video call', 'Text-chat only'] },
+      { id: 'b1-who-init', text: 'Who initiated?', type: 'single',
+        options: ['They came to me', 'I reached out', 'Mutual'] },
+      { id: 'b1-context', text: 'Brief context — where and when?', type: 'text',
+        placeholder: 'e.g. Coffee shop downtown, last Tuesday' },
+      { id: 'b2-evidence-direct', text: 'What did you directly observe?', type: 'multi',
+        subtitle: 'Select all that apply (max 5).',
+        maxSelect: 5,
+        options: [
+          'Physically present — clearly a real person',
+          'Spoke about their life with specific details',
+          'Others at the scene recognized them',
+          'Showed something hard to fabricate',
+          'Nothing I could directly verify',
+        ] },
+      { id: 'b2-evidence-support', text: 'Any supporting evidence?', type: 'multi',
+        subtitle: 'Select all that apply (max 5).',
+        maxSelect: 5,
+        options: [
+          'Social graph looks authentic',
+          'Connected to people already in Aura',
+          'Referred by someone I trust',
+          'Profile matches what I observed',
+          'No supporting evidence',
+        ] },
+      { id: 'b3-red-flags', ...Q_RED_FLAGS },
+      { id: 'b4a', text: 'Is this a real, biological person?', type: 'single',
+        subtitle: 'Not AI, not virtual, not a deepfake.',
+        /* Dynamic options: if b1-how-meet is 'In person', remove 'I have some doubt' */
+        options: ['Definitely', 'I believe so', 'I have some doubt'],
+        dynamicOptions: (a) => {
+          if (a['b1-how-meet'] === 'In person') return ['Definitely', 'I believe so'];
+          return ['Definitely', 'I believe so', 'I have some doubt'];
+        }
+      },
+      { id: 'b4b', ...Q_ONLY_ACCOUNT },
+      { id: 'b4c', ...Q_SYBIL },
+      { id: 'b5-confidence', text: 'How confident are you that this is a unique, real person?', type: 'star-confidence' },
+      { id: 'b6-doubt', text: "What's the source of your uncertainty?", type: 'multi',
+        subtitle: 'Select all that apply.',
+        options: [
+          'I only met them once',
+          'I know them in only one context',
+          'They were reluctant to share personal info',
+          'They seem capable of gaming the system',
+          'I did not see proof-of-work that would be hard to fake',
+          'Something feels off',
+          'Other'
+        ],
+        conditional: (a) => { const c = a['b5-confidence']; return c !== undefined && c <= 2; }
+      },
+    ];
+
+    /* Path C questions */
+    const PATH_C_QUESTIONS = [
+      { id: 'c1-sources', text: 'What are you working from?', type: 'multi',
+        subtitle: 'Select all that apply.',
+        options: [
+          'Self-attestation',
+          'Connection graph / social imports',
+          "Other evaluators' assessments",
+          'Referral chain',
+          'Activity history',
+          'Other'
+        ] },
+      { id: 'c2-looks-real', text: 'Does this profile look like a real, unique person?', type: 'star-confidence' },
+      { id: 'c3-strongest', text: "What signals give you the most confidence?", type: 'multi',
+        subtitle: 'Select all that apply.',
+        options: ['Rich connections with verified users', 'Believable self-attestation', 'Multiple evaluators already confident', 'Strong referral chain', 'Other'] },
+      { id: 'c3-weakest', text: "What are the weakest points?", type: 'multi',
+        subtitle: 'Select all that apply.',
+        options: ['Thin connections', 'No in-person verification', 'New profile, little history', 'Generic attestation', 'Other'] },
+      { id: 'c4-red-flags', ...Q_RED_FLAGS },
+      { id: 'c6-confidence', text: 'Based on what you\'ve reviewed, how confident are you in this person\'s uniqueness?', type: 'star-confidence' },
+    ];
+
+
+    /* ─── Shared Components ─── */
+
+    function BreathingGlow({ color }) {
+      const c = COLOR_HEX[color] || COLOR_HEX.violet;
+      return (
+        <>
+          <div
+            className="breathing-glow-primary"
+            style={{ background: `radial-gradient(circle, rgba(${c.rgb}, 0.25) 0%, transparent 70%)` }}
+          />
+          <div
+            className="breathing-glow-secondary"
+            style={{ background: `radial-gradient(circle, rgba(${c.rgb}, 0.15) 0%, transparent 65%)` }}
+          />
+        </>
+      );
+    }
+
+    function ProgressBar({ current, total, color }) {
+      const c = COLOR_HEX[color] || COLOR_HEX.violet;
+      const pct = total > 0 ? ((current + 1) / total) * 100 : 0;
+      return (
+        <div className="w-full max-w-sm mx-auto mb-4">
+          <div className="flex justify-between text-xs text-white/40 mb-1.5">
+            <span>{current + 1} of {total}</span>
+          </div>
+          <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${c.base}, ${c.light})` }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    function SectionBadge({ label, color }) {
+      const c = COLOR_HEX[color] || COLOR_HEX.violet;
+      return (
+        <div
+          className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium mb-3"
+          style={{
+            background: `rgba(${c.rgb}, 0.12)`,
+            color: c.light,
+            border: `1px solid rgba(${c.rgb}, 0.2)`
+          }}
+        >
+          {label}
+        </div>
+      );
+    }
+
+    function BackButton({ onClick }) {
+      return (
+        <button
+          onClick={onClick}
+          className="absolute top-4 left-4 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-white/[0.06] border border-white/[0.08] text-white/40 hover:text-white/70 hover:bg-white/[0.1] transition-all duration-200"
+          style={{ fontSize: '14px' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 2L4 7L9 12" />
+          </svg>
+        </button>
+      );
+    }
+
+    function ActionButton({ label, color, onClick, disabled, secondary }) {
+      const c = COLOR_HEX[color] || COLOR_HEX.violet;
+      if (secondary) {
+        return (
+          <button
+            onClick={onClick}
+            disabled={disabled}
+            className="btn-shine w-full h-14 rounded-2xl font-medium text-sm transition-all duration-200 disabled:opacity-30"
+            style={{
+              background: `rgba(${c.rgb}, 0.08)`,
+              border: `1px solid rgba(${c.rgb}, 0.25)`,
+              color: c.light,
+            }}
+          >
+            {label}
+          </button>
+        );
+      }
+      return (
+        <button
+          onClick={onClick}
+          disabled={disabled}
+          className="btn-shine w-full h-14 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-30"
+          style={{
+            background: `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.15))`,
+            border: `1px solid rgba(${c.rgb}, 0.35)`,
+            color: '#fff',
+            boxShadow: `0 0 20px rgba(${c.rgb}, 0.15), 0 0 60px rgba(${c.rgb}, 0.05)`,
+          }}
+        >
+          {label}
+        </button>
+      );
+    }
+
+    function OptionButton({ label, selected, color, onClick }) {
+      const c = COLOR_HEX[color] || COLOR_HEX.violet;
+      return (
+        <button
+          onClick={onClick}
+          className="btn-shine w-full h-14 rounded-2xl font-medium text-sm text-left px-5 transition-all duration-200"
+          style={{
+            background: selected
+              ? `linear-gradient(135deg, rgba(${c.rgb}, 0.25), rgba(${c.rgb}, 0.12))`
+              : 'rgba(255,255,255,0.04)',
+            border: selected
+              ? `1px solid rgba(${c.rgb}, 0.45)`
+              : '1px solid rgba(255,255,255,0.06)',
+            color: selected ? '#fff' : 'rgba(255,255,255,0.7)',
+            boxShadow: selected ? `0 0 16px rgba(${c.rgb}, 0.12)` : 'none',
+          }}
+        >
+          {label}
+        </button>
+      );
+    }
+
+    /* ─── Star Confidence Component ─── */
+
+    function StarConfidence({ color, value, onChange }) {
+      const c = COLOR_HEX[color] || COLOR_HEX.violet;
+      const labels = ['Gaps', 'Fair', 'Confident', 'Certain'];
+
+      return (
+        <div className="flex flex-col items-center gap-4 w-full animate-fadeSlideIn">
+          <div className="flex items-start justify-center gap-5">
+            {[1, 2, 3, 4].map(level => {
+              const isSelected = value !== undefined && level <= value;
+              /* Gradation: brightness scales with level */
+              const intensity = [0.2, 0.35, 0.5, 0.7][level - 1];
+              const glowSize = [8, 12, 16, 24][level - 1];
+              const borderAlpha = [0.3, 0.4, 0.55, 0.7][level - 1];
+              return (
+                <button
+                  key={level}
+                  onClick={() => onChange(level)}
+                  className="flex flex-col items-center gap-2 transition-all duration-200"
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300"
+                    style={{
+                      background: isSelected
+                        ? `linear-gradient(135deg, rgba(${c.rgb}, ${intensity}), rgba(${c.rgb}, ${intensity * 0.5}))`
+                        : 'rgba(255,255,255,0.08)',
+                      border: isSelected
+                        ? `1px solid rgba(${c.rgb}, ${borderAlpha})`
+                        : '1px solid rgba(255,255,255,0.1)',
+                      color: isSelected ? '#fff' : 'rgba(255,255,255,0.35)',
+                      boxShadow: isSelected ? `0 0 ${glowSize}px rgba(${c.rgb}, ${intensity * 0.6})` : 'none',
+                    }}
+                  >
+                    {level}
+                  </div>
+                  <span
+                    className="text-[10px] font-medium transition-colors duration-200"
+                    style={{ color: isSelected ? c.light : 'rgba(255,255,255,0.3)' }}
+                  >
+                    {labels[level - 1]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {value !== undefined && (
+            <div
+              className="text-center text-sm font-medium px-4 py-2.5 rounded-xl animate-fadeIn"
+              style={{
+                background: `rgba(${c.rgb}, 0.1)`,
+                color: c.light,
+                border: `1px solid rgba(${c.rgb}, 0.15)`
+              }}
+            >
+              {CONFIDENCE_LABELS[value - 1]}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+
+    /* ─── Question Renderers ─── */
+
+    function SingleSelect({ question, color, answer, onAnswer, answers }) {
+      const opts = question.dynamicOptions ? question.dynamicOptions(answers || {}) : question.options;
+      return (
+        <div className="flex flex-col gap-3 w-full animate-fadeSlideIn">
+          {opts.map((opt) => (
+            <OptionButton
+              key={opt}
+              label={opt}
+              selected={answer === opt}
+              color={color}
+              onClick={() => onAnswer(opt)}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    function MultiSelect({ question, color, answer, onAnswer, onContinue }) {
+      const selected = Array.isArray(answer) ? answer : (answer && typeof answer === 'object' ? answer.items || [] : []);
+      const otherText = (answer && typeof answer === 'object') ? answer.otherText || '' : '';
+      const maxSelect = question.maxSelect || Infinity;
+      const c = COLOR_HEX[color] || COLOR_HEX.violet;
+      const hasOther = question.hasOtherInput;
+
+      const toggle = (opt) => {
+        let next;
+        if (selected.includes(opt)) {
+          next = selected.filter(x => x !== opt);
+        } else {
+          if (selected.length >= maxSelect) return;
+          next = [...selected, opt];
+        }
+        if (hasOther) {
+          onAnswer({ items: next, otherText: next.includes('Other') ? otherText : '' });
+        } else {
+          onAnswer(next);
+        }
+      };
+
+      const updateOtherText = (text) => {
+        onAnswer({ items: selected, otherText: text });
+      };
+
+      return (
+        <div className="flex flex-col gap-3 w-full animate-fadeSlideIn">
+          <div className="text-[10px] text-white/30 text-center -mb-1">
+            Tap multiple{maxSelect < Infinity ? ` (up to ${maxSelect})` : ''} — then continue
+          </div>
+          {question.options.map((opt) => (
+            <OptionButton
+              key={opt}
+              label={opt}
+              selected={selected.includes(opt)}
+              color={color}
+              onClick={() => toggle(opt)}
+            />
+          ))}
+          {hasOther && selected.includes('Other') && (
+            <input
+              type="text"
+              value={otherText}
+              onChange={e => updateOtherText(e.target.value)}
+              placeholder="Please specify..."
+              className="w-full h-12 rounded-2xl px-5 text-sm font-medium bg-white/[0.04] border border-white/[0.08] text-white placeholder-white/30 outline-none"
+              style={{ borderColor: `rgba(${c.rgb}, 0.3)` }}
+              autoFocus
+            />
+          )}
+        </div>
+      );
+    }
+
+    function TextInput({ question, color, answer, onAnswer, onContinue }) {
+      const c = COLOR_HEX[color] || COLOR_HEX.violet;
+      const inputRef = useRef(null);
+
+      useEffect(() => {
+        if (inputRef.current) inputRef.current.focus();
+      }, [question.id]);
+
+      return (
+        <div className="flex flex-col gap-4 w-full animate-fadeSlideIn">
+          <input
+            ref={inputRef}
+            type="text"
+            value={answer || ''}
+            onChange={e => onAnswer(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && (answer || '').trim()) onContinue(); }}
+            placeholder={question.placeholder || ''}
+            className="w-full h-14 rounded-2xl px-5 text-sm font-medium bg-white/[0.04] border border-white/[0.08] text-white placeholder-white/30 outline-none transition-all duration-200"
+            onFocus={e => { e.target.style.borderColor = `rgba(${c.rgb}, 0.4)`; e.target.style.boxShadow = `0 0 12px rgba(${c.rgb}, 0.1)`; }}
+            onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+          />
+        </div>
+      );
+    }
+
+    function ToggleSwitch({ label, subtitle, color, isOn, onToggle }) {
+      const c = COLOR_HEX[color] || COLOR_HEX.violet;
+      return (
+        <button
+          onClick={onToggle}
+          className="w-full flex items-center justify-between rounded-2xl px-5 py-4 transition-all duration-200"
+          style={{
+            background: isOn
+              ? `linear-gradient(135deg, rgba(${c.rgb}, 0.2), rgba(${c.rgb}, 0.08))`
+              : 'rgba(255,255,255,0.04)',
+            border: isOn
+              ? `1px solid rgba(${c.rgb}, 0.35)`
+              : '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          <div className="text-left pr-4 flex-1">
+            <span className="text-sm font-medium text-white/80 block">{label}</span>
+            {subtitle && <span className="text-xs text-white/35 block mt-0.5">{subtitle}</span>}
+          </div>
+          <div
+            className="w-12 h-7 rounded-full relative transition-all duration-200 flex-shrink-0"
+            style={{ background: isOn ? `rgba(${c.rgb}, 0.5)` : 'rgba(255,255,255,0.1)' }}
+          >
+            <div
+              className="absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all duration-200 shadow-sm"
+              style={{ left: isOn ? '22px' : '2px' }}
+            />
+          </div>
+        </button>
+      );
+    }
+
+
+    /* ─── Screen Wrapper (split layout: content top, buttons bottom) ─── */
+
+    function ScreenLayout({ color, sectionLabel, progress, total, onBack, children, buttons }) {
+      return (
+        <div className="relative h-full w-full overflow-hidden flex flex-col" style={{ background: '#030712' }}>
+          <BreathingGlow color={color} />
+          {onBack && <BackButton onClick={onBack} />}
+
+          <div className="relative z-10 flex flex-col h-full w-full">
+            {/* Upper zone: scrollable content */}
+            <div className="flex-1 overflow-y-auto custom-scroll flex flex-col items-center w-full">
+              <div className="w-full max-w-sm mx-auto px-5 pt-14 pb-4 flex flex-col items-center">
+                {sectionLabel && <SectionBadge label={sectionLabel} color={color} />}
+                {(progress !== undefined && total !== undefined) && (
+                  <ProgressBar current={progress} total={total} color={color} />
+                )}
+                {children}
+              </div>
+            </div>
+
+            {/* Lower zone: pinned buttons */}
+            {buttons && (
+              <div className="flex-shrink-0 w-full max-w-sm mx-auto px-5 pb-6 pt-3">
+                {buttons}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+
+    /* ─── Landing Screen ─── */
+
+    function LandingScreen({ onSubject, onEvaluator }) {
+      const vc = COLOR_HEX.violet;
+      const ec = COLOR_HEX.emerald;
+
+      return (
+        <div className="relative h-full w-full overflow-hidden flex flex-col items-center justify-center" style={{ background: '#030712' }}>
+          <div className="breathing-glow-primary" style={{ background: `radial-gradient(circle, rgba(${vc.rgb}, 0.15) 0%, rgba(${ec.rgb}, 0.1) 40%, transparent 70%)`, top: '35%' }} />
+          <div className="breathing-glow-secondary" style={{ background: `radial-gradient(circle, rgba(${ec.rgb}, 0.12) 0%, transparent 60%)`, top: '45%' }} />
+
+          <div className="relative z-10 flex flex-col h-full w-full">
+            {/* Upper content */}
+            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm mx-auto px-5">
+              <div className="animate-fadeSlideIn flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-full mb-3"
+                  style={{
+                    background: `linear-gradient(135deg, rgba(${vc.rgb}, 0.3), rgba(${ec.rgb}, 0.3))`,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: `0 0 40px rgba(${vc.rgb}, 0.15), 0 0 40px rgba(${ec.rgb}, 0.1)`,
+                  }}
+                />
+                <h1 className="text-2xl font-bold text-white/90 tracking-tight">Unique Humanity</h1>
+                <h2 className="text-lg font-medium text-white/50">Verification</h2>
+                <p className="text-xs text-white/30 text-center mt-3 leading-relaxed max-w-xs">
+                  Prove you're a unique human, or help evaluate someone else's claim. Multiple evaluators, weighted confidence, no single point of failure.
+                </p>
+              </div>
+            </div>
+
+            {/* Bottom buttons */}
+            <div className="flex-shrink-0 w-full max-w-sm mx-auto px-5 pb-8">
+              <div className="flex flex-col gap-3 w-full animate-fadeSlideIn" style={{ animationDelay: '0.15s' }}>
+                <ActionButton label="I'm a new subject" color="violet" onClick={onSubject} />
+                <ActionButton label="I'm an Aura player evaluating someone" color="emerald" onClick={onEvaluator} />
+              </div>
+              <p className="text-[10px] text-white/20 text-center mt-6">
+                Aura Unique Humanity Verification — Prototype v2
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+
+    /* ─── Subject Flow ─── */
+
+    function SubjectFlow({ onComplete, onBack, onNavigate }) {
+      const [answers, setAnswers] = useState({});
+      const [currentScreenId, setCurrentScreenId] = useState('s1-name');
+      const [animKey, setAnimKey] = useState(0);
+
+      /* Build active question list based on current answers */
+      const activeQuestions = useMemo(() => {
+        return SUBJECT_QUESTIONS.filter(q =>
+          q.type !== 'delight' && q.type !== 'availability' &&
+          (!q.conditional || q.conditional(answers))
+        );
+      }, [answers]);
+
+      /* All screens including special ones */
+      const allScreenIds = useMemo(() => {
+        const ids = [];
+        for (const q of SUBJECT_QUESTIONS) {
+          if (q.conditional && !q.conditional(answers)) continue;
+          ids.push(q.id);
+        }
+        return ids;
+      }, [answers]);
+
+      const currentIdx = allScreenIds.indexOf(currentScreenId);
+      const currentQ = SUBJECT_QUESTIONS.find(q => q.id === currentScreenId);
+
+      const goToScreen = (id) => {
+        setAnimKey(k => k + 1);
+        setCurrentScreenId(id);
+      };
+
+      const advance = () => {
+        const nextIdx = currentIdx + 1;
+        if (nextIdx < allScreenIds.length) {
+          goToScreen(allScreenIds[nextIdx]);
+        } else {
+          onComplete(answers);
+        }
+      };
+
+      const goBack = () => {
+        if (currentIdx > 0) {
+          goToScreen(allScreenIds[currentIdx - 1]);
+        } else {
+          onBack();
+        }
+      };
+
+      const handleAnswer = (val) => {
+        setAnswers(prev => ({ ...prev, [currentScreenId]: val }));
+      };
+
+      /* Register navigation handler for dev panel */
+      useEffect(() => {
+        if (onNavigate) {
+          onNavigate.current = (screenId) => {
+            /* Pre-fill mock data for all prior questions */
+            const newAnswers = { ...MOCK_SUBJECT_ANSWERS };
+            setAnswers(newAnswers);
+            if (screenId === 'subject-card') {
+              onComplete(newAnswers);
+              return;
+            }
+            setTimeout(() => goToScreen(screenId), 50);
+          };
+        }
+      }, []);
+
+      if (!currentQ) return null;
+
+      const color = currentQ.color;
+      const sectionLabel = currentQ.sectionLabel;
+      const questionOnlyScreens = allScreenIds.filter(id => {
+        const q = SUBJECT_QUESTIONS.find(sq => sq.id === id);
+        return q && q.type !== 'delight' && q.type !== 'availability';
+      });
+      const progressIdx = questionOnlyScreens.indexOf(currentScreenId);
+
+      /* Delight screen */
+      if (currentQ.type === 'delight') {
+        const c = COLOR_HEX[color];
+        return (
+          <ScreenLayout
+            color={color}
+            sectionLabel={sectionLabel}
+            onBack={goBack}
+            buttons={
+              <ActionButton label="Continue" color={color} onClick={advance} />
+            }
+          >
+            <div key={`delight-${animKey}`} className="animate-fadeSlideIn flex flex-col items-center gap-5 mt-4 w-full">
+              <div
+                className="w-full rounded-2xl p-5 text-center"
+                style={{
+                  background: `linear-gradient(135deg, rgba(${c.rgb}, 0.15), rgba(${c.rgb}, 0.05))`,
+                  border: `1px solid rgba(${c.rgb}, 0.25)`,
+                  boxShadow: `0 0 40px rgba(${c.rgb}, 0.1)`,
+                }}
+              >
+                <div className="text-lg font-bold text-white/90 mb-1">
+                  You may already know 14 Aura users!
+                </div>
+                <p className="text-xs text-white/30 mb-4">
+                  We found people from your {Array.isArray(answers['s2-social']) ? answers['s2-social'].join(' & ') : 'social'} network who are already in Aura.
+                </p>
+                {/* Mock user profiles */}
+                {[
+                  { name: 'Ravi Kumar', mutual: 12 },
+                  { name: 'Deepa Shah', mutual: 8 },
+                  { name: 'Sarah Chen', mutual: 5 },
+                ].map((person, i) => (
+                  <div key={i} className="flex items-center justify-between py-2.5 border-t border-white/[0.06]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
+                        style={{ background: `rgba(${c.rgb}, 0.2)`, color: c.light }}>
+                        {person.name[0]}
+                      </div>
+                      <div className="text-left">
+                        <div className="text-sm font-medium text-white/80">{person.name}</div>
+                        <div className="text-[10px] text-white/30">{person.mutual} mutual connections</div>
+                      </div>
+                    </div>
+                    <button className="text-[10px] font-semibold px-3 py-1.5 rounded-full transition-colors"
+                      style={{ background: `rgba(${c.rgb}, 0.15)`, color: c.light, border: `1px solid rgba(${c.rgb}, 0.25)` }}>
+                      Contact
+                    </button>
+                  </div>
+                ))}
+                <div className="text-xs text-white/30 mt-2">+ 11 more</div>
+              </div>
+              <p className="text-xs text-white/30 text-center px-4">
+                Any of these people could verify you through Path A — the fastest route.
+              </p>
+            </div>
+          </ScreenLayout>
+        );
+      }
+
+      /* Availability screen */
+      if (currentQ.type === 'availability') {
+        return (
+          <ScreenLayout
+            color={color}
+            sectionLabel={sectionLabel}
+            onBack={goBack}
+            buttons={
+              <div className="flex flex-col gap-2">
+                <ActionButton label="Continue" color={color} onClick={() => onComplete(answers)} />
+                <button
+                  onClick={() => onComplete(answers)}
+                  className="text-xs text-white/30 hover:text-white/50 transition-colors py-2"
+                >
+                  Skip — these are optional
+                </button>
+              </div>
+            }
+          >
+            <div key={`avail-${animKey}`} className="animate-fadeSlideIn flex flex-col gap-4 w-full mt-4">
+              <p className="text-sm text-white/40 text-center mb-2 italic">
+                These are optional — they help evaluators feel confident about you.
+              </p>
+              <ToggleSwitch
+                label="Open to a quick video chat"
+                color={color}
+                isOn={!!answers['s4-video']}
+                onToggle={() => setAnswers(prev => ({ ...prev, 's4-video': !prev['s4-video'] }))}
+              />
+              <ToggleSwitch
+                label="Could meet someone nearby"
+                subtitle="Coffee shop, community event, etc."
+                color={color}
+                isOn={!!answers['s4-meet']}
+                onToggle={() => setAnswers(prev => ({ ...prev, 's4-meet': !prev['s4-meet'] }))}
+              />
+              <ToggleSwitch
+                label="Someone I know can confirm I'm real"
+                color={color}
+                isOn={!!answers['s4-vouch']}
+                onToggle={() => setAnswers(prev => ({ ...prev, 's4-vouch': !prev['s4-vouch'] }))}
+              />
+            </div>
+          </ScreenLayout>
+        );
+      }
+
+      /* Regular question screens */
+      const isSingle = currentQ.type === 'single';
+      const isMulti = currentQ.type === 'multi';
+      const isText = currentQ.type === 'text';
+
+      const handleSingleAnswer = (val) => {
+        handleAnswer(val);
+        setTimeout(advance, 300);
+      };
+
+      const needsContinueButton = isMulti || isText;
+      const continueDisabled = isText ? !(answers[currentScreenId] || '').trim() : isMulti ? !(answers[currentScreenId] || []).length : false;
+
+      return (
+        <ScreenLayout
+          color={color}
+          sectionLabel={sectionLabel}
+          progress={progressIdx >= 0 ? progressIdx : undefined}
+          total={progressIdx >= 0 ? questionOnlyScreens.length : undefined}
+          onBack={goBack}
+          buttons={
+            needsContinueButton ? (
+              <ActionButton label="Continue" color={color} onClick={advance} disabled={continueDisabled} />
+            ) : null
+          }
+        >
+          <div key={`q-${currentScreenId}-${animKey}`} className="animate-fadeSlideIn flex flex-col items-center gap-5 w-full mt-4">
+            <h2 className="question-text font-semibold text-white/90 px-2">
+              {currentQ.text}
+            </h2>
+            {currentQ.subtitle && (
+              <p className="text-xs text-white/40 text-center -mt-2 px-4">{currentQ.subtitle}</p>
+            )}
+
+            {isSingle && (
+              <SingleSelect question={currentQ} color={color} answer={answers[currentScreenId]} onAnswer={handleSingleAnswer} answers={answers} />
+            )}
+            {isMulti && (
+              <MultiSelect question={currentQ} color={color} answer={answers[currentScreenId]} onAnswer={handleAnswer} onContinue={advance} />
+            )}
+            {isText && (
+              <TextInput question={currentQ} color={color} answer={answers[currentScreenId]} onAnswer={handleAnswer} onContinue={advance} />
+            )}
+          </div>
+        </ScreenLayout>
+      );
+    }
+
+
+    /* ─── Subject Profile Card ─── */
+
+    function SubjectProfileCard({ answers, onBack }) {
+      const c = COLOR_HEX.violet;
+      const rows = [
+        { label: 'Name', value: answers['s1-name'] },
+        { label: 'Country', value: answers['s1-country'] },
+        { label: 'City', value: answers['s1-city'] },
+        { label: 'Source', value: Array.isArray(answers['s1-source']) ? answers['s1-source'].join(', ') : answers['s1-source'] },
+        answers['s1-referrer'] && { label: 'Referred by', value: answers['s1-referrer'] },
+        { label: 'Account type', value: answers['s1-account-type'] },
+        { label: 'Social', value: Array.isArray(answers['s2-social']) ? answers['s2-social'].join(', ') : answers['s2-social'] },
+        { label: 'Knows someone', value: answers['s2-know-anyone'] },
+        answers['s2-connection-name'] && { label: 'Connection', value: answers['s2-connection-name'] },
+        { label: 'Account status', value: answers['s3-attest'] },
+        { label: 'Open to video chat', value: answers['s4-video'] ? 'Yes' : 'No' },
+        { label: 'Open to in-person', value: answers['s4-meet'] ? 'Yes' : 'No' },
+        { label: 'Has a voucher', value: answers['s4-vouch'] ? 'Yes' : 'No' },
+      ].filter(Boolean);
+
+      return (
+        <ScreenLayout color="violet" onBack={onBack}>
+          <div className="animate-fadeSlideIn w-full">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4"
+                style={{ background: `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.1))`, border: `1px solid rgba(${c.rgb}, 0.3)` }}>
+                <span className="text-2xl">
+                  {(answers['s1-name'] || '?')[0]?.toUpperCase()}
+                </span>
+              </div>
+              <h2 className="text-xl font-bold text-white/90">{answers['s1-name'] || 'Anonymous'}</h2>
+              <p className="text-sm text-white/40 mt-1">{answers['s1-city'] || answers['s1-country'] || 'Unknown location'}</p>
+            </div>
+
+            <div className="card-surface rounded-2xl p-5 mb-4">
+              <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">Profile Card</h3>
+              <div className="flex flex-col gap-3">
+                {rows.map(row => (
+                  <div key={row.label} className="flex justify-between items-start gap-3">
+                    <span className="text-xs text-white/40 flex-shrink-0">{row.label}</span>
+                    <span className="text-sm text-white/80 text-right">{String(row.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-xs text-white/30 text-center mb-6 px-4">
+              This is what evaluators will see. Multiple evaluators will assess your profile to determine your verification level.
+            </p>
+
+            <ActionButton label="Submit Profile" color="violet" onClick={onBack} />
+            <div className="mt-3">
+              <ActionButton label="Start Over" color="gray" onClick={onBack} secondary />
+            </div>
+          </div>
+        </ScreenLayout>
+      );
+    }
+
+
+    /* ─── Evaluator Flow ─── */
+
+    function EvaluatorFlow({ onComplete, onBack, onNavigate }) {
+      const [phase, setPhase] = useState('gate'); // gate | fit | path
+      const [path, setPath] = useState(null); // A | B | C
+      const [answers, setAnswers] = useState({});
+      const [questionIdx, setQuestionIdx] = useState(0);
+      const [animKey, setAnimKey] = useState(0);
+
+      const pathConfig = {
+        A: { label: 'Vouching', color: 'cyan', questions: PATH_A_QUESTIONS },
+        B: { label: 'Investigation', color: 'amber', questions: PATH_B_QUESTIONS },
+        C: { label: 'Analysis', color: 'slate', questions: PATH_C_QUESTIONS },
+      };
+
+      const gateColor = 'emerald';
+
+      /* Get active questions for current path, respecting conditionals */
+      const getActiveQuestions = (p, ans) => {
+        if (!p || !pathConfig[p]) return [];
+        return pathConfig[p].questions.filter(q => !q.conditional || q.conditional(ans));
+      };
+
+      /* Dev panel navigation */
+      useEffect(() => {
+        if (onNavigate) {
+          onNavigate.current = (screenId) => {
+            const newAnswers = { ...MOCK_EVAL_ANSWERS };
+            setAnswers(newAnswers);
+
+            if (screenId === 'eval-gate') {
+              setPhase('gate');
+              return;
+            }
+            if (screenId === 'eval-fit') {
+              setPath('A');
+              setPhase('fit');
+              return;
+            }
+            if (screenId.startsWith('eval-summary-')) {
+              const p = screenId.split('-')[2];
+              setPath(p);
+              onComplete({ path: p, pathLabel: pathConfig[p].label, answers: newAnswers });
+              return;
+            }
+
+            /* Find which path this question belongs to */
+            for (const [p, cfg] of Object.entries(pathConfig)) {
+              const qIdx = cfg.questions.findIndex(q => q.id === screenId);
+              if (qIdx >= 0) {
+                setPath(p);
+                setPhase('path');
+                const active = getActiveQuestions(p, newAnswers);
+                const activeIdx = active.findIndex(q => q.id === screenId);
+                setTimeout(() => setQuestionIdx(activeIdx >= 0 ? activeIdx : qIdx), 50);
+                return;
+              }
+            }
+          };
+        }
+      }, []);
+
+      /* Gate screen */
+      if (phase === 'gate') {
+        return (
+          <ScreenLayout color={gateColor} sectionLabel="Relationship Gate" onBack={onBack}>
+            <div className="animate-fadeSlideIn flex flex-col items-center gap-6 w-full mt-4">
+              <h2 className="question-text font-semibold text-white/90 px-2">
+                How do you know this person?
+              </h2>
+              <div className="flex flex-col gap-3 w-full">
+                {[
+                  { key: 'A', label: 'I know them personally', sub: 'Highest weight — vouching', color: 'cyan' },
+                  { key: 'B', label: 'I met/interviewed them for verification', sub: 'Medium weight — investigation', color: 'amber' },
+                  { key: 'C', label: "I'm reviewing their profile only", sub: 'Lowest weight — analysis', color: 'slate' },
+                ].map(opt => {
+                  const oc = COLOR_HEX[opt.color];
+                  return (
+                    <button
+                      key={opt.key}
+                      onClick={() => {
+                        setPath(opt.key);
+                        setAnswers(prev => ({ ...prev, 'gate': opt.label }));
+                        setPhase('fit');
+                      }}
+                      className="btn-shine w-full rounded-2xl px-5 py-4 text-left transition-all duration-200"
+                      style={{
+                        background: `linear-gradient(135deg, rgba(${oc.rgb}, 0.12), rgba(${oc.rgb}, 0.04))`,
+                        border: `1px solid rgba(${oc.rgb}, 0.2)`,
+                      }}
+                    >
+                      <div className="text-sm font-semibold text-white/90">{opt.label}</div>
+                      <div className="text-xs mt-0.5" style={{ color: `rgba(${oc.rgb}, 0.7)` }}>{opt.sub}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </ScreenLayout>
+        );
+      }
+
+      /* Evaluator Fit check — redesigned, no kick-out */
+      if (phase === 'fit') {
+        const fitColor = pathConfig[path].color;
+        const c = COLOR_HEX[fitColor];
+        return (
+          <ScreenLayout
+            color={fitColor}
+            sectionLabel="Evaluator Fit"
+            onBack={() => setPhase('gate')}
+          >
+            <div className="animate-fadeSlideIn flex flex-col items-center gap-6 w-full mt-4">
+              <h2 className="question-text font-semibold text-white/90 px-2">
+                How well do you know this person's situation?
+              </h2>
+              <div className="flex flex-col gap-3 w-full">
+                {[
+                  "Very well — I'm a good judge here",
+                  "Somewhat — I can contribute but have gaps",
+                  "Not very well — I'll do my best with what I have",
+                ].map(opt => (
+                  <OptionButton
+                    key={opt}
+                    label={opt}
+                    color={fitColor}
+                    selected={answers['fit'] === opt}
+                    onClick={() => {
+                      setAnswers(prev => ({ ...prev, 'fit': opt }));
+                      setTimeout(() => setPhase('path'), 300);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </ScreenLayout>
+        );
+      }
+
+      /* Path questions */
+      const config = pathConfig[path];
+      const color = config.color;
+      const activePathQuestions = getActiveQuestions(path, answers);
+      const question = activePathQuestions[questionIdx];
+
+      if (!question) {
+        onComplete({ path, pathLabel: config.label, answers });
+        return null;
+      }
+
+      const handleAnswer = (val) => {
+        setAnswers(prev => ({ ...prev, [question.id]: val }));
+      };
+
+      const advance = () => {
+        setAnimKey(k => k + 1);
+        /* For star-confidence, default to undefined (must select) */
+        const updatedAnswers = { ...answers };
+        if (question.type === 'star-confidence' && updatedAnswers[question.id] === undefined) {
+          return; /* Don't advance without selection */
+        }
+
+        const nextQuestions = getActiveQuestions(path, updatedAnswers);
+        const currentFilteredIdx = nextQuestions.findIndex(q => q.id === question.id);
+        if (currentFilteredIdx + 1 < nextQuestions.length) {
+          setQuestionIdx(currentFilteredIdx + 1);
+        } else {
+          onComplete({ path, pathLabel: config.label, answers: updatedAnswers });
+        }
+      };
+
+      const goBack = () => {
+        if (questionIdx > 0) {
+          setAnimKey(k => k + 1);
+          setQuestionIdx(questionIdx - 1);
+        } else {
+          setPhase('fit');
+        }
+      };
+
+      const handleSingleAnswer = (val) => {
+        handleAnswer(val);
+        setTimeout(advance, 300);
+      };
+
+      const isSingle = question.type === 'single';
+      const isMulti = question.type === 'multi';
+      const isText = question.type === 'text';
+      const isStar = question.type === 'star-confidence';
+
+      const needsContinueButton = isMulti || isText || isStar;
+      const continueDisabled = isText
+        ? !(answers[question.id] || '').trim()
+        : isMulti
+          ? !(answers[question.id] || []).length
+          : isStar
+            ? answers[question.id] === undefined
+            : false;
+
+      return (
+        <ScreenLayout
+          color={color}
+          sectionLabel={`Path ${path}: ${config.label}`}
+          progress={questionIdx}
+          total={activePathQuestions.length}
+          onBack={goBack}
+          buttons={
+            needsContinueButton ? (
+              <ActionButton label="Continue" color={color} onClick={advance} disabled={continueDisabled} />
+            ) : null
+          }
+        >
+          <div key={`eq-${question.id}-${animKey}`} className="animate-fadeSlideIn flex flex-col items-center gap-5 w-full mt-4">
+            <h2 className="question-text font-semibold text-white/90 px-2">
+              {question.text}
+            </h2>
+            {question.subtitle && (
+              <p className="text-xs text-white/40 text-center -mt-2 px-4">{question.subtitle}</p>
+            )}
+
+            {isSingle && (
+              <SingleSelect question={question} color={color} answer={answers[question.id]} onAnswer={handleSingleAnswer} answers={answers} />
+            )}
+            {isMulti && (
+              <MultiSelect question={question} color={color} answer={answers[question.id]} onAnswer={handleAnswer} onContinue={advance} />
+            )}
+            {isText && (
+              <TextInput question={question} color={color} answer={answers[question.id]} onAnswer={handleAnswer} onContinue={advance} />
+            )}
+            {isStar && (
+              <StarConfidence color={color} value={answers[question.id]} onChange={handleAnswer} />
+            )}
+          </div>
+        </ScreenLayout>
+      );
+    }
+
+
+    /* ─── Evaluator Summary ─── */
+
+    function EvaluatorSummary({ data, onBack }) {
+      const { path, pathLabel, answers } = data;
+      const pathConfig = {
+        A: { color: 'cyan', questions: PATH_A_QUESTIONS },
+        B: { color: 'amber', questions: PATH_B_QUESTIONS },
+        C: { color: 'slate', questions: PATH_C_QUESTIONS },
+      };
+      const config = pathConfig[path];
+      const color = config.color;
+      const c = COLOR_HEX[color];
+
+      const confKey = path === 'A' ? 'a3-confidence' : path === 'B' ? 'b5-confidence' : 'c6-confidence';
+      const confidence = answers[confKey] || '--';
+
+      const confLabels = {
+        1: 'Some confidence, notable gaps',
+        2: 'Fairly confident, minor uncertainty',
+        3: 'Very confident',
+        4: 'Certain',
+      };
+
+      const rows = config.questions
+        .filter(q => answers[q.id] !== undefined)
+        .map(q => ({
+          label: q.text,
+          value: Array.isArray(answers[q.id]) ? answers[q.id].join(', ') : String(answers[q.id])
+        }));
+
+      return (
+        <ScreenLayout color={color} onBack={onBack}>
+          <div className="animate-fadeSlideIn w-full">
+            <div className="text-center mb-6">
+              <SectionBadge label={`Path ${path}: ${pathLabel}`} color={color} />
+              <h2 className="text-xl font-bold text-white/90 mt-2">Evaluation Summary</h2>
+            </div>
+
+            <div className="rounded-2xl p-5 mb-4 text-center"
+              style={{
+                background: `linear-gradient(135deg, rgba(${c.rgb}, 0.15), rgba(${c.rgb}, 0.05))`,
+                border: `1px solid rgba(${c.rgb}, 0.25)`
+              }}
+            >
+              <div className="flex justify-center gap-3 mb-3">
+                {[1, 2, 3, 4].map(level => {
+                  const isSelected = typeof confidence === 'number' && level <= confidence;
+                  return (
+                    <div
+                      key={level}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
+                      style={{
+                        background: isSelected
+                          ? `linear-gradient(135deg, rgba(${c.rgb}, 0.5), rgba(${c.rgb}, 0.25))`
+                          : 'rgba(255,255,255,0.08)',
+                        border: isSelected
+                          ? `1px solid rgba(${c.rgb}, 0.6)`
+                          : '1px solid rgba(255,255,255,0.1)',
+                        color: isSelected ? '#fff' : 'rgba(255,255,255,0.35)',
+                      }}
+                    >
+                      {level}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="text-xs text-white/50">{confLabels[confidence] || 'Confidence'}</div>
+            </div>
+
+            <div className="card-surface rounded-2xl p-5 mb-4">
+              <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">Responses</h3>
+              <div className="flex flex-col gap-4">
+                {rows.map((row, i) => (
+                  <div key={i}>
+                    <div className="text-xs text-white/40 mb-1">{row.label}</div>
+                    <div className="text-sm text-white/80">{row.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {answers['fit'] && (
+              <div className="card-surface rounded-2xl p-4 mb-4">
+                <div className="text-xs text-white/40 mb-1">Evaluator fit</div>
+                <div className="text-sm text-white/80">{answers['fit']}</div>
+              </div>
+            )}
+
+            <p className="text-xs text-white/30 text-center mb-6 px-4">
+              This evaluation will be weighted by your path ({pathLabel}), your confidence level, and your reputation in the network.
+            </p>
+
+            <ActionButton label="Submit Evaluation" color={color} onClick={onBack} />
+            <div className="mt-3">
+              <ActionButton label="Start Over" color="gray" onClick={onBack} secondary />
+            </div>
+          </div>
+        </ScreenLayout>
+      );
+    }
+
+
+    /* ─── Dev Panel ─── */
+
+    function DevPanel({ isOpen, onToggle, onJump }) {
+      if (!isOpen) return null;
+
+      const groups = {};
+      for (const [id, info] of Object.entries(SCREEN_REGISTRY)) {
+        if (!groups[info.group]) groups[info.group] = [];
+        groups[info.group].push({ id, ...info });
+      }
+
+      const groupOrder = ['Main', 'Subject', 'Evaluator', 'Path A', 'Path B', 'Path C'];
+
+      const groupColors = {
+        'Main': 'gray',
+        'Subject': 'violet',
+        'Evaluator': 'emerald',
+        'Path A': 'cyan',
+        'Path B': 'amber',
+        'Path C': 'slate',
+      };
+
+      return (
+        <div className="dev-panel">
+          <div className="p-4 border-b border-white/[0.06]">
+            <div className="text-xs font-semibold text-white/60 uppercase tracking-wider">Dev Panel</div>
+            <div className="text-[10px] text-white/30 mt-1">Click to jump, or use arrow keys</div>
+          </div>
+          <div className="p-3">
+            {groupOrder.map(group => {
+              if (!groups[group]) return null;
+              const gc = COLOR_HEX[groupColors[group]] || COLOR_HEX.gray;
+              return (
+                <div key={group} className="mb-4">
+                  <div
+                    className="text-[10px] font-semibold uppercase tracking-wider mb-2 px-1"
+                    style={{ color: gc.light }}
+                  >
+                    {group}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {groups[group].map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => onJump(item.id)}
+                        className="w-full text-left text-xs px-3 py-2 rounded-lg transition-all duration-150 hover:bg-white/[0.06] text-white/50 hover:text-white/80"
+                        style={{ border: '1px solid transparent' }}
+                        onMouseEnter={e => { e.target.style.borderColor = `rgba(${gc.rgb}, 0.2)`; }}
+                        onMouseLeave={e => { e.target.style.borderColor = 'transparent'; }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+
+    /* ─── App ─── */
+
+    function App() {
+      const [screen, setScreen] = useState('landing');
+      const [subjectAnswers, setSubjectAnswers] = useState(null);
+      const [evaluatorData, setEvaluatorData] = useState(null);
+      const [phoneSize, setPhoneSize] = useState(1); /* index into PHONE_SIZES, default iPhone 14 */
+      const [devOpen, setDevOpen] = useState(false);
+
+      const subjectNavRef = useRef(null);
+      const evalNavRef = useRef(null);
+
+      /* Arrow key navigation when dev panel is open */
+      const screenKeys = Object.keys(SCREEN_REGISTRY);
+      const currentDevScreenRef = useRef(null);
+
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          if (!devOpen) return;
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+          e.preventDefault();
+
+          const direction = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
+          const currentId = currentDevScreenRef.current;
+          let currentIdx = currentId ? screenKeys.indexOf(currentId) : -1;
+          if (currentIdx === -1) currentIdx = direction === 1 ? -1 : screenKeys.length;
+          const nextIdx = Math.max(0, Math.min(screenKeys.length - 1, currentIdx + direction));
+          const nextId = screenKeys[nextIdx];
+
+          currentDevScreenRef.current = nextId;
+          handleDevJump(nextId);
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [devOpen]);
+
+      const startOver = () => {
+        setScreen('landing');
+        setSubjectAnswers(null);
+        setEvaluatorData(null);
+      };
+
+      const handleDevJump = (screenId) => {
+        /* Track for arrow key navigation */
+        currentDevScreenRef.current = screenId;
+        /* Determine which flow this screen belongs to */
+        const info = SCREEN_REGISTRY[screenId];
+        if (!info) return;
+
+        if (screenId === 'landing') {
+          startOver();
+          return;
+        }
+
+        if (info.group === 'Subject') {
+          if (screenId === 'subject-card') {
+            setSubjectAnswers(MOCK_SUBJECT_ANSWERS);
+            setScreen('subject-card');
+          } else {
+            setScreen('subject');
+            setTimeout(() => {
+              if (subjectNavRef.current) subjectNavRef.current(screenId);
+            }, 100);
+          }
+          return;
+        }
+
+        if (info.group === 'Evaluator' || info.group.startsWith('Path')) {
+          if (screenId.startsWith('eval-summary-')) {
+            const p = screenId.split('-')[2];
+            const pathConfig = {
+              A: { label: 'Vouching' },
+              B: { label: 'Investigation' },
+              C: { label: 'Analysis' },
+            };
+            setEvaluatorData({ path: p, pathLabel: pathConfig[p].label, answers: MOCK_EVAL_ANSWERS });
+            setScreen('evaluator-summary');
+          } else {
+            setScreen('evaluator');
+            setTimeout(() => {
+              if (evalNavRef.current) evalNavRef.current(screenId);
+            }, 100);
+          }
+          return;
+        }
+      };
+
+      const phone = PHONE_SIZES[phoneSize];
+
+      const renderContent = () => {
+        switch (screen) {
+          case 'landing':
+            return (
+              <LandingScreen
+                onSubject={() => setScreen('subject')}
+                onEvaluator={() => setScreen('evaluator')}
+              />
+            );
+          case 'subject':
+            return (
+              <SubjectFlow
+                onComplete={(answers) => {
+                  setSubjectAnswers(answers);
+                  setScreen('subject-card');
+                }}
+                onBack={startOver}
+                onNavigate={subjectNavRef}
+              />
+            );
+          case 'subject-card':
+            return (
+              <SubjectProfileCard
+                answers={subjectAnswers || MOCK_SUBJECT_ANSWERS}
+                onBack={startOver}
+              />
+            );
+          case 'evaluator':
+            return (
+              <EvaluatorFlow
+                onComplete={(data) => {
+                  setEvaluatorData(data);
+                  setScreen('evaluator-summary');
+                }}
+                onBack={startOver}
+                onNavigate={evalNavRef}
+              />
+            );
+          case 'evaluator-summary':
+            return (
+              <EvaluatorSummary
+                data={evaluatorData}
+                onBack={startOver}
+              />
+            );
+          default:
+            return <LandingScreen onSubject={() => setScreen('subject')} onEvaluator={() => setScreen('evaluator')} />;
+        }
+      };
+
+      return (
+        <div style={{ minHeight: '100vh', background: '#111', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {/* Phone size selector */}
+          <div style={{ display: 'flex', gap: '8px', padding: '20px 0 16px', zIndex: 100 }}>
+            {PHONE_SIZES.map((size, idx) => (
+              <button
+                key={size.label}
+                onClick={() => setPhoneSize(idx)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  fontWeight: idx === phoneSize ? '600' : '400',
+                  background: idx === phoneSize ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
+                  border: idx === phoneSize ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                  color: idx === phoneSize ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  fontFamily: 'Inter, -apple-system, sans-serif',
+                }}
+              >
+                {size.label} ({size.width}x{size.height})
+              </button>
+            ))}
+          </div>
+
+          {/* Phone frame */}
+          <div className="phone-frame" style={{ width: phone.width + 24, height: phone.height + 24 }}>
+            <div className="phone-frame-inner" style={{ width: phone.width, height: phone.height }}>
+              {renderContent()}
+            </div>
+          </div>
+
+          <div style={{ height: '40px' }} />
+
+          {/* Dev panel toggle */}
+          <button className="dev-toggle" onClick={() => setDevOpen(!devOpen)} title="Dev Panel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+
+          <DevPanel isOpen={devOpen} onToggle={() => setDevOpen(!devOpen)} onJump={handleDevJump} />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
