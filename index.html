@@ -5834,7 +5834,7 @@ const AnsweredQuestionView = ({ question, response, results, darkMode, questionF
 };
 
 // Category Selection Screen - a5 mockup design
-const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCategory, onSettings, onProfile, stats, qotdData, qotdResponse, onQotdClick, onResetQotd, onAssessments, onAssessSurprise, assessCompleted, isLoggedIn }) => {
+const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCategory, onSettings, onProfile, stats, qotdData, qotdResponse, onQotdClick, onResetQotd, onAssessments, onAssessSurprise, assessCompleted, isLoggedIn, onVerify, verifyPendingCount }) => {
   const getProgress = (categoryId) => {
     const catQuestions = categoryId === 'random' ? questions : questions.filter(q => q.category === categoryId);
     const binaryQ = catQuestions.filter(q => q.type === 'binary');
@@ -6069,6 +6069,36 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
           </button>
 
           {/* Bottom spacer for comfortable scrolling */}
+          <div className="h-4" />
+        </div>
+
+        {/* DIVIDER — Self ↔ Work */}
+        <div className="flex items-center gap-3 my-5">
+          <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
+          <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Work</span>
+          <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
+        </div>
+
+        {/* SECTION 3: Work Tasks */}
+        <div className="space-y-3">
+          <button
+            onClick={onVerify}
+            className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-emerald glow-emerald border ${
+              darkMode
+                ? 'border-emerald-500/40 hover:border-emerald-400/80 active:border-emerald-300 bg-gradient-to-r from-emerald-900/30 to-emerald-950/50'
+                : 'border-emerald-300 hover:border-emerald-400 bg-gradient-to-r from-emerald-50 to-emerald-50'
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <span className="text-xl">🛡️</span>
+              <div className={`flex-1 text-base font-semibold ${TH('text-primary', darkMode)}`}>Verify</div>
+              {verifyPendingCount > 0 && (
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                  {verifyPendingCount}
+                </span>
+              )}
+            </div>
+          </button>
           <div className="h-4" />
         </div>
       </div>
@@ -6635,6 +6665,140 @@ const ProfileSection = ({ darkMode }) => {
     </div>
   );
 };
+
+// ==================== VERIFICATION DATA LAYER ====================
+
+const VERIFY_STORAGE_KEY = 'aura-verification-v1';
+const verifySaveToStorage = (subjectProfile, evaluations) => {
+  try { localStorage.setItem(VERIFY_STORAGE_KEY, JSON.stringify({ subjectProfile, evaluations, savedAt: Date.now() })); } catch {}
+};
+const verifyLoadFromStorage = () => {
+  try { const s = localStorage.getItem(VERIFY_STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; }
+};
+
+const VERIFY_SUBJECT_QUESTIONS = [
+  /* S1: Basics */
+  { id: 's1-name', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What name do you go by?', type: 'text', placeholder: 'Your name' },
+  { id: 's1-country', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What country or region?', type: 'single',
+    options: ['United States', 'Europe', 'South America', 'Southeast Asia', 'India', 'Africa', 'Middle East', 'Other'] },
+  { id: 's1-city', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What city or area?', type: 'text', placeholder: 'City or area' },
+  { id: 's1-source', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'How did you find Aura?', type: 'multi',
+    options: ['A friend told me about it', 'Just checking it out', 'I want to prove my identity', 'I want to become an Aura player'] },
+  { id: 's1-referrer', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'Who told you about Aura?', type: 'text', placeholder: 'Their name or username',
+    conditional: (a) => Array.isArray(a['s1-source']) && a['s1-source'].includes('A friend told me about it') },
+  { id: 's1-account-type', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What brings you here?', type: 'single',
+    options: ['Setting up a new account', 'Recovering an account I lost access to', 'Replacing an old account with a new one'] },
+  /* S2: Connections */
+  { id: 's2-social', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Connect your social accounts to find people you already know', type: 'multi',
+    subtitle: 'Select as many as you like. Not for auto-verification — gives evaluators a map.',
+    options: ['LinkedIn', 'Facebook'] },
+  { id: 's2-delight', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: '__DELIGHT__', type: 'delight',
+    conditional: (a) => Array.isArray(a['s2-social']) && a['s2-social'].length > 0 },
+  { id: 's2-contacts', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Want us to check your contacts too?', type: 'single',
+    subtitle: 'We only check for matches with Aura users. Nothing is stored or shared.',
+    options: ['Sure, check my contacts', 'No thanks'],
+    conditional: (a) => Array.isArray(a['s2-social']) && a['s2-social'].length > 0 },
+  { id: 's2-know-anyone', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Do you know anyone already using Aura?', type: 'single',
+    options: ["I'm sure they're here", "I think they might be", "No, I don't know anyone"],
+    conditional: (a) => !Array.isArray(a['s2-social']) || a['s2-social'].length === 0 },
+  { id: 's2-connection-name', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Who?', type: 'text', placeholder: 'Their name or username',
+    conditional: (a) => a['s2-know-anyone'] === "I'm sure they're here" || a['s2-know-anyone'] === "I think they might be" },
+  /* S3: Attestation */
+  { id: 's3-attest', section: 'S3', sectionLabel: 'Account', color: 'emerald', text: 'Do you have any other accounts in Aura or BrightID?', type: 'single',
+    subtitle: "One person, one account — that's how Aura stays fair. If you have an old account, an Aura player can help you sort it out.",
+    options: ['Nope, this is my only one', "Yes, I have an old one I don't use", "I'm not sure"] },
+  /* S4: Availability */
+  { id: 's4-availability', section: 'S4', sectionLabel: 'Availability', color: 'teal', text: '__AVAILABILITY__', type: 'availability' },
+];
+
+/* Evaluator shared question fragments */
+const VERIFY_Q_REAL_HUMAN = {
+  text: 'Is this a real, biological person?', type: 'single',
+  subtitle: 'Not AI, not virtual, not a deepfake.',
+  options: ['Definitely', 'I believe so', 'I have some doubt']
+};
+const VERIFY_Q_ONLY_ACCOUNT = {
+  text: 'Is this their only account in Aura?', type: 'single',
+  options: ["I'd be very surprised if not", "Probably", 'I have some doubt', 'I suspect another exists']
+};
+const VERIFY_Q_SYBIL = {
+  text: 'Could they maintain more than one identity?', type: 'multi',
+  subtitle: 'Select all that apply.',
+  options: ['Has separate social circles that may not overlap', 'Technically savvy', 'Networks spread across multiple cities or communities', 'Unlikely — simple, local life']
+};
+const VERIFY_Q_RED_FLAGS = {
+  text: 'Did you notice any red flags?', type: 'multi',
+  options: ['Vague or inconsistent', 'Evasive about basics', 'Seemed rushed or pushy', "Connections didn't check out", 'Nothing concerning']
+};
+
+const VERIFY_CONFIDENCE_LABELS = [
+  '1 — Notable gaps in my knowledge',
+  '2 — Fairly confident, some uncertainty',
+  '3 — Very confident, no reason to doubt',
+  "4 — Certain, I'd stake my reputation",
+];
+
+const VERIFY_PATH_A_QUESTIONS = [
+  { id: 'a1-relationship', text: 'How do you know them?', type: 'multi', subtitle: 'Select all that apply.',
+    options: ['Family', 'Friend', 'Colleague', 'Neighbor', 'Community member', 'Other'], hasOtherInput: true },
+  { id: 'a1-duration', text: 'How long have you known them?', type: 'single', options: ['Less than 1 year', '1-5 years', '5+ years'] },
+  { id: 'a1-last-interact', text: 'When did you last interact?', type: 'single', options: ['This week', 'This month', 'This year', 'Longer'] },
+  { id: 'a2a', ...VERIFY_Q_REAL_HUMAN },
+  { id: 'a2b', ...VERIFY_Q_ONLY_ACCOUNT },
+  { id: 'a2c', ...VERIFY_Q_SYBIL },
+  { id: 'a3-confidence', text: 'Overall, how strongly would you vouch for this person?', type: 'star-confidence' },
+  { id: 'a4-doubt', text: "What's the source of your uncertainty?", type: 'multi', subtitle: 'Select all that apply.',
+    options: ["I haven't seen them recently", 'I know them only in one context', "Something feels off but I can't pinpoint it", 'Other'],
+    conditional: (a) => { const c = a['a3-confidence']; return c !== undefined && c <= 2; } },
+];
+
+const VERIFY_PATH_B_QUESTIONS = [
+  { id: 'b1-how-meet', text: 'How did you meet?', type: 'single', options: ['In person', 'Video call', 'Text-chat only'] },
+  { id: 'b1-who-init', text: 'Who initiated?', type: 'single', options: ['They came to me', 'I reached out', 'Mutual'] },
+  { id: 'b1-context', text: 'Brief context — where and when?', type: 'text', placeholder: 'e.g. Coffee shop downtown, last Tuesday' },
+  { id: 'b2-evidence-direct', text: 'What did you directly observe?', type: 'multi', subtitle: 'Select all that apply (max 5).', maxSelect: 5,
+    options: ['Physically present — clearly a real person', 'Spoke about their life with specific details', 'Others at the scene recognized them', 'Showed something hard to fabricate', 'Nothing I could directly verify'] },
+  { id: 'b2-evidence-support', text: 'Any supporting evidence?', type: 'multi', subtitle: 'Select all that apply (max 5).', maxSelect: 5,
+    options: ['Social graph looks authentic', 'Connected to people already in Aura', 'Referred by someone I trust', 'Profile matches what I observed', 'No supporting evidence'] },
+  { id: 'b3-red-flags', ...VERIFY_Q_RED_FLAGS },
+  { id: 'b4a', text: 'Is this a real, biological person?', type: 'single', subtitle: 'Not AI, not virtual, not a deepfake.',
+    options: ['Definitely', 'I believe so', 'I have some doubt'],
+    dynamicOptions: (a) => a['b1-how-meet'] === 'In person' ? ['Definitely', 'I believe so'] : ['Definitely', 'I believe so', 'I have some doubt'] },
+  { id: 'b4b', ...VERIFY_Q_ONLY_ACCOUNT },
+  { id: 'b4c', ...VERIFY_Q_SYBIL },
+  { id: 'b5-confidence', text: 'How confident are you that this is a unique, real person?', type: 'star-confidence' },
+  { id: 'b6-doubt', text: "What's the source of your uncertainty?", type: 'multi', subtitle: 'Select all that apply.',
+    options: ['I only met them once', 'I know them in only one context', 'They were reluctant to share personal info', 'They seem capable of gaming the system', 'I did not see proof-of-work that would be hard to fake', 'Something feels off', 'Other'],
+    conditional: (a) => { const c = a['b5-confidence']; return c !== undefined && c <= 2; } },
+];
+
+const VERIFY_PATH_C_QUESTIONS = [
+  { id: 'c1-sources', text: 'What are you working from?', type: 'multi', subtitle: 'Select all that apply.',
+    options: ['Self-attestation', 'Connection graph / social imports', "Other evaluators' assessments", 'Referral chain', 'Activity history', 'Other'] },
+  { id: 'c2-looks-real', text: 'Does this profile look like a real, unique person?', type: 'star-confidence' },
+  { id: 'c3-strongest', text: "What signals give you the most confidence?", type: 'multi', subtitle: 'Select all that apply.',
+    options: ['Rich connections with verified users', 'Believable self-attestation', 'Multiple evaluators already confident', 'Strong referral chain', 'Other'] },
+  { id: 'c3-weakest', text: "What are the weakest points?", type: 'multi', subtitle: 'Select all that apply.',
+    options: ['Thin connections', 'No in-person verification', 'New profile, little history', 'Generic attestation', 'Other'] },
+  { id: 'c4-red-flags', ...VERIFY_Q_RED_FLAGS },
+  { id: 'c6-confidence', text: "Based on what you've reviewed, how confident are you in this person's uniqueness?", type: 'star-confidence' },
+];
+
+const VERIFY_PATH_CONFIG = {
+  A: { label: 'Vouching', color: 'cyan', questions: VERIFY_PATH_A_QUESTIONS },
+  B: { label: 'Investigation', color: 'amber', questions: VERIFY_PATH_B_QUESTIONS },
+  C: { label: 'Analysis', color: 'slate', questions: VERIFY_PATH_C_QUESTIONS },
+};
+
+const VERIFY_MOCK_SUBJECTS = [
+  { id: 'mock-1', name: 'Alex Rivera', city: 'Portland, OR', country: 'United States', connections: 14,
+    availability: { video: true, meet: true, vouch: true } },
+  { id: 'mock-2', name: 'Priya Sharma', city: 'Bangalore', country: 'India', connections: 8,
+    availability: { video: true, meet: false, vouch: true } },
+  { id: 'mock-3', name: 'Marcus Chen', city: 'Toronto', country: 'Other', connections: 0, availability: null },
+  { id: 'mock-4', name: 'Sofia Andersson', city: 'Stockholm', country: 'Europe', connections: 22,
+    availability: { video: true, meet: true, vouch: true } },
+];
 
 // ==================== VERIFICATION COMPONENTS ====================
 
@@ -7412,7 +7576,7 @@ const VerifyEvalSummary = ({ darkMode, data, subject, onSubmit, onBack }) => {
 
 
 // SettingsScreen
-const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak, showDemoControls, setShowDemoControls, entityType, setEntityType, onBack, onReset, onResetAssessments, hasAssessmentData, onHistory }) => (
+const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak, showDemoControls, setShowDemoControls, entityType, setEntityType, onBack, onReset, onResetAssessments, hasAssessmentData, onHistory, onResetVerification, hasVerificationData }) => (
   <div className={`flex-1 flex flex-col overflow-hidden ${TH('bg-main', darkMode)}`}>
     <div className={`flex items-center justify-between px-4 py-3 border-b ${TH('border-base', darkMode)}`}>
       <button onClick={onBack} className={`text-sm btn-feedback ${TH('text-violet', darkMode)}`}>← Back</button>
@@ -7513,11 +7677,14 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
           Session: {AURA_SESSION_ID}
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {hasAssessmentData && (
           <button onClick={onResetAssessments} className={`flex-1 py-2.5 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-600'}`}>Clear Assessments</button>
         )}
-        <button onClick={onReset} className={`${hasAssessmentData ? 'flex-1' : 'w-full'} py-2.5 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-100 text-rose-600'}`}>Reset Demo</button>
+        {hasVerificationData && (
+          <button onClick={onResetVerification} className={`flex-1 py-2.5 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-teal-900/30 text-teal-400' : 'bg-teal-100 text-teal-600'}`}>Clear Verification</button>
+        )}
+        <button onClick={onReset} className={`${hasAssessmentData || hasVerificationData ? 'flex-1' : 'w-full'} py-2.5 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-100 text-rose-600'}`}>Reset Demo</button>
       </div>
       <div className={`text-sm text-center ${TH('text-faint', darkMode)}`}>Aura Player vR-Data</div>
     </div>
@@ -7687,6 +7854,19 @@ function App() {
   const [assessShowDemoInfo, setAssessShowDemoInfo] = useState(false);
   const [assessProfileSwitching, setAssessProfileSwitching] = useState(false);
   const assessTimeoutRef = useRef(null);
+
+  // --- Verification System ---
+  const verifyStored = useRef(verifyLoadFromStorage());
+  const [verifySubjectProfile, setVerifySubjectProfile] = useState(() => verifyStored.current?.subjectProfile || null);
+  const [verifySubjectAnswers, setVerifySubjectAnswers] = useState({});
+  const [verifyCurrentSubjectId, setVerifyCurrentSubjectId] = useState(null);
+  const [verifyEvaluatorData, setVerifyEvaluatorData] = useState(null);
+  const [verifyEvaluations, setVerifyEvaluations] = useState(() => verifyStored.current?.evaluations || {});
+  const verifySaveAll = useCallback(() => {
+    verifySaveToStorage(verifySubjectProfile, verifyEvaluations);
+  }, [verifySubjectProfile, verifyEvaluations]);
+  useEffect(() => { verifySaveAll(); }, [verifySaveAll]);
+  const verifyPendingCount = VERIFY_MOCK_SUBJECTS.filter(s => !verifyEvaluations[s.id]).length;
 
   // --- Refs & Derived ---
   const submitTimeoutRef = useRef(null);
@@ -8536,6 +8716,14 @@ function App() {
         }}
         hasAssessmentData={Object.keys(assessCompleted).length > 0 || Object.keys(assessInProgress).length > 0}
         onHistory={() => setScreen('history')}
+        onResetVerification={() => {
+          localStorage.removeItem(VERIFY_STORAGE_KEY);
+          setVerifySubjectProfile(null);
+          setVerifyEvaluations({});
+          setVerifyEvaluatorData(null);
+          setVerifyCurrentSubjectId(null);
+        }}
+        hasVerificationData={!!verifySubjectProfile || Object.keys(verifyEvaluations).length > 0}
       />
     );
 
@@ -11161,6 +11349,52 @@ function App() {
       );
     }
 
+    // Verification screens
+    if (screen === 'verify-hub') return (
+      <VerifyHub darkMode={darkMode} subjectProfile={verifySubjectProfile}
+        onSubject={() => setScreen('verify-subject')}
+        onEvaluator={() => setScreen('verify-queue')}
+        onBack={() => setScreen('categories')} />
+    );
+    if (screen === 'verify-subject') return (
+      <VerifySubjectFlow darkMode={darkMode}
+        onComplete={(answers) => { setVerifySubjectProfile(answers); setVerifySubjectAnswers(answers); setScreen('verify-subject-card'); }}
+        onBack={() => setScreen('verify-hub')} />
+    );
+    if (screen === 'verify-subject-card') return (
+      <VerifySubjectCard darkMode={darkMode} answers={verifySubjectAnswers}
+        onSubmit={() => setScreen('verify-hub')}
+        onBack={() => setScreen('verify-hub')} />
+    );
+    if (screen === 'verify-queue') return (
+      <VerifyQueue darkMode={darkMode} subjects={VERIFY_MOCK_SUBJECTS} evaluations={verifyEvaluations}
+        onSelect={(id) => { setVerifyCurrentSubjectId(id); setScreen('verify-evaluator'); }}
+        onBack={() => setScreen('verify-hub')} />
+    );
+    if (screen === 'verify-evaluator') {
+      const subj = verifyCurrentSubjectId ? VERIFY_MOCK_SUBJECTS.find(s => s.id === verifyCurrentSubjectId) : null;
+      if (!subj) { setScreen('verify-queue'); return null; }
+      return (
+        <VerifyEvaluatorFlow darkMode={darkMode} subject={subj}
+          onComplete={(data) => { setVerifyEvaluatorData(data); setScreen('verify-eval-summary'); }}
+          onBack={() => setScreen('verify-queue')} />
+      );
+    }
+    if (screen === 'verify-eval-summary') {
+      if (!verifyEvaluatorData || !verifyCurrentSubjectId) { setScreen('verify-queue'); return null; }
+      const subj = VERIFY_MOCK_SUBJECTS.find(s => s.id === verifyCurrentSubjectId);
+      return (
+        <VerifyEvalSummary darkMode={darkMode} data={verifyEvaluatorData} subject={subj}
+          onSubmit={() => {
+            setVerifyEvaluations(prev => ({ ...prev, [verifyCurrentSubjectId]: { ...verifyEvaluatorData, completedAt: Date.now() } }));
+            setVerifyEvaluatorData(null);
+            setVerifyCurrentSubjectId(null);
+            setScreen('verify-queue');
+          }}
+          onBack={() => setScreen('verify-evaluator')} />
+      );
+    }
+
     // Categories screen (home)
     if (screen === 'categories') return (
       <CategoryScreen
@@ -11191,6 +11425,8 @@ function App() {
         }}
         assessCompleted={assessCompleted}
         isLoggedIn={!!getCurrentEmail()}
+        onVerify={() => setScreen('verify-hub')}
+        verifyPendingCount={verifyPendingCount}
       />
     );
 
@@ -11893,6 +12129,12 @@ function App() {
     { id: 'assess-results', label: 'Results', icon: '📊' },
     { id: 'assess-analysis', label: 'Analysis', icon: '🔬' },
     { id: 'launch', label: 'Launch', icon: '🚀' },
+    { id: 'verify-hub', label: 'V:Hub', icon: '🛡️' },
+    { id: 'verify-subject', label: 'V:Subj', icon: '👤' },
+    { id: 'verify-subject-card', label: 'V:Card', icon: '🪪' },
+    { id: 'verify-queue', label: 'V:Queue', icon: '📋' },
+    { id: 'verify-evaluator', label: 'V:Eval', icon: '🔍' },
+    { id: 'verify-eval-summary', label: 'V:Sum', icon: '📊' },
   ];
 
   const devPanelEl = IS_DEV && showDevPanel ? (() => {
@@ -12021,7 +12263,14 @@ function App() {
         <div className="px-4 py-2 border-b border-inherit">
           <div className="grid grid-cols-7 gap-1">
             {DEV_SCREENS.map(s => (
-              <button key={s.id} onClick={() => setScreen(s.id)}
+              <button key={s.id} onClick={() => {
+                if (s.id === 'verify-evaluator' && !verifyCurrentSubjectId) setVerifyCurrentSubjectId('mock-1');
+                if (s.id === 'verify-eval-summary' && !verifyEvaluatorData) {
+                  setVerifyCurrentSubjectId('mock-1');
+                  setVerifyEvaluatorData({ path: 'A', pathLabel: 'Vouching', answers: { 'a3-confidence': 3 } });
+                }
+                setScreen(s.id);
+              }}
                 className={`py-1.5 rounded text-center ${screen === s.id ? btnAccent : btnBase}`}
                 style={{fontSize:'11px'}}>
                 {s.label}
@@ -12147,7 +12396,7 @@ function App() {
           {/* Global stars background for dark mode */}
           {darkMode && <div className="global-stars" />}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && (
+            {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && !screen.startsWith('verify-') && (
               <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} assessCompleted={assessCompleted} accentColor={navAccentColor} />
             )}
             {renderContent()}
@@ -12172,7 +12421,7 @@ function App() {
     >
       {/* Global stars background for dark mode */}
       {darkMode && <div className="global-stars" />}
-      {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && (
+      {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && !screen.startsWith('verify-') && (
         <div className="safe-top">
           <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} assessCompleted={assessCompleted} />
         </div>
