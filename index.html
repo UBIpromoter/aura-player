@@ -1328,7 +1328,7 @@ const ONBOARDING_QUESTIONS = [
     }
   </script>
   <script type="text/babel">
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
 // ==================== UNIFIED COLOR SYSTEM ====================
 // Single source of truth for all Aura colors. Add new colors here.
@@ -6991,10 +6991,14 @@ const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, seconda
     <button onClick={onClick} disabled={disabled}
       className="w-full h-14 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-30"
       style={{
-        background: `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.15))`,
-        border: `1px solid rgba(${c.rgb}, 0.35)`,
-        color: darkMode ? '#fff' : '#fff',
-        boxShadow: `0 0 20px rgba(${c.rgb}, 0.15), 0 0 60px rgba(${c.rgb}, 0.05)`,
+        background: darkMode
+          ? `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.15))`
+          : `linear-gradient(135deg, rgba(${c.rgb}, 0.85), rgba(${c.rgb}, 0.65))`,
+        border: `1px solid rgba(${c.rgb}, ${darkMode ? 0.35 : 0.5})`,
+        color: '#fff',
+        boxShadow: darkMode
+          ? `0 0 20px rgba(${c.rgb}, 0.15), 0 0 60px rgba(${c.rgb}, 0.05)`
+          : `0 0 12px rgba(${c.rgb}, 0.2)`,
       }}>
       {label}
     </button>
@@ -7566,7 +7570,7 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
   const isStar = question.type === 'star-confidence';
   const needsContinueButton = isMulti || isText || isStar;
   const continueDisabled = isText ? !(answers[question.id] || '').trim()
-    : isMulti ? !(Array.isArray(answers[question.id]) ? answers[question.id].length : 0)
+    : isMulti ? !(Array.isArray(answers[question.id]) ? answers[question.id].length : (answers[question.id]?.items?.length || 0))
     : isStar ? answers[question.id] === undefined : false;
 
   return (
@@ -7597,7 +7601,8 @@ const VerifyEvalSummary = ({ darkMode, data, subject, onSubmit, onBack }) => {
   const confLabels = { 1: 'Some confidence, notable gaps', 2: 'Fairly confident, minor uncertainty', 3: 'Very confident', 4: 'Certain' };
   const rows = config.questions.filter(q => answers[q.id] !== undefined).map(q => ({
     label: q.text,
-    value: Array.isArray(answers[q.id]) ? answers[q.id].join(', ') : String(answers[q.id])
+    value: Array.isArray(answers[q.id]) ? answers[q.id].join(', ')
+      : (answers[q.id]?.items ? (answers[q.id].items.join(', ') + (answers[q.id].otherText ? ` (${answers[q.id].otherText})` : '')) : String(answers[q.id]))
   }));
 
   return (
