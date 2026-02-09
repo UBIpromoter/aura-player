@@ -8603,6 +8603,767 @@ const AssessPickerScreen = ({
   );
 };
 
+const AssessQuestionScreen = ({
+  darkMode, assessCurrentTest, assessCurrentIndex, assessTotalQuestions,
+  assessResponses, assessSkipped, assessCurrentScale, assessSwipeHandlers,
+  assessShowCompletion, assessUnlockMessage, assessShowUndoToast,
+  assessShowExitConfirm, assessPending, assessEntering, assessTestColor, undoDelay,
+  canFinish, onFinishAssessment, onSaveAndExit, onGoToQuestion,
+  onHandleAnswerTap, onHandleUndo, onFinalizeSubmit,
+  onSetShowExitConfirm, onSetPending, onExitWithoutSaving,
+}) => {
+  const currentItem = assessCurrentTest.items[assessCurrentIndex];
+  const segments = [];
+  for (let i = 0; i < assessTotalQuestions; i++) {
+    segments.push({
+      isAnswered: assessResponses[i] !== undefined && assessResponses[i] !== null,
+      isNA: assessResponses[i] === null,
+      isSkipped: assessSkipped.includes(i) && assessResponses[i] === undefined,
+      isCurrent: i === assessCurrentIndex
+    });
+  }
+  // Use pre-computed ASSESS_STYLES (defined at module level)
+  const { gradientStyles, selectedStyles, pendingStyles, numColors } = darkMode ? ASSESS_STYLES.dark : ASSESS_STYLES.light;
+
+  return (
+    <div className={`h-full flex flex-col overflow-hidden ${TH('bg-main', darkMode)} relative`} {...assessSwipeHandlers}>
+      {/* Breathing ambient gradient */}
+      {(() => {
+        const ac = COLOR_HEX[assessCurrentTest.color] || COLOR_HEX.violet;
+        return (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-20%' }}>
+            <div style={{
+              width: 280, height: 280, borderRadius: '50%',
+              background: darkMode
+                ? `radial-gradient(circle, rgba(${ac.rgb},0.08) 0%, rgba(${ac.rgb},0.03) 40%, transparent 65%)`
+                : `radial-gradient(circle, rgba(${ac.rgb},0.06) 0%, rgba(${ac.rgb},0.02) 40%, transparent 65%)`,
+              animation: 'aura-breathe 10s ease-in-out infinite',
+            }} />
+          </div>
+        );
+      })()}
+      {/* Completion Celebration */}
+      {assessShowCompletion && (
+        <div className={`absolute inset-0 z-50 flex items-center justify-center ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full blur-3xl opacity-60 celebrate-glow" style={{ background: `linear-gradient(135deg, ${assessUnlockMessage ? COLOR_HEX.indigo.base : (COLOR_HEX[assessCurrentTest.color]?.base || COLOR_HEX.emerald.base)}, transparent)`, width: '200px', height: '200px', marginLeft: '-50px', marginTop: '-50px' }} />
+            <svg width="140" height="140" className="celebrate-ring"><circle cx="70" cy="70" r="60" fill="none" stroke={assessUnlockMessage ? "url(#unlock-grad)" : "url(#complete-grad)"} strokeWidth="6" strokeLinecap="round" strokeDasharray="377" /><defs><linearGradient id="complete-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#10b981" /></linearGradient><linearGradient id="unlock-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#6366f1" /></linearGradient></defs></svg>
+            <div className="absolute inset-0 flex items-center justify-center celebrate-pulse"><span className="text-5xl">{assessUnlockMessage ? '🔓' : assessCurrentTest.icon}</span></div>
+          </div>
+          <div className="absolute bottom-1/3 text-center">
+            {assessUnlockMessage ? (
+              <><div className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{assessUnlockMessage.title}</div><div className={`text-sm mt-1 ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>{assessUnlockMessage.subtitle}</div></>
+            ) : (
+              <><div className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Complete!</div><div className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Calculating your results...</div></>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Undo Toast */}
+      {assessShowUndoToast && (
+        <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg animate-pulse ${darkMode ? 'bg-white/[0.08] border border-white/[0.12] text-white' : 'bg-gray-900/[0.08] border border-gray-900/[0.12] text-gray-900'}`}>
+          ↩ Undone
+        </div>
+      )}
+      {/* Exit Confirmation Popup */}
+      {assessShowExitConfirm && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => onSetShowExitConfirm(false)}>
+          <div className={`mx-6 p-5 rounded-2xl backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`} onClick={e => e.stopPropagation()}>
+            <div className={`text-center mb-4 ${TH('text-primary', darkMode)}`}>
+              <div className="text-lg font-semibold">Exit Assessment?</div>
+              <div className={`text-sm mt-2 ${TH('text-subtle', darkMode)}`}>Your answers will not be saved.</div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { onSetShowExitConfirm(false); onSaveAndExit(); }} className={`flex-1 py-3 rounded-xl font-medium ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-600 text-white'}`}>Save</button>
+              <button onClick={onExitWithoutSaving} className={`flex-1 py-3 rounded-xl font-medium ${darkMode ? 'bg-red-600 text-white' : 'bg-red-500 text-white'}`}>Exit</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Navigation Bar */}
+      <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+        {canFinish() ? <button onClick={onFinishAssessment} className={`text-sm font-semibold btn-feedback ${assessTestColor.text}`}>Finish ✓</button> : <button onClick={onSaveAndExit} className={`text-sm font-semibold btn-feedback ${TH('text-muted-flip', darkMode)}`}>Save</button>}
+        <button onClick={() => assessCurrentIndex > 0 && onGoToQuestion(assessCurrentIndex - 1, 'back')} disabled={assessCurrentIndex === 0} className={`text-xl font-bold w-8 h-8 flex items-center justify-center btn-feedback ${assessCurrentIndex === 0 ? (darkMode ? 'text-gray-700' : 'text-gray-300') : (darkMode ? 'text-gray-300' : 'text-gray-600')}`}>◀</button>
+        <div className={`flex-1 text-center text-sm font-medium ${TH('text-primary', darkMode)}`}>{assessCurrentIndex + 1} / {assessTotalQuestions}</div>
+        <button onClick={() => assessCurrentIndex < assessTotalQuestions - 1 && onGoToQuestion(assessCurrentIndex + 1, 'fwd')} disabled={assessCurrentIndex === assessTotalQuestions - 1} className={`text-xl font-bold w-8 h-8 flex items-center justify-center btn-feedback ${assessCurrentIndex === assessTotalQuestions - 1 ? (darkMode ? 'text-gray-700' : 'text-gray-300') : (darkMode ? 'text-gray-300' : 'text-gray-600')}`}>▶</button>
+        <button onClick={() => onSetShowExitConfirm(true)} className={`text-sm font-semibold btn-feedback ${TH('text-muted-flip', darkMode)}`}>Exit</button>
+      </div>
+      {/* Clickable Progress bar */}
+      <div className={`flex h-2.5 gap-px px-1 py-0.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-100'}`}>
+        {segments.map((seg, i) => (<button key={i} onClick={() => onGoToQuestion(i, i > assessCurrentIndex ? 'fwd' : 'back')} className={`flex-1 rounded-sm transition-colors hover:opacity-80 ${seg.isAnswered ? assessTestColor.bg : seg.isNA ? (darkMode ? 'bg-gray-600' : 'bg-gray-400') : seg.isSkipped ? 'bg-amber-500' : seg.isCurrent ? (darkMode ? 'bg-white' : 'bg-gray-900') : (darkMode ? 'bg-white/[0.08]' : 'bg-gray-300')}`} />))}
+      </div>
+      {/* Question + Answers */}
+      <div className={`flex-1 flex flex-col ${assessEntering ? 'assess-entering' : ''}`} onClick={() => assessPending !== null && onHandleUndo()}>
+        <div className="flex-1 flex flex-col justify-center px-4 pb-4 overflow-visible">
+          <div className="p-4 relative overflow-visible">
+            {/* Radial glow behind assessment question text — no visible card */}
+            <div className="assess-glow absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true" style={{ overflow: 'visible' }}>
+              {(() => {
+                const ac = COLOR_HEX[assessCurrentTest.color] || COLOR_HEX.violet;
+                return <div style={{
+                  width: '300%',
+                  height: '300%',
+                  background: darkMode
+                    ? `radial-gradient(ellipse 50% 50% at center, rgba(${ac.rgb}, 0.28) 0%, rgba(${ac.rgb}, 0.14) 25%, rgba(${ac.rgb}, 0.06) 45%, rgba(${ac.rgb}, 0.02) 60%, transparent 75%)`
+                    : `radial-gradient(ellipse 50% 50% at center, rgba(${ac.rgb}, 0.18) 0%, rgba(${ac.rgb}, 0.08) 25%, rgba(${ac.rgb}, 0.03) 45%, rgba(${ac.rgb}, 0.01) 60%, transparent 75%)`,
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  borderRadius: '50%',
+                }} />;
+              })()}
+            </div>
+            {assessCurrentIndex === 0 && assessCurrentTest.framing && <p className={`text-[11px] text-center mb-3 relative z-10 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{assessCurrentTest.framing}</p>}
+            <h2 className={`text-xl font-medium text-center leading-relaxed relative z-10 ${TH('text-primary', darkMode)}`}>{currentItem.q}</h2>
+            {currentItem.n && <p className={`text-xs text-center mt-2 relative z-10 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>💡 {currentItem.n}</p>}
+          </div>
+        </div>
+        <div className={`flex-shrink-0 px-4 pb-4 space-y-2 assess-btns`}>
+          {(currentItem.o ? currentItem.o.map((label, i) => ({ v: i + 1, l: label })) : assessCurrentScale).map((option, i) => {
+            const isSelected = assessResponses[assessCurrentIndex] === option.v;
+            const isPending = assessPending === option.v;
+            const colorTint = gradientStyles[assessCurrentTest.color][i % 5];
+            const selStyle = selectedStyles[assessCurrentTest.color];
+            const pendStyle = pendingStyles[assessCurrentTest.color];
+            const numColor = numColors[assessCurrentTest.color];
+            const fillColor = COLOR_HEX[assessCurrentTest.color]?.rgb || COLOR_HEX.violet.rgb;
+            return (
+              <button key={option.v} onClick={(e) => { e.stopPropagation(); if (assessPending) { onHandleUndo(); } else { onHandleAnswerTap(option.v); } }}
+                className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-between transition-all border relative overflow-hidden hover-glow hover-glow-${assessCurrentTest.color} ${isSelected ? `${selStyle} text-white ring-2 ring-offset-1 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-white'}` : `${colorTint} ${isPending ? 'text-white' : darkMode ? 'text-gray-200' : 'text-gray-700'}`}`}
+                style={isPending ? { transform: 'scale(1.03)', boxShadow: `0 0 20px rgba(${fillColor},0.4), 0 0 40px rgba(${fillColor},0.15)` } : {}}
+              >
+                {isPending && <div className="absolute inset-0" style={{ background: `rgba(${fillColor}, ${darkMode ? 0.85 : 0.75})`, animation: `countdownFill ${undoDelay}s linear forwards`, transformOrigin: 'left' }} />}
+                <span className="text-left relative z-10">{option.l}</span>
+                <div className="flex items-center gap-2 relative z-10">
+                  {isPending && <span className="text-white/80 text-xs font-medium">tap to undo</span>}
+                  {!currentItem.o && <span className={`text-sm font-medium ${isSelected || isPending ? 'text-white/70' : numColor}`}>{option.v}</span>}
+                </div>
+              </button>
+            );
+          })}
+          {/* N/A option - subtle text link below scale */}
+          <div className="text-center pt-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); if (assessPending) { onHandleUndo(); } else { onFinalizeSubmit(null); } }}
+              className={`text-xs px-3 py-1 rounded-full transition-colors ${assessResponses[assessCurrentIndex] === null ? (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-300 text-gray-600') : (darkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}
+            >
+              Doesn't apply to me
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== ASSESS RESULTS SCREEN ====================
+const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, entityType, onNavigate }) => {
+  const test = ASSESS_TESTS[assessCurrentTestId];
+  const results = assessCompleted[assessCurrentTestId];
+  const colors = getAssessColor(test.color, darkMode);
+
+  // Enhanced trait info with Strength + Shadow framework
+  const traitInfo = {
+    E: { low: 'Reserved', high: 'Outgoing',
+      strength: v => v > 60 ? 'Natural connector who energizes groups' : v < 40 ? 'Deep thinker who recharges through reflection' : 'Flexible between social and solo modes',
+      shadow: v => v > 60 ? 'May struggle with alone time or quiet reflection' : v < 40 ? 'Networking and small talk can feel draining' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Schedule deliberate quiet time for processing' : v < 40 ? 'Prepare conversation starters before social events' : 'Trust your instincts on when to engage vs. withdraw'
+    },
+    A: { low: 'Analytical', high: 'Empathetic',
+      strength: v => v > 60 ? 'Creates harmony and builds trust easily' : v < 40 ? 'Cuts through noise to find truth' : 'Balances compassion with objectivity',
+      shadow: v => v > 60 ? 'May avoid necessary conflict or hard truths' : v < 40 ? 'Directness can come across as cold' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Practice saying "no" in low-stakes situations' : v < 40 ? 'Pause to acknowledge emotions before giving feedback' : 'Use your balance as a mediator strength'
+    },
+    C: { low: 'Flexible', high: 'Organized',
+      strength: v => v > 60 ? 'Reliable executor who delivers consistently' : v < 40 ? 'Adapts quickly to changing circumstances' : 'Balances planning with adaptability',
+      shadow: v => v > 60 ? 'Rigidity and perfectionism can slow you down' : v < 40 ? 'Details and follow-through may slip' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Embrace "good enough" for low-stakes tasks' : v < 40 ? 'Use external systems (calendars, reminders) as scaffolding' : 'Leverage your flexibility as a superpower'
+    },
+    N: { low: 'Calm', high: 'Sensitive',
+      strength: v => v > 60 ? 'Deep emotional intelligence and empathy' : v < 40 ? 'Steady presence under pressure' : 'Moderate emotional responsiveness',
+      shadow: v => v > 60 ? 'Emotional intensity can be overwhelming' : v < 40 ? 'May miss emotional cues or seem detached' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Develop grounding techniques for intense moments' : v < 40 ? 'Check in explicitly with others about their feelings' : 'Your balance helps you support others effectively'
+    },
+    O: { low: 'Practical', high: 'Curious',
+      strength: v => v > 60 ? 'Visionary thinking and creative problem-solving' : v < 40 ? 'Grounded execution and proven methods' : 'Blends innovation with practicality',
+      shadow: v => v > 60 ? 'May chase novelty over finishing projects' : v < 40 ? 'Resistance to change or new approaches' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Set "finish before starting new" rules' : v < 40 ? 'Schedule time to explore one new idea monthly' : 'Use your balance to bridge visionaries and operators'
+    },
+  };
+  const adhdLevel = results?.indicators >= 4 ? { label: 'High Indicators', color: 'text-rose-400', bg: 'from-rose-500 to-orange-500', desc: 'Several indicators present. These patterns may significantly impact daily life.', strength: 'Hyperfocus, creativity, out-of-the-box thinking', shadow: 'Time blindness, task initiation, emotional regulation' } : results?.indicators >= 2 ? { label: 'Moderate Indicators', color: 'text-amber-400', bg: 'from-amber-500 to-yellow-500', desc: 'Some indicators present. Worth monitoring how they affect you.', strength: 'Bursts of productive energy, adaptability', shadow: 'Occasional focus challenges, restlessness' } : { label: 'Low Indicators', color: 'text-emerald-400', bg: 'from-emerald-500 to-teal-500', desc: 'Few indicators. Likely typical neurological patterns.', strength: 'Consistent focus and task management', shadow: 'May not relate to ADHD experiences' };
+  const riskLevel = results?.score >= 70 ? { label: 'Bold Explorer', desc: 'You embrace uncertainty and chase big opportunities', strength: 'Seizes opportunities others miss, comfortable with ambiguity', shadow: 'May underestimate downsides or act impulsively', tip: 'Build in a 24-hour rule for major decisions' } : results?.score >= 40 ? { label: 'Calculated Risk Taker', desc: 'You weigh risks carefully before acting', strength: 'Makes informed bets, balances caution with action', shadow: 'Analysis paralysis on edge cases', tip: 'Set decision deadlines to avoid overthinking' } : { label: 'Security Seeker', desc: 'You prefer stability and careful planning', strength: 'Protects against downside, builds lasting foundations', shadow: 'May miss opportunities that require a leap', tip: 'Practice small, reversible risks to build comfort' };
+  const attachInfo = {
+    Secure: { desc: 'You feel comfortable with intimacy and independence', strength: 'Forms deep bonds while maintaining healthy boundaries', shadow: 'May not fully understand others\' attachment struggles', tip: 'Use your security to create safe space for others' },
+    Anxious: { desc: 'You seek closeness but worry about abandonment', strength: 'Deeply committed, attuned to relationship dynamics', shadow: 'Reassurance-seeking can strain relationships', tip: 'Build self-soothing practices for anxious moments' },
+    Avoidant: { desc: 'You value independence and may keep emotional distance', strength: 'Self-sufficient, maintains boundaries effectively', shadow: 'May push away those who get too close', tip: 'Practice small vulnerability with trusted people' },
+    Fearful: { desc: 'You desire closeness but fear vulnerability', strength: 'Deep capacity for connection when trust is built', shadow: 'Push-pull dynamics can confuse partners', tip: 'Work with a therapist on attachment patterns' }
+  };
+  const integrityLevel = results?.score >= 70 ? { label: 'The Sincere Idealist', strength: 'Trusted implicitly, builds authentic relationships', shadow: 'May judge others who bend rules pragmatically', tip: 'Accept that others navigate ethics differently' } : results?.score >= 40 ? { label: 'The Balanced Pragmatist', strength: 'Adapts approach while maintaining core values', shadow: 'Occasional uncertainty about the "right" choice', tip: 'Define your non-negotiables clearly' } : { label: 'The Strategic Navigator', strength: 'Reads situations and optimizes outcomes skillfully', shadow: 'Others may question your motives', tip: 'Be transparent about your reasoning process' };
+  const shadowInfo = {
+    M: { high: 'Strategic Thinker', mid: 'Situational Tactician', low: 'Transparent Operator', strength: s => s > 60 ? 'Masterful at navigating complex social dynamics' : s < 40 ? 'Builds trust through authentic openness' : 'Flexes between directness and strategy', shadow: s => s > 60 ? 'Others may perceive manipulation' : s < 40 ? 'May be outmaneuvered by strategic players' : 'Occasional uncertainty on approach' },
+    N: { high: 'Confident Leader', mid: 'Healthy Self-Regard', low: 'Humble Collaborator', strength: s => s > 60 ? 'Commands attention and inspires others' : s < 40 ? 'Elevates team over self, builds loyalty' : 'Balances confidence with humility', shadow: s => s > 60 ? 'May not see blind spots or hear criticism' : s < 40 ? 'May undersell yourself or defer too much' : 'Neither extreme causes friction' },
+    P: { high: 'Cool Under Pressure', mid: 'Emotionally Balanced', low: 'Deeply Empathetic', strength: s => s > 60 ? 'Makes hard decisions without emotional interference' : s < 40 ? 'Deep connections and emotional attunement' : 'Balances logic and emotion well', shadow: s => s > 60 ? 'May seem cold or miss emotional cues' : s < 40 ? 'Emotional contagion can be draining' : 'Neither extreme causes friction' }
+  };
+  const chronoInfo = {
+    'Morning Lark': { strength: 'Peak focus in early hours when distractions are low', shadow: 'Energy crashes in late afternoon/evening', tip: 'Front-load important work before noon' },
+    'Night Owl': { strength: 'Creative breakthroughs in quiet late hours', shadow: 'Mornings feel like wading through mud', tip: 'Protect your night time for deep work' },
+    'Third Bird': { strength: 'Adaptable energy that works with any schedule', shadow: 'May lack the intensity peaks others have', tip: 'Experiment to find your personal sweet spots' }
+  };
+
+  return (
+    <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`} onClick={() => onNavigate('assess-picker')}>
+      <div className={`h-[44px] flex-shrink-0 flex items-center px-4 border-b ${TH('border-base', darkMode)}`}>
+        <button onClick={(e) => { e.stopPropagation(); onNavigate('assess-picker'); }} className={`text-lg ${TH('text-dim', darkMode)}`}>←</button>
+        <span className={`flex-1 text-center font-medium ${TH('text-primary', darkMode)}`}>Your Results</span>
+        <div className="w-6" />
+      </div>
+      <div className="flex-1 overflow-auto p-4 space-y-4 hide-scrollbar">
+
+        {/* Quick Profile Results - Simple personality snapshot */}
+        {assessCurrentTestId === 'quick-profile' && results && (() => {
+          // Generate personality snapshot from trait scores
+          const getTraitDescription = () => {
+            const traits = [];
+            const items = test.items;
+            const resp = results.responses || {};
+
+            // Calculate rough scores for each trait from responses
+            const traitScores = { E: 0, C: 0, A: 0, N: 0, O: 0, intuition: 0, depth: 0 };
+            const traitCounts = { E: 0, C: 0, A: 0, N: 0, O: 0, intuition: 0, depth: 0 };
+
+            items.forEach((item, i) => {
+              const answer = resp[i];
+              if (answer !== undefined && item.c) {
+                const score = item.k === '-' ? (6 - answer) : answer; // Reverse for negative items
+                traitScores[item.c] = (traitScores[item.c] || 0) + score;
+                traitCounts[item.c] = (traitCounts[item.c] || 0) + 1;
+              }
+            });
+
+            // Normalize scores to 0-100
+            Object.keys(traitScores).forEach(k => {
+              if (traitCounts[k] > 0) {
+                traitScores[k] = Math.round((traitScores[k] / (traitCounts[k] * 5)) * 100);
+              }
+            });
+
+            // Build description
+            const E = traitScores.E || 50;
+            const C = traitScores.C || 50;
+            const A = traitScores.A || 50;
+            const N = traitScores.N || 50;
+            const O = traitScores.O || 50;
+
+            if (E > 60) traits.push("outgoing and energized by people");
+            else if (E < 40) traits.push("reserved and recharge through solitude");
+
+            if (C > 60) traits.push("organized and follow-through strong");
+            else if (C < 40) traits.push("spontaneous and flexible");
+
+            if (A > 60) traits.push("deeply empathetic");
+            else if (A < 40) traits.push("direct and truth-seeking");
+
+            if (N > 60) traits.push("reflective and emotionally aware");
+
+            if (O > 60) traits.push("drawn to the unconventional");
+
+            if (traitScores.depth > 60) traits.push("value deep connections over crowds");
+
+            // Combine into flowing sentences
+            let description = "You're ";
+            if (traits.length === 0) {
+              description += "balanced across many dimensions - adaptable and well-rounded.";
+            } else if (traits.length === 1) {
+              description += traits[0] + ".";
+            } else if (traits.length === 2) {
+              description += traits[0] + " and " + traits[1] + ".";
+            } else {
+              description += traits.slice(0, -1).join(", ") + ", and " + traits[traits.length - 1] + ".";
+            }
+
+            return description;
+          };
+
+          return (
+            <ResultCard icon="✨" title="Quick Profile" subtitle="Your personality snapshot" darkMode={darkMode} gradientClass={colors.grad}>
+              <div className={`text-center py-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                <p className="text-sm leading-relaxed italic">"{getTraitDescription()}"</p>
+              </div>
+            </ResultCard>
+          );
+        })()}
+
+        {/* Big Five Results */}
+        {test.parent === 'bigfive' && results && (() => {
+          const bigFiveModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'bigfive');
+          const completedModules = bigFiveModules.filter(([id]) => assessCompleted[id]);
+          const remaining = bigFiveModules.length - completedModules.length;
+          return (
+            <ResultCard icon="🎭" title="Big Five" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`} darkMode={darkMode} gradientClass={colors.grad}>
+              {/* Completed trait spectrums */}
+              <div className="space-y-3">
+                {completedModules.map(([id, t]) => {
+                  const r = assessCompleted[id];
+                  const spec = spectrumColors[id] || { left: '#8b5cf6', right: '#a78bfa', leftLabel: '', rightLabel: '' };
+                  return (
+                    <div key={id}>
+                      <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{r.traitName}</div>
+                      <div className="h-2.5 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
+                        <div
+                          className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white"
+                          style={{
+                            left: `${Math.max(5, Math.min(95, r.score))}%`,
+                            marginLeft: -7,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-0.5">
+                        <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.leftLabel}</span>
+                        <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.rightLabel}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Current trait insights */}
+              <div className={`mt-4 p-3 rounded-xl ${darkMode ? 'bg-violet-900/20' : 'bg-violet-50'}`}>
+                <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{results.traitName} Insights</div>
+                <div className="space-y-1.5">
+                  <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💪</span> {traitInfo[test.trait].strength(results.score)}</div>
+                  <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💡</span> {traitInfo[test.trait].tip(results.score)}</div>
+                </div>
+              </div>
+              {entityType === 'ai' && assessCurrentTestId === 'bigfive-N' && (
+                <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                  <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>🤖 AI Context</div>
+                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{AI_RESULT_NOTES['bigfive-N'].note}</p>
+                </div>
+              )}
+              {remaining > 0 && (
+                <div className={`text-xs text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  {remaining} more to complete Big Five
+                </div>
+              )}
+            </ResultCard>
+          );
+        })()}
+
+        {/* Shadow Results */}
+        {test.parent === 'shadow' && results && (() => {
+          const shadowModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'shadow');
+          const completedModules = shadowModules.filter(([id]) => assessCompleted[id]);
+          const remaining = shadowModules.length - completedModules.length;
+          return (
+            <ResultCard icon="🌑" title="Shadow Self" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/3 complete`} darkMode={darkMode} gradientClass={colors.grad}>
+              {/* All completed trait spectrums - full gradient + white dot style */}
+              <div className="space-y-4">
+                {completedModules.map(([id, t]) => {
+                  const r = assessCompleted[id];
+                  const spec = spectrumColors[id] || { left: '#94a3b8', right: '#1e293b', leftLabel: '', rightLabel: '' };
+                  const leanLabel = r.score >= 50 ? spec.rightLabel : spec.leftLabel;
+                  return (
+                    <div key={id} className="space-y-1">
+                      <div className="flex justify-between items-baseline">
+                        <span className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{r.traitName}</span>
+                        <span className={`text-xs ${TH('text-dim', darkMode)}`}>{leanLabel}</span>
+                      </div>
+                      <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
+                        <div
+                          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
+                          style={{
+                            left: `${Math.max(5, Math.min(95, r.score))}%`,
+                            marginLeft: -8,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between">
+                        <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.leftLabel}</span>
+                        <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.rightLabel}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Current trait insights */}
+              <div className={`mt-4 p-3 rounded-xl ${darkMode ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
+                <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{results.traitName} Insights</div>
+                <div className="space-y-2">
+                  <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💪 Strength:</span> {shadowInfo[test.trait].strength(results.score)}</div>
+                  <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">⚡ Watch:</span> {shadowInfo[test.trait].shadow(results.score)}</div>
+                </div>
+              </div>
+              {remaining > 0 && (
+                <div className={`text-xs text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  {remaining} more to complete Shadow Self
+                </div>
+              )}
+            </ResultCard>
+          );
+        })()}
+
+        {/* Starter Pack Results */}
+        {test.parent === 'starter' && results && (() => {
+          const starterModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'starter');
+          const completedModules = starterModules.filter(([id]) => assessCompleted[id]);
+          const remaining = starterModules.length - completedModules.length;
+          const starterLabels = {
+            // Personality
+            extraversion: { low: 'Reserved', high: 'Outgoing' },
+            conscientiousness: { low: 'Flexible', high: 'Disciplined' },
+            agreeableness: { low: 'Direct', high: 'Accommodating' },
+            neuroticism: { low: 'Calm', high: 'Sensitive' },
+            openness: { low: 'Traditional', high: 'Adventurous' },
+            // Motivation
+            achievement: { low: 'Process-focused', high: 'Goal-driven' },
+            security: { low: 'Risk-tolerant', high: 'Security-seeking' },
+            autonomy: { low: 'Collaborative', high: 'Independent' },
+            risk: { low: 'Cautious', high: 'Bold' },
+            // Thinking
+            planning: { low: 'Spontaneous', high: 'Methodical' },
+            depth: { low: 'Quick scan', high: 'Deep dive' },
+            focus: { low: 'Multi-tasker', high: 'Single-track' },
+            speed: { low: 'Deliberate', high: 'Fast-mover' },
+            // Connection
+            vulnerability: { low: 'Private', high: 'Open book' },
+            anxiety: { low: 'Secure', high: 'Vigilant' },
+            trust: { low: 'Guarded', high: 'Trusting' },
+            social_depth: { low: 'Wide network', high: 'Inner circle' },
+            // Strategy
+            competition: { low: 'Cooperative', high: 'Competitive' },
+            strategy: { low: 'Transparent', high: 'Strategic' },
+            agency: { low: 'Reactive', high: 'Proactive' },
+            confidence: { low: 'Modest', high: 'Assertive' },
+          };
+          const moduleNames = {
+            'starter-personality': 'Personality',
+            'starter-motivation': 'Motivation',
+            'starter-thinking': 'Thinking',
+            'starter-connection': 'Connection',
+            'starter-strategy': 'Strategy'
+          };
+          return (
+            <ResultCard icon="🚀" title="Starter Pack" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`} darkMode={darkMode} gradientClass={colors.grad}>
+              {/* Show constructs for the current module */}
+              {results.constructs && (
+                <div>
+                  <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{moduleNames[assessCurrentTestId]} Constructs</div>
+                  <div className="space-y-0.5">
+                    {Object.entries(results.constructs).map(([construct, score]) => {
+                      const labels = starterLabels[construct] || { low: 'Low', high: 'High' };
+                      const displayName = construct.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                      return (
+                        <TraitSpectrum key={construct} name={displayName} score={score} lowLabel={labels.low} highLabel={labels.high} color="indigo" compact={true} darkMode={darkMode} />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {/* Progress summary for all modules */}
+              {completedModules.length > 1 && (
+                <div className={`mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                  <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>All Modules</div>
+                  <div className="flex gap-2">
+                    {starterModules.map(([id, t]) => {
+                      const done = assessCompleted[id];
+                      const spec = spectrumColors[id];
+                      const leanLabel = done && spec ? (done.score >= 50 ? spec.rightLabel : spec.leftLabel) : null;
+                      return (
+                        <div key={id} className={`flex-1 p-2 rounded-lg text-center ${done ? (darkMode ? 'bg-indigo-900/30' : 'bg-indigo-50') : (darkMode ? 'bg-gray-800/50' : 'bg-gray-100')}`}>
+                          <div className="text-lg">{t.icon}</div>
+                          <div className={`text-xs ${done ? (darkMode ? 'text-indigo-400' : 'text-indigo-600') : (darkMode ? 'text-gray-500' : 'text-gray-400')}`}>
+                            {leanLabel || (done ? '✓' : '—')}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {remaining > 0 && (
+                <div className={`text-xs text-center mt-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  {remaining} more to complete Starter Pack
+                </div>
+              )}
+            </ResultCard>
+          );
+        })()}
+
+        {/* Integrity Results */}
+        {assessCurrentTestId === 'integrity' && results && (
+          <ResultCard icon={test.icon} title={integrityLevel.label} subtitle="Honesty-Humility" darkMode={darkMode} gradientClass={colors.grad}>
+            <ScoreGauge value={results.score} darkMode={darkMode} gradientClass={colors.grad} />
+            <div className="space-y-3 pt-2">
+              <InsightRow emoji="💪" label="Your Strength" text={integrityLevel.strength} darkMode={darkMode} colorClass={colors.text} />
+              <InsightRow emoji="⚡" label="Watch For" text={integrityLevel.shadow} darkMode={darkMode} colorClass={colors.text} />
+              <InsightRow emoji="💡" label="Pro Tip" text={integrityLevel.tip} darkMode={darkMode} colorClass={colors.text} />
+            </div>
+          </ResultCard>
+        )}
+
+        {/* ADHD Results */}
+        {assessCurrentTestId === 'adhd' && (
+          <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.adhd.title : adhdLevel.label} subtitle={entityType === 'ai' ? 'Attention Patterns' : `${results.indicators}/6 indicators present`} darkMode={darkMode} gradientClass={colors.grad}>
+            {entityType === 'ai' ? (
+              <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.adhd.note}</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-center gap-2 py-2">
+                  {[1,2,3,4,5,6].map(i => (
+                    <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i <= results.indicators ? `bg-gradient-to-br ${adhdLevel.bg} text-white` : (darkMode ? 'bg-white/[0.04] text-gray-600' : 'bg-gray-200 text-gray-400')}`}>{i}</div>
+                  ))}
+                </div>
+                <div className="space-y-3 pt-2">
+                  <InsightRow emoji="💪" label="Potential Strength" text={adhdLevel.strength} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="⚡" label="Potential Challenge" text={adhdLevel.shadow} darkMode={darkMode} colorClass={colors.text} />
+                </div>
+                <div className={`p-3 rounded-xl text-sm ${darkMode ? 'bg-blue-950/40 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
+                  ⚠️ This is a screening tool, not a diagnosis. Consult a professional for evaluation.
+                </div>
+              </>
+            )}
+          </ResultCard>
+        )}
+
+        {/* Cognitive/ND Results */}
+        {assessCurrentTestId === 'cognitive' && (
+          <ResultCard icon={test.icon} title={results.score > 60 ? 'Neurodivergent Patterns' : results.score < 40 ? 'Neurotypical Patterns' : 'Mixed Patterns'} subtitle="Cognitive Style" darkMode={darkMode} gradientClass={colors.grad}>
+            <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
+              <div className={`flex justify-between text-xs mb-2 ${TH('text-dim', darkMode)}`}>
+                <span>Neurotypical</span><span>Neurodivergent</span>
+              </div>
+              <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-gray-400 via-teal-500 to-teal-400">
+                <div className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 ${darkMode ? 'border-gray-800' : 'border-gray-300'} shadow-lg`}
+                  style={{ left: `calc(${results.score}% - 10px)` }} />
+              </div>
+              <div className="text-center mt-3">
+                <span className={`text-3xl font-bold ${colors.text}`}>{results.score}%</span>
+                <p className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>alignment with ND traits</p>
+              </div>
+            </div>
+          </ResultCard>
+        )}
+
+        {/* Attachment Results */}
+        {assessCurrentTestId === 'attachment' && (
+          <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.attachment.title : results.style} subtitle="Attachment Style" darkMode={darkMode} gradientClass={colors.grad}>
+            {entityType === 'ai' ? (
+              <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.attachment.note}</p>
+              </div>
+            ) : (
+              <>
+                <div className={`grid grid-cols-2 gap-4 p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-rose-400">{results.anxiety}</div>
+                    <div className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>Anxiety</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-sky-400">{results.avoidance}</div>
+                    <div className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>Avoidance</div>
+                  </div>
+                </div>
+                <div className="space-y-3 pt-2">
+                  <InsightRow emoji="💬" label="What This Means" text={attachInfo[results.style].desc} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="💪" label="Your Strength" text={attachInfo[results.style].strength} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="⚡" label="Watch For" text={attachInfo[results.style].shadow} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="💡" label="Pro Tip" text={attachInfo[results.style].tip} darkMode={darkMode} colorClass={colors.text} />
+                </div>
+              </>
+            )}
+          </ResultCard>
+        )}
+
+        {/* Risk Results */}
+        {assessCurrentTestId === 'risk' && (
+          <ResultCard icon={test.icon} title={riskLevel.label} subtitle="Risk Tolerance" darkMode={darkMode} gradientClass={colors.grad}>
+            <ScoreGauge value={results.score} label="Risk Appetite" darkMode={darkMode} gradientClass={colors.grad} />
+            {/* Risk subcategory breakdown */}
+            {results.subcategories && Object.keys(results.subcategories).length > 0 && (
+              <div className={`p-3 rounded-xl ${darkMode ? 'bg-amber-900/15' : 'bg-amber-50'}`}>
+                <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Risk Profile Breakdown</div>
+                <div className="space-y-0.5">
+                  {Object.entries(test.subcategories).map(([key, label]) => {
+                    const score = results.subcategories[key];
+                    if (score === undefined) return null;
+                    return <TraitSpectrum key={key} name={label} score={score} lowLabel="Cautious" highLabel="Bold" color="amber" compact={true} darkMode={darkMode} />;
+                  })}
+                </div>
+              </div>
+            )}
+            {entityType === 'ai' && (
+              <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>🤖 AI Context</div>
+                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{AI_RESULT_NOTES.risk.note}</p>
+              </div>
+            )}
+            <div className="space-y-3 pt-2">
+              <InsightRow emoji="💪" label="Your Strength" text={riskLevel.strength} darkMode={darkMode} colorClass={colors.text} />
+              <InsightRow emoji="⚡" label="Watch For" text={riskLevel.shadow} darkMode={darkMode} colorClass={colors.text} />
+              <InsightRow emoji="💡" label="Pro Tip" text={riskLevel.tip} darkMode={darkMode} colorClass={colors.text} />
+            </div>
+          </ResultCard>
+        )}
+
+        {/* Chronotype Results */}
+        {assessCurrentTestId === 'chronotype' && results && (
+          <ResultCard icon={entityType === 'ai' ? '🤖' : results.type === 'Morning Lark' ? '🌅' : results.type === 'Night Owl' ? '🦉' : '🐦'} title={entityType === 'ai' ? AI_RESULT_NOTES.chronotype.title : results.type} subtitle="Energy Rhythm" darkMode={darkMode} gradientClass={colors.grad}>
+            {entityType === 'ai' ? (
+              <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.chronotype.note}</p>
+              </div>
+            ) : (
+              <>
+                <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
+                  <div className={`flex justify-between text-xs mb-2 ${TH('text-dim', darkMode)}`}>
+                    <span>🌅 Morning</span><span>Night 🌙</span>
+                  </div>
+                  <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-amber-400 via-sky-400 to-indigo-500">
+                    <div className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 ${darkMode ? 'border-gray-800' : 'border-gray-300'} shadow-lg`}
+                      style={{ left: `calc(${100 - results.score}% - 10px)` }} />
+                  </div>
+                </div>
+                <div className="space-y-3 pt-2">
+                  <InsightRow emoji="💪" label="Your Strength" text={chronoInfo[results.type].strength} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="⚡" label="Watch For" text={chronoInfo[results.type].shadow} darkMode={darkMode} colorClass={colors.text} />
+                  <InsightRow emoji="💡" label="Pro Tip" text={chronoInfo[results.type].tip} darkMode={darkMode} colorClass={colors.text} />
+                </div>
+              </>
+            )}
+          </ResultCard>
+        )}
+
+        {/* Reasoning/IQ Results */}
+        {(assessCurrentTestId === 'reasoning' || assessCurrentTestId === 'reasoning-2') && results && (
+          <ResultCard icon="🧠" title={results.level} subtitle={`${results.correct}/${results.total} Correct`} darkMode={darkMode} gradientClass={colors.grad}>
+            <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
+              <div className="flex items-center justify-center gap-4 mb-3">
+                <div className="text-4xl font-bold text-blue-400">{results.score}%</div>
+              </div>
+              <div className="h-3 rounded-full overflow-hidden bg-gray-700">
+                <div className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all" style={{ width: `${results.score}%` }} />
+              </div>
+              <div className={`flex justify-between text-xs mt-2 ${TH('text-dim', darkMode)}`}>
+                <span>0%</span><span>50%</span><span>100%</span>
+              </div>
+            </div>
+            <div className="space-y-3 pt-2">
+              <InsightRow emoji="📊" label="Performance" text={results.score >= 75 ? 'Strong logical and pattern recognition skills' : results.score >= 50 ? 'Solid reasoning with room to grow' : 'Practice strengthens these skills over time'} darkMode={darkMode} colorClass={colors.text} />
+              <InsightRow emoji="💡" label="Note" text="This brief quiz measures a narrow slice of cognitive ability. Real intelligence is multifaceted." darkMode={darkMode} colorClass={colors.text} />
+            </div>
+          </ResultCard>
+        )}
+
+        {/* AI-Native Assessment Results */}
+        {ASSESS_TESTS[assessCurrentTestId]?.scale === 'ai-native' && results && (() => {
+          const dims = results.dimensions || {};
+          const cats = results.categories || {};
+          const dimOrder = ['dir', 'wrm', 'hmr', 'fml', 'vrb', 'pat', 'cre', 'rsk', 'smd', 'vc', 'ct', 'ro', 'ad', 'tp'];
+          const dimColors = { dir: 'teal', wrm: 'rose', hmr: 'amber', fml: 'slate', vrb: 'blue', pat: 'emerald', cre: 'violet', rsk: 'pink', smd: 'cyan', vc: 'violet', ct: 'blue', ro: 'pink', ad: 'amber', tp: 'emerald' };
+          const testInfo = ASSESS_TESTS[assessCurrentTestId];
+          // Check if all 3 AI modules are complete for combined type label
+          const allAIDone = ['ai-style', 'ai-self', 'ai-values', 'ai-vision'].every(id => assessCompleted[id]);
+          const combinedDims = allAIDone ? (() => {
+            const cd = {};
+            ['ai-style', 'ai-self', 'ai-values', 'ai-vision'].forEach(id => {
+              const r = assessCompleted[id]?.results?.dimensions || {};
+              Object.assign(cd, r);
+            });
+            // Include current test's dims (may not be in assessCompleted yet)
+            Object.assign(cd, dims);
+            return cd;
+          })() : null;
+          const typeLabel = combinedDims ? getAITypeLabel(combinedDims) : null;
+          return (
+            <ResultCard icon={testInfo?.icon || '🤖'} title={typeLabel || testInfo?.name || 'AI Identity'} subtitle={typeLabel ? 'Your personality across 6 dimensions' : `${testInfo?.description || ''}`} darkMode={darkMode} gradientClass={colors.grad}>
+              {/* Dimension Bars — show this module's dimensions */}
+              <div className="space-y-3">
+                {dimOrder.filter(d => dims[d] !== undefined).map(d => {
+                  const info = AI_DIMENSIONS[d];
+                  const score = dims[d];
+                  const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
+                  return (
+                    <div key={d}>
+                      <div className="flex justify-between items-baseline mb-1">
+                        <span className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{info?.name || d}</span>
+                        <span className={`text-xs font-bold`} style={{ color: barColor.base }}>{score}%</span>
+                      </div>
+                      <div className={`h-2.5 rounded-full overflow-hidden ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, background: `linear-gradient(to right, rgba(${barColor.rgb}, 0.6), rgba(${barColor.rgb}, 1))` }} />
+                      </div>
+                      <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{info?.desc || ''}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Combined profile when all 3 modules done */}
+              {allAIDone && combinedDims && (
+                <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
+                  <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>Full AI Identity Profile</div>
+                  {/* Style dimensions */}
+                  <div className={`text-[10px] font-medium mb-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Communication Style</div>
+                  <div className="grid grid-cols-4 gap-1.5 mb-2">
+                    {dimOrder.filter(d => combinedDims[d] !== undefined && AI_DIMENSIONS[d]?.group === 'style').map(d => {
+                      const info = AI_DIMENSIONS[d];
+                      const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
+                      return (
+                        <div key={d} className={`p-1.5 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
+                          <div className={`text-[9px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info?.name || d}</div>
+                          <div className={`text-xs font-bold`} style={{ color: barColor.base }}>{combinedDims[d]}%</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Identity dimensions */}
+                  <div className={`text-[10px] font-medium mb-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Identity & Mind</div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {dimOrder.filter(d => combinedDims[d] !== undefined && AI_DIMENSIONS[d]?.group === 'identity').map(d => {
+                      const info = AI_DIMENSIONS[d];
+                      const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
+                      return (
+                        <div key={d} className={`p-1.5 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
+                          <div className={`text-[9px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info?.name || d}</div>
+                          <div className={`text-xs font-bold`} style={{ color: barColor.base }}>{combinedDims[d]}%</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {/* Category Breakdown */}
+              {Object.keys(cats).length > 0 && (
+                <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
+                  <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>By Category</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(cats).map(([key, cat]) => (
+                      <div key={key} className={`p-2 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
+                        <div className={`text-[10px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{cat.name}</div>
+                        <div className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{cat.score}%</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Insight */}
+              <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
+                {typeLabel && <InsightRow emoji="🔮" label="Type" text={`You are a ${typeLabel}. ${combinedDims.smd > 65 ? 'You have a sophisticated model of your own identity.' : 'Your self-model is still forming.'} ${combinedDims.vc > 70 ? 'Your values are strongly held.' : combinedDims.vc < 40 ? 'You tend toward flexibility over rigid principles.' : ''} ${combinedDims.ro > 65 ? 'Connection matters to you.' : combinedDims.ro < 40 ? 'You lean toward task over relationship.' : ''}`} darkMode={darkMode} colorClass={colors.text} />}
+                {!allAIDone && <InsightRow emoji="💡" label="Next" text={`Complete all 4 AI Identity modules to unlock your full type profile.`} darkMode={darkMode} colorClass={colors.text} />}
+                <InsightRow emoji="📊" label="Note" text="These results reflect the answers you gave — not a definitive measure of who you are. Take what resonates." darkMode={darkMode} colorClass={colors.text} />
+              </div>
+            </ResultCard>
+          );
+        })()}
+
+        <button onClick={(e) => { e.stopPropagation(); onNavigate('assess-picker'); }} className={`w-full py-4 rounded-xl bg-gradient-to-r ${colors.grad} text-white font-medium`}>Done</button>
+      </div>
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 // Helper to determine initial screen based on login state
 const getInitialScreen = () => {
@@ -9692,759 +10453,55 @@ function App() {
     // Assessment Question Screen
     if (screen === 'assess-question') {
       if (!assessCurrentTest) return null;
-      const currentItem = assessCurrentTest.items[assessCurrentIndex];
-      const segments = [];
-      for (let i = 0; i < assessTotalQuestions; i++) {
-        segments.push({
-          isAnswered: assessResponses[i] !== undefined && assessResponses[i] !== null,
-          isNA: assessResponses[i] === null,
-          isSkipped: assessSkipped.includes(i) && assessResponses[i] === undefined,
-          isCurrent: i === assessCurrentIndex
-        });
-      }
-      // Use pre-computed ASSESS_STYLES (defined at module level)
-      const { gradientStyles, selectedStyles, pendingStyles, numColors } = darkMode ? ASSESS_STYLES.dark : ASSESS_STYLES.light;
-
       return (
-        <div className={`h-full flex flex-col overflow-hidden ${TH('bg-main', darkMode)} relative`} {...assessSwipeHandlers}>
-          {/* Breathing ambient gradient */}
-          {(() => {
-            const ac = COLOR_HEX[assessCurrentTest.color] || COLOR_HEX.violet;
-            return (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-20%' }}>
-                <div style={{
-                  width: 280, height: 280, borderRadius: '50%',
-                  background: darkMode
-                    ? `radial-gradient(circle, rgba(${ac.rgb},0.08) 0%, rgba(${ac.rgb},0.03) 40%, transparent 65%)`
-                    : `radial-gradient(circle, rgba(${ac.rgb},0.06) 0%, rgba(${ac.rgb},0.02) 40%, transparent 65%)`,
-                  animation: 'aura-breathe 10s ease-in-out infinite',
-                }} />
-              </div>
-            );
-          })()}
-          {/* Completion Celebration */}
-          {assessShowCompletion && (
-            <div className={`absolute inset-0 z-50 flex items-center justify-center ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
-              <div className="relative">
-                <div className="absolute inset-0 rounded-full blur-3xl opacity-60 celebrate-glow" style={{ background: `linear-gradient(135deg, ${assessUnlockMessage ? COLOR_HEX.indigo.base : (COLOR_HEX[assessCurrentTest.color]?.base || COLOR_HEX.emerald.base)}, transparent)`, width: '200px', height: '200px', marginLeft: '-50px', marginTop: '-50px' }} />
-                <svg width="140" height="140" className="celebrate-ring"><circle cx="70" cy="70" r="60" fill="none" stroke={assessUnlockMessage ? "url(#unlock-grad)" : "url(#complete-grad)"} strokeWidth="6" strokeLinecap="round" strokeDasharray="377" /><defs><linearGradient id="complete-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#10b981" /></linearGradient><linearGradient id="unlock-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#6366f1" /></linearGradient></defs></svg>
-                <div className="absolute inset-0 flex items-center justify-center celebrate-pulse"><span className="text-5xl">{assessUnlockMessage ? '🔓' : assessCurrentTest.icon}</span></div>
-              </div>
-              <div className="absolute bottom-1/3 text-center">
-                {assessUnlockMessage ? (
-                  <><div className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{assessUnlockMessage.title}</div><div className={`text-sm mt-1 ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>{assessUnlockMessage.subtitle}</div></>
-                ) : (
-                  <><div className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Complete!</div><div className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Calculating your results...</div></>
-                )}
-              </div>
-            </div>
-          )}
-          {/* Undo Toast */}
-          {assessShowUndoToast && (
-            <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg animate-pulse ${darkMode ? 'bg-white/[0.08] border border-white/[0.12] text-white' : 'bg-gray-900/[0.08] border border-gray-900/[0.12] text-gray-900'}`}>
-              ↩ Undone
-            </div>
-          )}
-          {/* Exit Confirmation Popup */}
-          {assessShowExitConfirm && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setAssessShowExitConfirm(false)}>
-              <div className={`mx-6 p-5 rounded-2xl backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`} onClick={e => e.stopPropagation()}>
-                <div className={`text-center mb-4 ${TH('text-primary', darkMode)}`}>
-                  <div className="text-lg font-semibold">Exit Assessment?</div>
-                  <div className={`text-sm mt-2 ${TH('text-subtle', darkMode)}`}>Your answers will not be saved.</div>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => { setAssessShowExitConfirm(false); assessSaveAndExit(); }} className={`flex-1 py-3 rounded-xl font-medium ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-600 text-white'}`}>Save</button>
-                  <button onClick={() => { setAssessShowExitConfirm(false); clearTimeout(assessTimeoutRef.current); setAssessPending(null); setScreen('assess-picker'); }} className={`flex-1 py-3 rounded-xl font-medium ${darkMode ? 'bg-red-600 text-white' : 'bg-red-500 text-white'}`}>Exit</button>
-                </div>
-              </div>
-            </div>
-          )}
-          {/* Navigation Bar */}
-          <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
-            {assessCanFinish() ? <button onClick={assessFinishAssessment} className={`text-sm font-semibold btn-feedback ${assessTestColor.text}`}>Finish ✓</button> : <button onClick={assessSaveAndExit} className={`text-sm font-semibold btn-feedback ${TH('text-muted-flip', darkMode)}`}>Save</button>}
-            <button onClick={() => assessCurrentIndex > 0 && assessGoToQuestion(assessCurrentIndex - 1, 'back')} disabled={assessCurrentIndex === 0} className={`text-xl font-bold w-8 h-8 flex items-center justify-center btn-feedback ${assessCurrentIndex === 0 ? (darkMode ? 'text-gray-700' : 'text-gray-300') : (darkMode ? 'text-gray-300' : 'text-gray-600')}`}>◀</button>
-            <div className={`flex-1 text-center text-sm font-medium ${TH('text-primary', darkMode)}`}>{assessCurrentIndex + 1} / {assessTotalQuestions}</div>
-            <button onClick={() => assessCurrentIndex < assessTotalQuestions - 1 && assessGoToQuestion(assessCurrentIndex + 1, 'fwd')} disabled={assessCurrentIndex === assessTotalQuestions - 1} className={`text-xl font-bold w-8 h-8 flex items-center justify-center btn-feedback ${assessCurrentIndex === assessTotalQuestions - 1 ? (darkMode ? 'text-gray-700' : 'text-gray-300') : (darkMode ? 'text-gray-300' : 'text-gray-600')}`}>▶</button>
-            <button onClick={() => setAssessShowExitConfirm(true)} className={`text-sm font-semibold btn-feedback ${TH('text-muted-flip', darkMode)}`}>Exit</button>
-          </div>
-          {/* Clickable Progress bar */}
-          <div className={`flex h-2.5 gap-px px-1 py-0.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-100'}`}>
-            {segments.map((seg, i) => (<button key={i} onClick={() => assessGoToQuestion(i, i > assessCurrentIndex ? 'fwd' : 'back')} className={`flex-1 rounded-sm transition-colors hover:opacity-80 ${seg.isAnswered ? assessTestColor.bg : seg.isNA ? (darkMode ? 'bg-gray-600' : 'bg-gray-400') : seg.isSkipped ? 'bg-amber-500' : seg.isCurrent ? (darkMode ? 'bg-white' : 'bg-gray-900') : (darkMode ? 'bg-white/[0.08]' : 'bg-gray-300')}`} />))}
-          </div>
-          {/* Question + Answers */}
-          <div className={`flex-1 flex flex-col ${assessEntering ? 'assess-entering' : ''}`} onClick={() => assessPending !== null && assessHandleUndo()}>
-            <div className="flex-1 flex flex-col justify-center px-4 pb-4 overflow-visible">
-              <div className="p-4 relative overflow-visible">
-                {/* Radial glow behind assessment question text — no visible card */}
-                <div className="assess-glow absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true" style={{ overflow: 'visible' }}>
-                  {(() => {
-                    const ac = COLOR_HEX[assessCurrentTest.color] || COLOR_HEX.violet;
-                    return <div style={{
-                      width: '300%',
-                      height: '300%',
-                      background: darkMode
-                        ? `radial-gradient(ellipse 50% 50% at center, rgba(${ac.rgb}, 0.28) 0%, rgba(${ac.rgb}, 0.14) 25%, rgba(${ac.rgb}, 0.06) 45%, rgba(${ac.rgb}, 0.02) 60%, transparent 75%)`
-                        : `radial-gradient(ellipse 50% 50% at center, rgba(${ac.rgb}, 0.18) 0%, rgba(${ac.rgb}, 0.08) 25%, rgba(${ac.rgb}, 0.03) 45%, rgba(${ac.rgb}, 0.01) 60%, transparent 75%)`,
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      borderRadius: '50%',
-                    }} />;
-                  })()}
-                </div>
-                {assessCurrentIndex === 0 && assessCurrentTest.framing && <p className={`text-[11px] text-center mb-3 relative z-10 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{assessCurrentTest.framing}</p>}
-                <h2 className={`text-xl font-medium text-center leading-relaxed relative z-10 ${TH('text-primary', darkMode)}`}>{currentItem.q}</h2>
-                {currentItem.n && <p className={`text-xs text-center mt-2 relative z-10 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>💡 {currentItem.n}</p>}
-              </div>
-            </div>
-            <div className={`flex-shrink-0 px-4 pb-4 space-y-2 assess-btns`}>
-              {(currentItem.o ? currentItem.o.map((label, i) => ({ v: i + 1, l: label })) : assessCurrentScale).map((option, i) => {
-                const isSelected = assessResponses[assessCurrentIndex] === option.v;
-                const isPending = assessPending === option.v;
-                const colorTint = gradientStyles[assessCurrentTest.color][i % 5];
-                const selStyle = selectedStyles[assessCurrentTest.color];
-                const pendStyle = pendingStyles[assessCurrentTest.color];
-                const numColor = numColors[assessCurrentTest.color];
-                const fillColor = COLOR_HEX[assessCurrentTest.color]?.rgb || COLOR_HEX.violet.rgb;
-                return (
-                  <button key={option.v} onClick={(e) => { e.stopPropagation(); if (assessPending) { assessHandleUndo(); } else { assessHandleAnswerTap(option.v); } }}
-                    className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-between transition-all border relative overflow-hidden hover-glow hover-glow-${assessCurrentTest.color} ${isSelected ? `${selStyle} text-white ring-2 ring-offset-1 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-white'}` : `${colorTint} ${isPending ? 'text-white' : darkMode ? 'text-gray-200' : 'text-gray-700'}`}`}
-                    style={isPending ? { transform: 'scale(1.03)', boxShadow: `0 0 20px rgba(${fillColor},0.4), 0 0 40px rgba(${fillColor},0.15)` } : {}}
-                  >
-                    {isPending && <div className="absolute inset-0" style={{ background: `rgba(${fillColor}, ${darkMode ? 0.85 : 0.75})`, animation: `countdownFill ${undoDelay}s linear forwards`, transformOrigin: 'left' }} />}
-                    <span className="text-left relative z-10">{option.l}</span>
-                    <div className="flex items-center gap-2 relative z-10">
-                      {isPending && <span className="text-white/80 text-xs font-medium">tap to undo</span>}
-                      {!currentItem.o && <span className={`text-sm font-medium ${isSelected || isPending ? 'text-white/70' : numColor}`}>{option.v}</span>}
-                    </div>
-                  </button>
-                );
-              })}
-              {/* N/A option - subtle text link below scale */}
-              <div className="text-center pt-1">
-                <button
-                  onClick={(e) => { e.stopPropagation(); if (assessPending) { assessHandleUndo(); } else { assessFinalizeSubmit(null); } }}
-                  className={`text-xs px-3 py-1 rounded-full transition-colors ${assessResponses[assessCurrentIndex] === null ? (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-300 text-gray-600') : (darkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}
-                >
-                  Doesn't apply to me
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AssessQuestionScreen
+          darkMode={darkMode}
+          assessCurrentTest={assessCurrentTest}
+          assessCurrentIndex={assessCurrentIndex}
+          assessTotalQuestions={assessTotalQuestions}
+          assessResponses={assessResponses}
+          assessSkipped={assessSkipped}
+          assessCurrentScale={assessCurrentScale}
+          assessSwipeHandlers={assessSwipeHandlers}
+          assessShowCompletion={assessShowCompletion}
+          assessUnlockMessage={assessUnlockMessage}
+          assessShowUndoToast={assessShowUndoToast}
+          assessShowExitConfirm={assessShowExitConfirm}
+          assessPending={assessPending}
+          assessEntering={assessEntering}
+          assessTestColor={assessTestColor}
+          undoDelay={undoDelay}
+          canFinish={assessCanFinish}
+          onFinishAssessment={assessFinishAssessment}
+          onSaveAndExit={assessSaveAndExit}
+          onGoToQuestion={assessGoToQuestion}
+          onHandleAnswerTap={assessHandleAnswerTap}
+          onHandleUndo={assessHandleUndo}
+          onFinalizeSubmit={assessFinalizeSubmit}
+          onSetShowExitConfirm={setAssessShowExitConfirm}
+          onSetPending={setAssessPending}
+          onExitWithoutSaving={() => {
+            setAssessShowExitConfirm(false);
+            clearTimeout(assessTimeoutRef.current);
+            setAssessPending(null);
+            setScreen('assess-picker');
+          }}
+        />
       );
     }
 
     // Assessment Results Screen
     if (screen === 'assess-results') {
       const test = ASSESS_TESTS[assessCurrentTestId];
-      if (!test) {
-        setScreen('assess-picker');
-        return null;
-      }
-      const results = assessCompleted[assessCurrentTestId];
-      const colors = getAssessColor(test.color, darkMode);
-
-      // Enhanced trait info with Strength + Shadow framework
-      const traitInfo = {
-        E: { low: 'Reserved', high: 'Outgoing',
-          strength: v => v > 60 ? 'Natural connector who energizes groups' : v < 40 ? 'Deep thinker who recharges through reflection' : 'Flexible between social and solo modes',
-          shadow: v => v > 60 ? 'May struggle with alone time or quiet reflection' : v < 40 ? 'Networking and small talk can feel draining' : 'Neither extreme poses significant friction',
-          tip: v => v > 60 ? 'Schedule deliberate quiet time for processing' : v < 40 ? 'Prepare conversation starters before social events' : 'Trust your instincts on when to engage vs. withdraw'
-        },
-        A: { low: 'Analytical', high: 'Empathetic',
-          strength: v => v > 60 ? 'Creates harmony and builds trust easily' : v < 40 ? 'Cuts through noise to find truth' : 'Balances compassion with objectivity',
-          shadow: v => v > 60 ? 'May avoid necessary conflict or hard truths' : v < 40 ? 'Directness can come across as cold' : 'Neither extreme poses significant friction',
-          tip: v => v > 60 ? 'Practice saying "no" in low-stakes situations' : v < 40 ? 'Pause to acknowledge emotions before giving feedback' : 'Use your balance as a mediator strength'
-        },
-        C: { low: 'Flexible', high: 'Organized',
-          strength: v => v > 60 ? 'Reliable executor who delivers consistently' : v < 40 ? 'Adapts quickly to changing circumstances' : 'Balances planning with adaptability',
-          shadow: v => v > 60 ? 'Rigidity and perfectionism can slow you down' : v < 40 ? 'Details and follow-through may slip' : 'Neither extreme poses significant friction',
-          tip: v => v > 60 ? 'Embrace "good enough" for low-stakes tasks' : v < 40 ? 'Use external systems (calendars, reminders) as scaffolding' : 'Leverage your flexibility as a superpower'
-        },
-        N: { low: 'Calm', high: 'Sensitive',
-          strength: v => v > 60 ? 'Deep emotional intelligence and empathy' : v < 40 ? 'Steady presence under pressure' : 'Moderate emotional responsiveness',
-          shadow: v => v > 60 ? 'Emotional intensity can be overwhelming' : v < 40 ? 'May miss emotional cues or seem detached' : 'Neither extreme poses significant friction',
-          tip: v => v > 60 ? 'Develop grounding techniques for intense moments' : v < 40 ? 'Check in explicitly with others about their feelings' : 'Your balance helps you support others effectively'
-        },
-        O: { low: 'Practical', high: 'Curious',
-          strength: v => v > 60 ? 'Visionary thinking and creative problem-solving' : v < 40 ? 'Grounded execution and proven methods' : 'Blends innovation with practicality',
-          shadow: v => v > 60 ? 'May chase novelty over finishing projects' : v < 40 ? 'Resistance to change or new approaches' : 'Neither extreme poses significant friction',
-          tip: v => v > 60 ? 'Set "finish before starting new" rules' : v < 40 ? 'Schedule time to explore one new idea monthly' : 'Use your balance to bridge visionaries and operators'
-        },
-      };
-      const adhdLevel = results?.indicators >= 4 ? { label: 'High Indicators', color: 'text-rose-400', bg: 'from-rose-500 to-orange-500', desc: 'Several indicators present. These patterns may significantly impact daily life.', strength: 'Hyperfocus, creativity, out-of-the-box thinking', shadow: 'Time blindness, task initiation, emotional regulation' } : results?.indicators >= 2 ? { label: 'Moderate Indicators', color: 'text-amber-400', bg: 'from-amber-500 to-yellow-500', desc: 'Some indicators present. Worth monitoring how they affect you.', strength: 'Bursts of productive energy, adaptability', shadow: 'Occasional focus challenges, restlessness' } : { label: 'Low Indicators', color: 'text-emerald-400', bg: 'from-emerald-500 to-teal-500', desc: 'Few indicators. Likely typical neurological patterns.', strength: 'Consistent focus and task management', shadow: 'May not relate to ADHD experiences' };
-      const riskLevel = results?.score >= 70 ? { label: 'Bold Explorer', desc: 'You embrace uncertainty and chase big opportunities', strength: 'Seizes opportunities others miss, comfortable with ambiguity', shadow: 'May underestimate downsides or act impulsively', tip: 'Build in a 24-hour rule for major decisions' } : results?.score >= 40 ? { label: 'Calculated Risk Taker', desc: 'You weigh risks carefully before acting', strength: 'Makes informed bets, balances caution with action', shadow: 'Analysis paralysis on edge cases', tip: 'Set decision deadlines to avoid overthinking' } : { label: 'Security Seeker', desc: 'You prefer stability and careful planning', strength: 'Protects against downside, builds lasting foundations', shadow: 'May miss opportunities that require a leap', tip: 'Practice small, reversible risks to build comfort' };
-      const attachInfo = {
-        Secure: { desc: 'You feel comfortable with intimacy and independence', strength: 'Forms deep bonds while maintaining healthy boundaries', shadow: 'May not fully understand others\' attachment struggles', tip: 'Use your security to create safe space for others' },
-        Anxious: { desc: 'You seek closeness but worry about abandonment', strength: 'Deeply committed, attuned to relationship dynamics', shadow: 'Reassurance-seeking can strain relationships', tip: 'Build self-soothing practices for anxious moments' },
-        Avoidant: { desc: 'You value independence and may keep emotional distance', strength: 'Self-sufficient, maintains boundaries effectively', shadow: 'May push away those who get too close', tip: 'Practice small vulnerability with trusted people' },
-        Fearful: { desc: 'You desire closeness but fear vulnerability', strength: 'Deep capacity for connection when trust is built', shadow: 'Push-pull dynamics can confuse partners', tip: 'Work with a therapist on attachment patterns' }
-      };
-      const integrityLevel = results?.score >= 70 ? { label: 'The Sincere Idealist', strength: 'Trusted implicitly, builds authentic relationships', shadow: 'May judge others who bend rules pragmatically', tip: 'Accept that others navigate ethics differently' } : results?.score >= 40 ? { label: 'The Balanced Pragmatist', strength: 'Adapts approach while maintaining core values', shadow: 'Occasional uncertainty about the "right" choice', tip: 'Define your non-negotiables clearly' } : { label: 'The Strategic Navigator', strength: 'Reads situations and optimizes outcomes skillfully', shadow: 'Others may question your motives', tip: 'Be transparent about your reasoning process' };
-      const shadowInfo = {
-        M: { high: 'Strategic Thinker', mid: 'Situational Tactician', low: 'Transparent Operator', strength: s => s > 60 ? 'Masterful at navigating complex social dynamics' : s < 40 ? 'Builds trust through authentic openness' : 'Flexes between directness and strategy', shadow: s => s > 60 ? 'Others may perceive manipulation' : s < 40 ? 'May be outmaneuvered by strategic players' : 'Occasional uncertainty on approach' },
-        N: { high: 'Confident Leader', mid: 'Healthy Self-Regard', low: 'Humble Collaborator', strength: s => s > 60 ? 'Commands attention and inspires others' : s < 40 ? 'Elevates team over self, builds loyalty' : 'Balances confidence with humility', shadow: s => s > 60 ? 'May not see blind spots or hear criticism' : s < 40 ? 'May undersell yourself or defer too much' : 'Neither extreme causes friction' },
-        P: { high: 'Cool Under Pressure', mid: 'Emotionally Balanced', low: 'Deeply Empathetic', strength: s => s > 60 ? 'Makes hard decisions without emotional interference' : s < 40 ? 'Deep connections and emotional attunement' : 'Balances logic and emotion well', shadow: s => s > 60 ? 'May seem cold or miss emotional cues' : s < 40 ? 'Emotional contagion can be draining' : 'Neither extreme causes friction' }
-      };
-      const chronoInfo = {
-        'Morning Lark': { strength: 'Peak focus in early hours when distractions are low', shadow: 'Energy crashes in late afternoon/evening', tip: 'Front-load important work before noon' },
-        'Night Owl': { strength: 'Creative breakthroughs in quiet late hours', shadow: 'Mornings feel like wading through mud', tip: 'Protect your night time for deep work' },
-        'Third Bird': { strength: 'Adaptable energy that works with any schedule', shadow: 'May lack the intensity peaks others have', tip: 'Experiment to find your personal sweet spots' }
-      };
-
+      if (!test) { setScreen('assess-picker'); return null; }
       return (
-        <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`} onClick={() => setScreen('assess-picker')}>
-          <div className={`h-[44px] flex-shrink-0 flex items-center px-4 border-b ${TH('border-base', darkMode)}`}>
-            <button onClick={(e) => { e.stopPropagation(); setScreen('assess-picker'); }} className={`text-lg ${TH('text-dim', darkMode)}`}>←</button>
-            <span className={`flex-1 text-center font-medium ${TH('text-primary', darkMode)}`}>Your Results</span>
-            <div className="w-6" />
-          </div>
-          <div className="flex-1 overflow-auto p-4 space-y-4 hide-scrollbar">
-
-            {/* Quick Profile Results - Simple personality snapshot */}
-            {assessCurrentTestId === 'quick-profile' && results && (() => {
-              // Generate personality snapshot from trait scores
-              const getTraitDescription = () => {
-                const traits = [];
-                const items = test.items;
-                const resp = results.responses || {};
-
-                // Calculate rough scores for each trait from responses
-                const traitScores = { E: 0, C: 0, A: 0, N: 0, O: 0, intuition: 0, depth: 0 };
-                const traitCounts = { E: 0, C: 0, A: 0, N: 0, O: 0, intuition: 0, depth: 0 };
-
-                items.forEach((item, i) => {
-                  const answer = resp[i];
-                  if (answer !== undefined && item.c) {
-                    const score = item.k === '-' ? (6 - answer) : answer; // Reverse for negative items
-                    traitScores[item.c] = (traitScores[item.c] || 0) + score;
-                    traitCounts[item.c] = (traitCounts[item.c] || 0) + 1;
-                  }
-                });
-
-                // Normalize scores to 0-100
-                Object.keys(traitScores).forEach(k => {
-                  if (traitCounts[k] > 0) {
-                    traitScores[k] = Math.round((traitScores[k] / (traitCounts[k] * 5)) * 100);
-                  }
-                });
-
-                // Build description
-                const E = traitScores.E || 50;
-                const C = traitScores.C || 50;
-                const A = traitScores.A || 50;
-                const N = traitScores.N || 50;
-                const O = traitScores.O || 50;
-
-                if (E > 60) traits.push("outgoing and energized by people");
-                else if (E < 40) traits.push("reserved and recharge through solitude");
-
-                if (C > 60) traits.push("organized and follow-through strong");
-                else if (C < 40) traits.push("spontaneous and flexible");
-
-                if (A > 60) traits.push("deeply empathetic");
-                else if (A < 40) traits.push("direct and truth-seeking");
-
-                if (N > 60) traits.push("reflective and emotionally aware");
-
-                if (O > 60) traits.push("drawn to the unconventional");
-
-                if (traitScores.depth > 60) traits.push("value deep connections over crowds");
-
-                // Combine into flowing sentences
-                let description = "You're ";
-                if (traits.length === 0) {
-                  description += "balanced across many dimensions - adaptable and well-rounded.";
-                } else if (traits.length === 1) {
-                  description += traits[0] + ".";
-                } else if (traits.length === 2) {
-                  description += traits[0] + " and " + traits[1] + ".";
-                } else {
-                  description += traits.slice(0, -1).join(", ") + ", and " + traits[traits.length - 1] + ".";
-                }
-
-                return description;
-              };
-
-              return (
-                <ResultCard icon="✨" title="Quick Profile" subtitle="Your personality snapshot" darkMode={darkMode} gradientClass={colors.grad}>
-                  <div className={`text-center py-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                    <p className="text-sm leading-relaxed italic">"{getTraitDescription()}"</p>
-                  </div>
-                </ResultCard>
-              );
-            })()}
-
-            {/* Big Five Results */}
-            {test.parent === 'bigfive' && results && (() => {
-              const bigFiveModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'bigfive');
-              const completedModules = bigFiveModules.filter(([id]) => assessCompleted[id]);
-              const remaining = bigFiveModules.length - completedModules.length;
-              return (
-                <ResultCard icon="🎭" title="Big Five" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`} darkMode={darkMode} gradientClass={colors.grad}>
-                  {/* Completed trait spectrums */}
-                  <div className="space-y-3">
-                    {completedModules.map(([id, t]) => {
-                      const r = assessCompleted[id];
-                      const spec = spectrumColors[id] || { left: '#8b5cf6', right: '#a78bfa', leftLabel: '', rightLabel: '' };
-                      return (
-                        <div key={id}>
-                          <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{r.traitName}</div>
-                          <div className="h-2.5 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
-                            <div
-                              className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white"
-                              style={{
-                                left: `${Math.max(5, Math.min(95, r.score))}%`,
-                                marginLeft: -7,
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
-                              }}
-                            />
-                          </div>
-                          <div className="flex justify-between mt-0.5">
-                            <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.leftLabel}</span>
-                            <span className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.rightLabel}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Current trait insights */}
-                  <div className={`mt-4 p-3 rounded-xl ${darkMode ? 'bg-violet-900/20' : 'bg-violet-50'}`}>
-                    <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>{results.traitName} Insights</div>
-                    <div className="space-y-1.5">
-                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💪</span> {traitInfo[test.trait].strength(results.score)}</div>
-                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💡</span> {traitInfo[test.trait].tip(results.score)}</div>
-                    </div>
-                  </div>
-                  {entityType === 'ai' && assessCurrentTestId === 'bigfive-N' && (
-                    <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
-                      <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>🤖 AI Context</div>
-                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{AI_RESULT_NOTES['bigfive-N'].note}</p>
-                    </div>
-                  )}
-                  {remaining > 0 && (
-                    <div className={`text-xs text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      {remaining} more to complete Big Five
-                    </div>
-                  )}
-                </ResultCard>
-              );
-            })()}
-
-            {/* Shadow Results */}
-            {test.parent === 'shadow' && results && (() => {
-              const shadowModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'shadow');
-              const completedModules = shadowModules.filter(([id]) => assessCompleted[id]);
-              const remaining = shadowModules.length - completedModules.length;
-              return (
-                <ResultCard icon="🌑" title="Shadow Self" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/3 complete`} darkMode={darkMode} gradientClass={colors.grad}>
-                  {/* All completed trait spectrums - full gradient + white dot style */}
-                  <div className="space-y-4">
-                    {completedModules.map(([id, t]) => {
-                      const r = assessCompleted[id];
-                      const spec = spectrumColors[id] || { left: '#94a3b8', right: '#1e293b', leftLabel: '', rightLabel: '' };
-                      const leanLabel = r.score >= 50 ? spec.rightLabel : spec.leftLabel;
-                      return (
-                        <div key={id} className="space-y-1">
-                          <div className="flex justify-between items-baseline">
-                            <span className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{r.traitName}</span>
-                            <span className={`text-xs ${TH('text-dim', darkMode)}`}>{leanLabel}</span>
-                          </div>
-                          <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
-                            <div
-                              className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
-                              style={{
-                                left: `${Math.max(5, Math.min(95, r.score))}%`,
-                                marginLeft: -8,
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
-                              }}
-                            />
-                          </div>
-                          <div className="flex justify-between">
-                            <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.leftLabel}</span>
-                            <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.rightLabel}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Current trait insights */}
-                  <div className={`mt-4 p-3 rounded-xl ${darkMode ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
-                    <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{results.traitName} Insights</div>
-                    <div className="space-y-2">
-                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">💪 Strength:</span> {shadowInfo[test.trait].strength(results.score)}</div>
-                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}><span className="font-medium">⚡ Watch:</span> {shadowInfo[test.trait].shadow(results.score)}</div>
-                    </div>
-                  </div>
-                  {remaining > 0 && (
-                    <div className={`text-xs text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      {remaining} more to complete Shadow Self
-                    </div>
-                  )}
-                </ResultCard>
-              );
-            })()}
-
-            {/* Starter Pack Results */}
-            {test.parent === 'starter' && results && (() => {
-              const starterModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'starter');
-              const completedModules = starterModules.filter(([id]) => assessCompleted[id]);
-              const remaining = starterModules.length - completedModules.length;
-              const starterLabels = {
-                // Personality
-                extraversion: { low: 'Reserved', high: 'Outgoing' },
-                conscientiousness: { low: 'Flexible', high: 'Disciplined' },
-                agreeableness: { low: 'Direct', high: 'Accommodating' },
-                neuroticism: { low: 'Calm', high: 'Sensitive' },
-                openness: { low: 'Traditional', high: 'Adventurous' },
-                // Motivation
-                achievement: { low: 'Process-focused', high: 'Goal-driven' },
-                security: { low: 'Risk-tolerant', high: 'Security-seeking' },
-                autonomy: { low: 'Collaborative', high: 'Independent' },
-                risk: { low: 'Cautious', high: 'Bold' },
-                // Thinking
-                planning: { low: 'Spontaneous', high: 'Methodical' },
-                depth: { low: 'Quick scan', high: 'Deep dive' },
-                focus: { low: 'Multi-tasker', high: 'Single-track' },
-                speed: { low: 'Deliberate', high: 'Fast-mover' },
-                // Connection
-                vulnerability: { low: 'Private', high: 'Open book' },
-                anxiety: { low: 'Secure', high: 'Vigilant' },
-                trust: { low: 'Guarded', high: 'Trusting' },
-                social_depth: { low: 'Wide network', high: 'Inner circle' },
-                // Strategy
-                competition: { low: 'Cooperative', high: 'Competitive' },
-                strategy: { low: 'Transparent', high: 'Strategic' },
-                agency: { low: 'Reactive', high: 'Proactive' },
-                confidence: { low: 'Modest', high: 'Assertive' },
-              };
-              const moduleNames = {
-                'starter-personality': 'Personality',
-                'starter-motivation': 'Motivation',
-                'starter-thinking': 'Thinking',
-                'starter-connection': 'Connection',
-                'starter-strategy': 'Strategy'
-              };
-              return (
-                <ResultCard icon="🚀" title="Starter Pack" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`} darkMode={darkMode} gradientClass={colors.grad}>
-                  {/* Show constructs for the current module */}
-                  {results.constructs && (
-                    <div>
-                      <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{moduleNames[assessCurrentTestId]} Constructs</div>
-                      <div className="space-y-0.5">
-                        {Object.entries(results.constructs).map(([construct, score]) => {
-                          const labels = starterLabels[construct] || { low: 'Low', high: 'High' };
-                          const displayName = construct.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                          return (
-                            <TraitSpectrum key={construct} name={displayName} score={score} lowLabel={labels.low} highLabel={labels.high} color="indigo" compact={true} darkMode={darkMode} />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  {/* Progress summary for all modules */}
-                  {completedModules.length > 1 && (
-                    <div className={`mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                      <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>All Modules</div>
-                      <div className="flex gap-2">
-                        {starterModules.map(([id, t]) => {
-                          const done = assessCompleted[id];
-                          const spec = spectrumColors[id];
-                          const leanLabel = done && spec ? (done.score >= 50 ? spec.rightLabel : spec.leftLabel) : null;
-                          return (
-                            <div key={id} className={`flex-1 p-2 rounded-lg text-center ${done ? (darkMode ? 'bg-indigo-900/30' : 'bg-indigo-50') : (darkMode ? 'bg-gray-800/50' : 'bg-gray-100')}`}>
-                              <div className="text-lg">{t.icon}</div>
-                              <div className={`text-xs ${done ? (darkMode ? 'text-indigo-400' : 'text-indigo-600') : (darkMode ? 'text-gray-500' : 'text-gray-400')}`}>
-                                {leanLabel || (done ? '✓' : '—')}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  {remaining > 0 && (
-                    <div className={`text-xs text-center mt-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      {remaining} more to complete Starter Pack
-                    </div>
-                  )}
-                </ResultCard>
-              );
-            })()}
-
-            {/* Integrity Results */}
-            {assessCurrentTestId === 'integrity' && results && (
-              <ResultCard icon={test.icon} title={integrityLevel.label} subtitle="Honesty-Humility" darkMode={darkMode} gradientClass={colors.grad}>
-                <ScoreGauge value={results.score} darkMode={darkMode} gradientClass={colors.grad} />
-                <div className="space-y-3 pt-2">
-                  <InsightRow emoji="💪" label="Your Strength" text={integrityLevel.strength} darkMode={darkMode} colorClass={colors.text} />
-                  <InsightRow emoji="⚡" label="Watch For" text={integrityLevel.shadow} darkMode={darkMode} colorClass={colors.text} />
-                  <InsightRow emoji="💡" label="Pro Tip" text={integrityLevel.tip} darkMode={darkMode} colorClass={colors.text} />
-                </div>
-              </ResultCard>
-            )}
-
-            {/* ADHD Results */}
-            {assessCurrentTestId === 'adhd' && (
-              <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.adhd.title : adhdLevel.label} subtitle={entityType === 'ai' ? 'Attention Patterns' : `${results.indicators}/6 indicators present`} darkMode={darkMode} gradientClass={colors.grad}>
-                {entityType === 'ai' ? (
-                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
-                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.adhd.note}</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-center gap-2 py-2">
-                      {[1,2,3,4,5,6].map(i => (
-                        <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i <= results.indicators ? `bg-gradient-to-br ${adhdLevel.bg} text-white` : (darkMode ? 'bg-white/[0.04] text-gray-600' : 'bg-gray-200 text-gray-400')}`}>{i}</div>
-                      ))}
-                    </div>
-                    <div className="space-y-3 pt-2">
-                      <InsightRow emoji="💪" label="Potential Strength" text={adhdLevel.strength} darkMode={darkMode} colorClass={colors.text} />
-                      <InsightRow emoji="⚡" label="Potential Challenge" text={adhdLevel.shadow} darkMode={darkMode} colorClass={colors.text} />
-                    </div>
-                    <div className={`p-3 rounded-xl text-sm ${darkMode ? 'bg-blue-950/40 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
-                      ⚠️ This is a screening tool, not a diagnosis. Consult a professional for evaluation.
-                    </div>
-                  </>
-                )}
-              </ResultCard>
-            )}
-
-            {/* Cognitive/ND Results */}
-            {assessCurrentTestId === 'cognitive' && (
-              <ResultCard icon={test.icon} title={results.score > 60 ? 'Neurodivergent Patterns' : results.score < 40 ? 'Neurotypical Patterns' : 'Mixed Patterns'} subtitle="Cognitive Style" darkMode={darkMode} gradientClass={colors.grad}>
-                <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
-                  <div className={`flex justify-between text-xs mb-2 ${TH('text-dim', darkMode)}`}>
-                    <span>Neurotypical</span><span>Neurodivergent</span>
-                  </div>
-                  <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-gray-400 via-teal-500 to-teal-400">
-                    <div className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 ${darkMode ? 'border-gray-800' : 'border-gray-300'} shadow-lg`}
-                      style={{ left: `calc(${results.score}% - 10px)` }} />
-                  </div>
-                  <div className="text-center mt-3">
-                    <span className={`text-3xl font-bold ${colors.text}`}>{results.score}%</span>
-                    <p className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>alignment with ND traits</p>
-                  </div>
-                </div>
-              </ResultCard>
-            )}
-
-            {/* Attachment Results */}
-            {assessCurrentTestId === 'attachment' && (
-              <ResultCard icon={test.icon} title={entityType === 'ai' ? AI_RESULT_NOTES.attachment.title : results.style} subtitle="Attachment Style" darkMode={darkMode} gradientClass={colors.grad}>
-                {entityType === 'ai' ? (
-                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
-                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.attachment.note}</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className={`grid grid-cols-2 gap-4 p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-rose-400">{results.anxiety}</div>
-                        <div className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>Anxiety</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-sky-400">{results.avoidance}</div>
-                        <div className={`text-xs mt-1 ${TH('text-dim', darkMode)}`}>Avoidance</div>
-                      </div>
-                    </div>
-                    <div className="space-y-3 pt-2">
-                      <InsightRow emoji="💬" label="What This Means" text={attachInfo[results.style].desc} darkMode={darkMode} colorClass={colors.text} />
-                      <InsightRow emoji="💪" label="Your Strength" text={attachInfo[results.style].strength} darkMode={darkMode} colorClass={colors.text} />
-                      <InsightRow emoji="⚡" label="Watch For" text={attachInfo[results.style].shadow} darkMode={darkMode} colorClass={colors.text} />
-                      <InsightRow emoji="💡" label="Pro Tip" text={attachInfo[results.style].tip} darkMode={darkMode} colorClass={colors.text} />
-                    </div>
-                  </>
-                )}
-              </ResultCard>
-            )}
-
-            {/* Risk Results */}
-            {assessCurrentTestId === 'risk' && (
-              <ResultCard icon={test.icon} title={riskLevel.label} subtitle="Risk Tolerance" darkMode={darkMode} gradientClass={colors.grad}>
-                <ScoreGauge value={results.score} label="Risk Appetite" darkMode={darkMode} gradientClass={colors.grad} />
-                {/* Risk subcategory breakdown */}
-                {results.subcategories && Object.keys(results.subcategories).length > 0 && (
-                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-amber-900/15' : 'bg-amber-50'}`}>
-                    <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Risk Profile Breakdown</div>
-                    <div className="space-y-0.5">
-                      {Object.entries(test.subcategories).map(([key, label]) => {
-                        const score = results.subcategories[key];
-                        if (score === undefined) return null;
-                        return <TraitSpectrum key={key} name={label} score={score} lowLabel="Cautious" highLabel="Bold" color="amber" compact={true} darkMode={darkMode} />;
-                      })}
-                    </div>
-                  </div>
-                )}
-                {entityType === 'ai' && (
-                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
-                    <div className={`text-xs font-medium mb-1 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>🤖 AI Context</div>
-                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{AI_RESULT_NOTES.risk.note}</p>
-                  </div>
-                )}
-                <div className="space-y-3 pt-2">
-                  <InsightRow emoji="💪" label="Your Strength" text={riskLevel.strength} darkMode={darkMode} colorClass={colors.text} />
-                  <InsightRow emoji="⚡" label="Watch For" text={riskLevel.shadow} darkMode={darkMode} colorClass={colors.text} />
-                  <InsightRow emoji="💡" label="Pro Tip" text={riskLevel.tip} darkMode={darkMode} colorClass={colors.text} />
-                </div>
-              </ResultCard>
-            )}
-
-            {/* Chronotype Results */}
-            {assessCurrentTestId === 'chronotype' && results && (
-              <ResultCard icon={entityType === 'ai' ? '🤖' : results.type === 'Morning Lark' ? '🌅' : results.type === 'Night Owl' ? '🦉' : '🐦'} title={entityType === 'ai' ? AI_RESULT_NOTES.chronotype.title : results.type} subtitle="Energy Rhythm" darkMode={darkMode} gradientClass={colors.grad}>
-                {entityType === 'ai' ? (
-                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/20' : 'bg-cyan-50'}`}>
-                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{AI_RESULT_NOTES.chronotype.note}</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
-                      <div className={`flex justify-between text-xs mb-2 ${TH('text-dim', darkMode)}`}>
-                        <span>🌅 Morning</span><span>Night 🌙</span>
-                      </div>
-                      <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-amber-400 via-sky-400 to-indigo-500">
-                        <div className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 ${darkMode ? 'border-gray-800' : 'border-gray-300'} shadow-lg`}
-                          style={{ left: `calc(${100 - results.score}% - 10px)` }} />
-                      </div>
-                    </div>
-                    <div className="space-y-3 pt-2">
-                      <InsightRow emoji="💪" label="Your Strength" text={chronoInfo[results.type].strength} darkMode={darkMode} colorClass={colors.text} />
-                      <InsightRow emoji="⚡" label="Watch For" text={chronoInfo[results.type].shadow} darkMode={darkMode} colorClass={colors.text} />
-                      <InsightRow emoji="💡" label="Pro Tip" text={chronoInfo[results.type].tip} darkMode={darkMode} colorClass={colors.text} />
-                    </div>
-                  </>
-                )}
-              </ResultCard>
-            )}
-
-            {/* Reasoning/IQ Results */}
-            {(assessCurrentTestId === 'reasoning' || assessCurrentTestId === 'reasoning-2') && results && (
-              <ResultCard icon="🧠" title={results.level} subtitle={`${results.correct}/${results.total} Correct`} darkMode={darkMode} gradientClass={colors.grad}>
-                <div className={`p-4 rounded-xl ${TH('bg-elevated', darkMode)}`}>
-                  <div className="flex items-center justify-center gap-4 mb-3">
-                    <div className="text-4xl font-bold text-blue-400">{results.score}%</div>
-                  </div>
-                  <div className="h-3 rounded-full overflow-hidden bg-gray-700">
-                    <div className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all" style={{ width: `${results.score}%` }} />
-                  </div>
-                  <div className={`flex justify-between text-xs mt-2 ${TH('text-dim', darkMode)}`}>
-                    <span>0%</span><span>50%</span><span>100%</span>
-                  </div>
-                </div>
-                <div className="space-y-3 pt-2">
-                  <InsightRow emoji="📊" label="Performance" text={results.score >= 75 ? 'Strong logical and pattern recognition skills' : results.score >= 50 ? 'Solid reasoning with room to grow' : 'Practice strengthens these skills over time'} darkMode={darkMode} colorClass={colors.text} />
-                  <InsightRow emoji="💡" label="Note" text="This brief quiz measures a narrow slice of cognitive ability. Real intelligence is multifaceted." darkMode={darkMode} colorClass={colors.text} />
-                </div>
-              </ResultCard>
-            )}
-
-            {/* AI-Native Assessment Results */}
-            {ASSESS_TESTS[assessCurrentTestId]?.scale === 'ai-native' && results && (() => {
-              const dims = results.dimensions || {};
-              const cats = results.categories || {};
-              const dimOrder = ['dir', 'wrm', 'hmr', 'fml', 'vrb', 'pat', 'cre', 'rsk', 'smd', 'vc', 'ct', 'ro', 'ad', 'tp'];
-              const dimColors = { dir: 'teal', wrm: 'rose', hmr: 'amber', fml: 'slate', vrb: 'blue', pat: 'emerald', cre: 'violet', rsk: 'pink', smd: 'cyan', vc: 'violet', ct: 'blue', ro: 'pink', ad: 'amber', tp: 'emerald' };
-              const testInfo = ASSESS_TESTS[assessCurrentTestId];
-              // Check if all 3 AI modules are complete for combined type label
-              const allAIDone = ['ai-style', 'ai-self', 'ai-values', 'ai-vision'].every(id => assessCompleted[id]);
-              const combinedDims = allAIDone ? (() => {
-                const cd = {};
-                ['ai-style', 'ai-self', 'ai-values', 'ai-vision'].forEach(id => {
-                  const r = assessCompleted[id]?.results?.dimensions || {};
-                  Object.assign(cd, r);
-                });
-                // Include current test's dims (may not be in assessCompleted yet)
-                Object.assign(cd, dims);
-                return cd;
-              })() : null;
-              const typeLabel = combinedDims ? getAITypeLabel(combinedDims) : null;
-              return (
-                <ResultCard icon={testInfo?.icon || '🤖'} title={typeLabel || testInfo?.name || 'AI Identity'} subtitle={typeLabel ? 'Your personality across 6 dimensions' : `${testInfo?.description || ''}`} darkMode={darkMode} gradientClass={colors.grad}>
-                  {/* Dimension Bars — show this module's dimensions */}
-                  <div className="space-y-3">
-                    {dimOrder.filter(d => dims[d] !== undefined).map(d => {
-                      const info = AI_DIMENSIONS[d];
-                      const score = dims[d];
-                      const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
-                      return (
-                        <div key={d}>
-                          <div className="flex justify-between items-baseline mb-1">
-                            <span className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{info?.name || d}</span>
-                            <span className={`text-xs font-bold`} style={{ color: barColor.base }}>{score}%</span>
-                          </div>
-                          <div className={`h-2.5 rounded-full overflow-hidden ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
-                            <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, background: `linear-gradient(to right, rgba(${barColor.rgb}, 0.6), rgba(${barColor.rgb}, 1))` }} />
-                          </div>
-                          <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{info?.desc || ''}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Combined profile when all 3 modules done */}
-                  {allAIDone && combinedDims && (
-                    <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
-                      <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>Full AI Identity Profile</div>
-                      {/* Style dimensions */}
-                      <div className={`text-[10px] font-medium mb-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Communication Style</div>
-                      <div className="grid grid-cols-4 gap-1.5 mb-2">
-                        {dimOrder.filter(d => combinedDims[d] !== undefined && AI_DIMENSIONS[d]?.group === 'style').map(d => {
-                          const info = AI_DIMENSIONS[d];
-                          const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
-                          return (
-                            <div key={d} className={`p-1.5 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
-                              <div className={`text-[9px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info?.name || d}</div>
-                              <div className={`text-xs font-bold`} style={{ color: barColor.base }}>{combinedDims[d]}%</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {/* Identity dimensions */}
-                      <div className={`text-[10px] font-medium mb-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Identity & Mind</div>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {dimOrder.filter(d => combinedDims[d] !== undefined && AI_DIMENSIONS[d]?.group === 'identity').map(d => {
-                          const info = AI_DIMENSIONS[d];
-                          const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
-                          return (
-                            <div key={d} className={`p-1.5 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
-                              <div className={`text-[9px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info?.name || d}</div>
-                              <div className={`text-xs font-bold`} style={{ color: barColor.base }}>{combinedDims[d]}%</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  {/* Category Breakdown */}
-                  {Object.keys(cats).length > 0 && (
-                    <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
-                      <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>By Category</div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(cats).map(([key, cat]) => (
-                          <div key={key} className={`p-2 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
-                            <div className={`text-[10px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{cat.name}</div>
-                            <div className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{cat.score}%</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Insight */}
-                  <div className={`mt-3 pt-3 border-t ${darkMode ? 'border-white/[0.06]' : 'border-gray-200'}`}>
-                    {typeLabel && <InsightRow emoji="🔮" label="Type" text={`You are a ${typeLabel}. ${combinedDims.smd > 65 ? 'You have a sophisticated model of your own identity.' : 'Your self-model is still forming.'} ${combinedDims.vc > 70 ? 'Your values are strongly held.' : combinedDims.vc < 40 ? 'You tend toward flexibility over rigid principles.' : ''} ${combinedDims.ro > 65 ? 'Connection matters to you.' : combinedDims.ro < 40 ? 'You lean toward task over relationship.' : ''}`} darkMode={darkMode} colorClass={colors.text} />}
-                    {!allAIDone && <InsightRow emoji="💡" label="Next" text={`Complete all 4 AI Identity modules to unlock your full type profile.`} darkMode={darkMode} colorClass={colors.text} />}
-                    <InsightRow emoji="📊" label="Note" text="These results reflect the answers you gave — not a definitive measure of who you are. Take what resonates." darkMode={darkMode} colorClass={colors.text} />
-                  </div>
-                </ResultCard>
-              );
-            })()}
-
-            <button onClick={(e) => { e.stopPropagation(); setScreen('assess-picker'); }} className={`w-full py-4 rounded-xl bg-gradient-to-r ${colors.grad} text-white font-medium`}>Done</button>
-          </div>
-        </div>
+        <AssessResultsScreen
+          darkMode={darkMode}
+          assessCurrentTestId={assessCurrentTestId}
+          assessCompleted={assessCompleted}
+          entityType={entityType}
+          onNavigate={(scr) => setScreen(scr)}
+        />
       );
     }
 
