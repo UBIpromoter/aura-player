@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Organism — Answer Mapping Playground v2</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+body{background:#050A18;color:#e2e8f0;display:flex;}
+
+.viz-area{flex:1;position:relative;min-width:0;}
+canvas{display:block;width:100%;height:100%;}
+.viz-info{position:absolute;bottom:12px;left:12px;font-size:10px;color:#334155;
+  display:flex;gap:8px;align-items:center;letter-spacing:0.5px;}
+.viz-info .trait{display:flex;align-items:center;gap:3px;}
+.viz-info .dot{width:6px;height:6px;border-radius:50%;display:inline-block;}
+.viz-stats{position:absolute;top:12px;left:12px;font-size:10px;color:#475569;
+  letter-spacing:0.3px;line-height:1.6;}
+
+.top-bar{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px;
+  align-items:center;z-index:10;padding:4px 8px;border-radius:8px;
+  background:rgba(5,10,24,0.7);backdrop-filter:blur(8px);}
+.top-bar button{border:1px solid #1e293b;padding:3px 10px;border-radius:5px;cursor:pointer;
+  font-size:10px;letter-spacing:0.7px;background:rgba(15,23,42,0.6);color:#475569;
+  font-family:inherit;transition:all 0.2s;}
+.top-bar button:hover{background:#1e293b;color:#94a3b8;}
+.top-bar button.on{background:rgba(78,205,196,0.12);color:#4ECDC4;border-color:rgba(78,205,196,0.25);}
+.div{width:1px;height:16px;margin:0 2px;background:#1e293b;}
+
+/* Sidebar */
+.sidebar{width:400px;height:100vh;background:rgba(8,12,28,0.95);border-left:1px solid #1e293b;
+  flex-shrink:0;overflow:hidden;display:flex;flex-direction:column;padding:0;}
+.sidebar h1{font-size:13px;font-weight:700;color:#94a3b8;letter-spacing:1px;
+  text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #1e293b;}
+
+.presets{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;}
+.presets button{border:1px solid #1e293b;padding:4px 10px;border-radius:6px;cursor:pointer;
+  font-size:10px;background:rgba(15,23,42,0.6);color:#64748b;font-family:inherit;
+  transition:all 0.15s;letter-spacing:0.3px;}
+.presets button:hover{background:#1e293b;color:#94a3b8;}
+.presets button.active{background:rgba(78,205,196,0.1);color:#4ECDC4;border-color:rgba(78,205,196,0.25);}
+
+/* Info panel — sticky at top, above sections */
+.info-panel{background:rgba(10,16,32,0.9);border:1px solid #1e293b;border-radius:6px;
+  padding:8px 12px;margin-bottom:14px;min-height:44px;transition:opacity 0.15s;}
+.info-panel .info-label{font-size:11px;font-weight:600;color:#94a3b8;letter-spacing:0.5px;
+  margin-bottom:2px;}
+.info-panel .info-desc{font-size:11px;color:#64748b;line-height:1.5;}
+.info-panel.empty{opacity:0.4;}
+.info-panel.empty .info-desc{font-style:italic;}
+
+.section{margin-bottom:14px;}
+.section-header{display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;padding:5px 0;user-select:none;}
+.section-header h2{font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;}
+.section-header .indicator{font-size:10px;color:#475569;transition:transform 0.2s;}
+.section-header:hover h2{color:#e2e8f0;}
+.section.collapsed .section-body{display:none;}
+.section.collapsed .indicator{transform:rotate(-90deg);}
+.section-body{padding:4px 0 4px 0;}
+.section-actions{display:flex;gap:4px;align-items:center;}
+.section-actions button{border:none;background:none;color:#475569;font-size:9px;
+  cursor:pointer;padding:2px 6px;border-radius:3px;font-family:inherit;}
+.section-actions button:hover{background:rgba(255,255,255,0.05);color:#94a3b8;}
+
+.slider-row{display:flex;align-items:center;gap:8px;margin:4px 0;height:26px;
+  border-radius:4px;padding:0 4px;cursor:default;}
+.slider-label{width:80px;font-size:10px;color:#8494a7;letter-spacing:0.3px;flex-shrink:0;
+  text-align:left;font-weight:500;display:flex;align-items:center;justify-content:flex-start;gap:5px;
+  cursor:pointer;user-select:none;}
+.slider-label .trait-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.slider-wrap{flex:1;position:relative;height:20px;display:flex;align-items:center;}
+.slider-wrap input[type=range]{width:100%;height:6px;-webkit-appearance:none;appearance:none;
+  background:transparent;outline:none;cursor:pointer;border-radius:3px;}
+.slider-wrap input[type=range]::-webkit-slider-track{height:6px;border-radius:3px;
+  background:var(--track-color, #1e293b);}
+.slider-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--thumb-color, #4ECDC4);border:2px solid rgba(0,0,0,0.4);
+  box-shadow:0 0 8px var(--glow-color, rgba(78,205,196,0.4)),0 0 2px rgba(255,255,255,0.1);cursor:grab;}
+.slider-wrap input[type=range]::-webkit-slider-thumb:active{cursor:grabbing;transform:scale(1.15);
+  box-shadow:0 0 14px var(--glow-color, rgba(78,205,196,0.6)),0 0 3px rgba(255,255,255,0.15);}
+.slider-value{width:36px;font-size:10px;color:#94a3b8;text-align:left;font-variant-numeric:tabular-nums;
+  flex-shrink:0;cursor:pointer;user-select:none;}
+
+.mapping-note{font-size:9px;color:#475569;padding:2px 0 4px 0;line-height:1.4;}
+
+/* Section colors — brighter tracks for visibility */
+.sec-bigfive .section-header h2{color:#4ECDC4;}
+.sec-bigfive .slider-wrap{--track-color:#18524a;--thumb-color:#4ECDC4;--glow-color:rgba(78,205,196,0.4);}
+.sec-shadow .section-header h2{color:#94a3b8;}
+.sec-shadow .slider-wrap{--track-color:#2d3d52;--thumb-color:#94a3b8;--glow-color:rgba(148,163,184,0.35);}
+.sec-attach .section-header h2{color:#f43f5e;}
+.sec-attach .slider-wrap{--track-color:#5c2235;--thumb-color:#f43f5e;--glow-color:rgba(244,63,94,0.35);}
+.sec-risk .section-header h2{color:#f59e0b;}
+.sec-risk .slider-wrap{--track-color:#5c4515;--thumb-color:#f59e0b;--glow-color:rgba(245,158,11,0.35);}
+.sec-chrono .section-header h2{color:#3b82f6;}
+.sec-chrono .slider-wrap{--track-color:#1a3a6a;--thumb-color:#3b82f6;--glow-color:rgba(59,130,246,0.35);}
+.sec-adhd .section-header h2{color:#8b5cf6;}
+.sec-adhd .slider-wrap{--track-color:#2d2470;--thumb-color:#8b5cf6;--glow-color:rgba(139,92,246,0.35);}
+.sec-motion .section-header h2{color:#06b6d4;}
+.sec-motion .slider-wrap{--track-color:#164a5e;--thumb-color:#06b6d4;--glow-color:rgba(6,182,212,0.35);}
+.sec-glow .section-header h2{color:#d946ef;}
+.sec-glow .slider-wrap{--track-color:#452358;--thumb-color:#d946ef;--glow-color:rgba(217,70,239,0.35);}
+.sec-membrane .section-header h2{color:#10b981;}
+.sec-membrane .slider-wrap{--track-color:#1a4a38;--thumb-color:#10b981;--glow-color:rgba(16,185,129,0.35);}
+.sec-global .section-header h2{color:#94a3b8;}
+.sec-global .slider-wrap{--track-color:#2d3d52;--thumb-color:#94a3b8;--glow-color:rgba(148,163,184,0.35);}
+
+.sidebar-toggle{position:absolute;top:50%;right:400px;transform:translateY(-50%);
+  z-index:20;background:rgba(8,12,28,0.9);border:1px solid #1e293b;border-right:none;
+  border-radius:6px 0 0 6px;padding:8px 4px;cursor:pointer;color:#475569;font-size:14px;
+  transition:right 0.3s;}
+.sidebar-toggle:hover{color:#94a3b8;background:#0f172a;}
+body.sidebar-hidden .sidebar{display:none;}
+body.sidebar-hidden .sidebar-toggle{right:0;}
+
+/* Keyboard navigation highlight */
+.slider-row.focused{background:rgba(78,205,196,0.08);outline:1px solid rgba(78,205,196,0.25);}
+
+/* Sidebar fixed top */
+.sidebar-fixed{flex-shrink:0;padding:12px 14px 0;border-bottom:1px solid #1e293b;
+  background:rgba(8,12,28,0.98);}
+
+/* Sidebar scroll area */
+.sidebar-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 14px 14px;
+  scrollbar-width:thin;scrollbar-color:#1e293b transparent;}
+.sidebar-scroll::-webkit-scrollbar{width:5px;}
+.sidebar-scroll::-webkit-scrollbar-track{background:transparent;}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:#1e293b;border-radius:3px;}
+</style>
+</head>
+<body>
+
+<div class="viz-area">
+  <canvas id="c"></canvas>
+  <div class="top-bar">
+    <button onclick="sS(0)" id="s0">Seed</button>
+    <button onclick="sS(1)" id="s1">Young</button>
+    <button onclick="sS(2)" id="s2">Growing</button>
+    <button onclick="sS(3)" id="s3" class="on">Full</button>
+    <div class="div"></div>
+    <button onclick="sE('human')" id="eh" class="on">Human</button>
+    <button onclick="sE('ai')" id="ea">AI</button>
+    <div class="div"></div>
+    <button onclick="sT('dark')" id="td" class="on">Dark</button>
+    <button onclick="sT('light')" id="tl">Light</button>
+  </div>
+  <div class="viz-info" id="info"></div>
+  <div class="viz-stats" id="stats"></div>
+</div>
+
+<button class="sidebar-toggle" onclick="toggleSidebar()" id="sidebarToggle">◀</button>
+
+<div class="sidebar" id="sidebar">
+<div class="sidebar-fixed">
+  <h1>Answer → Viz Mapping</h1>
+  <div class="presets" id="presets"></div>
+
+  <div class="info-panel empty" id="infoPanel">
+    <div class="info-label" id="infoLabel">Navigate</div>
+    <div class="info-desc" id="infoDesc">Click a slider or use ↑↓ to browse, ←→ to adjust</div>
+  </div>
+</div>
+<div class="sidebar-scroll" id="sidebarScroll">
+
+  <div class="section sec-bigfive" id="sec-bigfive">
+    <div class="section-header" onclick="toggleSection('sec-bigfive')">
+      <h2>Big Five Personality</h2>
+      <div class="section-actions">
+        <button onclick="event.stopPropagation();randomizeSection('bigFive')">dice</button>
+        <span class="indicator">▼</span>
+      </div>
+    </div>
+    <div class="section-body" id="body-bigfive"></div>
+    <div class="mapping-note">Each slider controls one blob: size, brightness, interior detail</div>
+  </div>
+
+  <div class="section sec-shadow" id="sec-shadow">
+    <div class="section-header" onclick="toggleSection('sec-shadow')">
+      <h2>Shadow Self</h2>
+      <div class="section-actions">
+        <button onclick="event.stopPropagation();randomizeSection('shadow')">dice</button>
+        <span class="indicator">▼</span>
+      </div>
+    </div>
+    <div class="section-body" id="body-shadow"></div>
+    <div class="mapping-note">M → connections glow · N → node inflation · P → sharp edges, cold shift</div>
+  </div>
+
+  <div class="section sec-attach" id="sec-attach">
+    <div class="section-header" onclick="toggleSection('sec-attach')">
+      <h2>Attachment Style</h2>
+      <div class="section-actions">
+        <button onclick="event.stopPropagation();randomizeSection('attachment')">dice</button>
+        <span class="indicator">▼</span>
+      </div>
+    </div>
+    <div class="section-body" id="body-attach"></div>
+    <div class="mapping-note">Anxiety → more/faster connections · Avoidance → sparse, spread apart</div>
+  </div>
+
+  <div class="section sec-risk" id="sec-risk">
+    <div class="section-header" onclick="toggleSection('sec-risk')">
+      <h2>Risk Profile</h2>
+      <div class="section-actions">
+        <button onclick="event.stopPropagation();randomizeSection('risk')">dice</button>
+        <span class="indicator">▼</span>
+      </div>
+    </div>
+    <div class="section-body" id="body-risk"></div>
+    <div class="mapping-note">Financial → wander · Social → sway · Physical → wiggle · Ethical → chaos</div>
+  </div>
+
+  <div class="section sec-chrono" id="sec-chrono">
+    <div class="section-header" onclick="toggleSection('sec-chrono')">
+      <h2>Chronotype</h2>
+      <div class="section-actions">
+        <button onclick="event.stopPropagation();randomizeSection('chronotype')">dice</button>
+        <span class="indicator">▼</span>
+      </div>
+    </div>
+    <div class="section-body" id="body-chrono"></div>
+    <div class="mapping-note">Night owl → slow dreamy · Morning lark → bright energetic</div>
+  </div>
+
+  <div class="section sec-adhd" id="sec-adhd">
+    <div class="section-header" onclick="toggleSection('sec-adhd')">
+      <h2>ADHD / Depth</h2>
+      <div class="section-actions">
+        <button onclick="event.stopPropagation();randomizeSection('adhd')">dice</button>
+        <span class="indicator">▼</span>
+      </div>
+    </div>
+    <div class="section-body" id="body-adhd"></div>
+    <div class="mapping-note">ADHD → visible jitter · Depth → stage + node count</div>
+  </div>
+
+  <div class="section sec-motion" id="sec-motion">
+    <div class="section-header" onclick="toggleSection('sec-motion')">
+      <h2>Motion Overrides</h2>
+      <div class="section-actions">
+        <button onclick="event.stopPropagation();resetMotion()">reset</button>
+        <span class="indicator">▼</span>
+      </div>
+    </div>
+    <div class="section-body" id="body-motion"></div>
+    <div class="mapping-note">Override auto-derived values from Risk/Chrono/ADHD</div>
+  </div>
+
+  <div class="section sec-glow" id="sec-glow">
+    <div class="section-header" onclick="toggleSection('sec-glow')">
+      <h2>Glow & Light</h2>
+      <div class="section-actions">
+        <button onclick="event.stopPropagation();resetGlow()">reset</button>
+        <span class="indicator">▼</span>
+      </div>
+    </div>
+    <div class="section-body" id="body-glow"></div>
+    <div class="mapping-note">Overall glow extent, brightness, color shifts</div>
+  </div>
+
+  <div class="section sec-membrane" id="sec-membrane">
+    <div class="section-header" onclick="toggleSection('sec-membrane')">
+      <h2>Membrane & Connections</h2>
+      <div class="section-actions">
+        <button onclick="event.stopPropagation();resetMembrane()">reset</button>
+        <span class="indicator">▼</span>
+      </div>
+    </div>
+    <div class="section-body" id="body-membrane"></div>
+    <div class="mapping-note">Membrane visibility, connection density, pulse behavior</div>
+  </div>
+
+  <div class="section sec-global" id="sec-global">
+    <div class="section-header" onclick="toggleSection('sec-global')">
+      <h2>Global</h2>
+      <div class="section-actions"><span class="indicator">▼</span></div>
+    </div>
+    <div class="section-body" id="body-global"></div>
+  </div>
+</div><!-- end sidebar-scroll -->
+</div><!-- end sidebar -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// AURA ORGANISM — ANSWER MAPPING PLAYGROUND v2
+// Smooth transitions, every slider visible, reduced motion
+// ═══════════════════════════════════════════════════════════════
+
+const PI=Math.PI, TAU=PI*2;
+
+// ═══ TRAITS ═══
+const TR={
+  O:{l:'Openness',     base:[78,205,196],  acc:[255,154,139], css:'rgb(78,205,196)'},
+  C:{l:'Conscientiousness', base:[69,183,209],  acc:[255,183,77], css:'rgb(69,183,209)'},
+  E:{l:'Extraversion', base:[150,230,161], acc:[230,120,200], css:'rgb(150,230,161)'},
+  A:{l:'Agreeableness',base:[221,160,221], acc:[120,220,180], css:'rgb(221,160,221)'},
+  N:{l:'Neuroticism',  base:[247,220,111], acc:[140,160,240], css:'rgb(247,220,111)'}
+};
+const TK=Object.keys(TR);
+const SSC=[0.20,0.45,0.72,1.0], GSC=[0.35,0.55,0.78,1.0];
+
+// ═══ STATE ═══
+let stableSeed = Math.floor(Math.random()*99999);
+
+const scores = {
+  bigFive:    { O:65, C:55, E:70, A:60, N:40 },
+  shadow:     { M:25, N:20, P:15 },
+  attachment: { anxiety:1.5, avoidance:1.5 },
+  risk:       { financial:40, social:50, physical:30, ethical:35 },
+  chronotype: 55,
+  adhd:       1,
+  depth:      4,
+};
+
+const mods = {
+  driftAmp:1.0, driftSpeed:1.0, swayAmp:1.0,
+  wiggleAmp:1.0, wiggleSpeed:1.0,
+  breathRate:1.0, breathAmp:1.0, pulseSpeed:1.0,
+  glowRadius:1.0, glowIntensity:1.0,
+  memOpacity:1.0, memThickness:1.0,
+  connDensity:1.0, connPulseIrr:0.0,
+  // Shadow individual
+  machConn:0.0, narcInflate:0.0, psychSharp:0.0, psychCool:0.0,
+  // Attachment structural
+  avoidSpread:0.0, avoidDim:0.0,
+  // Risk structural
+  riskGlow:0.0, riskInflate:0.0, riskConnChaos:0.0, riskMemBreathe:0.0,
+};
+let modsOverride = {};
+
+let cvs,ctx,CW,CH,CX,CY,oR;
+let ent='human',thm='dark',stg=3;
+let gen,allN,actN,cons,puls;
+let t0=0,tL=0;
+let hullPts=[];
+
+// Lerp targets for smooth glow color
+let currentGlow=[78,205,196], targetGlow=[78,205,196];
+
+// ═══ HELPERS ═══
+function m32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function rga(c,a){return`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;}
+function ltn(c,n){return[Math.min(255,c[0]+n),Math.min(255,c[1]+n),Math.min(255,c[2]+n)];}
+function drk(c,n){return[Math.max(0,c[0]-n),Math.max(0,c[1]-n),Math.max(0,c[2]-n)];}
+function dst(x1,y1,x2,y2){const a=x1-x2,b=y1-y2;return Math.sqrt(a*a+b*b);}
+function bl(cs,ws){let r=0,g=0,b=0,w=0;for(let i=0;i<cs.length;i++){r+=cs[i][0]*ws[i];g+=cs[i][1]*ws[i];b+=cs[i][2]*ws[i];w+=ws[i];}return w?[r/w|0,g/w|0,b/w|0]:[128,128,128];}
+function lr3(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+function clamp(v,lo,hi){return v<lo?lo:v>hi?hi:v;}
+function lerp(a,b,t){return a+(b-a)*t;}
+
+// Trait-dependent color: dim at low tv, vivid at high tv
+function traitCol(base, tv) {
+  const shift = -80 + 120 * tv; // -80 at 0, +40 at 1
+  let c = shift < 0 ? drk(base, -shift) : ltn(base, shift);
+  // Desaturate at low values
+  if (tv < 0.4) {
+    const g = Math.round(0.299*c[0] + 0.587*c[1] + 0.114*c[2]);
+    const t = tv / 0.4;
+    c = [Math.round(g+(c[0]-g)*t), Math.round(g+(c[1]-g)*t), Math.round(g+(c[2]-g)*t)];
+  }
+  // Psychopathy cool shift: push toward blue
+  if (mods.psychCool > 0) {
+    const cool = mods.psychCool;
+    c = [Math.round(c[0]*(1-cool*0.3)), Math.round(c[1]*(1-cool*0.1)), Math.min(255, Math.round(c[2]*(1+cool*0.2)))];
+  }
+  return c;
+}
+
+// Value noise
+const PERM=new Uint8Array(512);
+(function(){const r=m32(42);for(let i=0;i<256;i++)PERM[i]=i;
+  for(let i=255;i>0;i--){const j=(r()*i)|0;[PERM[i],PERM[j]]=[PERM[j],PERM[i]];}
+  for(let i=0;i<256;i++)PERM[i+256]=PERM[i];})();
+function noise2(x,y){
+  const xi=Math.floor(x)&255,yi=Math.floor(y)&255,xf=x-Math.floor(x),yf=y-Math.floor(y);
+  const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=PERM[xi]+yi,b=PERM[xi+1]+yi;
+  return((PERM[a]/255*(1-u)+PERM[b]/255*u)*(1-v)+(PERM[a+1]/255*(1-u)+PERM[b+1]/255*u)*v);
+}
+function fbm(x,y,oct){let v=0,a=0.5,f=1;for(let i=0;i<oct;i++){v+=a*noise2(x*f,y*f);a*=0.5;f*=2;}return v;}
+
+// Convex hull + Chaikin
+function convexHull(points){
+  if(points.length<3) return points.slice();
+  const sorted=points.slice().sort((a,b)=>a.x-b.x||a.y-b.y);
+  const cross=(O,A,B)=>(A.x-O.x)*(B.y-O.y)-(A.y-O.y)*(B.x-O.x);
+  const lower=[];
+  for(const p of sorted){while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0) lower.pop();lower.push(p);}
+  const upper=[];
+  for(let i=sorted.length-1;i>=0;i--){const p=sorted[i];while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0) upper.pop();upper.push(p);}
+  return lower.slice(0,-1).concat(upper.slice(0,-1));
+}
+function chaikin(pts,iters){
+  let cur=pts;
+  for(let it=0;it<iters;it++){const next=[];
+    for(let i=0;i<cur.length;i++){const a=cur[i],b=cur[(i+1)%cur.length];
+      next.push({x:a.x*0.75+b.x*0.25,y:a.y*0.75+b.y*0.25});
+      next.push({x:a.x*0.25+b.x*0.75,y:a.y*0.25+b.y*0.75});}
+    cur=next;}
+  return cur;
+}
+function computeHull(ns){
+  const sc=SSC[stg],pts=[];
+  // Tight padding — membrane hugs nodes closely
+  for(const n of ns){const r=n.rd*sc;
+    const pad=n.tp==='p'?r*0.5+oR*0.05:r*0.4+oR*0.03;
+    const totalR=r+pad;
+    for(let i=0;i<24;i++){const a=(i/24)*TAU;
+      pts.push({x:n.x+Math.cos(a)*totalR,y:n.y+Math.sin(a)*totalR});}}
+  if(pts.length<3)return[{x:CX-20,y:CY-20},{x:CX+20,y:CY-20},{x:CX+20,y:CY+20},{x:CX-20,y:CY+20}];
+  let hull=convexHull(pts);
+
+  // Corner smoothing: detect sharp angles and pull vertices inward
+  const smoothed=[];
+  const n2=hull.length;
+  for(let i=0;i<n2;i++){
+    const prev=hull[(i-1+n2)%n2], cur=hull[i], next=hull[(i+1)%n2];
+    const ax=prev.x-cur.x,ay=prev.y-cur.y;
+    const bx=next.x-cur.x,by=next.y-cur.y;
+    const dot=ax*bx+ay*by;
+    const la=Math.sqrt(ax*ax+ay*ay)||1, lb=Math.sqrt(bx*bx+by*by)||1;
+    const cosA=dot/(la*lb);
+    // Sharp angle (cosA > -0.3 means angle < ~107°) → blend toward midpoint of neighbors
+    if(cosA > -0.3){
+      const blend=0.15+0.15*Math.max(0,cosA); // sharper = more blending
+      smoothed.push({
+        x:cur.x*(1-blend)+(prev.x+next.x)*0.5*blend,
+        y:cur.y*(1-blend)+(prev.y+next.y)*0.5*blend
+      });
+    } else {
+      smoothed.push(cur);
+    }
+  }
+
+  return chaikin(smoothed,10);
+}
+function traceSmoothedHull(ctx,hull){
+  if(hull.length<3)return;
+  const n=hull.length;
+  // Catmull-Rom → cubic Bezier for perfectly smooth closed curve
+  const tension=0.4;
+  ctx.beginPath();
+  for(let i=0;i<n;i++){
+    const p0=hull[(i-1+n)%n], p1=hull[i], p2=hull[(i+1)%n], p3=hull[(i+2)%n];
+    const cp1x=p1.x+(p2.x-p0.x)*tension, cp1y=p1.y+(p2.y-p0.y)*tension;
+    const cp2x=p2.x-(p3.x-p1.x)*tension, cp2y=p2.y-(p3.y-p1.y)*tension;
+    if(i===0) ctx.moveTo(p1.x,p1.y);
+    ctx.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,p2.x,p2.y);
+  }
+  ctx.closePath();
+}
+
+// ═══ GENOME — stable seed, scores set trait values ═══
+function mkGen() {
+  const bf = scores.bigFive;
+  const tv = {};
+  for (const k of TK) tv[k] = clamp(bf[k] / 100, 0.02, 1.0);
+  const so = [...TK].sort((a,b) => tv[b] - tv[a]);
+  const glow = bl([TR[so[0]].base, TR[so[1]].base], [0.65, 0.35]);
+  const r = m32(stableSeed);
+  const iord = [0,1,2,3,4,5].sort(() => r() - 0.5);
+  const ints = {}; for (let i=0;i<5;i++) ints[TK[i]] = iord[i];
+  return { tv, s:stableSeed, dom:so[0], glow, glowAcc:TR[so[0]].acc, ints, so };
+}
+
+// ═══ NODES — store creation ratios for smooth updates ═══
+function mkNodes(g) {
+  const r = m32(g.s + 3333), ns = [];
+
+  // Primaries — store index for target recomputation
+  for (let i=0;i<5;i++) {
+    const k = TK[i], v = g.tv[k];
+    ns.push({
+      tp:'p', k, idx:i, tv:v,
+      rgb:TR[k].base, acc:TR[k].acc, iIdx:g.ints[k],
+      // Current properties (will lerp) — initial angles set after creation via updateTargets
+      bA: (i/5)*TAU - PI/2,
+      bR: oR*(0.28 + 0.22*v),
+      rd: oR*(0.06 + v*0.14),
+      // Targets — will be set by updateTargets
+      tBA: (i/5)*TAU - PI/2,
+      tBR: oR*(0.28 + 0.22*v),
+      tRd: oR*(0.06 + v*0.14),
+      tTV: v,
+      x:0, y:0, dp:0, sd:g.s+i*137.5, bp:i*1.47, stg:0
+    });
+  }
+
+  // Companions — 5 per primary, store ratios
+  for (let i=0;i<5;i++) {
+    const p = ns[i];
+    for (let c=0;c<5;c++) {
+      const aOff = (c-2)*0.3 + (r()-0.5)*0.2;  // stored angle offset
+      const rOff = 0.04 + r()*0.06;              // stored radius offset (oR units)
+      const tvRatio = 0.25 + r()*0.35;           // stored tv ratio
+      const v = p.tv * tvRatio;
+      ns.push({
+        tp:'c', k:p.k, parentIdx:i,
+        aOff, rOff, tvRatio,
+        tv:v, tTV:v,
+        rgb:p.rgb, acc:p.acc,
+        bA: p.bA + aOff,
+        bR: p.bR + oR*rOff,
+        rd: oR*(0.010 + v*0.025),
+        tBA: p.bA + aOff,
+        tBR: p.bR + oR*rOff,
+        tRd: oR*(0.010 + v*0.025),
+        x:0, y:0, dp:0,
+        sd:g.s+(10+i*5+c)*137.5, bp:(10+i*5+c)*0.9, stg:1
+      });
+    }
+  }
+
+  // Accessories
+  const AD=[
+    {a:['O','C'],n:5},{a:['E','N'],n:5},{a:['O'],n:4},{a:['E','A'],n:5},{a:['C','N'],n:4},
+    {a:['O','C','E','A','N'],n:7},{a:['A','E'],n:5},{a:['N','O'],n:5},
+    {a:['O','E'],n:4},{a:['C','A'],n:4},{a:['N','E','A'],n:5}
+  ];
+  let ai=0;
+  for(let a=0;a<AD.length;a++){const d=AD[a],sr2=a<5?2:3;
+    for(let n=0;n<d.n;n++){
+      const ak=d.a[n%d.a.length],ai2=TK.indexOf(ak),ap=ns[ai2];
+      const aOff=(r()-0.5)*0.8;
+      const scF=0.04+r()*0.10;
+      const rOffF=scF*(0.5+r()*0.5);
+      const tvRatio=0.12+r()*0.22;
+      const v=ap.tv*tvRatio;
+      const nb=ns[(ai2+1+Math.floor(r()*3))%5];
+      const blendT=0.15+r()*0.2;
+      const rgb=lr3(ap.rgb,nb.acc,blendT).map(x=>clamp(x|0,0,255));
+      ns.push({
+        tp:'a', k:ak, parentIdx:ai2,
+        aOff, rOffF, tvRatio, blendT, nbIdx:(ai2+1+Math.floor(r()*3))%5,
+        tv:v, tTV:v,
+        rgb, acc:ap.acc,
+        bA:ap.bA+aOff, bR:ap.bR+oR*rOffF,
+        rd:oR*(0.004+v*0.012),
+        tBA:ap.bA+aOff, tBR:ap.bR+oR*rOffF,
+        tRd:oR*(0.004+v*0.012),
+        x:0,y:0,dp:0,
+        sd:g.s+(40+ai)*137.5, bp:(40+ai)*0.7, stg:sr2
+      }); ai++;
+    }
+  }
+
+  // Halo ring
+  for(let h=0;h<18;h++){
+    const ha=(h/18)*TAU+(r()-0.5)*0.3;
+    const pi=h%5, pp=ns[pi];
+    const tvRatio=0.08+r()*0.12;
+    const v=pp.tv*tvRatio;
+    const rOffF=0.02+r()*0.06;
+    const blendT=0.2+r()*0.3;
+    const rgb=lr3(pp.rgb,pp.acc,blendT).map(x=>clamp(x|0,0,255));
+    ns.push({
+      tp:'a', k:TK[pi], parentIdx:pi,
+      aOff:ha - pp.bA, rOffF, tvRatio, blendT,
+      tv:v, tTV:v,
+      rgb, acc:pp.acc,
+      bA:ha, bR:pp.bR+oR*rOffF,
+      rd:oR*(0.003+v*0.006),
+      tBA:ha, tBR:pp.bR+oR*rOffF,
+      tRd:oR*(0.003+v*0.006),
+      x:0,y:0,dp:0,
+      sd:g.s+(120+h)*137.5, bp:(120+h)*0.5, stg:3
+    });
+  }
+  return ns;
+}
+
+function filt(ns,si){return ns.filter(n=>n.tp==='p'||(n.tp==='c'&&si>=1)||(n.tp==='a'&&si>=n.stg));}
+
+// ═══ RANK-BASED ANGULAR PLACEMENT ═══
+// Dominant traits claim prominent positions; layout reshuffles as scores change
+function computeTraitAngles() {
+  const bf = scores.bigFive;
+  const vals = TK.map(k => ({k, v: bf[k]/100}));
+
+  // Sort by value descending — strongest trait gets top position
+  const ranked = [...vals].sort((a,b) => b.v - a.v);
+
+  // Assign angular slots: strongest → top (-PI/2), others spread around
+  // But don't just use fixed slots — let values influence spacing
+  const angles = {};
+  const n = ranked.length;
+
+  // Base: evenly spaced around circle starting from top
+  // Twist: strong traits pull toward center angles, weak ones get pushed wider
+  const totalV = ranked.reduce((s,r) => s + r.v, 0) || 1;
+  const avgV = totalV / n;
+
+  for (let i = 0; i < n; i++) {
+    const r = ranked[i];
+    // Base angle: evenly distributed starting from top
+    const baseA = (i/n)*TAU - PI/2;
+
+    // Value-based offset: high values pull slightly toward their neighbors,
+    // low values push away (creating gaps around weak traits)
+    const relStrength = (r.v - avgV) / avgV; // -1 to ~1
+    const neighborPull = relStrength * 0.2; // ±0.2 rad
+
+    // Add a small seed-based jitter so same scores don't always look identical
+    const seedJitter = (Math.sin(stableSeed * 0.1 + i * 2.7) * 0.15);
+
+    angles[r.k] = baseA + neighborPull + seedJitter;
+  }
+  return angles;
+}
+
+// ═══ UPDATE TARGETS — called when scores change, no regeneration ═══
+function updateTargets() {
+  const bf = scores.bigFive;
+  for (const k of TK) gen.tv[k] = clamp(bf[k]/100, 0.02, 1.0);
+
+  // Update glow target
+  const so = [...TK].sort((a,b) => gen.tv[b] - gen.tv[a]);
+  gen.so = so; gen.dom = so[0];
+  targetGlow = bl([TR[so[0]].base, TR[so[1]].base], [0.65, 0.35]);
+
+  // Rank-based angles — layout shifts as relative scores change
+  const traitAngles = computeTraitAngles();
+
+  // Inflate factor: narcissism + physical risk
+  const inflate = 1 + mods.narcInflate * 0.4 + (mods.riskInflate||0) * 0.3;
+  // Avoidance spreads nodes outward (1.0 = normal, up to 1.4 at max avoidance)
+  const spread = 1 + (mods.avoidSpread||0) * 0.4;
+
+  // Update all node targets
+  for (const n of allN) {
+    if (n.tp === 'p') {
+      const v = gen.tv[n.k];
+      n.tTV = v;
+      n.tBA = traitAngles[n.k];
+      n.tBR = oR*(0.28 + 0.22*v) * (1 + mods.narcInflate*0.15) * spread;
+      n.tRd = oR*(0.06 + v*0.14) * inflate;
+    } else if (n.tp === 'c') {
+      const parent = allN[n.parentIdx];
+      const pv = parent.tTV;
+      n.tTV = pv * n.tvRatio;
+      n.tBA = parent.tBA + n.aOff;
+      n.tBR = (parent.tBR + oR*n.rOff * (1 + mods.narcInflate*0.1)) * spread;
+      n.tRd = oR*(0.010 + n.tTV*0.025) * inflate;
+    } else if (n.tp === 'a') {
+      const parent = allN[n.parentIdx];
+      const pv = parent.tTV;
+      n.tTV = pv * n.tvRatio;
+      n.tBA = parent.tBA + n.aOff;
+      n.tBR = (parent.tBR + oR*n.rOffF * (1 + mods.narcInflate*0.05)) * spread;
+      n.tRd = oR*(0.004 + n.tTV*0.012);
+    }
+  }
+}
+
+// ═══ DERIVE MODIFIERS FROM SCORES ═══
+function deriveModifiers() {
+  const s = scores;
+  const bf = s.bigFive;
+
+  // Big Five → motion components (every trait moves something)
+  const oN = bf.O/100, cN = bf.C/100, eN = bf.E/100, aN = bf.A/100, nN = bf.N/100;
+  // O = exploratory drift, E = energetic sway, N = nervous wiggle
+  const bfDrift = 0.3 + oN * 0.6;          // openness → wander range
+  const bfSway  = 0.3 + eN * 0.8;          // extraversion → social sway
+  const bfWiggle = 0.15 + nN * 0.6;        // neuroticism → micro-tremor
+  const bfBreath = 0.4 + (1-cN)*0.5 + aN*0.3;  // low-C + high-A = deep, relaxed breathing
+  const bfSpeed = 0.6 + eN*0.3 - cN*0.15;  // extraversion speeds up, conscientiousness steadies
+
+  // Shadow — individual effects + motion
+  const mNorm=s.shadow.M/100, nNorm=s.shadow.N/100, pNorm=s.shadow.P/100;
+  if(!('machConn'    in modsOverride)) mods.machConn    = mNorm;
+  if(!('narcInflate' in modsOverride)) mods.narcInflate  = nNorm;
+  if(!('psychSharp'  in modsOverride)) mods.psychSharp   = pNorm;
+  if(!('psychCool'   in modsOverride)) mods.psychCool    = pNorm * 0.6;
+  // Shadow adds restless energy: M = calculated drift, N = pulsing sway, P = jittery wiggle
+  const shadowDrift = mNorm * 0.4;
+  const shadowSway  = nNorm * 0.3;
+  const shadowWiggle = pNorm * 0.5;
+
+  // Attachment — anxiety intensifies, avoidance DRAMATICALLY pulls apart + dampens
+  const anxN=s.attachment.anxiety/5, avdN=s.attachment.avoidance/5;
+  if(!('connDensity' in modsOverride)) mods.connDensity  = 0.3 + anxN*1.4 - avdN*1.0;  // avoidance strips connections
+  if(!('pulseSpeed'  in modsOverride)) mods.pulseSpeed   = 0.4 + anxN*1.2 - avdN*0.6;  // avoidance slows pulses
+  if(!('breathRate'  in modsOverride)) mods.breathRate    = bfBreath + anxN*0.8 - avdN*0.5;
+  if(!('breathAmp'   in modsOverride)) mods.breathAmp    = 0.3 + anxN*1.4 - avdN*0.8;  // avoidance = shallow breath
+  if(!('connPulseIrr'in modsOverride)) mods.connPulseIrr = anxN*0.5 + avdN*0.3;
+  // Avoidance modifier: spreads nodes outward, dims glow, thins connections
+  if(!('avoidSpread' in modsOverride)) mods.avoidSpread  = avdN;   // 0-1, used in updateTargets
+  if(!('avoidDim'    in modsOverride)) mods.avoidDim     = avdN;   // dims connection alpha
+  // Attachment → motion: anxiety = frantic wiggle, avoidance = slow drift outward
+  const attachWiggle = anxN * 0.4;
+  const attachDrift  = avdN * 0.5;  // avoidant types have wide, lonely drift
+
+  // Risk — richer effects: each changes motion + something structural
+  const rFin=s.risk.financial/100, rSoc=s.risk.social/100, rPhy=s.risk.physical/100, rEth=s.risk.ethical/100;
+  const riskAvg = (rFin+rSoc+rPhy+rEth)/4;
+  // Financial → bold position swings (drift amp + glow intensity)
+  // Social → expansive sway + membrane breathe
+  // Physical → kinetic wiggle + larger nodes
+  // Ethical → erratic speed + connection chaos
+  const riskDrift  = rFin*0.8;
+  const riskSway   = rSoc*0.7;
+  const riskWiggle = rPhy*0.6;
+  const riskSpeed  = rEth*0.5;
+
+  // Compose all motion sources
+  if(!('driftAmp'    in modsOverride)) mods.driftAmp   = bfDrift + shadowDrift + attachDrift + riskDrift*0.6;
+  if(!('driftSpeed'  in modsOverride)) mods.driftSpeed  = bfSpeed + riskSpeed*0.4;
+  if(!('swayAmp'     in modsOverride)) mods.swayAmp    = bfSway + shadowSway + riskSway*0.5;
+  if(!('wiggleAmp'   in modsOverride)) mods.wiggleAmp  = bfWiggle + shadowWiggle + attachWiggle + riskWiggle*0.5 + (s.adhd/6)*1.5;
+  if(!('wiggleSpeed' in modsOverride)) mods.wiggleSpeed = 0.5 + riskSpeed*0.3 + (s.adhd/6)*0.8;
+
+  // Chronotype — subtle tempo influence only (±15% speed range)
+  const chronoMod = 0.92 + (s.chronotype/100)*0.16;  // 0.92 to 1.08
+  if(!('driftSpeed'  in modsOverride)) mods.driftSpeed  *= chronoMod;
+  if(!('wiggleSpeed' in modsOverride)) mods.wiggleSpeed *= chronoMod;
+
+  // Risk structural effects
+  if(!('riskGlow'    in modsOverride)) mods.riskGlow    = rFin*0.5;  // financial risk → brighter glow
+  if(!('riskInflate' in modsOverride)) mods.riskInflate  = rPhy*0.3;  // physical risk → bigger nodes
+  if(!('riskConnChaos'in modsOverride)) mods.riskConnChaos = rEth*0.6; // ethical risk → erratic pulses
+  if(!('riskMemBreathe'in modsOverride)) mods.riskMemBreathe = rSoc*0.5; // social risk → membrane fluctuation
+
+  // Glow — base + risk + shadow contributions
+  if(!('glowRadius'   in modsOverride)) mods.glowRadius    = 1.0 + mods.riskGlow*0.8;
+  if(!('glowIntensity'in modsOverride)) mods.glowIntensity = 1.0 + mods.riskGlow*0.6 - mods.avoidDim*0.4;
+  if(!('memOpacity'   in modsOverride)) mods.memOpacity    = 1.0 - pNorm*0.4 - mods.avoidDim*0.2;
+  if(!('memThickness' in modsOverride)) mods.memThickness  = 1.0 - pNorm*0.3 + mods.riskMemBreathe*0.3;
+
+  // Depth → stage
+  stg = s.depth>=4?3:s.depth>=2?2:s.depth>=1?1:0;
+  for(let j=0;j<4;j++) document.getElementById('s'+j).classList.toggle('on',j===stg);
+}
+
+// ═══ PHYSICS — gentle base motion, lerp toward targets ═══
+function updPhys(ns, t) {
+  const LERP_RATE = 0.06;
+  const sc = SSC[stg];
+  const breathVal = Math.sin(t*0.12*mods.breathRate)*0.003*mods.breathAmp;
+  const bsc = 1 + breathVal;
+
+  for (const n of ns) {
+    // Lerp properties toward targets
+    n.tv  = lerp(n.tv,  n.tTV, LERP_RATE);
+    n.rd  = lerp(n.rd,  n.tRd, LERP_RATE);
+    n.bR  = lerp(n.bR,  n.tBR, LERP_RATE);
+    // Angle lerp (handle wrapping)
+    let da = n.tBA - n.bA;
+    if (da > PI) da -= TAU;
+    if (da < -PI) da += TAU;
+    n.bA += da * LERP_RATE;
+
+    const tOff = n.sd * 0.37;
+
+    // SLOW WANDER — much gentler base (TAU*0.25 vs 0.65)
+    const wA = n.bA + (fbm(n.sd*0.13, t*0.004*mods.driftSpeed+tOff, 3)-0.5)*TAU*0.25*mods.driftAmp;
+    const wR = n.bR*(0.88 + fbm(n.sd*0.17+100, t*0.005*mods.driftSpeed+tOff, 3)*0.24*mods.driftAmp);
+
+    const baseX = CX + Math.cos(wA)*wR*bsc*sc;
+    const baseY = CY + Math.sin(wA)*wR*bsc*sc;
+
+    // VISIBLE SWAY — reduced base (6% vs 15%)
+    const swayA = oR*sc*0.06*mods.swayAmp;
+    const sx = (fbm(n.sd*0.1+t*0.025+tOff, t*0.020, 2)*2-1)*swayA;
+    const sy = (fbm(t*0.022, n.sd*0.1+t*0.028+tOff, 2)*2-1)*swayA;
+
+    // MICRO-WIGGLE — reduced base (1.5% vs 3%), scales dramatically with ADHD
+    const wigA = oR*sc*0.015*mods.wiggleAmp;
+    const wx = (fbm(n.sd*0.3+t*0.15*mods.wiggleSpeed, t*0.12*mods.wiggleSpeed, 1)*2-1)*wigA;
+    const wy = (fbm(t*0.13*mods.wiggleSpeed, n.sd*0.3+t*0.16*mods.wiggleSpeed, 1)*2-1)*wigA;
+
+    n.x = baseX + sx + wx;
+    n.y = baseY + sy + wy;
+  }
+
+  // Center on viewport
+  let cx2=0,cy2=0;
+  for(const n of ns){cx2+=n.x;cy2+=n.y;}
+  cx2/=ns.length;cy2/=ns.length;
+  const ox=CX-cx2, oy=CY-cy2;
+  for(const n of ns){n.x+=ox;n.y+=oy;}
+
+  // Lerp glow color
+  for(let i=0;i<3;i++) currentGlow[i]=lerp(currentGlow[i],targetGlow[i],0.04);
+
+  hullPts = computeHull(ns);
+}
+
+// ═══ CONNECTIONS ═══
+function mkCon(ns){
+  const cn=[],seen=new Set();
+  const K=Math.max(3,Math.round(7*mods.connDensity));
+  for(let i=0;i<ns.length;i++){const dd=[];
+    for(let j=0;j<ns.length;j++){if(i===j)continue;
+      const xi=CX+Math.cos(ns[i].bA)*ns[i].bR,yi=CY+Math.sin(ns[i].bA)*ns[i].bR;
+      const xj=CX+Math.cos(ns[j].bA)*ns[j].bR,yj=CY+Math.sin(ns[j].bA)*ns[j].bR;
+      dd.push({j,d:dst(xi,yi,xj,yj)});}
+    dd.sort((a,b)=>a.d-b.d);
+    for(let k=0;k<Math.min(K,dd.length);k++){const j=dd[k].j,ky=Math.min(i,j)+'-'+Math.max(i,j);
+      if(seen.has(ky))continue;seen.add(ky);
+      cn.push({a:i,b:j,col:bl([ns[i].rgb,ns[j].rgb],[0.5,0.5]),
+        str:(ns[i].tv+ns[j].tv)/2,cs:i*31+j*17,isPP:ns[i].tp==='p'&&ns[j].tp==='p'});}}
+  const pI=[];ns.forEach((n,i)=>{if(n.tp==='p')pI.push(i);});
+  for(let i=0;i<pI.length;i++)for(let j=i+1;j<pI.length;j++){
+    const ky=pI[i]+'-'+pI[j];
+    if(!seen.has(ky)){seen.add(ky);const a=ns[pI[i]],b=ns[pI[j]];
+      cn.push({a:pI[i],b:pI[j],col:bl([a.rgb,b.rgb],[0.5,0.5]),
+        str:(a.tv+b.tv)/2,cs:pI[i]*31+pI[j]*17,isPP:true});}}
+  return cn;
+}
+function mkPul(cn,sd){
+  const r=m32(sd+5555),ps=[];
+  for(const c of cn){const ct=1+Math.floor(c.str*1.5);
+    for(let i=0;i<ct;i++){
+      const baseSpeed=0.03+r()*0.05;
+      const irrF=1+(r()-0.5)*(mods.connPulseIrr + (mods.riskConnChaos||0))*2;
+      ps.push({a:c.a,b:c.b,cs:c.cs,p:r(),sp:baseSpeed*irrF*mods.pulseSpeed,
+        dr:r()>0.5?1:-1,col:ltn(c.col,55),sz:0.8+c.str*1.5+(c.isPP?1:0)});}}
+  return ps;
+}
+function updPul(ps,dt){for(const q of ps){q.p+=q.sp*q.dr*dt;if(q.p>1)q.p-=1;if(q.p<0)q.p+=1;}}
+function cMid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2};}
+
+// ═══ BLOB PATH — psychopathy sharpens edges ═══
+function blobP(ctx,cx,cy,r,sd,t){
+  const wob = 1 - mods.psychSharp;
+  ctx.beginPath();for(let i=0;i<=48;i++){const a=(i/48)*TAU;
+    const br=r+wob*(Math.sin(a*3+t*0.12+sd)*r*0.08+Math.sin(a*5+t*0.07+sd*1.3)*r*0.04
+      +Math.sin(a*2+t*0.15+sd*0.7)*r*0.05);
+    ctx.lineTo(cx+Math.cos(a)*br,cy+Math.sin(a)*br);}
+  ctx.closePath();
+}
+
+// ═══ INTERIORS ═══
+const INT=[
+{name:'Chromatin',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*8901|0),b=ltn(col,85),h=ltn(col,140);
+  const count=Math.max(2,Math.floor(9*n.tv));
+  for(let s=0;s<count;s++){const sa=sr()*TAU,sR=sr()*r*0.35;
+    let px=n.x+Math.cos(sa)*sR,py=n.y+Math.sin(sa)*sR;
+    cx.beginPath();cx.moveTo(px,py);
+    const segs=Math.max(5,Math.floor(30*n.tv));
+    for(let p=0;p<segs;p++){const da=sr()*1.0-0.5+Math.sin(t*0.03+s+p*0.3)*0.15,step=r*0.04+sr()*r*0.025;
+      px+=Math.cos(da+p*0.5+s)*step;py+=Math.sin(da+p*0.7+s)*step;cx.lineTo(px,py);}
+    cx.strokeStyle=rga(b,0.5);cx.lineWidth=0.7+sr()*0.5;cx.lineCap='round';cx.stroke();}
+  const dots=Math.max(1,Math.floor(8*n.tv));
+  for(let i=0;i<dots;i++){const a=sr()*TAU,dd=sr()*r*0.6;
+    const jx=n.x+Math.cos(a)*dd,jy=n.y+Math.sin(a)*dd,sz=1+sr()*2;
+    const jg=cx.createRadialGradient(jx,jy,0,jx,jy,sz*3);
+    jg.addColorStop(0,rga(h,0.7));jg.addColorStop(0.4,rga(b,0.2));jg.addColorStop(1,rga(b,0));
+    cx.fillStyle=jg;cx.beginPath();cx.arc(jx,jy,sz*3,0,TAU);cx.fill();}}},
+{name:'Constellation',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*7913|0),b=ltn(col,90),h=ltn(col,140);
+  const stars=Math.max(4,Math.floor((14+sr()*8)*n.tv)),pts=[];
+  for(let i=0;i<stars;i++){const a=sr()*TAU,dd=r*0.08+sr()*r*0.7;
+    pts.push({x:n.x+Math.cos(a)*dd,y:n.y+Math.sin(a)*dd});}
+  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+    const dd=dst(pts[i].x,pts[i].y,pts[j].x,pts[j].y);
+    if(dd<r*0.8&&sr()>0.2){cx.beginPath();cx.moveTo(pts[i].x,pts[i].y);cx.lineTo(pts[j].x,pts[j].y);
+      cx.strokeStyle=rga(b,0.2*(1-dd/(r*0.8)));cx.lineWidth=0.3;cx.stroke();}}
+  for(const p of pts){const sz=2+sr()*3;
+    const sg=cx.createRadialGradient(p.x,p.y,0,p.x,p.y,sz*2);
+    sg.addColorStop(0,rga(h,0.85));sg.addColorStop(0.4,rga(b,0.2));sg.addColorStop(1,rga(b,0));
+    cx.fillStyle=sg;cx.beginPath();cx.arc(p.x,p.y,sz*2,0,TAU);cx.fill();}}},
+{name:'Vesicles',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*4567|0),b=ltn(col,70),h=ltn(col,120);
+  const ct=Math.max(2,Math.floor((8+sr()*7+n.tv*5)*n.tv));
+  for(let i=0;i<ct;i++){const a=sr()*TAU,dd=r*0.12+sr()*r*0.55,sz=r*0.06+sr()*r*0.12;
+    const vx=n.x+Math.cos(a)*dd,vy=n.y+Math.sin(a)*dd;
+    blobP(cx,vx,vy,sz,n.sd+i*71,t);cx.fillStyle=rga(drk(b,20),0.45);cx.fill();
+    blobP(cx,vx,vy,sz,n.sd+i*71,t);cx.strokeStyle=rga(b,0.25);cx.lineWidth=0.5;cx.stroke();
+    const vg=cx.createRadialGradient(vx,vy,0,vx,vy,sz*0.6);
+    vg.addColorStop(0,rga(h,0.4));vg.addColorStop(1,rga(h,0));
+    cx.fillStyle=vg;cx.beginPath();cx.arc(vx,vy,sz*0.6,0,TAU);cx.fill();}}},
+{name:'Axon Tree',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*1234|0),b=ltn(col,100),h=ltn(col,150);
+  const arms=Math.max(2,Math.floor((4+sr()*2)*n.tv));
+  for(let a=0;a<arms;a++){const bA=(a/arms)*TAU+sr()*0.5;
+    let px=n.x,py=n.y,ca=bA,lw=2.5+sr()*1.5;
+    const segs=Math.max(3,Math.floor(12*n.tv));
+    for(let seg=0;seg<segs;seg++){const len=(r*0.1)*(1-seg*0.035)+sr()*r*0.025;
+      const nx2=px+Math.cos(ca)*len,ny2=py+Math.sin(ca)*len;
+      cx.beginPath();cx.moveTo(px,py);cx.lineTo(nx2,ny2);
+      cx.strokeStyle=rga(b,0.55*(1-seg*0.06));cx.lineWidth=lw;cx.lineCap='round';cx.stroke();
+      px=nx2;py=ny2;ca+=sr()*0.7-0.35;lw*=0.82;
+      if(seg>2&&sr()>0.35&&n.tv>0.4){const ba2=ca+(sr()>0.5?0.5:-0.5);let bx=px,by=py,bw=lw*0.7;
+        for(let bb=0;bb<5;bb++){const bx2=bx+Math.cos(ba2+sr()*0.3)*r*0.05,by2=by+Math.sin(ba2+sr()*0.3)*r*0.05;
+          cx.beginPath();cx.moveTo(bx,by);cx.lineTo(bx2,by2);
+          cx.strokeStyle=rga(b,0.35*(1-bb*0.12));cx.lineWidth=bw;cx.lineCap='round';cx.stroke();
+          bx=bx2;by=by2;bw*=0.7;}}}}
+  const sg=cx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*0.22);
+  sg.addColorStop(0,rga(h,0.85*n.tv));sg.addColorStop(0.4,rga(b,0.35*n.tv));sg.addColorStop(1,rga(b,0));
+  cx.fillStyle=sg;cx.beginPath();cx.arc(n.x,n.y,r*0.22,0,TAU);cx.fill();}},
+{name:'Membrane Folds',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*6802|0),b=ltn(col,80),h=ltn(col,130);
+  const layers=Math.max(2,Math.floor(7*n.tv));
+  for(let L=0;L<layers;L++){const lr2=r*(0.1+L*0.12),wa=lr2*0.15+sr()*lr2*0.1;
+    cx.beginPath();for(let s=0;s<=48;s++){const a=(s/48)*TAU;
+      const w=Math.sin(a*3+t*0.05+L*2+sr()*5)*wa+Math.sin(a*5+t*0.03+L)*wa*0.4;
+      cx.lineTo(n.x+Math.cos(a)*(lr2+w),n.y+Math.sin(a)*(lr2+w));}
+    cx.closePath();cx.strokeStyle=rga(b,0.42*(1-L*0.06));cx.lineWidth=0.7+sr()*0.4;cx.stroke();}}},
+{name:'Synaptic',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*3456|0),b=ltn(col,80),h=ltn(col,130);
+  const arms=Math.max(2,Math.floor((6+sr()*3)*n.tv)),jns=[];
+  for(let a=0;a<arms;a++){const ba=(a/arms)*TAU+sr()*0.4;
+    let px=n.x,py=n.y,ca=ba;
+    const segs=Math.max(2,Math.floor(8*n.tv));
+    for(let s=0;s<segs;s++){const len=r*0.09+sr()*r*0.05,nx2=px+Math.cos(ca)*len,ny2=py+Math.sin(ca)*len;
+      cx.beginPath();cx.moveTo(px,py);cx.lineTo(nx2,ny2);
+      cx.strokeStyle=rga(b,0.45*(1-s*0.08));cx.lineWidth=1.3-s*0.1;cx.lineCap='round';cx.stroke();
+      if(s>0&&sr()>0.25)jns.push({x:nx2,y:ny2,sz:1.2+sr()*2.5});
+      px=nx2;py=ny2;ca+=sr()*0.6-0.3;}}
+  for(const j of jns){const jg=cx.createRadialGradient(j.x,j.y,0,j.x,j.y,j.sz*3);
+    jg.addColorStop(0,rga(h,0.8));jg.addColorStop(0.3,rga(b,0.25));jg.addColorStop(1,rga(b,0));
+    cx.fillStyle=jg;cx.beginPath();cx.arc(j.x,j.y,j.sz*3,0,TAU);cx.fill();}}}
+];
+
+// ═══ DRAWING ═══
+function drawMem(ctx,d,hull){
+  if(hull.length<3) return;
+  // Social risk adds membrane breathe — thickness pulses over time
+  const memBreathe = 1 + (mods.riskMemBreathe||0) * Math.sin(performance.now()*0.002) * 0.3;
+  const widths=[18,8,3.5,1.0].map(w=>w*mods.memThickness*memBreathe);
+  const alphas=[0.035,0.065,0.11,0.32].map(a=>a*mods.memOpacity);
+  const mc=ltn(currentGlow,30);
+  for(let pass=0;pass<4;pass++){
+    traceSmoothedHull(ctx,hull);
+    ctx.strokeStyle=rga(mc,alphas[pass]);ctx.lineWidth=widths[pass];
+    ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();}
+}
+
+function drawGlow(ctx,d,prims){
+  for(const p of prims){
+    const col=traitCol(p.rgb,p.tv);
+    const str=p.tv*GSC[stg]*mods.glowIntensity;
+    if(str<0.02) continue;
+    const sc=SSC[stg];
+    const nodeR=p.rd*sc;
+    const glowR=(oR*2.5+p.tv*oR*2.0)*mods.glowRadius;
+    const g=ctx.createRadialGradient(p.x,p.y,nodeR*0.3,p.x,p.y,glowR);
+    g.addColorStop(0,rga(col,0.40*str));
+    g.addColorStop(0.05,rga(col,0.32*str));
+    g.addColorStop(0.12,rga(col,0.22*str));
+    g.addColorStop(0.25,rga(col,0.13*str));
+    g.addColorStop(0.45,rga(col,0.06*str));
+    g.addColorStop(0.7,rga(col,0.025*str));
+    g.addColorStop(1,rga(col,0));
+    ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);
+  }
+}
+
+function drawAIFade(ctx,d){
+  const bg=d?'5,10,24':'240,242,245';
+  const vR=Math.max(CW,CH)*0.8;
+  const g=ctx.createRadialGradient(CX,CY,vR*0.5,CX,CY,vR);
+  g.addColorStop(0,`rgba(${bg},0)`);g.addColorStop(0.7,`rgba(${bg},0)`);
+  g.addColorStop(1,`rgba(${bg},0.3)`);ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);
+}
+
+function drawBody(ctx,prims,d,hull){
+  if(hull.length<3) return;
+  let maxR=0;
+  for(const h of hull){const d2=dst(h.x,h.y,CX,CY);if(d2>maxR)maxR=d2;}
+  maxR=Math.max(maxR,50);
+  const baseCol=ltn(currentGlow,15);
+  const bg=ctx.createRadialGradient(CX,CY,0,CX,CY,maxR);
+  bg.addColorStop(0,rga(baseCol,0.12));bg.addColorStop(0.6,rga(baseCol,0.08));bg.addColorStop(1,rga(baseCol,0.04));
+  ctx.fillStyle=bg;ctx.fillRect(0,0,CW,CH);
+  for(const p of prims){
+    const col=traitCol(p.rgb,p.tv);
+    const strength=p.tv*0.14;
+    const r=maxR*0.65;
+    const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+    g.addColorStop(0,rga(col,strength));g.addColorStop(0.4,rga(col,strength*0.4));g.addColorStop(1,rga(col,0));
+    ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);
+  }
+}
+
+function drawNeural(ctx,prims,d){
+  const sr=m32(gen.s+9999);
+  // Machiavellianism boosts connection visibility
+  const connAlpha = Math.max(0.02, (0.08 + mods.machConn * 0.15) * (1 - (mods.avoidDim||0)*0.7));
+  for(let i=0;i<prims.length;i++){for(let j=i+1;j<prims.length;j++){
+    const a=prims[i],b=prims[j];
+    const col=bl([a.rgb,b.rgb],[0.5,0.5]);
+    const bc=ltn(col,60);
+    const count=3+Math.floor((a.tv+b.tv)*2);
+    for(let f=0;f<count;f++){
+      const spread=(f/(count-1||1)-0.5)*0.6;
+      const dx=b.x-a.x,dy=b.y-a.y,len=Math.sqrt(dx*dx+dy*dy)||1;
+      const nx=-dy/len,ny=dx/len;
+      const off=spread*oR*0.08;
+      const mx=(a.x+b.x)/2+nx*off,my=(a.y+b.y)/2+ny*off;
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mx,my,b.x,b.y);
+      ctx.strokeStyle=rga(bc,connAlpha);ctx.lineWidth=0.4+sr()*0.5;ctx.stroke();}}}
+  const r2=m32(gen.s+1111);
+  const dotCount=20+stg*12;
+  let maxR=0;
+  for(const h of hullPts){const d2=dst(h.x,h.y,CX,CY);if(d2>maxR)maxR=d2;}
+  maxR=Math.max(maxR,50);
+  for(let i=0;i<dotCount;i++){
+    const a=r2()*TAU,dd=maxR*(0.1+r2()*0.35);
+    const px=CX+Math.cos(a)*dd,py=CY+Math.sin(a)*dd;
+    const dists=prims.map(p=>({p,d:dst(px,py,p.x,p.y)})).sort((a,b)=>a.d-b.d);
+    if(dists.length<2)continue;
+    const c=bl([dists[0].p.rgb,dists[1].p.rgb],[0.6,0.4]);
+    const bc=ltn(c,70);
+    const sz=0.8+r2()*1.5;
+    const g=ctx.createRadialGradient(px,py,0,px,py,sz*2.5);
+    g.addColorStop(0,rga(bc,0.4));g.addColorStop(0.4,rga(bc,0.1));g.addColorStop(1,rga(bc,0));
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(px,py,sz*2.5,0,TAU);ctx.fill();}
+}
+
+// ═══ MAIN RENDER ═══
+function render(ts){
+  const t=(ts-t0)/1000, dt=tL?Math.min((ts-tL)/1000,0.05):0.016; tL=ts;
+  const d=thm==='dark', sc=SSC[stg];
+
+  cvs.width=CW;cvs.height=CH;
+  ctx.fillStyle=d?'#050A18':'#F0F2F5';ctx.fillRect(0,0,CW,CH);
+
+  if(!d){
+    const vR=Math.max(CW,CH)*0.7;
+    const df=ctx.createRadialGradient(CX,CY,0,CX,CY,vR);
+    df.addColorStop(0,'rgba(8,12,28,0.92)');df.addColorStop(0.15,'rgba(8,12,28,0.88)');
+    df.addColorStop(0.30,'rgba(10,15,32,0.80)');df.addColorStop(0.45,'rgba(12,18,38,0.65)');
+    df.addColorStop(0.58,'rgba(15,22,42,0.42)');df.addColorStop(0.70,'rgba(20,28,50,0.22)');
+    df.addColorStop(0.82,'rgba(30,40,60,0.08)');df.addColorStop(0.92,'rgba(40,50,70,0.02)');
+    df.addColorStop(1,'rgba(240,242,245,0)');
+    ctx.fillStyle=df;ctx.fillRect(0,0,CW,CH);
+  }
+
+  updPhys(actN,t);
+  updPul(puls,dt);
+
+  const prims=actN.filter(n=>n.tp==='p');
+
+  drawGlow(ctx,d,prims);
+  if(ent==='human') drawMem(ctx,d,hullPts);
+  else drawAIFade(ctx,d);
+
+  ctx.save();
+  if(ent==='human'&&hullPts.length>=3){traceSmoothedHull(ctx,hullPts);ctx.clip();}
+  if(ent==='human') drawBody(ctx,prims,d,hullPts);
+  drawNeural(ctx,prims,d);
+
+  // Tissue connections — machiavellianism boosts opacity
+  const connBoost = 1 + mods.machConn * 2;
+  for(const c of cons){
+    const a=actN[c.a],b=actN[c.b]; if(!a||!b)continue;
+    const mid=cMid(a,b),col=c.col;
+    if(c.isPP){
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
+      ctx.strokeStyle=rga(col,(0.04+c.str*0.02)*connBoost);ctx.lineWidth=22+c.str*12;ctx.lineCap='round';ctx.stroke();
+    }
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
+    ctx.strokeStyle=rga(col,(0.05+c.str*0.025)*connBoost);ctx.lineWidth=6+c.str*4;ctx.lineCap='round';ctx.stroke();
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
+    ctx.strokeStyle=rga(ltn(col,25),(0.35+c.str*0.12)*Math.min(connBoost,2));ctx.lineWidth=0.5+c.str*0.7;ctx.stroke();
+  }
+
+  // Energy pulses
+  for(const p of puls){
+    const a=actN[p.a],b=actN[p.b]; if(!a||!b)continue;
+    const mid=cMid(a,b),pr=p.p,mt=1-pr;
+    const px=mt*mt*a.x+2*mt*pr*mid.x+pr*pr*b.x,py=mt*mt*a.y+2*mt*pr*mid.y+pr*pr*b.y;
+    const gr=ctx.createRadialGradient(px,py,0,px,py,p.sz*3);
+    gr.addColorStop(0,rga(p.col,0.6));gr.addColorStop(0.3,rga(p.col,0.18));gr.addColorStop(1,rga(p.col,0));
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(px,py,p.sz*3,0,TAU);ctx.fill();
+  }
+
+  // Nodes — with trait-based coloring and interior detail scaling
+  const sorted=[...actN].sort((a,b)=>a.dp-b.dp);
+  for(const n of sorted){
+    const r=n.rd*sc*(1+0.02*Math.sin(n.bp+t*0.3)+Math.sin(t*0.12*mods.breathRate)*0.003*mods.breathAmp);
+    const col=traitCol(n.rgb,n.tv);
+    if(n.tp==='p'){
+      // Node halo
+      const hr=ctx.createRadialGradient(n.x,n.y,r*0.6,n.x,n.y,r*2.5*(1+mods.narcInflate*0.5));
+      hr.addColorStop(0,rga(col,0.2*(1+mods.narcInflate)));
+      hr.addColorStop(0.4,rga(col,0.08*(1+mods.narcInflate)));
+      hr.addColorStop(1,rga(col,0));
+      ctx.fillStyle=hr;ctx.beginPath();ctx.arc(n.x,n.y,r*2.5*(1+mods.narcInflate*0.5),0,TAU);ctx.fill();
+
+      // Body fill
+      blobP(ctx,n.x,n.y,r,n.sd,t);
+      ctx.fillStyle=rga(drk(col,55),0.88);ctx.fill();
+
+      // Interior — detail scales with tv
+      ctx.save();blobP(ctx,n.x,n.y,r,n.sd,t);ctx.clip();
+      INT[n.iIdx].fn(ctx,n,r,col,d,t);
+
+      // Dim overlay for low tv — interior fades into body at low scores
+      if(n.tv<0.6){
+        const dimA=(0.6-n.tv)/0.6*0.7;
+        const dimC=drk(col,55);
+        ctx.fillStyle=rga(dimC,dimA);
+        ctx.fillRect(n.x-r*1.5,n.y-r*1.5,r*3,r*3);
+      }
+      ctx.restore();
+
+      // Borders
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.strokeStyle=rga(col,0.12+mods.psychSharp*0.15);ctx.lineWidth=5-mods.psychSharp*3;ctx.stroke();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.strokeStyle=rga(col,0.28+mods.psychSharp*0.2);ctx.lineWidth=2-mods.psychSharp*0.5;ctx.stroke();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.strokeStyle=rga(ltn(col,40),0.65+mods.psychSharp*0.2);ctx.lineWidth=0.7+mods.psychSharp*0.5;ctx.stroke();
+
+    } else if(n.tp==='c'){
+      const g2=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*4);
+      g2.addColorStop(0,rga(col,0.28));g2.addColorStop(0.3,rga(col,0.1));g2.addColorStop(1,rga(col,0));
+      ctx.fillStyle=g2;ctx.beginPath();ctx.arc(n.x,n.y,r*4,0,TAU);ctx.fill();
+      ctx.fillStyle=rga(drk(col,25),0.82);ctx.beginPath();ctx.arc(n.x,n.y,r,0,TAU);ctx.fill();
+      ctx.fillStyle=rga(ltn(col,80),0.85);ctx.beginPath();ctx.arc(n.x,n.y,r*0.35,0,TAU);ctx.fill();
+      ctx.strokeStyle=rga(col,0.5);ctx.lineWidth=0.4;ctx.beginPath();ctx.arc(n.x,n.y,r,0,TAU);ctx.stroke();
+    } else {
+      const g3=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*3);
+      g3.addColorStop(0,rga(col,0.28));g3.addColorStop(0.3,rga(col,0.08));g3.addColorStop(1,rga(col,0));
+      ctx.fillStyle=g3;ctx.beginPath();ctx.arc(n.x,n.y,r*3,0,TAU);ctx.fill();
+      ctx.fillStyle=rga(col,0.7);ctx.beginPath();ctx.arc(n.x,n.y,r,0,TAU);ctx.fill();
+    }
+  }
+  ctx.restore();
+  requestAnimationFrame(render);
+}
+
+// ═══ CONTROLS ═══
+function sS(i){stg=i;scores.depth=i===0?0:i===1?1:i===2?2:4;
+  for(let j=0;j<4;j++)document.getElementById('s'+j).classList.toggle('on',j===i);
+  updateSlider('depth',scores.depth);
+  rebuildConnections();}
+function sE(m){ent=m;document.getElementById('eh').classList.toggle('on',m==='human');document.getElementById('ea').classList.toggle('on',m==='ai');}
+function sT(t2){thm=t2;document.getElementById('td').classList.toggle('on',t2==='dark');document.getElementById('tl').classList.toggle('on',t2==='light');}
+
+function rebuildConnections(){
+  actN=filt(allN,stg);cons=mkCon(actN);puls=mkPul(cons,gen.s);updStats();
+}
+
+function fullRebuild(){
+  deriveModifiers();
+  gen=mkGen();
+  allN=mkNodes(gen);
+  updateTargets();
+  // Snap to targets instantly (no lerp on rebuild)
+  for(const n of allN){n.bA=n.tBA;n.bR=n.tBR;n.rd=n.tRd;n.tv=n.tTV;}
+  actN=filt(allN,stg);
+  cons=mkCon(actN);puls=mkPul(cons,gen.s);
+  updInfo();updStats();
+}
+
+// Called when any score slider changes — NO regeneration, just target update
+function onScoreChange(section) {
+  deriveModifiers();
+  updateTargets();
+  if (section==='depth') { rebuildConnections(); }
+  else if (section==='attachment'||section==='connDensity'||section==='risk') {
+    cons=mkCon(actN); puls=mkPul(cons,gen.s);
+  }
+  updInfo(); updStats();
+}
+
+function updInfo(){
+  document.getElementById('info').innerHTML=TK.map(k=>{
+    const c=TR[k].base,v=gen.tv[k];
+    return`<span class="trait"><span class="dot" style="background:rgb(${c})"></span>${TR[k].l} ${(v*100).toFixed(0)}</span>`;
+  }).join('');
+}
+function updStats(){
+  const s=scores;
+  const style=s.attachment.anxiety<2.5&&s.attachment.avoidance<2.5?'Secure':
+    s.attachment.anxiety>=2.5&&s.attachment.avoidance<2.5?'Anxious':
+    s.attachment.anxiety<2.5&&s.attachment.avoidance>=2.5?'Avoidant':'Fearful';
+  document.getElementById('stats').innerHTML=[
+    `Nodes: ${actN.length} (${actN.filter(n=>n.tp==='p').length}p ${actN.filter(n=>n.tp==='c').length}c ${actN.filter(n=>n.tp==='a').length}a)`,
+    `Stage: ${stg} | Attach: ${style}`,
+    `Drift: ${mods.driftAmp.toFixed(2)} | Sway: ${mods.swayAmp.toFixed(2)} | Wiggle: ${mods.wiggleAmp.toFixed(2)} | Spread: ${(mods.avoidSpread||0).toFixed(2)}`,
+  ].join('<br>');
+}
+
+// ═══ UI ═══
+function toggleSection(id){document.getElementById(id).classList.toggle('collapsed');}
+function toggleSidebar(){
+  document.body.classList.toggle('sidebar-hidden');
+  document.getElementById('sidebarToggle').textContent=document.body.classList.contains('sidebar-hidden')?'▶':'◀';
+  resize();
+}
+
+// ═══ SLIDER DESCRIPTIONS — one sentence per slider ═══
+const SLIDER_DESC = {
+  bf_O: 'Openness — teal blob grows, brightens, interior fills. Also adds exploratory drift motion.',
+  bf_C: 'Conscientiousness — blue blob grows. Steadies overall motion, slows tempo.',
+  bf_E: 'Extraversion — green blob grows. Adds energetic sway and speeds up animation.',
+  bf_A: 'Agreeableness — purple blob grows. Deepens breathing rhythm.',
+  bf_N: 'Neuroticism — yellow blob grows. Adds nervous micro-tremor to all nodes.',
+  sh_M: 'Machiavellianism — brightens connections + adds calculated drift energy.',
+  sh_N: 'Narcissism — inflates node halos and sizes + adds pulsing sway.',
+  sh_P: 'Psychopathy — sharpens edges, cools colors, thins membrane + adds jittery wiggle.',
+  at_anx: 'Anxiety — more connections, faster pulses, frantic breathing + nervous wiggle.',
+  at_avd: 'Avoidance — strips connections, spreads nodes apart, dims glow, lonely slow drift.',
+  rk_financial: 'Financial risk — bold wander + brighter glow. The organism takes up more space.',
+  rk_social: 'Social risk — expansive sway motion + membrane thickness fluctuation.',
+  rk_physical: 'Physical risk — kinetic wiggle + physically larger nodes.',
+  rk_ethical: 'Ethical risk — erratic speed + connection pulse chaos. Unpredictable energy.',
+  chrono: 'Subtle tempo shift — night owl (0) = slightly slower, morning lark (100) = slightly faster.',
+  adhd: 'ADHD indicators — visible jitter and restless micro-movement at higher values.',
+  depth: 'Assessment depth — more completed assessments reveals more node types (stages 0–3).',
+  mo_driftAmp: 'How far nodes wander from their base orbital position over time.',
+  mo_driftSpeed: 'How fast the slow deep wander animation progresses.',
+  mo_swayAmp: 'Amplitude of the visible liquid side-to-side sway motion.',
+  mo_wiggleAmp: 'Amplitude of the constant micro-shimmer on all nodes.',
+  mo_wiggleSpeed: 'Frequency of the micro-wiggle animation cycle.',
+  mo_breathRate: 'Speed of the membrane breathing rhythm — in and out.',
+  mo_breathAmp: 'How much the membrane expands and contracts during breathing.',
+  mo_pulseSpeed: 'Speed of energy dots traveling along connections between nodes.',
+  gl_radius: 'How far the colored glow extends outward from each primary node.',
+  gl_intensity: 'Overall brightness multiplier for the glow effect.',
+  gl_machConn: 'Override: connection glow boost from Machiavellianism.',
+  gl_narcInflate: 'Override: node size and halo inflation from Narcissism.',
+  gl_psychSharp: 'Override: edge sharpness — 0 = organic blobby, 1 = perfect circles.',
+  gl_psychCool: 'Override: color temperature shift — pushes all colors toward blue.',
+  mm_opacity: 'Visibility of the membrane outline surrounding the organism bubble.',
+  mm_thickness: 'Line width of the multi-layered membrane boundary.',
+  mm_connDensity: 'How many connections form between nodes — higher = denser network.',
+  mm_pulseIrr: 'Irregularity of energy pulse speeds — 0 = steady, 1 = chaotic.',
+  g_seed: 'Changes interior patterns and companion placement — the organism\'s DNA.',
+};
+
+const sliderEls={};
+const sliderOrder=[]; // ordered list of keys for keyboard navigation
+let focusedSliderIdx = -1;
+
+function mkSlider(containerId, key, label, min, max, step, value, onChange, dotColor) {
+  const body=document.getElementById(containerId);
+  const row=document.createElement('div');row.className='slider-row';
+  row.dataset.sliderKey=key;
+  const lbl=document.createElement('span');lbl.className='slider-label';
+  if(dotColor){
+    const dot=document.createElement('span');dot.className='trait-dot';dot.style.background=dotColor;
+    lbl.appendChild(dot);
+  }
+  lbl.appendChild(document.createTextNode(label));
+  const wrap=document.createElement('div');wrap.className='slider-wrap';
+  const input=document.createElement('input');input.type='range';
+  input.min=min;input.max=max;input.step=step;input.value=value;
+  const sliderIdx=sliderOrder.length;
+  input.dataset.sliderIdx=sliderIdx;
+  const val=document.createElement('span');val.className='slider-value';
+  val.textContent=Number(value).toFixed(step<1?(step<0.1?2:1):0);
+  input.addEventListener('input',()=>{
+    const v=parseFloat(input.value);
+    val.textContent=v.toFixed(step<1?(step<0.1?2:1):0);
+    onChange(v);
+  });
+  // Click on track/thumb → native behavior (move thumb) + select
+  input.addEventListener('focus',()=>{
+    setFocusedSlider(sliderIdx, false);
+  });
+  // Click label or value → select only, don't move thumb
+  lbl.addEventListener('click',(e)=>{
+    e.preventDefault();
+    setFocusedSlider(sliderIdx);
+  });
+  val.addEventListener('click',(e)=>{
+    e.preventDefault();
+    setFocusedSlider(sliderIdx);
+  });
+  wrap.appendChild(input);row.appendChild(lbl);row.appendChild(wrap);row.appendChild(val);body.appendChild(row);
+  sliderEls[key]={input,val,step,row};
+  sliderOrder.push(key);
+}
+function updateSlider(key,value){
+  const el=sliderEls[key];if(!el)return;
+  el.input.value=value;el.val.textContent=Number(value).toFixed(el.step<1?(el.step<0.1?2:1):0);
+}
+
+// ═══ KEYBOARD NAVIGATION + INFO PANEL ═══
+function setFocusedSlider(idx, doFocus) {
+  // Remove old highlight
+  if (focusedSliderIdx >= 0 && focusedSliderIdx < sliderOrder.length) {
+    const oldKey = sliderOrder[focusedSliderIdx];
+    if (sliderEls[oldKey]) sliderEls[oldKey].row.classList.remove('focused');
+  }
+  focusedSliderIdx = idx;
+  if (idx < 0 || idx >= sliderOrder.length) return;
+  const key = sliderOrder[idx];
+  const el = sliderEls[key];
+  if (!el) return;
+
+  // Highlight new row
+  el.row.classList.add('focused');
+
+  // Focus the input so left/right work
+  if (doFocus !== false) el.input.focus({preventScroll:true});
+
+  // Scroll into view within sidebar
+  const scroll = document.getElementById('sidebarScroll');
+  const rowRect = el.row.getBoundingClientRect();
+  const scrollRect = scroll.getBoundingClientRect();
+  if (rowRect.top < scrollRect.top + 40) {
+    el.row.scrollIntoView({block:'start',behavior:'smooth'});
+  } else if (rowRect.bottom > scrollRect.bottom - 70) {
+    el.row.scrollIntoView({block:'end',behavior:'smooth'});
+  }
+
+  // Update info panel
+  const panel = document.getElementById('infoPanel');
+  const labelEl = document.getElementById('infoLabel');
+  const descEl = document.getElementById('infoDesc');
+  const desc = SLIDER_DESC[key];
+  if (desc) {
+    panel.classList.remove('empty');
+    // Get the label text from the slider
+    const labelText = el.row.querySelector('.slider-label').textContent.trim();
+    labelEl.textContent = labelText;
+    descEl.textContent = desc;
+  } else {
+    panel.classList.add('empty');
+    labelEl.textContent = 'Navigate';
+    descEl.textContent = 'Use ↑↓ to move between sliders, ←→ to adjust';
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  // Only intercept up/down when a slider is focused or sidebar is visible
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const onSlider = document.activeElement && document.activeElement.type === 'range';
+    const sidebarVisible = !document.body.classList.contains('sidebar-hidden');
+    if (!sidebarVisible) return;
+
+    e.preventDefault();
+    let next = focusedSliderIdx;
+    if (e.key === 'ArrowDown') {
+      next = Math.min(sliderOrder.length - 1, focusedSliderIdx + 1);
+      if (focusedSliderIdx < 0) next = 0;
+    } else {
+      next = Math.max(0, focusedSliderIdx - 1);
+      if (focusedSliderIdx < 0) next = 0;
+    }
+    // Skip sliders in collapsed sections
+    const dir = e.key === 'ArrowDown' ? 1 : -1;
+    while (next >= 0 && next < sliderOrder.length) {
+      const key = sliderOrder[next];
+      const el = sliderEls[key];
+      if (el && el.row.offsetParent !== null) break; // visible
+      next += dir;
+    }
+    if (next >= 0 && next < sliderOrder.length) setFocusedSlider(next);
+  }
+});
+
+function buildUI(){
+  // Big Five — each with trait color dot
+  for(const k of TK){
+    mkSlider('body-bigfive','bf_'+k,TR[k].l,0,100,1,scores.bigFive[k],v=>{
+      scores.bigFive[k]=v; onScoreChange('bigFive');
+    }, TR[k].css);
+  }
+
+  // Shadow — individual effects
+  const shN={M:'Machiavel',N:'Narcissism',P:'Psychopathy'};
+  for(const k of ['M','N','P']){
+    mkSlider('body-shadow','sh_'+k,shN[k],0,100,1,scores.shadow[k],v=>{
+      scores.shadow[k]=v; onScoreChange('shadow');
+    });
+  }
+
+  // Attachment
+  mkSlider('body-attach','at_anx','Anxiety',0,5,0.1,scores.attachment.anxiety,v=>{
+    scores.attachment.anxiety=v; onScoreChange('attachment');
+  });
+  mkSlider('body-attach','at_avd','Avoidance',0,5,0.1,scores.attachment.avoidance,v=>{
+    scores.attachment.avoidance=v; onScoreChange('attachment');
+  });
+
+  // Risk
+  for(const k of ['financial','social','physical','ethical']){
+    mkSlider('body-risk','rk_'+k,k.charAt(0).toUpperCase()+k.slice(1),0,100,1,scores.risk[k],v=>{
+      scores.risk[k]=v; onScoreChange('risk');
+    });
+  }
+
+  // Chronotype
+  mkSlider('body-chrono','chrono','Morningness',0,100,1,scores.chronotype,v=>{
+    scores.chronotype=v; onScoreChange('chronotype');
+  });
+
+  // ADHD + Depth
+  mkSlider('body-adhd','adhd','Indicators',0,6,1,scores.adhd,v=>{
+    scores.adhd=v; onScoreChange('adhd');
+  });
+  mkSlider('body-adhd','depth','Assess depth',0,20,1,scores.depth,v=>{
+    scores.depth=v; onScoreChange('depth');
+  });
+
+  // Motion overrides
+  const motionS=[
+    ['driftAmp','Drift amp',0,3,0.05],['driftSpeed','Drift spd',0,3,0.05],
+    ['swayAmp','Sway amp',0,3,0.05],['wiggleAmp','Wiggle amp',0,5,0.05],
+    ['wiggleSpeed','Wiggle spd',0,3,0.05],['breathRate','Breath rate',0,3,0.05],
+    ['breathAmp','Breath amp',0,3,0.05],['pulseSpeed','Pulse spd',0,3,0.05],
+  ];
+  for(const[key,label,min,max,step] of motionS){
+    mkSlider('body-motion','mo_'+key,label,min,max,step,mods[key],v=>{
+      modsOverride[key]=true;mods[key]=v;
+      if(key==='pulseSpeed'){cons=mkCon(actN);puls=mkPul(cons,gen.s);}
+    });
+  }
+
+  // Glow
+  mkSlider('body-glow','gl_radius','Radius',0.1,4,0.05,mods.glowRadius,v=>{modsOverride.glowRadius=true;mods.glowRadius=v;});
+  mkSlider('body-glow','gl_intensity','Intensity',0,3,0.05,mods.glowIntensity,v=>{modsOverride.glowIntensity=true;mods.glowIntensity=v;});
+  mkSlider('body-glow','gl_machConn','Mach conn',0,1,0.02,mods.machConn,v=>{modsOverride.machConn=true;mods.machConn=v;});
+  mkSlider('body-glow','gl_narcInflate','Narc inflate',0,1,0.02,mods.narcInflate,v=>{modsOverride.narcInflate=true;mods.narcInflate=v;updateTargets();});
+  mkSlider('body-glow','gl_psychSharp','Psych sharp',0,1,0.02,mods.psychSharp,v=>{modsOverride.psychSharp=true;mods.psychSharp=v;});
+  mkSlider('body-glow','gl_psychCool','Psych cool',0,1,0.02,mods.psychCool,v=>{modsOverride.psychCool=true;mods.psychCool=v;});
+
+  // Membrane
+  mkSlider('body-membrane','mm_opacity','Opacity',0,3,0.05,mods.memOpacity,v=>{modsOverride.memOpacity=true;mods.memOpacity=v;});
+  mkSlider('body-membrane','mm_thickness','Thickness',0,3,0.05,mods.memThickness,v=>{modsOverride.memThickness=true;mods.memThickness=v;});
+  mkSlider('body-membrane','mm_connDensity','Conn density',0.1,3,0.05,mods.connDensity,v=>{modsOverride.connDensity=true;mods.connDensity=v;cons=mkCon(actN);puls=mkPul(cons,gen.s);});
+  mkSlider('body-membrane','mm_pulseIrr','Pulse chaos',0,1,0.02,mods.connPulseIrr,v=>{modsOverride.connPulseIrr=true;mods.connPulseIrr=v;puls=mkPul(cons,gen.s);});
+
+  // Global
+  mkSlider('body-global','g_seed','Seed',1,99999,1,stableSeed,v=>{
+    stableSeed=v; fullRebuild();
+  });
+}
+
+// ═══ PRESETS ═══
+const PRESETS={
+  'Balanced':{bigFive:{O:55,C:55,E:55,A:55,N:55},shadow:{M:20,N:20,P:15},attachment:{anxiety:1.5,avoidance:1.5},risk:{financial:40,social:40,physical:40,ethical:40},chronotype:50,adhd:1,depth:4},
+  'High Extravert':{bigFive:{O:70,C:45,E:95,A:75,N:25},shadow:{M:15,N:30,P:10},attachment:{anxiety:1.0,avoidance:0.8},risk:{financial:55,social:70,physical:50,ethical:40},chronotype:65,adhd:1,depth:6},
+  'Deep Thinker':{bigFive:{O:92,C:78,E:20,A:50,N:55},shadow:{M:25,N:15,P:10},attachment:{anxiety:2.5,avoidance:2.0},risk:{financial:30,social:20,physical:15,ethical:25},chronotype:30,adhd:3,depth:8},
+  'Dark Triad':{bigFive:{O:60,C:70,E:65,A:15,N:35},shadow:{M:88,N:92,P:78},attachment:{anxiety:1.5,avoidance:4.0},risk:{financial:85,social:75,physical:70,ethical:90},chronotype:35,adhd:2,depth:5},
+  'Anxious':{bigFive:{O:55,C:40,E:60,A:85,N:80},shadow:{M:10,N:10,P:5},attachment:{anxiety:4.5,avoidance:1.0},risk:{financial:20,social:25,physical:15,ethical:15},chronotype:45,adhd:2,depth:4},
+  'Risk Taker':{bigFive:{O:80,C:30,E:85,A:40,N:30},shadow:{M:45,N:50,P:35},attachment:{anxiety:1.5,avoidance:2.5},risk:{financial:90,social:85,physical:95,ethical:70},chronotype:60,adhd:4,depth:3},
+  'Minimalist':{bigFive:{O:25,C:90,E:15,A:65,N:10},shadow:{M:5,N:5,P:3},attachment:{anxiety:0.5,avoidance:1.0},risk:{financial:10,social:15,physical:10,ethical:5},chronotype:80,adhd:0,depth:2},
+  'Hyperfocus':{bigFive:{O:85,C:35,E:50,A:45,N:60},shadow:{M:20,N:25,P:10},attachment:{anxiety:2.5,avoidance:1.5},risk:{financial:50,social:45,physical:40,ethical:30},chronotype:25,adhd:6,depth:5},
+  'New User':{bigFive:{O:50,C:50,E:50,A:50,N:50},shadow:{M:25,N:25,P:25},attachment:{anxiety:2.5,avoidance:2.5},risk:{financial:50,social:50,physical:50,ethical:50},chronotype:50,adhd:1,depth:0},
+  'Random':null
+};
+
+function R(max){return Math.floor(Math.random()*(max+1));}
+
+function loadPreset(name){
+  modsOverride={};
+  if(name==='Random'){
+    stableSeed=R(99999);
+    scores.bigFive={O:R(100),C:R(100),E:R(100),A:R(100),N:R(100)};
+    scores.shadow={M:R(100),N:R(100),P:R(100)};
+    scores.attachment={anxiety:Math.random()*5,avoidance:Math.random()*5};
+    scores.risk={financial:R(100),social:R(100),physical:R(100),ethical:R(100)};
+    scores.chronotype=R(100);scores.adhd=R(6);scores.depth=R(20);
+  } else {
+    const p=PRESETS[name];
+    scores.bigFive={...p.bigFive};scores.shadow={...p.shadow};
+    scores.attachment={...p.attachment};scores.risk={...p.risk};
+    scores.chronotype=p.chronotype;scores.adhd=p.adhd;scores.depth=p.depth;
+  }
+  syncSlidersToScores();fullRebuild();
+  document.querySelectorAll('.presets button').forEach(b=>b.classList.remove('active'));
+  if(event&&event.target) event.target.classList.add('active');
+}
+
+function syncSlidersToScores(){
+  for(const k of TK)updateSlider('bf_'+k,scores.bigFive[k]);
+  for(const k of ['M','N','P'])updateSlider('sh_'+k,scores.shadow[k]);
+  updateSlider('at_anx',scores.attachment.anxiety);updateSlider('at_avd',scores.attachment.avoidance);
+  for(const k of ['financial','social','physical','ethical'])updateSlider('rk_'+k,scores.risk[k]);
+  updateSlider('chrono',scores.chronotype);updateSlider('adhd',scores.adhd);updateSlider('depth',scores.depth);
+  updateSlider('g_seed',stableSeed);
+  deriveModifiers();
+  for(const key of ['driftAmp','driftSpeed','swayAmp','wiggleAmp','wiggleSpeed','breathRate','breathAmp','pulseSpeed'])updateSlider('mo_'+key,mods[key]);
+  updateSlider('gl_radius',mods.glowRadius);updateSlider('gl_intensity',mods.glowIntensity);
+  updateSlider('gl_machConn',mods.machConn);updateSlider('gl_narcInflate',mods.narcInflate);
+  updateSlider('gl_psychSharp',mods.psychSharp);updateSlider('gl_psychCool',mods.psychCool);
+  updateSlider('mm_opacity',mods.memOpacity);updateSlider('mm_thickness',mods.memThickness);
+  updateSlider('mm_connDensity',mods.connDensity);updateSlider('mm_pulseIrr',mods.connPulseIrr);
+}
+
+function randomizeSection(section){
+  if(section==='bigFive')for(const k of TK)scores.bigFive[k]=R(100);
+  else if(section==='shadow')for(const k of ['M','N','P'])scores.shadow[k]=R(100);
+  else if(section==='attachment'){scores.attachment.anxiety=Math.random()*5;scores.attachment.avoidance=Math.random()*5;}
+  else if(section==='risk')for(const k of ['financial','social','physical','ethical'])scores.risk[k]=R(100);
+  else if(section==='chronotype')scores.chronotype=R(100);
+  else if(section==='adhd'){scores.adhd=R(6);scores.depth=R(20);}
+  syncSlidersToScores();onScoreChange(section);
+}
+
+function resetMotion(){for(const k of ['driftAmp','driftSpeed','swayAmp','wiggleAmp','wiggleSpeed','breathRate','breathAmp','pulseSpeed'])delete modsOverride[k];deriveModifiers();syncSlidersToScores();}
+function resetGlow(){for(const k of ['glowRadius','glowIntensity','machConn','narcInflate','psychSharp','psychCool']){delete modsOverride[k];if(k==='glowRadius'||k==='glowIntensity')mods[k]=1.0;}deriveModifiers();syncSlidersToScores();updateTargets();}
+function resetMembrane(){for(const k of ['memOpacity','memThickness','connDensity','connPulseIrr']){delete modsOverride[k];if(k==='memOpacity'||k==='memThickness')mods[k]=1.0;}deriveModifiers();syncSlidersToScores();cons=mkCon(actN);puls=mkPul(cons,gen.s);}
+
+function buildPresets(){
+  const c=document.getElementById('presets');
+  for(const name of Object.keys(PRESETS)){
+    const btn=document.createElement('button');btn.textContent=name;
+    btn.onclick=()=>loadPreset(name);c.appendChild(btn);}
+}
+
+// ═══ RESIZE ═══
+function resize(){
+  const area=document.querySelector('.viz-area');
+  CW=cvs.width=area.clientWidth;CH=cvs.height=area.clientHeight;
+  CX=CW/2;CY=CH/2;oR=Math.min(CW,CH)*0.38;
+  if(gen){updateTargets();rebuildConnections();}
+}
+
+// ═══ INIT ═══
+cvs=document.getElementById('c');ctx=cvs.getContext('2d');
+buildUI();buildPresets();
+resize();window.addEventListener('resize',resize);
+t0=performance.now();
+deriveModifiers();
+gen=mkGen();allN=mkNodes(gen);
+updateTargets();
+for(const n of allN){n.bA=n.tBA;n.bR=n.tBR;n.rd=n.tRd;n.tv=n.tTV;}
+actN=filt(allN,stg);cons=mkCon(actN);puls=mkPul(cons,gen.s);
+currentGlow=[...gen.glow]; targetGlow=[...gen.glow];
+updInfo();updStats();
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
