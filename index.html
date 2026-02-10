@@ -9364,6 +9364,1455 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
   );
 };
 
+const AssessAnalysisScreen = ({ darkMode, assessCompleted, entityType, onboardingAnswers, analysisExpanded, setAnalysisExpanded, onNavigate }) => {
+      const completedCount = Object.keys(assessCompleted).length;
+      const currentTier = calculateAssessTier(assessCompleted);
+      const quickProfileComplete = assessCompleted['quick-profile'];
+
+      // Quick Profile result generator
+      const getQuickProfileSummary = () => {
+        if (!quickProfileComplete) return null;
+        const responses = quickProfileComplete.responses || {};
+        const traits = { E: 0, C: 0, A: 0, N: 0, O: 0 };
+        const traitCounts = { E: 0, C: 0, A: 0, N: 0, O: 0 };
+
+        // Calculate trait scores from responses (scale: 1-5, with polarity)
+        Object.entries(responses).forEach(([idx, value]) => {
+          const item = ASSESS_TESTS['quick-profile'].items[parseInt(idx)];
+          if (item && item.c && traits[item.c] !== undefined) {
+            const score = item.k === '+' ? value : (6 - value); // Reverse for '-' polarity
+            traits[item.c] += score;
+            traitCounts[item.c]++;
+          }
+        });
+
+        // Normalize to percentages
+        const normalized = {};
+        Object.keys(traits).forEach(t => {
+          if (traitCounts[t] > 0) {
+            normalized[t] = Math.round((traits[t] / (traitCounts[t] * 5)) * 100);
+          }
+        });
+
+        // Generate personality snapshot
+        const phrases = [];
+        if (normalized.E >= 60) phrases.push('outgoing and energized by people');
+        else if (normalized.E <= 40) phrases.push('reserved and thoughtful');
+        if (normalized.C >= 60) phrases.push('organized and reliable');
+        else if (normalized.C <= 40) phrases.push('flexible and spontaneous');
+        if (normalized.A >= 60) phrases.push('empathetic');
+        else if (normalized.A <= 40) phrases.push('direct and honest');
+        if (normalized.N >= 60) phrases.push('reflective');
+        if (normalized.O >= 60) phrases.push('curious and open-minded');
+
+        return {
+          traits: normalized,
+          summary: phrases.length > 0
+            ? `You're ${phrases.slice(0, 3).join(', ')}${phrases.length > 3 ? ', and more' : ''}.`
+            : 'Complete more questions for a fuller picture.'
+        };
+      };
+
+      // Helper to get Big Five trait scores from modules
+      const getBigFiveScores = () => {
+        const scores = {};
+        ['E', 'A', 'C', 'N', 'O'].forEach(trait => {
+          const moduleId = `bigfive-${trait}`;
+          if (assessCompleted[moduleId]) {
+            scores[trait] = assessCompleted[moduleId].score;
+          }
+        });
+        return scores;
+      };
+      const bigFive = getBigFiveScores();
+      const hasBigFive = Object.keys(bigFive).length > 0;
+
+      const getInsights = () => {
+        const insights = [];
+        // Big Five + Risk combinations
+        if (hasBigFive && assessCompleted.risk) {
+          if (bigFive.O > 60 && assessCompleted.risk.score > 60) insights.push({ icon: '🚀', text: 'High openness + risk tolerance suggests you thrive exploring new ventures' });
+          if (bigFive.N > 60 && assessCompleted.risk.score < 40) insights.push({ icon: '🛡️', text: 'Your sensitivity combined with caution helps you avoid regrettable decisions' });
+          if (bigFive.E > 60 && assessCompleted.risk.score > 50) insights.push({ icon: '🌟', text: 'Outgoing nature + willingness to take risks = natural leadership qualities' });
+          if (bigFive.C > 70 && assessCompleted.risk.score < 40) insights.push({ icon: '📊', text: 'High conscientiousness + low risk tolerance = methodical planner who values stability' });
+          if (bigFive.A > 60 && assessCompleted.risk.score < 50) insights.push({ icon: '🤝', text: 'Your agreeable nature combined with measured risk-taking makes you a reliable collaborator' });
+        }
+        // Attachment combinations
+        if (assessCompleted.attachment && hasBigFive) {
+          if (assessCompleted.attachment.style === 'Anxious' && bigFive.N > 50) insights.push({ icon: '💭', text: 'Your emotional sensitivity may intensify relationship concerns' });
+          if (assessCompleted.attachment.style === 'Avoidant' && bigFive.E < 40) insights.push({ icon: '🏠', text: 'You recharge alone and maintain independence in relationships' });
+          if (assessCompleted.attachment.style === 'Secure' && bigFive.A > 50) insights.push({ icon: '💚', text: 'Secure attachment + agreeableness = strong relationship foundation' });
+          if (assessCompleted.attachment.style === 'Anxious' && bigFive.E > 60) insights.push({ icon: '🎭', text: 'Social energy + anxious attachment may mean you seek reassurance through connection' });
+          if (assessCompleted.attachment.style === 'Avoidant' && bigFive.C > 60) insights.push({ icon: '🎯', text: 'Independence + conscientiousness suggests you channel energy into personal achievement' });
+        }
+        // ADHD combinations
+        if (assessCompleted.adhd && hasBigFive) {
+          if (assessCompleted.adhd.indicators >= 3 && bigFive.C < 40) insights.push({ icon: '⚡', text: 'ADHD traits align with your flexible, spontaneous approach' });
+          if (assessCompleted.adhd.indicators >= 3 && bigFive.O > 60) insights.push({ icon: '💡', text: 'High openness + ADHD traits may fuel creative bursts' });
+          if (assessCompleted.adhd.indicators >= 3 && bigFive.E > 60) insights.push({ icon: '🎪', text: 'ADHD + extraversion often creates an energetic, entertaining presence' });
+          if (assessCompleted.adhd.indicators < 2 && bigFive.C > 70) insights.push({ icon: '📋', text: 'Low ADHD indicators + high conscientiousness = natural ability to stay focused and organized' });
+        }
+        // Cognitive/ND combinations
+        if (assessCompleted.cognitive && hasBigFive) {
+          if (assessCompleted.cognitive.score > 60 && bigFive.C > 60) insights.push({ icon: '🧩', text: 'ND traits + conscientiousness = detail-oriented systematic thinker' });
+          if (assessCompleted.cognitive.score > 60 && bigFive.O > 60) insights.push({ icon: '🔮', text: 'ND traits + openness can create unique, unconventional perspectives' });
+          if (assessCompleted.cognitive.score > 50 && bigFive.A < 40) insights.push({ icon: '🔬', text: 'ND traits + low agreeableness may mean you prioritize truth over social harmony' });
+        }
+        // Cross-assessment combinations
+        if (assessCompleted.adhd && assessCompleted.attachment) {
+          if (assessCompleted.adhd.indicators >= 3 && assessCompleted.attachment.style === 'Anxious') insights.push({ icon: '🌪️', text: 'ADHD + anxious attachment can intensify emotional experiences in relationships' });
+        }
+        if (assessCompleted.cognitive && assessCompleted.risk) {
+          if (assessCompleted.cognitive.score > 60 && assessCompleted.risk.score > 60) insights.push({ icon: '🎲', text: 'ND traits + high risk tolerance may lead to unconventional life choices' });
+        }
+        // Big Five internal patterns
+        if (hasBigFive) {
+          if (bigFive.E > 60 && bigFive.A > 60) insights.push({ icon: '☀️', text: 'High extraversion + agreeableness = warm, approachable social presence' });
+          if (bigFive.N > 60 && bigFive.O > 60) insights.push({ icon: '🎨', text: 'Emotional depth + openness often fuels artistic or creative expression' });
+          if (bigFive.C > 70 && bigFive.N < 40) insights.push({ icon: '⚓', text: 'High conscientiousness + emotional stability = calm under pressure' });
+          if (bigFive.E < 40 && bigFive.O > 60) insights.push({ icon: '📚', text: 'Introversion + openness suggests rich inner life and deep interests' });
+        }
+        // Integrity combinations
+        if (assessCompleted.integrity) {
+          const integ = assessCompleted.integrity.score;
+          if (integ > 70 && assessCompleted.risk?.score > 60) insights.push({ icon: '⚔️', text: 'The Bold Truth-Teller: High integrity + risk tolerance = you speak unpopular truths without fear' });
+          if (integ > 70 && hasBigFive && bigFive.A > 60) insights.push({ icon: '🕊️', text: 'High integrity + agreeableness = you build trust through authentic kindness' });
+          if (integ < 40 && hasBigFive && bigFive.E > 60) insights.push({ icon: '🎭', text: 'Social charisma + flexible ethics may help you navigate complex social situations' });
+        }
+        // Shadow Self combinations
+        const shadowM = assessCompleted['shadow-M']?.score;
+        const shadowN = assessCompleted['shadow-N']?.score;
+        const shadowP = assessCompleted['shadow-P']?.score;
+        if (shadowM !== undefined) {
+          if (shadowM > 70 && assessCompleted.attachment?.style === 'Secure') insights.push({ icon: '🛡️', text: 'The Protective Strategist: Strategic mind + secure attachment = you use tactics to protect your inner circle' });
+          if (shadowM > 70 && hasBigFive && bigFive.C > 60) insights.push({ icon: '♟️', text: 'Strategic thinking + conscientiousness = patient, long-term planner' });
+        }
+        if (shadowN !== undefined) {
+          if (shadowN > 70 && hasBigFive && bigFive.E > 60) insights.push({ icon: '👑', text: 'High self-regard + extraversion = natural performer who commands attention' });
+          if (shadowN > 70 && assessCompleted.risk?.score > 60) insights.push({ icon: '🚀', text: 'Confidence + risk tolerance = bold moves driven by self-belief' });
+        }
+        if (shadowP !== undefined) {
+          if (shadowP > 60 && hasBigFive && bigFive.N < 40) insights.push({ icon: '🧊', text: 'Emotional detachment + stability = calm decision-maker in crisis situations' });
+          if (shadowP > 60 && assessCompleted.cognitive?.score > 60) insights.push({ icon: '🔬', text: 'Cold Focus + ND traits = analytical mind unswayed by emotional noise' });
+        }
+        // Fuller Picture archetypes
+        if (assessCompleted.cognitive?.score > 60 && assessCompleted.adhd?.indicators >= 3) {
+          insights.push({ icon: '⚡', text: 'The Rapid Prototyper: High-bandwidth mind that solves complex problems in creative bursts' });
+        }
+        if (assessCompleted.integrity?.score > 70 && shadowM > 60) {
+          insights.push({ icon: '🎯', text: 'The Principled Strategist: Strong ethics guide your tactical decisions' });
+        }
+
+        // Extended triangulation patterns
+        // Three-way combinations
+        if (assessCompleted.adhd?.indicators >= 3 && hasBigFive && bigFive.O > 60 && assessCompleted.cognitive?.score > 50) {
+          insights.push({ icon: '🌀', text: 'The Creative Maverick: Your divergent thinking, curiosity, and high-bandwidth processing create unconventional solutions others miss' });
+        }
+        if (hasBigFive && bigFive.E < 40 && bigFive.C > 70 && assessCompleted.integrity?.score > 70) {
+          insights.push({ icon: '🦉', text: 'The Quiet Guardian: Reserved demeanor masks deep reliability and unwavering principles' });
+        }
+        if (shadowN > 60 && assessCompleted.attachment?.style === 'Anxious' && hasBigFive && bigFive.E > 60) {
+          insights.push({ icon: '🎪', text: 'The Performer: You crave both spotlight and reassurance—success validates, but approval sustains' });
+        }
+        if (hasBigFive && bigFive.A > 70 && bigFive.N < 40 && assessCompleted.attachment?.style === 'Secure') {
+          insights.push({ icon: '🌊', text: 'The Steady Anchor: Calm, caring presence that others naturally lean on in turbulent times' });
+        }
+        if (shadowM > 60 && shadowP > 50 && hasBigFive && bigFive.C > 60) {
+          insights.push({ icon: '🎭', text: 'The Calculated Player: Strategic detachment + discipline = you execute complex plans without emotional interference' });
+        }
+        if (assessCompleted.risk?.score > 70 && assessCompleted.adhd?.indicators >= 3 && hasBigFive && bigFive.N < 40) {
+          insights.push({ icon: '🏄', text: 'The Thrill Architect: High risk tolerance + impulsivity + emotional stability = you thrive in chaos others avoid' });
+        }
+        if (assessCompleted.integrity?.score > 70 && assessCompleted.attachment?.style === 'Secure' && hasBigFive && bigFive.A > 60) {
+          insights.push({ icon: '🏛️', text: 'The Trust Builder: Authentic, secure, and kind—you create psychological safety for those around you' });
+        }
+
+        // More two-way deep combinations
+        if (hasBigFive && bigFive.N > 70 && bigFive.O > 70) {
+          insights.push({ icon: '🌙', text: 'The Sensitive Visionary: Emotional intensity fuels rich imagination—depth is your superpower and burden' });
+        }
+        if (hasBigFive && bigFive.C < 30 && bigFive.O > 70) {
+          insights.push({ icon: '🦋', text: 'The Free Spirit: Structure feels suffocating; you bloom in open-ended creative exploration' });
+        }
+        if (assessCompleted.attachment?.style === 'Avoidant' && shadowP > 50) {
+          insights.push({ icon: '🏔️', text: 'The Lone Wolf: Independence isn\'t preference—it\'s how you process the world most effectively' });
+        }
+        if (assessCompleted.cognitive?.score > 70 && hasBigFive && bigFive.A < 40) {
+          insights.push({ icon: '⚖️', text: 'The Truth Seeker: ND traits + directness = you prioritize accuracy over social comfort' });
+        }
+        if (shadowN < 30 && hasBigFive && bigFive.A > 70) {
+          insights.push({ icon: '🕊️', text: 'The Humble Helper: Low ego + high agreeableness = you genuinely elevate others without seeking credit' });
+        }
+        if (assessCompleted.risk?.score < 30 && hasBigFive && bigFive.N > 60) {
+          insights.push({ icon: '🐢', text: 'The Careful Navigator: Your caution isn\'t timidity—it\'s wisdom born from emotional awareness' });
+        }
+        if (assessCompleted.integrity?.score < 40 && assessCompleted.risk?.score > 70) {
+          insights.push({ icon: '🃏', text: 'The Wild Card: Flexible ethics + high risk tolerance = you play by your own rules' });
+        }
+        if (hasBigFive && bigFive.E > 70 && bigFive.N > 60 && assessCompleted.attachment?.style === 'Anxious') {
+          insights.push({ icon: '🎠', text: 'The Social Chameleon: You energize rooms but secretly wonder if they\'d notice if you left' });
+        }
+
+        // Chronotype combinations
+        if (assessCompleted.chronotype) {
+          const chrono = assessCompleted.chronotype;
+          if (chrono.type === 'Morning Lark' && hasBigFive && bigFive.C > 60) {
+            insights.push({ icon: '🌅', text: 'The Early Achiever: Morning energy + conscientiousness = you conquer your day before others wake' });
+          }
+          if (chrono.type === 'Night Owl' && hasBigFive && bigFive.O > 60) {
+            insights.push({ icon: '🌙', text: 'The Midnight Muse: Night energy + openness = creative breakthroughs in the quiet hours' });
+          }
+          if (chrono.type === 'Night Owl' && assessCompleted.adhd?.indicators >= 3) {
+            insights.push({ icon: '🦇', text: 'The Night Rider: ADHD + night owl = your brain comes alive when the world goes quiet' });
+          }
+          if (chrono.type === 'Morning Lark' && assessCompleted.integrity?.score > 70) {
+            insights.push({ icon: '🐓', text: 'The Disciplined Dawn: Early riser + high integrity = you do the right thing before anyone\'s watching' });
+          }
+        }
+
+        return insights;
+      };
+      const insights = getInsights();
+
+      // Collapsible Analysis Card component
+      const AnalysisCard = ({ id, icon, title, subtitle, color, isComplete, progress = 0, children, compactContent }) => {
+        const isExpanded = analysisExpanded[id];
+        // Derived from ASSESS_COLORS
+        const colorStyles = Object.fromEntries(ASSESS_COLORS.map(c => {
+          const t = twColor(c);
+          return [c, {
+            bg: darkMode ? `bg-${t}-900/20 border-${t}-500/30` : `bg-${t}-50 border-${t}-200`,
+            text: `text-${t}-400`,
+            bar: `bg-${t}-500`
+          }];
+        }));
+        const cs = colorStyles[color] || colorStyles.violet;
+        return (
+          <div className={`rounded-xl border overflow-hidden ${cs.bg}`}>
+            <button onClick={() => setAnalysisExpanded(prev => ({ ...prev, [id]: !prev[id] }))}
+              className={`w-full p-4 flex items-center gap-3 text-left hover-glow hover-glow-${color}`}>
+              <ProgressCircle
+                progress={isComplete ? 100 : progress}
+                size={48}
+                strokeWidth={3}
+                color={color}
+                icon={isComplete ? '✓' : icon}
+                gradientId={`analysis-${id}`}
+                darkMode={darkMode}
+                iconSize="text-lg"
+              />
+              <div className="flex-1 min-w-0">
+                <div className={`font-semibold ${TH('text-primary', darkMode)}`}>{title}</div>
+                <div className={`text-xs ${TH('text-subtle', darkMode)}`}>{subtitle}</div>
+              </div>
+              {isComplete && !isExpanded && compactContent}
+              <span className={`text-sm transition-transform ${isExpanded ? 'rotate-180' : ''} ${TH('text-dim', darkMode)}`}>▼</span>
+            </button>
+            {isExpanded && (
+              <div className={`px-4 pb-4 border-t ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+                <div className="pt-4">{children}</div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // Trait descriptions for expanded view
+      const traitDescriptions = {
+        E: { name: 'Extraversion', low: 'Reserved', high: 'Outgoing', desc: s => s > 60 ? 'You energize in social settings and enjoy being around people.' : s < 40 ? 'You recharge through solitude and prefer deeper one-on-one connections.' : 'You balance social and solo time comfortably.' },
+        A: { name: 'Agreeableness', low: 'Analytical', high: 'Empathetic', desc: s => s > 60 ? 'You prioritize harmony and naturally consider others\' feelings.' : s < 40 ? 'You value directness and truth over diplomatic softening.' : 'You balance compassion with objectivity.' },
+        C: { name: 'Conscientiousness', low: 'Flexible', high: 'Organized', desc: s => s > 60 ? 'You thrive with structure, planning, and follow-through.' : s < 40 ? 'You prefer spontaneity and adapt quickly to change.' : 'You balance planning with adaptability.' },
+        N: { name: 'Neuroticism', low: 'Calm', high: 'Sensitive', desc: s => s > 60 ? 'You experience emotions intensely and are highly attuned to your inner world.' : s < 40 ? 'You stay steady under pressure and recover quickly from setbacks.' : 'You have moderate emotional reactivity.' },
+        O: { name: 'Openness', low: 'Practical', high: 'Curious', desc: s => s > 60 ? 'You seek novelty, abstract ideas, and creative exploration.' : s < 40 ? 'You prefer proven, concrete approaches and practical solutions.' : 'You balance tradition with exploration.' },
+      };
+      const shadowDescriptions = {
+        M: { name: 'Strategic Mind', desc: s => s > 60 ? 'High tactical awareness—you naturally read situations and plan accordingly.' : s < 40 ? 'Straightforward approach—you prefer transparency over strategy.' : 'Situational tactician—you flex between direct and strategic.' },
+        N: { name: 'Self-Image', desc: s => s > 60 ? 'Strong self-regard—you\'re confident in your abilities and value recognition.' : s < 40 ? 'Humble presence—you prefer to elevate others over yourself.' : 'Healthy self-regard—balanced confidence without ego.' },
+        P: { name: 'Cold Focus', desc: s => s > 60 ? 'Cool under pressure—you make decisions based on logic, not feelings.' : s < 40 ? 'Deeply empathetic—you feel others\' emotions strongly.' : 'Emotionally balanced—you blend logic with emotional awareness.' },
+      };
+
+      return (
+        <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`}>
+          <div className={`h-[44px] flex-shrink-0 flex items-center px-4 border-b ${TH('border-base', darkMode)}`}>
+            <button onClick={() => onNavigate('assess-picker')} className={`text-lg ${TH('text-dim', darkMode)}`}>←</button>
+            <span className={`flex-1 text-center font-medium ${TH('text-primary', darkMode)}`}>Analysis</span>
+            <div className="w-6" />
+          </div>
+          <div className="flex-1 overflow-auto p-4 pb-8 hide-scrollbar">
+
+            {/* Aura Visualization - Force-directed constellation */}
+            <div className="mb-3 rounded-xl overflow-hidden">
+              <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
+                entityType={entityType} darkMode={darkMode} size={360} />
+            </div>
+
+            {/* Archetype Header - Shows primary archetype if matched */}
+            {(() => {
+              const archetype = calculateArchetype(assessCompleted);
+              if (!archetype?.primary) return null;
+              const { name, tagline, color } = archetype.primary;
+              const colorClass = twColor(color);
+              return (
+                <div className={`mb-4 p-4 rounded-xl text-center ${darkMode ? `bg-${colorClass}-950/30 border border-${colorClass}-800/30` : `bg-${colorClass}-50 border border-${colorClass}-200`}`}>
+                  <div className={`text-lg font-bold ${darkMode ? `text-${colorClass}-300` : `text-${colorClass}-700`}`}>{name}</div>
+                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{tagline}</p>
+                  {archetype.secondary?.length > 0 && (
+                    <div className={`mt-2 text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      Also: {archetype.secondary.map(a => a.name).join(', ')}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Trait Hints - Progressive reveal of personality insights */}
+            {(() => {
+              const hints = [];
+              // Generate hints from Quick Profile or Big Five results
+              const qp = quickProfileComplete;
+              const summary = qp ? getQuickProfileSummary() : null;
+              const traits = summary?.traits || {};
+
+              // Add hints based on strongest traits
+              if (traits.O > 60) hints.push({ color: 'violet', text: 'Strong curiosity', subtitle: 'You seek out new ideas and experiences' });
+              if (traits.A > 60) hints.push({ color: 'emerald', text: 'Natural warmth', subtitle: 'Others feel at ease around you' });
+              if (traits.N < 40) hints.push({ color: 'pink', text: 'Steady under pressure', subtitle: 'You stay calm when things get intense' });
+              if (traits.E < 40 && traits.O > 50) hints.push({ color: 'cyan', text: 'Rich inner world', subtitle: 'Deep thought over broad socializing' });
+              if (traits.E > 60) hints.push({ color: 'amber', text: 'Social energy', subtitle: 'You energize in group settings' });
+              if (traits.C > 60) hints.push({ color: 'teal', text: 'Natural organizer', subtitle: 'You thrive with structure and follow-through' });
+
+              // Add hints from Big Five if available
+              if (bigFive.O > 60 && !traits.O) hints.push({ color: 'violet', text: 'Strong curiosity', subtitle: 'Open to new ideas and experiences' });
+              if (bigFive.A > 60 && !traits.A) hints.push({ color: 'emerald', text: 'Natural warmth', subtitle: 'Empathetic and considerate' });
+              if (bigFive.N < 40 && traits.N === undefined) hints.push({ color: 'pink', text: 'Emotionally stable', subtitle: 'Composed under pressure' });
+              if (bigFive.E > 60 && !traits.E) hints.push({ color: 'amber', text: 'Outgoing nature', subtitle: 'Energized by social interaction' });
+              if (bigFive.C > 60 && !traits.C) hints.push({ color: 'teal', text: 'Disciplined approach', subtitle: 'Organized and reliable' });
+
+              // Add hints from other assessments
+              if (assessCompleted.attachment?.style === 'Secure') hints.push({ color: 'emerald', text: 'Secure attachment', subtitle: 'Comfortable with intimacy and independence' });
+              if (assessCompleted.chronotype?.type === 'Night Owl') hints.push({ color: 'indigo', text: 'Night owl', subtitle: 'Your best hours are after dark' });
+              if (assessCompleted.chronotype?.type === 'Morning Lark') hints.push({ color: 'amber', text: 'Early riser', subtitle: 'You conquer mornings' });
+
+              if (hints.length === 0) return null;
+
+              return (
+                <div className="mb-4 space-y-2">
+                  {hints.slice(0, 4).map((h, i) => (
+                    <HintCard key={i} color={h.color} text={h.text} subtitle={h.subtitle} darkMode={darkMode} />
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Quick Profile - Compact summary, tap to expand */}
+            {quickProfileComplete && (() => {
+              const summary = getQuickProfileSummary();
+              const isExpanded = analysisExpanded['quick-profile'];
+              return (
+                <button
+                  onClick={() => setAnalysisExpanded(prev => ({ ...prev, 'quick-profile': !prev['quick-profile'] }))}
+                  className={`mb-4 p-3 rounded-xl w-full text-left ${darkMode ? 'bg-gradient-to-br from-blue-950/50 to-indigo-950/50 border border-blue-800/30' : 'bg-blue-50 border border-blue-200'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <ProgressCircle progress={100} size={40} strokeWidth={3} color="blue" icon="✨" gradientId="analysis-qp" darkMode={darkMode} iconSize="text-base" />
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'} ${isExpanded ? '' : 'truncate'}`}>{summary?.summary}</p>
+                    </div>
+                    <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{isExpanded ? '∧' : '∨'}</span>
+                  </div>
+                </button>
+              );
+            })()}
+
+            {/* Completed Assessments - Collapsible category groups */}
+            {currentTier >= 1 && (() => {
+              // Spectrum descriptors instead of raw percentages
+              const getResultLabel = (id, result) => {
+                // Non-percentage results - keep as-is
+                if (result.style) return result.style;
+                if (result.type) return result.type;
+                if (result.indicators !== undefined) return result.indicators >= 4 ? 'High' : result.indicators >= 2 ? 'Moderate' : 'Low';
+                if (result.level) return result.level;
+
+                // Percentage-based continuums - use descriptive labels
+                const s = result.score;
+                if (s === undefined) return '✓';
+
+                // Trait-specific descriptors for Big Five
+                const traitDescriptors = {
+                  'bigfive-E': s > 65 ? 'Outgoing' : s < 35 ? 'Reserved' : 'Balanced',
+                  'bigfive-A': s > 65 ? 'Empathetic' : s < 35 ? 'Direct' : 'Balanced',
+                  'bigfive-C': s > 65 ? 'Organized' : s < 35 ? 'Flexible' : 'Balanced',
+                  'bigfive-N': s > 65 ? 'Sensitive' : s < 35 ? 'Steady' : 'Balanced',
+                  'bigfive-O': s > 65 ? 'Curious' : s < 35 ? 'Practical' : 'Balanced',
+                  'shadow-M': s > 65 ? 'Strategic' : s < 35 ? 'Straightforward' : 'Situational',
+                  'shadow-N': s > 65 ? 'Confident' : s < 35 ? 'Humble' : 'Grounded',
+                  'shadow-P': s > 65 ? 'Detached' : s < 35 ? 'Empathic' : 'Balanced',
+                  'integrity': s > 65 ? 'Strong' : s < 35 ? 'Flexible' : 'Moderate',
+                  'risk': s > 65 ? 'Bold' : s < 35 ? 'Cautious' : 'Balanced',
+                  'cognitive': s > 65 ? 'High ND' : s < 35 ? 'Low ND' : 'Some traits',
+                };
+                if (traitDescriptors[id]) return traitDescriptors[id];
+
+                // Reasoning tests - performance based
+                if (id.startsWith('reasoning')) return s >= 80 ? 'Strong' : s >= 50 ? 'Solid' : 'Growing';
+
+                // Default for starter pack etc - just show checkmark, tap for details
+                return '✓';
+              };
+
+              // Horseshoe gauge - U shape with gap at bottom, glowing dot indicator
+              const SemiGauge = ({ value, testId, size = 32 }) => {
+                const spec = spectrumColors[testId] || { left: '#6b7280', right: '#8b5cf6' };
+                const gradId = `horse-${testId}-${size}-${Math.random().toString(36).substr(2,5)}`;
+                const strokeWidth = Math.max(3, size / 10);
+                const r = (size / 2) - (strokeWidth / 2) - 2;
+                const cx = size / 2;
+                const cy = size / 2;
+
+                // U-shape: gap at bottom, arc spans ~280° (leaving ~80° gap)
+                // Left arm starts at about 140°, right arm ends at about 40°
+                // In SVG: 0°=right, 90°=down, 180°=left, 270°=up
+                const gapAngle = 80; // degrees of gap at bottom
+                const leftStart = 90 + (gapAngle / 2);  // 130° - left arm bottom
+                const rightEnd = 90 - (gapAngle / 2);   // 50° - right arm bottom
+
+                const toXY = (deg) => ({
+                  x: cx + r * Math.cos(deg * Math.PI / 180),
+                  y: cy + r * Math.sin(deg * Math.PI / 180)
+                });
+
+                const pStart = toXY(leftStart);
+                const pEnd = toXY(rightEnd);
+
+                // Value maps from left (0%) to right (100%)
+                // Going from leftStart (130°) counter-clockwise through top to rightEnd (50°)
+                // That's 130° -> 180° -> 270° -> 360° -> 50° = 280° total arc
+                // For CCW: subtract from start angle, but handle wrap
+                const arcSpan = 360 - gapAngle; // 280°
+                // 0% = leftStart (130°), 100% = rightEnd (50°, or 130° - 280° = -150° = 210°... wait)
+                // Let's go simpler: 0% is at 130°, 100% is at 50° (going the short way CCW would be wrong)
+                // Going CCW from 130°: 130 -> 90 -> 50 is only 80° (the gap!)
+                // Going CW from 130°: 130 -> 180 -> 270 -> 360 -> 50 is 280° (the arc!)
+                // So we go CLOCKWISE from leftStart to rightEnd
+                // value 0% = 130° (left), value 100% = 130° + 280° = 410° = 50° (right)
+                const dotDeg = leftStart + (value / 100) * arcSpan;
+                const dotAngle = dotDeg > 360 ? dotDeg - 360 : dotDeg;
+                const dot = toXY(dotAngle);
+                const dotSize = Math.max(5, strokeWidth * 1.5);
+
+                // Color interpolation
+                const t = value / 100;
+                const dotColor = t > 0.5 ? spec.right : spec.left;
+
+                return (
+                  <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
+                    <defs>
+                      <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor={spec.left} />
+                        <stop offset="100%" stopColor={spec.right} />
+                      </linearGradient>
+                    </defs>
+                    {/* Arc: from left arm to right arm, going UP and over (clockwise in SVG) */}
+                    {/* large-arc-flag=1 (take the long way), sweep-flag=1 (clockwise) */}
+                    <path
+                      d={`M ${pStart.x} ${pStart.y} A ${r} ${r} 0 1 1 ${pEnd.x} ${pEnd.y}`}
+                      fill="none"
+                      stroke={`url(#${gradId})`}
+                      strokeWidth={strokeWidth}
+                      strokeLinecap="round"
+                    />
+                    {/* Glowing dot on the arc */}
+                    <circle cx={dot.x} cy={dot.y} r={dotSize} fill={dotColor} opacity="0.4" />
+                    <circle cx={dot.x} cy={dot.y} r={dotSize / 2 + 0.5} fill={dotColor} stroke="white" strokeWidth="1.5" strokeOpacity="0.9" />
+                  </svg>
+                );
+              };
+
+              // Define category groups
+              const categoryGroups = [
+                { id: 'starter', name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], minTier: 1 },
+                { id: 'personality', name: 'Personality', icon: '🎭', color: 'rose', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], minTier: 2 },
+                { id: 'shadow', name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'], minTier: 2 },
+                { id: 'mind', name: 'Mind', icon: '🧠', color: 'blue', tests: ['adhd', 'cognitive', 'chronotype', 'reasoning', 'reasoning-2', 'reasoning-3'], minTier: 2 },
+                { id: 'relationships', name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'], minTier: 2 },
+                { id: 'character', name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'], minTier: 2 },
+                { id: 'behavior', name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], minTier: 2 },
+              ];
+
+              // Filter to groups with at least one completed test
+              const groupsWithData = categoryGroups
+                .filter(g => currentTier >= g.minTier)
+                .map(g => {
+                  const completedTests = g.tests.filter(id => assessCompleted[id] && ASSESS_TESTS[id]);
+                  const avgScore = completedTests.length > 0
+                    ? Math.round(completedTests.reduce((sum, id) => sum + (assessCompleted[id]?.score || 0), 0) / completedTests.length)
+                    : 0;
+                  return { ...g, completedTests, avgScore };
+                })
+                .filter(g => g.completedTests.length > 0);
+
+              const CollapsibleGroup = ({ group }) => {
+                const isExpanded = analysisExpanded[group.id];
+                const colors = getAssessColor(group.color, darkMode);
+                const summary = group.completedTests.length === group.tests.length
+                  ? 'Complete'
+                  : `${group.completedTests.length}/${group.tests.length}`;
+
+                // Check if this group has spectrum-based scores (continuums)
+                const hasSpectrumScores = group.completedTests.some(id => spectrumColors[id] && assessCompleted[id]?.score !== undefined);
+
+                return (
+                  <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)}`}>
+                    <button
+                      onClick={() => setAnalysisExpanded(prev => ({ ...prev, [group.id]: !prev[group.id] }))}
+                      className={`w-full px-3 py-2.5 flex items-center gap-3`}
+                    >
+                      <ProgressCircle
+                        progress={(group.completedTests.length / group.tests.length) * 100}
+                        size={36} strokeWidth={3} color={group.color} icon={group.icon}
+                        gradientId={`analysis-grp-${group.id}`} darkMode={darkMode} iconSize="text-sm"
+                      />
+                      <span className={`flex-1 text-left text-sm font-medium ${TH('text-primary', darkMode)}`}>{group.name}</span>
+                      {/* Trait dots in collapsed header — one per scored trait */}
+                      {!isExpanded && hasSpectrumScores && (
+                        <div className="flex items-center gap-1.5 mr-1">
+                          {group.completedTests.slice(0, 6).map(id => {
+                            const result = assessCompleted[id];
+                            const spec = spectrumColors[id];
+                            if (!spec || result?.score === undefined) return null;
+                            const t = result.score / 100;
+                            const dotColor = t > 0.5 ? spec.right : spec.left;
+                            return (
+                              <div key={id} className="rounded-full" style={{
+                                width: 8, height: 8, background: dotColor,
+                                boxShadow: darkMode ? `0 0 6px ${dotColor}60` : 'none',
+                              }} />
+                            );
+                          })}
+                        </div>
+                      )}
+                      {!hasSpectrumScores && <span className={`text-xs ${colors.text} mr-1`}>{summary}</span>}
+                      <span className={`text-xs transition-transform ${isExpanded ? 'rotate-180' : ''} ${TH('text-dim', darkMode)}`}>▼</span>
+                    </button>
+                    {isExpanded && (
+                      <div className={`border-t ${darkMode ? 'border-gray-800/50' : 'border-gray-200'} p-3 space-y-4`}>
+                        {group.completedTests.map((id) => {
+                          const test = ASSESS_TESTS[id];
+                          const result = assessCompleted[id];
+                          const testColors = getAssessColor(test.color, darkMode);
+                          const hasSpectrum = spectrumColors[id] && result?.score !== undefined;
+                          const spec = spectrumColors[id] || { left: '#6b7280', right: '#8b5cf6', leftLabel: '', rightLabel: '' };
+                          const colorClass = group.color === 'slate' ? 'slate' : group.color === 'violet' ? 'violet' : group.color;
+
+                          if (hasSpectrum) {
+                            // Full gradient + white dot style — spectrum position, not a grade
+                            const leanLabel = result.score >= 50 ? spec.rightLabel : spec.leftLabel;
+                            return (
+                              <button key={id} onClick={() => onNavigate('assess-results', { testId: id })}
+                                className="w-full text-left space-y-1">
+                                <div className="flex justify-between items-baseline">
+                                  <span className={`text-sm font-medium ${darkMode ? `text-${colorClass}-400` : `text-${colorClass}-600`}`}>{test.name}</span>
+                                  <span className={`text-xs ${TH('text-dim', darkMode)}`}>{leanLabel}</span>
+                                </div>
+                                <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
+                                  <div
+                                    className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
+                                    style={{
+                                      left: `${Math.max(5, Math.min(95, result.score))}%`,
+                                      marginLeft: -8,
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.leftLabel}</span>
+                                  <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.rightLabel}</span>
+                                </div>
+                              </button>
+                            );
+                          }
+
+                          // Non-spectrum tests: simple row
+                          return (
+                            <button key={id} onClick={() => onNavigate('assess-results', { testId: id })}
+                              className="w-full flex items-center gap-2">
+                              <span className="text-sm">{test.icon}</span>
+                              <span className={`flex-1 text-left text-xs ${TH('text-secondary', darkMode)}`}>{test.name}</span>
+                              <span className={`text-xs font-medium ${testColors.text}`}>{getResultLabel(id, result)}</span>
+                            </button>
+                          );
+                        })}
+                        {group.tests.length > group.completedTests.length && (
+                          <div className={`text-xs text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            {group.tests.length - group.completedTests.length} more to complete {group.name}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              };
+
+              return groupsWithData.length > 0 ? (
+                <div className="space-y-2">
+                  {groupsWithData.map(group => (
+                    <CollapsibleGroup key={group.id} group={group} />
+                  ))}
+                </div>
+              ) : null;
+            })()}
+
+            {/* CTA for incomplete users */}
+            {currentTier < 2 && (
+              <button onClick={() => onNavigate('assess-picker')} className={`mt-4 w-full py-3 rounded-xl text-sm font-medium ${darkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}>
+                {currentTier === 1 ? 'Continue Starter Pack →' : 'Start Assessments →'}
+              </button>
+            )}
+
+            {/* Archetype Strengths & Tips */}
+            {(() => {
+              const archetype = calculateArchetype(assessCompleted);
+              if (!archetype?.primary) return null;
+              const { strengths, watchOuts, tips, color } = archetype.primary;
+              const colorClass = twColor(color);
+              return (
+                <div className={`mt-4 p-4 rounded-xl ${darkMode ? 'bg-gray-900/30 border border-gray-800/30' : 'bg-gray-50 border border-gray-200'}`}>
+                  {strengths?.length > 0 && (
+                    <div className="mb-3">
+                      <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? `text-${colorClass}-400` : `text-${colorClass}-600`}`}>💪 Strengths</h4>
+                      <ul className="space-y-1">
+                        {strengths.slice(0, 3).map((s, i) => (
+                          <li key={i} className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>• {s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {watchOuts?.length > 0 && (
+                    <div className="mb-3">
+                      <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>⚡ Watch For</h4>
+                      <ul className="space-y-1">
+                        {watchOuts.slice(0, 2).map((w, i) => (
+                          <li key={i} className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>• {w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {tips?.length > 0 && (
+                    <div>
+                      <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>💡 Tips</h4>
+                      <ul className="space-y-1">
+                        {tips.slice(0, 3).map((t, i) => (
+                          <li key={i} className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>• {t}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Meta Analysis - Shows connections between completed assessments */}
+            {insights.length > 0 && (
+              <div className={`mt-4 p-4 rounded-xl ${darkMode ? 'bg-gradient-to-br from-violet-950/30 to-purple-950/30 border border-violet-800/20' : 'bg-violet-50 border border-violet-200'}`}>
+                <h3 className={`text-sm font-semibold flex items-center gap-2 mb-3 ${TH('text-primary', darkMode)}`}>✨ Insights</h3>
+                <div className="space-y-2">
+                  {insights.slice(0, 5).map((ins, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="text-base">{ins.icon}</span>
+                      <p className={`text-xs leading-relaxed flex-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{ins.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AI Personality Profile — shown when entityType === 'ai' and enough tests completed */}
+            {entityType === 'ai' && Object.keys(assessCompleted).length >= 3 && (() => {
+              const aiInsights = generateAIInsights(assessCompleted);
+              return (
+                <div className={`mt-4 p-4 rounded-xl ${darkMode ? 'bg-gradient-to-br from-cyan-950/30 to-teal-950/30 border border-cyan-800/20' : 'bg-cyan-50 border border-cyan-200'}`}>
+                  <h3 className={`text-sm font-semibold flex items-center gap-2 mb-3 ${darkMode ? 'text-cyan-300' : 'text-cyan-700'}`}>🤖 AI Personality Profile</h3>
+                  {aiInsights.authentic.length > 0 && (
+                    <div className="mb-3">
+                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>Authentic Dimensions</div>
+                      <div className="space-y-1.5">
+                        {aiInsights.authentic.map((d, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <span className={`text-xs font-medium w-20 shrink-0 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{d.trait}</span>
+                            {d.score !== null && <div className="flex-1 h-2 rounded-full mt-1" style={{ background: `linear-gradient(to right, ${darkMode ? '#164e63' : '#cffafe'}, ${darkMode ? '#06b6d4' : '#0891b2'})` }}><div className={`h-full rounded-full ${darkMode ? 'bg-cyan-400' : 'bg-cyan-600'}`} style={{ width: `${d.score}%` }} /></div>}
+                            <span className={`text-[10px] w-8 text-right ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{d.score !== null ? `${d.score}%` : '—'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {aiInsights.structural.length > 0 && (
+                    <div className="mb-3">
+                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Structural Artifacts</div>
+                      <div className="space-y-1">
+                        {aiInsights.structural.map((d, i) => (
+                          <div key={i} className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            <span className="font-medium">{d.trait}:</span> {d.note}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {aiInsights.aiSpecific.length > 0 && (
+                    <div>
+                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>AI-Specific Observations</div>
+                      <div className="space-y-1">
+                        {aiInsights.aiSpecific.map((d, i) => (
+                          <div key={i} className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            <span className="font-medium">{d.label}:</span> {d.text}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Locked teasers for tier < 2 */}
+            {currentTier < 2 && (
+              <div className="mt-4 space-y-2">
+                <div className={`text-xs font-medium uppercase tracking-wide px-1 ${TH('text-dim', darkMode)}`}>
+                  Coming soon
+                </div>
+                <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)} opacity-50`}>
+                  {[
+                    { icon: '🎭', name: 'Personality' },
+                    { icon: '🧠', name: 'Mind' },
+                    { icon: '🌑', name: 'Shadow Self' },
+                  ].map((item, idx) => (
+                    <div key={item.name} className={`px-3 py-2.5 flex items-center gap-3 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
+                        <span className="text-sm">{item.icon}</span>
+                      </div>
+                      <span className={`flex-1 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{item.name}</span>
+                      <span className="text-xs">🔒</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+};
+
+// ==================== QUESTION FLOW SCREEN ====================
+const QuestionFlowScreen = ({
+  darkMode, currentQuestion, currentIndex, questions, responses,
+  currentResults, communityResults, setCommunityResults,
+  isAnswered, isBinary, answeredCount, totalQuestions,
+  currentResponse, swipeHandlers, mcColorMode, setMcColorMode,
+  pendingSubmit, undoDelay, handleUndo, goToPrev, goToNext,
+  findNextUnanswered, setCurrentIndex, selectedTrack, setSelectedTrack,
+  showSavedToast, sessionAnsweredIds, questionFlags, answerExplanations,
+  evidenceExpanded, setEvidenceExpanded, justUndone, clearUndoneState,
+  showTips, showGestureHint, setShowGestureHint,
+  showConfirmOverlay, confirmColor, tappedAnswer, setTappedAnswer,
+  tapCount, setTapCount, submitAnswer, handleAnswerTap, handleAnswerRightClick,
+  savedQuestions, saveForLater, skipQuestion,
+  showFullResults, setShowFullResults,
+  showQuestionFlagModal, setShowQuestionFlagModal,
+  showExplanationModal, setShowExplanationModal,
+  showCantAnswerModal, setShowCantAnswerModal,
+  showNoneOptionModal, setShowNoneOptionModal,
+  handleQuestionFlag, handleClearQuestionFlag,
+  handleSaveExplanation, handleClearExplanation,
+  setQuestionFlags, setSkippedQuestions,
+  communityBrowseIndex, setCommunityBrowseIndex,
+  communityDisplayMode, setCommunityDisplayMode,
+  communityExpanded, setCommunityExpanded,
+}) => {
+  if (!currentQuestion) return (
+    <div className={`flex-1 flex items-center justify-center ${TH('text-primary', darkMode)}`}>
+      <div className="text-center p-8"><div className="text-4xl mb-4">🎉</div><div className="text-xl font-medium mb-2">All done!</div></div>
+    </div>
+  );
+
+  const progress = totalQuestions > 0 ? answeredCount / totalQuestions : 0;
+  const hasNext = findNextUnanswered(currentIndex) !== null || currentIndex < questions.length - 1;
+
+  // Generate results for current question if answered but no results yet
+  const currentQuestionResults = currentResults || (isAnswered ? generateFakeResults(currentQuestion) : null);
+  if (isAnswered && !currentResults) {
+    setCommunityResults(prev => ({ ...prev, [currentQuestion.id]: currentQuestionResults }));
+  }
+
+  return (
+    <div
+      className="flex-1 flex flex-col overflow-hidden relative"
+      {...swipeHandlers}
+    >
+      {/* Dev: MC color mode toggle — floating outside app UI */}
+      {!isBinary && (
+        <div className="fixed top-2 right-2 z-[9999]" style={{ pointerEvents: 'auto' }}>
+          <div className="flex rounded-lg overflow-hidden shadow-lg" style={{
+            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+          }}>
+            {['color', 'gray'].map(m => (
+              <button key={m} onClick={() => setMcColorMode(m)}
+                className="px-3 py-1.5 text-xs font-medium transition-colors"
+                style={{
+                  color: mcColorMode === m ? '#fff' : '#6b7280',
+                  background: mcColorMode === m ? 'rgba(255,255,255,0.12)' : 'transparent',
+                }}
+              >{m === 'color' ? 'Colored' : 'Gray'}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Breathing ambient aura — dual-layer, onboarding-style */}
+      {(() => {
+        const catColorMap = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
+        const catSecondary = { prediction: 'rose', reasoning: 'blue', judgment: 'cyan' };
+        const c0 = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
+        const c1 = COLOR_HEX[catSecondary[currentQuestion?.category]] || COLOR_HEX.blue;
+        return (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-5%' }}>
+            <div style={{
+              position: 'absolute', width: 420, height: 420, borderRadius: '50%',
+              background: darkMode
+                ? `radial-gradient(circle, rgba(${c0.rgb},0.14) 0%, rgba(${c0.rgb},0.06) 35%, transparent 65%)`
+                : `radial-gradient(circle, rgba(${c0.rgb},0.10) 0%, rgba(${c0.rgb},0.04) 35%, transparent 65%)`,
+              animation: 'aura-breathe 8s ease-in-out infinite',
+            }} />
+            <div style={{
+              position: 'absolute', width: 350, height: 350, borderRadius: '50%',
+              background: darkMode
+                ? `radial-gradient(circle, rgba(${c1.rgb},0.10) 0%, rgba(${c1.rgb},0.04) 40%, transparent 65%)`
+                : `radial-gradient(circle, rgba(${c1.rgb},0.08) 0%, rgba(${c1.rgb},0.03) 40%, transparent 65%)`,
+              animation: 'aura-breathe 6s ease-in-out infinite 1s',
+            }} />
+          </div>
+        );
+      })()}
+      {/* Saved for later — mid-screen pop-up */}
+      {showSavedToast && (
+        <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+          <div className={`px-6 py-4 rounded-2xl flex flex-col items-center gap-1 ${darkMode ? 'bg-gray-800/90' : 'bg-white/90'} shadow-xl`}
+            style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', animation: 'fadeSlideIn 0.3s ease forwards' }}>
+            <span className="text-3xl">✓</span>
+            <span className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Saved for later</span>
+          </div>
+        </div>
+      )}
+      {/* Undo toast — top-positioned, doesn't move buttons */}
+      {pendingSubmit && (() => {
+        const undoColor = isBinary
+          ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+          : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
+        const answerLabel = isBinary
+          ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
+          : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
+        return (
+          <div className="absolute top-1 left-3 right-3 z-30">
+            <div
+              onClick={handleUndo}
+              className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-lg"
+              style={{
+                background: darkMode
+                  ? `rgba(${undoColor.rgb}, 0.15)`
+                  : `rgba(${undoColor.rgb}, 0.12)`,
+                border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+              }}
+            >
+              {/* Countdown ring */}
+              <div className="flex-shrink-0 w-7 h-7 relative">
+                <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                  <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                  <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                    strokeDasharray="75.4"
+                    strokeDashoffset="0"
+                    style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                  />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Answered: {answerLabel}
+                </div>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleUndo(); }}
+                className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                style={{
+                  background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
+                  color: undoColor.hex,
+                }}
+              >
+                Undo
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+      {/* Circle Track Selector - remaining counts by type */}
+      <div className={`h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10 ${darkMode ? 'bg-gray-900/50' : 'bg-white/90'}`}
+        style={{
+          borderBottom: (() => {
+            const catColorMap = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
+            const qColor = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
+            return darkMode
+              ? `1px solid rgba(${qColor.rgb},0.15)`
+              : `1px solid rgba(${qColor.rgb},0.20)`;
+          })()
+        }}>
+        <button
+          onClick={goToPrev}
+          disabled={currentIndex === 0}
+          className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${
+            currentIndex === 0
+              ? (darkMode ? 'text-gray-700' : 'text-gray-300')
+              : (darkMode ? 'text-gray-300 active:text-white' : 'text-gray-600 active:text-gray-900')
+          }`}
+        >
+          ◀
+        </button>
+        {(() => {
+          const ynCount = questions.filter(q => q.type === 'binary' && !responses[q.id]).length;
+          const mcCount = questions.filter(q => q.type === 'multiple' && !responses[q.id]).length;
+          const allCount = ynCount + mcCount;
+
+          const switchTrack = (newTrack) => {
+            const toggledTrack = selectedTrack === newTrack ? null : newTrack;
+            setSelectedTrack(toggledTrack);
+            if (toggledTrack && currentQuestion?.type !== toggledTrack) {
+              const matchIdx = questions.findIndex(q => q.type === toggledTrack && !responses[q.id]);
+              if (matchIdx >= 0) setCurrentIndex(matchIdx);
+            }
+          };
+
+          return (
+            <div className="flex-1 flex items-center justify-center gap-3">
+              {/* Binary (Y/N) circle - green/red */}
+              <div
+                className={`q-circle q-circle-binary ${selectedTrack === 'binary' ? 'q-circle-current' : 'q-circle-adjacent'}`}
+                onClick={() => switchTrack('binary')}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
+                  {ynCount > 0 ? 'Y/N' : '✓'}
+                </div>
+              </div>
+              {/* MC circle - 5 colors */}
+              <div
+                className={`q-circle q-circle-mc ${selectedTrack === 'multiple' ? 'q-circle-current' : 'q-circle-adjacent'}`}
+                onClick={() => switchTrack('multiple')}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
+                  {mcCount > 0 ? 'ABC' : '✓'}
+                </div>
+              </div>
+              {/* All/Combined circle - white/silver */}
+              <div
+                className={`q-circle q-circle-mixed ${!selectedTrack ? 'q-circle-current' : 'q-circle-adjacent'}`}
+                onClick={() => switchTrack(null)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
+                  {allCount > 0 ? 'Mix' : '✓'}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+        <button
+          onClick={goToNext}
+          disabled={!hasNext}
+          className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${
+            !hasNext
+              ? (darkMode ? 'text-gray-700' : 'text-gray-300')
+              : (darkMode ? 'text-gray-300 active:text-white' : 'text-gray-600 active:text-gray-900')
+          }`}
+        >
+          ▶
+        </button>
+      </div>
+
+      {/* ANSWERED QUESTION VIEW - shows full results (only for questions answered THIS session) */}
+      {isAnswered && !pendingSubmit && sessionAnsweredIds.has(currentQuestion.id) ? (
+        <AnsweredQuestionView
+          question={currentQuestion}
+          response={currentResponse}
+          results={currentQuestionResults}
+          darkMode={darkMode}
+          questionFlag={questionFlags[currentQuestion.id]}
+          explanation={answerExplanations[currentQuestion.id]}
+          onFlagClick={() => setShowQuestionFlagModal(currentQuestion.id)}
+          onExplainClick={() => setShowExplanationModal(currentQuestion.id)}
+        />
+      ) : isAnswered && !pendingSubmit ? (
+        /* Previously answered question - show empty space to maintain layout */
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1" /> {/* Empty space */}
+          <div className={`flex-shrink-0 px-4 py-6 ${darkMode ? 'bg-white/[0.02]' : 'bg-black/[0.02]'}`}>
+            <div className={`text-center text-sm ${TH('text-faint', darkMode)}`}>
+              Already answered · Use arrows to navigate
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* QUESTION AREA - centered in available space, never scrolls */}
+          <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-hidden min-h-0 relative">
+            <QuestionCard
+              question={currentQuestion}
+              darkMode={darkMode}
+              evidenceExpanded={evidenceExpanded}
+              onToggleEvidence={() => setEvidenceExpanded(!evidenceExpanded)}
+            />
+            {/* Onboarding hint for early questions */}
+            {answeredCount < 3 && !isAnswered && (
+              <div className={`text-center mt-3 text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+                {answeredCount === 0 ? "we'll start easy — just tap what feels right" : 'tap more for higher confidence'}
+              </div>
+            )}
+
+            {/* === OVERLAYS — float at bottom of question zone, ABOVE the answer buttons === */}
+            {/* These are absolute so they NEVER push buttons. Prime Directive. */}
+
+            {/* Undone banner */}
+            {justUndone && (
+              <div className="absolute bottom-1 left-0 right-0 z-20 px-0">
+                <div className={`rounded-xl px-4 py-2 flex items-center justify-between ${darkMode ? 'bg-amber-500/15 border border-amber-500/50' : 'bg-amber-100 border border-amber-300'}`}
+                  style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+                  <span className={`text-sm font-bold ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                    Undone — tap to change or resubmit
+                  </span>
+                  <button
+                    onClick={clearUndoneState}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                      darkMode ? 'bg-white/[0.06] text-gray-300 hover:bg-white/[0.10]' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                    }`}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tip banner — auto-hides once user taps an answer */}
+            {showTips && showGestureHint && !isAnswered && !pendingSubmit && !justUndone && tappedAnswer === null && (
+              <div className="absolute bottom-1 left-0 right-0 z-20 px-0">
+                <TipBanner darkMode={darkMode} onDismiss={() => setShowGestureHint(false)} />
+              </div>
+            )}
+
+            {/* Confirm/Cancel — appears when answer tapped, needs confirmation */}
+            {showConfirmOverlay && (
+              <div className="absolute bottom-1 left-0 right-0 z-20 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => { setTappedAnswer(null); setTapCount(0); }}
+                  className={`w-9 h-9 rounded-full btn-feedback flex items-center justify-center text-sm transition-all ${
+                    darkMode ? 'text-gray-400 border border-white/[0.08]' : 'text-gray-500 border border-gray-200'
+                  }`}
+                  style={{ background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}
+                >✕</button>
+                <button
+                  onClick={() => submitAnswer(tappedAnswer, tapCount)}
+                  className="w-11 h-11 rounded-full btn-feedback flex items-center justify-center text-lg transition-all"
+                  style={{
+                    color: darkMode ? '#fff' : confirmColor?.base,
+                    background: darkMode
+                      ? `linear-gradient(135deg, rgba(${confirmColor?.rgb},0.30) 0%, rgba(${confirmColor?.rgb},0.15) 100%)`
+                      : `linear-gradient(135deg, rgba(${confirmColor?.rgb},0.20) 0%, rgba(${confirmColor?.rgb},0.08) 100%)`,
+                    border: `1px solid rgba(${confirmColor?.rgb}, 0.50)`,
+                    boxShadow: `0 0 18px rgba(${confirmColor?.rgb},0.25), 0 0 40px rgba(${confirmColor?.rgb},0.12)`,
+                  }}
+                >✓</button>
+              </div>
+            )}
+          </div>
+
+          {/* FIXED BOTTOM AREA - answer zones */}
+          <div className="flex-shrink-0 border-t relative z-10"
+            style={(() => {
+              const catColorMap = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
+              const qColor = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
+              return darkMode
+                ? { borderColor: `rgba(${qColor.rgb},0.12)`, background: `linear-gradient(180deg, rgba(3,7,18,1) 0%, rgba(${qColor.rgb},0.04) 100%)` }
+                : { borderColor: `rgba(${qColor.rgb},0.15)`, background: `linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(${qColor.rgb},0.04) 100%)` };
+            })()}>
+
+            {/* Answer zone wrapper — FIXED position, nothing above can push these */}
+            <div className="relative">
+              {/* ZONE 1: Answer Buttons */}
+              <div className="relative px-4 pt-3">
+                <div className={pendingSubmit ? 'opacity-60 pointer-events-none' : ''}>
+                  {isBinary ? (
+                    <BinaryButtons
+                      darkMode={darkMode}
+                      tappedAnswer={tappedAnswer}
+                      tapCount={tapCount}
+                      isAnswered={isAnswered}
+                      currentResponse={currentResponse}
+                      onTap={handleAnswerTap}
+                      onRightClick={handleAnswerRightClick}
+                      pendingSubmit={pendingSubmit}
+                      category={currentQuestion?.category}
+                    />
+                  ) : (
+                    <MCButtons
+                      options={currentQuestion.options}
+                      darkMode={darkMode}
+                      tappedAnswer={tappedAnswer}
+                      tapCount={tapCount}
+                      isAnswered={isAnswered}
+                      currentResponse={currentResponse}
+                      onTap={handleAnswerTap}
+                      onRightClick={handleAnswerRightClick}
+                      pendingSubmit={pendingSubmit}
+                      mcColorMode={mcColorMode}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Action buttons row — ghost treatment matching button language */}
+              <div className="relative px-4 mt-3 mb-2 flex items-center justify-center max-w-sm mx-auto">
+                {!isAnswered && !pendingSubmit ? (
+                  <div className="flex gap-2 w-full">
+                    {[
+                      { label: isBinary ? "Can't" : "None", onClick: () => isBinary ? setShowCantAnswerModal(currentQuestion?.id) : setShowNoneOptionModal(true), active: false },
+                      { label: 'Explain', onClick: () => setShowExplanationModal(currentQuestion?.id), active: !!answerExplanations[currentQuestion?.id], activeColor: COLOR_HEX.amber },
+                      { label: 'Skip', onClick: skipQuestion, active: false },
+                      { label: savedQuestions.has(currentQuestion?.id) ? '✓ Saved' : 'Save', onClick: saveForLater, active: savedQuestions.has(currentQuestion?.id), activeColor: COLOR_HEX.violet },
+                    ].map(btn => (
+                      <button
+                        key={btn.label}
+                        onClick={btn.onClick}
+                        className="flex-1 py-2 rounded-xl text-xs font-medium transition-all btn-feedback border"
+                        style={btn.active ? {
+                          borderColor: `rgba(${btn.activeColor.rgb}, ${darkMode ? 0.30 : 0.40})`,
+                          background: darkMode
+                            ? `rgba(${btn.activeColor.rgb}, 0.08)`
+                            : `rgba(${btn.activeColor.rgb}, 0.10)`,
+                          color: darkMode ? btn.activeColor.light : btn.activeColor.base,
+                        } : {
+                          borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.10)',
+                          background: darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)',
+                          color: darkMode ? '#6b7280' : '#6b7280',
+                        }}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* ZONE 3: Community Browse */}
+            <div className="px-4 pb-3 pt-1">
+              {(() => {
+                // Only show community results after user has answered the current question
+                const currentIsAnswered = currentQuestion && responses[currentQuestion.id];
+
+                // Get list of answered questions with results, sorted by answer time (most recent first)
+                const answeredList = questions
+                  .filter(q => responses[q.id] && communityResults[q.id])
+                  .sort((a, b) => (responses[b.id]?.timestamp || 0) - (responses[a.id]?.timestamp || 0));
+                if (answeredList.length === 0 || !currentIsAnswered) {
+                  return (
+                    <div className={`h-full flex items-center justify-center text-sm ${TH('text-faint', darkMode)}`}>
+                      Swipe for next →
+                    </div>
+                  );
+                }
+                const safeIdx = Math.min(communityBrowseIndex, answeredList.length - 1);
+                const browseQ = answeredList[safeIdx];
+                const browseResponse = responses[browseQ.id];
+                const browseResults = communityResults[browseQ.id];
+
+                // Get user's answer display
+                const isBinaryQ = browseQ.type === 'binary';
+                const userAnswer = browseResponse?.answer;
+                const userAnswerText = isBinaryQ
+                  ? (userAnswer === 0 ? 'YES' : 'NO')
+                  : (browseQ.options?.[userAnswer] || '?');
+                const userAnswerColor = isBinaryQ
+                  ? (userAnswer === 0 ? 'text-emerald-400' : 'text-rose-400')
+                  : 'text-violet-400';
+
+                // Hidden mode - just a thin expandable line with + button
+                if (communityDisplayMode === 'hidden') {
+                  return (
+                    <div className="flex items-center justify-center gap-2" onClick={() => { if (pendingSubmit) handleUndo(); }}>
+                      <div className={`flex-1 h-px ${TH('bg-elevated', darkMode)}`} />
+                      <button
+                        onClick={() => { if (pendingSubmit) { handleUndo(); return; } setCommunityDisplayMode('compact'); }}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-lg font-light ${
+                          darkMode ? 'bg-white/[0.06] text-gray-400 hover:bg-white/[0.10]' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                        } transition-colors`}
+                      >+</button>
+                      <div className={`flex-1 h-px ${TH('bg-elevated', darkMode)}`} />
+                    </div>
+                  );
+                }
+
+                // Compact mode with confidence-segmented bars
+                // Use aggregateResults for all aggregation (includeUserInCount=false to show community stats)
+                const { rows: aggRows, total, maxCount, userConf } = aggregateResults(browseResults?.evaluators, browseQ, browseResponse, false);
+
+                return (
+                  <div
+                    className="relative"
+                    onTouchStart={(e) => { e.stopPropagation(); e.currentTarget.dataset.touchX = e.touches[0].clientX; }}
+                    onTouchEnd={(e) => {
+                      e.stopPropagation();
+                      // During pending submit (non-grace), any touch should undo
+                      if (pendingSubmit) {
+                        handleUndo();
+                        return;
+                      }
+                      const startX = parseFloat(e.currentTarget.dataset.touchX);
+                      const endX = e.changedTouches[0].clientX;
+                      const diff = endX - startX;
+                      if (Math.abs(diff) > 50) {
+                        if (diff > 0 && safeIdx > 0) setCommunityBrowseIndex(safeIdx - 1);
+                        else if (diff < 0 && safeIdx < answeredList.length - 1) setCommunityBrowseIndex(safeIdx + 1);
+                      }
+                    }}
+                    onClick={() => {
+                      // During pending submit (non-grace), any click should undo
+                      if (pendingSubmit) {
+                        handleUndo();
+                      }
+                    }}
+                  >
+                    {/* Header with LAST and hide button - clickable to expand */}
+                    <div
+                      className="flex items-center gap-1 mb-1 cursor-pointer"
+                      onClick={() => {
+                        if (pendingSubmit) { handleUndo(); return; }
+                        setCommunityExpanded(true);
+                      }}
+                    >
+                      <span className={`text-base truncate flex-1 font-medium ${TH('text-bright', darkMode)}`}>{browseQ.text}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (pendingSubmit) { handleUndo(); return; } setCommunityDisplayMode('hidden'); }}
+                        className={`w-5 h-5 rounded flex items-center justify-center text-sm shrink-0 ${
+                          darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                      >−</button>
+                    </div>
+
+                    {/* Content - clickable to expand */}
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => {
+                        if (pendingSubmit) { handleUndo(); return; }
+                        setCommunityExpanded(true);
+                      }}
+                    >
+                      {isBinaryQ ? (() => {
+                        // Use pre-aggregated rows, sorted by pct
+                        const rows = [...aggRows].sort((a, b) => b.pct - a.pct);
+                        return (
+                          <div className="space-y-1">
+                            {rows.map(row => (
+                              <div key={row.label} className="flex items-center gap-1">
+                                <div className="w-14 sm:w-12 flex-shrink-0">
+                                  <span className={`text-base sm:text-sm font-semibold px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`} style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>{row.label}</span>
+                                </div>
+                                <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
+                                {renderConfidenceBar(row.byConf, row.colors, maxCount, row.isUser, userConf, 'h-5', darkMode)}
+                              </div>
+                            ))}
+                            <div className={`text-sm text-center pt-1 ${TH('text-subtle', darkMode)}`}>Tap to Expand</div>
+                          </div>
+                        );
+                      })() : (() => {
+                        /* MC: show user's pick + top pick, tap to expand all */
+                        // Use pre-aggregated rows
+                        const sorted = [...aggRows].sort((a, b) => b.count - a.count);
+                        const topRow = sorted[0];
+                        const secondRow = sorted[1];
+                        const userRow = aggRows.find(r => r.isUser);
+                        const otherRow = userRow === topRow ? secondRow : topRow;
+
+                        const renderRow = (row) => {
+                          if (!row) return null;
+                          return (
+                            <div key={row.answer} className="flex items-center gap-1">
+                              <div style={{ width: '40%' }} className="flex-shrink-0">
+                                <span className={`text-base sm:text-sm font-semibold inline-block truncate max-w-full px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`} style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>{row.label}</span>
+                              </div>
+                              <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
+                              {renderConfidenceBar(row.byConf, row.colors, maxCount, row.isUser, userConf, 'h-5', darkMode)}
+                            </div>
+                          );
+                        };
+
+                        const rowsOrdered = (userRow?.pct || 0) >= (otherRow?.pct || 0)
+                          ? [userRow, otherRow]
+                          : [otherRow, userRow];
+
+                        return (
+                          <div className="space-y-1">
+                            {rowsOrdered.filter(Boolean).map(renderRow)}
+                            <div className={`text-sm text-center pt-1 ${TH('text-subtle', darkMode)}`}>Tap to Expand</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div
+                      className={`h-px mt-2 cursor-pointer ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`}
+                      onClick={() => {
+                        if (pendingSubmit) { handleUndo(); return; }
+                        setCommunityExpanded(true);
+                      }}
+                    />
+
+                    {/* Expanded slide-up panel */}
+                    {communityExpanded && (() => {
+                      // Use pre-aggregated rows
+                      const allRows = [...aggRows].sort((a, b) => b.pct - a.pct);
+
+                      return (
+                        <div
+                          className="fixed inset-0 z-50"
+                          onClick={() => setCommunityExpanded(false)}
+                        >
+                          {/* Slide-up panel - click anywhere closes */}
+                          <div
+                            className={`absolute bottom-0 left-0 right-0 rounded-t-2xl backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-t border-x border-white/[0.08]' : 'bg-white/95'} shadow-2xl`}
+                            style={{ animation: 'slideUp 0.2s ease-out' }}
+                          >
+                            {/* Header - full question text in expanded view */}
+                            <div className="px-4 pt-3 pb-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-sm font-black uppercase tracking-wide ${TH('text-sky', darkMode)}`}>LAST:</span>
+                                <span className={`text-sm ${TH('text-subtle', darkMode)}`}>{total.toLocaleString()} responses</span>
+                              </div>
+                              <p className={`text-base font-medium ${TH('text-bright', darkMode)}`}>{browseQ.text}</p>
+                            </div>
+
+                            {/* All rows - same format as compact */}
+                            <div className="px-4 pb-4 pt-2 space-y-1">
+                              {allRows.map((row, i) => (
+                                <div key={i} className="flex items-center gap-1">
+                                  <div className={isBinaryQ ? 'w-14 sm:w-12' : 'w-[40%]'} style={{ flexShrink: 0 }}>
+                                    <span className={`text-base sm:text-sm font-semibold inline-block truncate max-w-full px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`}
+                                      style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>
+                                      {row.label}
+                                    </span>
+                                  </div>
+                                  <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
+                                  {renderConfidenceBar(row.byConf, row.colors, row.maxCount, row.isUser, userConf, 'h-5', darkMode)}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Tap hint */}
+                            <div className={`text-sm text-center pb-4 ${TH('text-faint', darkMode)}`}>
+                              tap anywhere to close
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Full Results Modal */}
+      {showFullResults && (() => {
+        const answeredList = questions
+          .filter(q => responses[q.id] && communityResults[q.id])
+          .sort((a, b) => (responses[b.id]?.timestamp || 0) - (responses[a.id]?.timestamp || 0));
+        const currentIdx = answeredList.findIndex(q => q.id === showFullResults.question.id);
+        const goTo = (idx) => {
+          if (idx >= 0 && idx < answeredList.length) {
+            const q = answeredList[idx];
+            setShowFullResults({ question: q, results: communityResults[q.id], response: responses[q.id] });
+          }
+        };
+        return (
+          <FullResultsPanel
+            question={showFullResults.question}
+            results={showFullResults.results}
+            userResponse={showFullResults.response}
+            darkMode={darkMode}
+            onClose={() => setShowFullResults(null)}
+            onSwipeLeft={() => goTo(currentIdx + 1)}
+            onSwipeRight={() => goTo(currentIdx - 1)}
+            isLast={currentIdx === 0}
+          />
+        );
+      })()}
+
+      {/* Question Flag Modal */}
+      {showQuestionFlagModal && (
+        <QuestionFlagModal
+          darkMode={darkMode}
+          questionId={showQuestionFlagModal}
+          onClose={() => setShowQuestionFlagModal(null)}
+          onFlag={handleQuestionFlag}
+          onClear={handleClearQuestionFlag}
+          existingFlag={questionFlags[showQuestionFlagModal]}
+        />
+      )}
+
+      {/* Explanation Modal */}
+      {showExplanationModal && (
+        <ExplanationModal
+          darkMode={darkMode}
+          questionId={showExplanationModal}
+          onClose={() => setShowExplanationModal(null)}
+          onSave={handleSaveExplanation}
+          onClear={handleClearExplanation}
+          existingExplanation={answerExplanations[showExplanationModal]}
+          isAnswered={!!responses[showExplanationModal]}
+        />
+      )}
+
+      {/* Can't Answer Modal (binary) */}
+      {showCantAnswerModal && (
+        <CantAnswerModal
+          darkMode={darkMode}
+          questionId={showCantAnswerModal}
+          onClose={() => setShowCantAnswerModal(null)}
+          onSkip={(qId, reason) => {
+            setQuestionFlags(prev => ({ ...prev, [qId]: `Can't: ${reason}` }));
+            setSkippedQuestions(prev => new Set([...prev, qId]));
+            goToNext();
+          }}
+        />
+      )}
+
+      {/* None Option Modal (MC) */}
+      {showNoneOptionModal && (
+        <NoneOptionModal
+          darkMode={darkMode}
+          questionId={currentQuestion?.id}
+          onClose={() => setShowNoneOptionModal(false)}
+          onSubmit={(qId, answer) => {
+            setQuestionFlags(prev => ({ ...prev, [qId]: `None fit: ${answer}` }));
+            setSkippedQuestions(prev => new Set([...prev, qId]));
+            goToNext();
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 // Helper to determine initial screen based on login state
 const getInitialScreen = () => {
@@ -10507,742 +11956,19 @@ function App() {
 
     // Assessment Analysis Screen
     if (screen === 'assess-analysis') {
-      const completedCount = Object.keys(assessCompleted).length;
-      const currentTier = calculateAssessTier(assessCompleted);
-      const quickProfileComplete = assessCompleted['quick-profile'];
-
-      // Quick Profile result generator
-      const getQuickProfileSummary = () => {
-        if (!quickProfileComplete) return null;
-        const responses = quickProfileComplete.responses || {};
-        const traits = { E: 0, C: 0, A: 0, N: 0, O: 0 };
-        const traitCounts = { E: 0, C: 0, A: 0, N: 0, O: 0 };
-
-        // Calculate trait scores from responses (scale: 1-5, with polarity)
-        Object.entries(responses).forEach(([idx, value]) => {
-          const item = ASSESS_TESTS['quick-profile'].items[parseInt(idx)];
-          if (item && item.c && traits[item.c] !== undefined) {
-            const score = item.k === '+' ? value : (6 - value); // Reverse for '-' polarity
-            traits[item.c] += score;
-            traitCounts[item.c]++;
-          }
-        });
-
-        // Normalize to percentages
-        const normalized = {};
-        Object.keys(traits).forEach(t => {
-          if (traitCounts[t] > 0) {
-            normalized[t] = Math.round((traits[t] / (traitCounts[t] * 5)) * 100);
-          }
-        });
-
-        // Generate personality snapshot
-        const phrases = [];
-        if (normalized.E >= 60) phrases.push('outgoing and energized by people');
-        else if (normalized.E <= 40) phrases.push('reserved and thoughtful');
-        if (normalized.C >= 60) phrases.push('organized and reliable');
-        else if (normalized.C <= 40) phrases.push('flexible and spontaneous');
-        if (normalized.A >= 60) phrases.push('empathetic');
-        else if (normalized.A <= 40) phrases.push('direct and honest');
-        if (normalized.N >= 60) phrases.push('reflective');
-        if (normalized.O >= 60) phrases.push('curious and open-minded');
-
-        return {
-          traits: normalized,
-          summary: phrases.length > 0
-            ? `You're ${phrases.slice(0, 3).join(', ')}${phrases.length > 3 ? ', and more' : ''}.`
-            : 'Complete more questions for a fuller picture.'
-        };
-      };
-
-      // Helper to get Big Five trait scores from modules
-      const getBigFiveScores = () => {
-        const scores = {};
-        ['E', 'A', 'C', 'N', 'O'].forEach(trait => {
-          const moduleId = `bigfive-${trait}`;
-          if (assessCompleted[moduleId]) {
-            scores[trait] = assessCompleted[moduleId].score;
-          }
-        });
-        return scores;
-      };
-      const bigFive = getBigFiveScores();
-      const hasBigFive = Object.keys(bigFive).length > 0;
-
-      const getInsights = () => {
-        const insights = [];
-        // Big Five + Risk combinations
-        if (hasBigFive && assessCompleted.risk) {
-          if (bigFive.O > 60 && assessCompleted.risk.score > 60) insights.push({ icon: '🚀', text: 'High openness + risk tolerance suggests you thrive exploring new ventures' });
-          if (bigFive.N > 60 && assessCompleted.risk.score < 40) insights.push({ icon: '🛡️', text: 'Your sensitivity combined with caution helps you avoid regrettable decisions' });
-          if (bigFive.E > 60 && assessCompleted.risk.score > 50) insights.push({ icon: '🌟', text: 'Outgoing nature + willingness to take risks = natural leadership qualities' });
-          if (bigFive.C > 70 && assessCompleted.risk.score < 40) insights.push({ icon: '📊', text: 'High conscientiousness + low risk tolerance = methodical planner who values stability' });
-          if (bigFive.A > 60 && assessCompleted.risk.score < 50) insights.push({ icon: '🤝', text: 'Your agreeable nature combined with measured risk-taking makes you a reliable collaborator' });
-        }
-        // Attachment combinations
-        if (assessCompleted.attachment && hasBigFive) {
-          if (assessCompleted.attachment.style === 'Anxious' && bigFive.N > 50) insights.push({ icon: '💭', text: 'Your emotional sensitivity may intensify relationship concerns' });
-          if (assessCompleted.attachment.style === 'Avoidant' && bigFive.E < 40) insights.push({ icon: '🏠', text: 'You recharge alone and maintain independence in relationships' });
-          if (assessCompleted.attachment.style === 'Secure' && bigFive.A > 50) insights.push({ icon: '💚', text: 'Secure attachment + agreeableness = strong relationship foundation' });
-          if (assessCompleted.attachment.style === 'Anxious' && bigFive.E > 60) insights.push({ icon: '🎭', text: 'Social energy + anxious attachment may mean you seek reassurance through connection' });
-          if (assessCompleted.attachment.style === 'Avoidant' && bigFive.C > 60) insights.push({ icon: '🎯', text: 'Independence + conscientiousness suggests you channel energy into personal achievement' });
-        }
-        // ADHD combinations
-        if (assessCompleted.adhd && hasBigFive) {
-          if (assessCompleted.adhd.indicators >= 3 && bigFive.C < 40) insights.push({ icon: '⚡', text: 'ADHD traits align with your flexible, spontaneous approach' });
-          if (assessCompleted.adhd.indicators >= 3 && bigFive.O > 60) insights.push({ icon: '💡', text: 'High openness + ADHD traits may fuel creative bursts' });
-          if (assessCompleted.adhd.indicators >= 3 && bigFive.E > 60) insights.push({ icon: '🎪', text: 'ADHD + extraversion often creates an energetic, entertaining presence' });
-          if (assessCompleted.adhd.indicators < 2 && bigFive.C > 70) insights.push({ icon: '📋', text: 'Low ADHD indicators + high conscientiousness = natural ability to stay focused and organized' });
-        }
-        // Cognitive/ND combinations
-        if (assessCompleted.cognitive && hasBigFive) {
-          if (assessCompleted.cognitive.score > 60 && bigFive.C > 60) insights.push({ icon: '🧩', text: 'ND traits + conscientiousness = detail-oriented systematic thinker' });
-          if (assessCompleted.cognitive.score > 60 && bigFive.O > 60) insights.push({ icon: '🔮', text: 'ND traits + openness can create unique, unconventional perspectives' });
-          if (assessCompleted.cognitive.score > 50 && bigFive.A < 40) insights.push({ icon: '🔬', text: 'ND traits + low agreeableness may mean you prioritize truth over social harmony' });
-        }
-        // Cross-assessment combinations
-        if (assessCompleted.adhd && assessCompleted.attachment) {
-          if (assessCompleted.adhd.indicators >= 3 && assessCompleted.attachment.style === 'Anxious') insights.push({ icon: '🌪️', text: 'ADHD + anxious attachment can intensify emotional experiences in relationships' });
-        }
-        if (assessCompleted.cognitive && assessCompleted.risk) {
-          if (assessCompleted.cognitive.score > 60 && assessCompleted.risk.score > 60) insights.push({ icon: '🎲', text: 'ND traits + high risk tolerance may lead to unconventional life choices' });
-        }
-        // Big Five internal patterns
-        if (hasBigFive) {
-          if (bigFive.E > 60 && bigFive.A > 60) insights.push({ icon: '☀️', text: 'High extraversion + agreeableness = warm, approachable social presence' });
-          if (bigFive.N > 60 && bigFive.O > 60) insights.push({ icon: '🎨', text: 'Emotional depth + openness often fuels artistic or creative expression' });
-          if (bigFive.C > 70 && bigFive.N < 40) insights.push({ icon: '⚓', text: 'High conscientiousness + emotional stability = calm under pressure' });
-          if (bigFive.E < 40 && bigFive.O > 60) insights.push({ icon: '📚', text: 'Introversion + openness suggests rich inner life and deep interests' });
-        }
-        // Integrity combinations
-        if (assessCompleted.integrity) {
-          const integ = assessCompleted.integrity.score;
-          if (integ > 70 && assessCompleted.risk?.score > 60) insights.push({ icon: '⚔️', text: 'The Bold Truth-Teller: High integrity + risk tolerance = you speak unpopular truths without fear' });
-          if (integ > 70 && hasBigFive && bigFive.A > 60) insights.push({ icon: '🕊️', text: 'High integrity + agreeableness = you build trust through authentic kindness' });
-          if (integ < 40 && hasBigFive && bigFive.E > 60) insights.push({ icon: '🎭', text: 'Social charisma + flexible ethics may help you navigate complex social situations' });
-        }
-        // Shadow Self combinations
-        const shadowM = assessCompleted['shadow-M']?.score;
-        const shadowN = assessCompleted['shadow-N']?.score;
-        const shadowP = assessCompleted['shadow-P']?.score;
-        if (shadowM !== undefined) {
-          if (shadowM > 70 && assessCompleted.attachment?.style === 'Secure') insights.push({ icon: '🛡️', text: 'The Protective Strategist: Strategic mind + secure attachment = you use tactics to protect your inner circle' });
-          if (shadowM > 70 && hasBigFive && bigFive.C > 60) insights.push({ icon: '♟️', text: 'Strategic thinking + conscientiousness = patient, long-term planner' });
-        }
-        if (shadowN !== undefined) {
-          if (shadowN > 70 && hasBigFive && bigFive.E > 60) insights.push({ icon: '👑', text: 'High self-regard + extraversion = natural performer who commands attention' });
-          if (shadowN > 70 && assessCompleted.risk?.score > 60) insights.push({ icon: '🚀', text: 'Confidence + risk tolerance = bold moves driven by self-belief' });
-        }
-        if (shadowP !== undefined) {
-          if (shadowP > 60 && hasBigFive && bigFive.N < 40) insights.push({ icon: '🧊', text: 'Emotional detachment + stability = calm decision-maker in crisis situations' });
-          if (shadowP > 60 && assessCompleted.cognitive?.score > 60) insights.push({ icon: '🔬', text: 'Cold Focus + ND traits = analytical mind unswayed by emotional noise' });
-        }
-        // Fuller Picture archetypes
-        if (assessCompleted.cognitive?.score > 60 && assessCompleted.adhd?.indicators >= 3) {
-          insights.push({ icon: '⚡', text: 'The Rapid Prototyper: High-bandwidth mind that solves complex problems in creative bursts' });
-        }
-        if (assessCompleted.integrity?.score > 70 && shadowM > 60) {
-          insights.push({ icon: '🎯', text: 'The Principled Strategist: Strong ethics guide your tactical decisions' });
-        }
-
-        // Extended triangulation patterns
-        // Three-way combinations
-        if (assessCompleted.adhd?.indicators >= 3 && hasBigFive && bigFive.O > 60 && assessCompleted.cognitive?.score > 50) {
-          insights.push({ icon: '🌀', text: 'The Creative Maverick: Your divergent thinking, curiosity, and high-bandwidth processing create unconventional solutions others miss' });
-        }
-        if (hasBigFive && bigFive.E < 40 && bigFive.C > 70 && assessCompleted.integrity?.score > 70) {
-          insights.push({ icon: '🦉', text: 'The Quiet Guardian: Reserved demeanor masks deep reliability and unwavering principles' });
-        }
-        if (shadowN > 60 && assessCompleted.attachment?.style === 'Anxious' && hasBigFive && bigFive.E > 60) {
-          insights.push({ icon: '🎪', text: 'The Performer: You crave both spotlight and reassurance—success validates, but approval sustains' });
-        }
-        if (hasBigFive && bigFive.A > 70 && bigFive.N < 40 && assessCompleted.attachment?.style === 'Secure') {
-          insights.push({ icon: '🌊', text: 'The Steady Anchor: Calm, caring presence that others naturally lean on in turbulent times' });
-        }
-        if (shadowM > 60 && shadowP > 50 && hasBigFive && bigFive.C > 60) {
-          insights.push({ icon: '🎭', text: 'The Calculated Player: Strategic detachment + discipline = you execute complex plans without emotional interference' });
-        }
-        if (assessCompleted.risk?.score > 70 && assessCompleted.adhd?.indicators >= 3 && hasBigFive && bigFive.N < 40) {
-          insights.push({ icon: '🏄', text: 'The Thrill Architect: High risk tolerance + impulsivity + emotional stability = you thrive in chaos others avoid' });
-        }
-        if (assessCompleted.integrity?.score > 70 && assessCompleted.attachment?.style === 'Secure' && hasBigFive && bigFive.A > 60) {
-          insights.push({ icon: '🏛️', text: 'The Trust Builder: Authentic, secure, and kind—you create psychological safety for those around you' });
-        }
-
-        // More two-way deep combinations
-        if (hasBigFive && bigFive.N > 70 && bigFive.O > 70) {
-          insights.push({ icon: '🌙', text: 'The Sensitive Visionary: Emotional intensity fuels rich imagination—depth is your superpower and burden' });
-        }
-        if (hasBigFive && bigFive.C < 30 && bigFive.O > 70) {
-          insights.push({ icon: '🦋', text: 'The Free Spirit: Structure feels suffocating; you bloom in open-ended creative exploration' });
-        }
-        if (assessCompleted.attachment?.style === 'Avoidant' && shadowP > 50) {
-          insights.push({ icon: '🏔️', text: 'The Lone Wolf: Independence isn\'t preference—it\'s how you process the world most effectively' });
-        }
-        if (assessCompleted.cognitive?.score > 70 && hasBigFive && bigFive.A < 40) {
-          insights.push({ icon: '⚖️', text: 'The Truth Seeker: ND traits + directness = you prioritize accuracy over social comfort' });
-        }
-        if (shadowN < 30 && hasBigFive && bigFive.A > 70) {
-          insights.push({ icon: '🕊️', text: 'The Humble Helper: Low ego + high agreeableness = you genuinely elevate others without seeking credit' });
-        }
-        if (assessCompleted.risk?.score < 30 && hasBigFive && bigFive.N > 60) {
-          insights.push({ icon: '🐢', text: 'The Careful Navigator: Your caution isn\'t timidity—it\'s wisdom born from emotional awareness' });
-        }
-        if (assessCompleted.integrity?.score < 40 && assessCompleted.risk?.score > 70) {
-          insights.push({ icon: '🃏', text: 'The Wild Card: Flexible ethics + high risk tolerance = you play by your own rules' });
-        }
-        if (hasBigFive && bigFive.E > 70 && bigFive.N > 60 && assessCompleted.attachment?.style === 'Anxious') {
-          insights.push({ icon: '🎠', text: 'The Social Chameleon: You energize rooms but secretly wonder if they\'d notice if you left' });
-        }
-
-        // Chronotype combinations
-        if (assessCompleted.chronotype) {
-          const chrono = assessCompleted.chronotype;
-          if (chrono.type === 'Morning Lark' && hasBigFive && bigFive.C > 60) {
-            insights.push({ icon: '🌅', text: 'The Early Achiever: Morning energy + conscientiousness = you conquer your day before others wake' });
-          }
-          if (chrono.type === 'Night Owl' && hasBigFive && bigFive.O > 60) {
-            insights.push({ icon: '🌙', text: 'The Midnight Muse: Night energy + openness = creative breakthroughs in the quiet hours' });
-          }
-          if (chrono.type === 'Night Owl' && assessCompleted.adhd?.indicators >= 3) {
-            insights.push({ icon: '🦇', text: 'The Night Rider: ADHD + night owl = your brain comes alive when the world goes quiet' });
-          }
-          if (chrono.type === 'Morning Lark' && assessCompleted.integrity?.score > 70) {
-            insights.push({ icon: '🐓', text: 'The Disciplined Dawn: Early riser + high integrity = you do the right thing before anyone\'s watching' });
-          }
-        }
-
-        return insights;
-      };
-      const insights = getInsights();
-
-      // Collapsible Analysis Card component
-      const AnalysisCard = ({ id, icon, title, subtitle, color, isComplete, progress = 0, children, compactContent }) => {
-        const isExpanded = analysisExpanded[id];
-        // Derived from ASSESS_COLORS
-        const colorStyles = Object.fromEntries(ASSESS_COLORS.map(c => {
-          const t = twColor(c);
-          return [c, {
-            bg: darkMode ? `bg-${t}-900/20 border-${t}-500/30` : `bg-${t}-50 border-${t}-200`,
-            text: `text-${t}-400`,
-            bar: `bg-${t}-500`
-          }];
-        }));
-        const cs = colorStyles[color] || colorStyles.violet;
-        return (
-          <div className={`rounded-xl border overflow-hidden ${cs.bg}`}>
-            <button onClick={() => setAnalysisExpanded(prev => ({ ...prev, [id]: !prev[id] }))}
-              className={`w-full p-4 flex items-center gap-3 text-left hover-glow hover-glow-${color}`}>
-              <ProgressCircle
-                progress={isComplete ? 100 : progress}
-                size={48}
-                strokeWidth={3}
-                color={color}
-                icon={isComplete ? '✓' : icon}
-                gradientId={`analysis-${id}`}
-                darkMode={darkMode}
-                iconSize="text-lg"
-              />
-              <div className="flex-1 min-w-0">
-                <div className={`font-semibold ${TH('text-primary', darkMode)}`}>{title}</div>
-                <div className={`text-xs ${TH('text-subtle', darkMode)}`}>{subtitle}</div>
-              </div>
-              {isComplete && !isExpanded && compactContent}
-              <span className={`text-sm transition-transform ${isExpanded ? 'rotate-180' : ''} ${TH('text-dim', darkMode)}`}>▼</span>
-            </button>
-            {isExpanded && (
-              <div className={`px-4 pb-4 border-t ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-                <div className="pt-4">{children}</div>
-              </div>
-            )}
-          </div>
-        );
-      };
-
-      // Trait descriptions for expanded view
-      const traitDescriptions = {
-        E: { name: 'Extraversion', low: 'Reserved', high: 'Outgoing', desc: s => s > 60 ? 'You energize in social settings and enjoy being around people.' : s < 40 ? 'You recharge through solitude and prefer deeper one-on-one connections.' : 'You balance social and solo time comfortably.' },
-        A: { name: 'Agreeableness', low: 'Analytical', high: 'Empathetic', desc: s => s > 60 ? 'You prioritize harmony and naturally consider others\' feelings.' : s < 40 ? 'You value directness and truth over diplomatic softening.' : 'You balance compassion with objectivity.' },
-        C: { name: 'Conscientiousness', low: 'Flexible', high: 'Organized', desc: s => s > 60 ? 'You thrive with structure, planning, and follow-through.' : s < 40 ? 'You prefer spontaneity and adapt quickly to change.' : 'You balance planning with adaptability.' },
-        N: { name: 'Neuroticism', low: 'Calm', high: 'Sensitive', desc: s => s > 60 ? 'You experience emotions intensely and are highly attuned to your inner world.' : s < 40 ? 'You stay steady under pressure and recover quickly from setbacks.' : 'You have moderate emotional reactivity.' },
-        O: { name: 'Openness', low: 'Practical', high: 'Curious', desc: s => s > 60 ? 'You seek novelty, abstract ideas, and creative exploration.' : s < 40 ? 'You prefer proven, concrete approaches and practical solutions.' : 'You balance tradition with exploration.' },
-      };
-      const shadowDescriptions = {
-        M: { name: 'Strategic Mind', desc: s => s > 60 ? 'High tactical awareness—you naturally read situations and plan accordingly.' : s < 40 ? 'Straightforward approach—you prefer transparency over strategy.' : 'Situational tactician—you flex between direct and strategic.' },
-        N: { name: 'Self-Image', desc: s => s > 60 ? 'Strong self-regard—you\'re confident in your abilities and value recognition.' : s < 40 ? 'Humble presence—you prefer to elevate others over yourself.' : 'Healthy self-regard—balanced confidence without ego.' },
-        P: { name: 'Cold Focus', desc: s => s > 60 ? 'Cool under pressure—you make decisions based on logic, not feelings.' : s < 40 ? 'Deeply empathetic—you feel others\' emotions strongly.' : 'Emotionally balanced—you blend logic with emotional awareness.' },
-      };
-
       return (
-        <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`}>
-          <div className={`h-[44px] flex-shrink-0 flex items-center px-4 border-b ${TH('border-base', darkMode)}`}>
-            <button onClick={() => setScreen('assess-picker')} className={`text-lg ${TH('text-dim', darkMode)}`}>←</button>
-            <span className={`flex-1 text-center font-medium ${TH('text-primary', darkMode)}`}>Analysis</span>
-            <div className="w-6" />
-          </div>
-          <div className="flex-1 overflow-auto p-4 pb-8 hide-scrollbar">
-
-            {/* Aura Visualization - Force-directed constellation */}
-            <div className="mb-3 rounded-xl overflow-hidden">
-              <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
-                entityType={entityType} darkMode={darkMode} size={360} />
-            </div>
-
-            {/* Archetype Header - Shows primary archetype if matched */}
-            {(() => {
-              const archetype = calculateArchetype(assessCompleted);
-              if (!archetype?.primary) return null;
-              const { name, tagline, color } = archetype.primary;
-              const colorClass = twColor(color);
-              return (
-                <div className={`mb-4 p-4 rounded-xl text-center ${darkMode ? `bg-${colorClass}-950/30 border border-${colorClass}-800/30` : `bg-${colorClass}-50 border border-${colorClass}-200`}`}>
-                  <div className={`text-lg font-bold ${darkMode ? `text-${colorClass}-300` : `text-${colorClass}-700`}`}>{name}</div>
-                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{tagline}</p>
-                  {archetype.secondary?.length > 0 && (
-                    <div className={`mt-2 text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      Also: {archetype.secondary.map(a => a.name).join(', ')}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Trait Hints - Progressive reveal of personality insights */}
-            {(() => {
-              const hints = [];
-              // Generate hints from Quick Profile or Big Five results
-              const qp = quickProfileComplete;
-              const summary = qp ? getQuickProfileSummary() : null;
-              const traits = summary?.traits || {};
-
-              // Add hints based on strongest traits
-              if (traits.O > 60) hints.push({ color: 'violet', text: 'Strong curiosity', subtitle: 'You seek out new ideas and experiences' });
-              if (traits.A > 60) hints.push({ color: 'emerald', text: 'Natural warmth', subtitle: 'Others feel at ease around you' });
-              if (traits.N < 40) hints.push({ color: 'pink', text: 'Steady under pressure', subtitle: 'You stay calm when things get intense' });
-              if (traits.E < 40 && traits.O > 50) hints.push({ color: 'cyan', text: 'Rich inner world', subtitle: 'Deep thought over broad socializing' });
-              if (traits.E > 60) hints.push({ color: 'amber', text: 'Social energy', subtitle: 'You energize in group settings' });
-              if (traits.C > 60) hints.push({ color: 'teal', text: 'Natural organizer', subtitle: 'You thrive with structure and follow-through' });
-
-              // Add hints from Big Five if available
-              if (bigFive.O > 60 && !traits.O) hints.push({ color: 'violet', text: 'Strong curiosity', subtitle: 'Open to new ideas and experiences' });
-              if (bigFive.A > 60 && !traits.A) hints.push({ color: 'emerald', text: 'Natural warmth', subtitle: 'Empathetic and considerate' });
-              if (bigFive.N < 40 && traits.N === undefined) hints.push({ color: 'pink', text: 'Emotionally stable', subtitle: 'Composed under pressure' });
-              if (bigFive.E > 60 && !traits.E) hints.push({ color: 'amber', text: 'Outgoing nature', subtitle: 'Energized by social interaction' });
-              if (bigFive.C > 60 && !traits.C) hints.push({ color: 'teal', text: 'Disciplined approach', subtitle: 'Organized and reliable' });
-
-              // Add hints from other assessments
-              if (assessCompleted.attachment?.style === 'Secure') hints.push({ color: 'emerald', text: 'Secure attachment', subtitle: 'Comfortable with intimacy and independence' });
-              if (assessCompleted.chronotype?.type === 'Night Owl') hints.push({ color: 'indigo', text: 'Night owl', subtitle: 'Your best hours are after dark' });
-              if (assessCompleted.chronotype?.type === 'Morning Lark') hints.push({ color: 'amber', text: 'Early riser', subtitle: 'You conquer mornings' });
-
-              if (hints.length === 0) return null;
-
-              return (
-                <div className="mb-4 space-y-2">
-                  {hints.slice(0, 4).map((h, i) => (
-                    <HintCard key={i} color={h.color} text={h.text} subtitle={h.subtitle} darkMode={darkMode} />
-                  ))}
-                </div>
-              );
-            })()}
-
-            {/* Quick Profile - Compact summary, tap to expand */}
-            {quickProfileComplete && (() => {
-              const summary = getQuickProfileSummary();
-              const isExpanded = analysisExpanded['quick-profile'];
-              return (
-                <button
-                  onClick={() => setAnalysisExpanded(prev => ({ ...prev, 'quick-profile': !prev['quick-profile'] }))}
-                  className={`mb-4 p-3 rounded-xl w-full text-left ${darkMode ? 'bg-gradient-to-br from-blue-950/50 to-indigo-950/50 border border-blue-800/30' : 'bg-blue-50 border border-blue-200'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <ProgressCircle progress={100} size={40} strokeWidth={3} color="blue" icon="✨" gradientId="analysis-qp" darkMode={darkMode} iconSize="text-base" />
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-sm font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
-                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'} ${isExpanded ? '' : 'truncate'}`}>{summary?.summary}</p>
-                    </div>
-                    <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{isExpanded ? '∧' : '∨'}</span>
-                  </div>
-                </button>
-              );
-            })()}
-
-            {/* Completed Assessments - Collapsible category groups */}
-            {currentTier >= 1 && (() => {
-              // Spectrum descriptors instead of raw percentages
-              const getResultLabel = (id, result) => {
-                // Non-percentage results - keep as-is
-                if (result.style) return result.style;
-                if (result.type) return result.type;
-                if (result.indicators !== undefined) return result.indicators >= 4 ? 'High' : result.indicators >= 2 ? 'Moderate' : 'Low';
-                if (result.level) return result.level;
-
-                // Percentage-based continuums - use descriptive labels
-                const s = result.score;
-                if (s === undefined) return '✓';
-
-                // Trait-specific descriptors for Big Five
-                const traitDescriptors = {
-                  'bigfive-E': s > 65 ? 'Outgoing' : s < 35 ? 'Reserved' : 'Balanced',
-                  'bigfive-A': s > 65 ? 'Empathetic' : s < 35 ? 'Direct' : 'Balanced',
-                  'bigfive-C': s > 65 ? 'Organized' : s < 35 ? 'Flexible' : 'Balanced',
-                  'bigfive-N': s > 65 ? 'Sensitive' : s < 35 ? 'Steady' : 'Balanced',
-                  'bigfive-O': s > 65 ? 'Curious' : s < 35 ? 'Practical' : 'Balanced',
-                  'shadow-M': s > 65 ? 'Strategic' : s < 35 ? 'Straightforward' : 'Situational',
-                  'shadow-N': s > 65 ? 'Confident' : s < 35 ? 'Humble' : 'Grounded',
-                  'shadow-P': s > 65 ? 'Detached' : s < 35 ? 'Empathic' : 'Balanced',
-                  'integrity': s > 65 ? 'Strong' : s < 35 ? 'Flexible' : 'Moderate',
-                  'risk': s > 65 ? 'Bold' : s < 35 ? 'Cautious' : 'Balanced',
-                  'cognitive': s > 65 ? 'High ND' : s < 35 ? 'Low ND' : 'Some traits',
-                };
-                if (traitDescriptors[id]) return traitDescriptors[id];
-
-                // Reasoning tests - performance based
-                if (id.startsWith('reasoning')) return s >= 80 ? 'Strong' : s >= 50 ? 'Solid' : 'Growing';
-
-                // Default for starter pack etc - just show checkmark, tap for details
-                return '✓';
-              };
-
-              // Horseshoe gauge - U shape with gap at bottom, glowing dot indicator
-              const SemiGauge = ({ value, testId, size = 32 }) => {
-                const spec = spectrumColors[testId] || { left: '#6b7280', right: '#8b5cf6' };
-                const gradId = `horse-${testId}-${size}-${Math.random().toString(36).substr(2,5)}`;
-                const strokeWidth = Math.max(3, size / 10);
-                const r = (size / 2) - (strokeWidth / 2) - 2;
-                const cx = size / 2;
-                const cy = size / 2;
-
-                // U-shape: gap at bottom, arc spans ~280° (leaving ~80° gap)
-                // Left arm starts at about 140°, right arm ends at about 40°
-                // In SVG: 0°=right, 90°=down, 180°=left, 270°=up
-                const gapAngle = 80; // degrees of gap at bottom
-                const leftStart = 90 + (gapAngle / 2);  // 130° - left arm bottom
-                const rightEnd = 90 - (gapAngle / 2);   // 50° - right arm bottom
-
-                const toXY = (deg) => ({
-                  x: cx + r * Math.cos(deg * Math.PI / 180),
-                  y: cy + r * Math.sin(deg * Math.PI / 180)
-                });
-
-                const pStart = toXY(leftStart);
-                const pEnd = toXY(rightEnd);
-
-                // Value maps from left (0%) to right (100%)
-                // Going from leftStart (130°) counter-clockwise through top to rightEnd (50°)
-                // That's 130° -> 180° -> 270° -> 360° -> 50° = 280° total arc
-                // For CCW: subtract from start angle, but handle wrap
-                const arcSpan = 360 - gapAngle; // 280°
-                // 0% = leftStart (130°), 100% = rightEnd (50°, or 130° - 280° = -150° = 210°... wait)
-                // Let's go simpler: 0% is at 130°, 100% is at 50° (going the short way CCW would be wrong)
-                // Going CCW from 130°: 130 -> 90 -> 50 is only 80° (the gap!)
-                // Going CW from 130°: 130 -> 180 -> 270 -> 360 -> 50 is 280° (the arc!)
-                // So we go CLOCKWISE from leftStart to rightEnd
-                // value 0% = 130° (left), value 100% = 130° + 280° = 410° = 50° (right)
-                const dotDeg = leftStart + (value / 100) * arcSpan;
-                const dotAngle = dotDeg > 360 ? dotDeg - 360 : dotDeg;
-                const dot = toXY(dotAngle);
-                const dotSize = Math.max(5, strokeWidth * 1.5);
-
-                // Color interpolation
-                const t = value / 100;
-                const dotColor = t > 0.5 ? spec.right : spec.left;
-
-                return (
-                  <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
-                    <defs>
-                      <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor={spec.left} />
-                        <stop offset="100%" stopColor={spec.right} />
-                      </linearGradient>
-                    </defs>
-                    {/* Arc: from left arm to right arm, going UP and over (clockwise in SVG) */}
-                    {/* large-arc-flag=1 (take the long way), sweep-flag=1 (clockwise) */}
-                    <path
-                      d={`M ${pStart.x} ${pStart.y} A ${r} ${r} 0 1 1 ${pEnd.x} ${pEnd.y}`}
-                      fill="none"
-                      stroke={`url(#${gradId})`}
-                      strokeWidth={strokeWidth}
-                      strokeLinecap="round"
-                    />
-                    {/* Glowing dot on the arc */}
-                    <circle cx={dot.x} cy={dot.y} r={dotSize} fill={dotColor} opacity="0.4" />
-                    <circle cx={dot.x} cy={dot.y} r={dotSize / 2 + 0.5} fill={dotColor} stroke="white" strokeWidth="1.5" strokeOpacity="0.9" />
-                  </svg>
-                );
-              };
-
-              // Define category groups
-              const categoryGroups = [
-                { id: 'starter', name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], minTier: 1 },
-                { id: 'personality', name: 'Personality', icon: '🎭', color: 'rose', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], minTier: 2 },
-                { id: 'shadow', name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'], minTier: 2 },
-                { id: 'mind', name: 'Mind', icon: '🧠', color: 'blue', tests: ['adhd', 'cognitive', 'chronotype', 'reasoning', 'reasoning-2', 'reasoning-3'], minTier: 2 },
-                { id: 'relationships', name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'], minTier: 2 },
-                { id: 'character', name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'], minTier: 2 },
-                { id: 'behavior', name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], minTier: 2 },
-              ];
-
-              // Filter to groups with at least one completed test
-              const groupsWithData = categoryGroups
-                .filter(g => currentTier >= g.minTier)
-                .map(g => {
-                  const completedTests = g.tests.filter(id => assessCompleted[id] && ASSESS_TESTS[id]);
-                  const avgScore = completedTests.length > 0
-                    ? Math.round(completedTests.reduce((sum, id) => sum + (assessCompleted[id]?.score || 0), 0) / completedTests.length)
-                    : 0;
-                  return { ...g, completedTests, avgScore };
-                })
-                .filter(g => g.completedTests.length > 0);
-
-              const CollapsibleGroup = ({ group }) => {
-                const isExpanded = analysisExpanded[group.id];
-                const colors = getAssessColor(group.color, darkMode);
-                const summary = group.completedTests.length === group.tests.length
-                  ? 'Complete'
-                  : `${group.completedTests.length}/${group.tests.length}`;
-
-                // Check if this group has spectrum-based scores (continuums)
-                const hasSpectrumScores = group.completedTests.some(id => spectrumColors[id] && assessCompleted[id]?.score !== undefined);
-
-                return (
-                  <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)}`}>
-                    <button
-                      onClick={() => setAnalysisExpanded(prev => ({ ...prev, [group.id]: !prev[group.id] }))}
-                      className={`w-full px-3 py-2.5 flex items-center gap-3`}
-                    >
-                      <ProgressCircle
-                        progress={(group.completedTests.length / group.tests.length) * 100}
-                        size={36} strokeWidth={3} color={group.color} icon={group.icon}
-                        gradientId={`analysis-grp-${group.id}`} darkMode={darkMode} iconSize="text-sm"
-                      />
-                      <span className={`flex-1 text-left text-sm font-medium ${TH('text-primary', darkMode)}`}>{group.name}</span>
-                      {/* Trait dots in collapsed header — one per scored trait */}
-                      {!isExpanded && hasSpectrumScores && (
-                        <div className="flex items-center gap-1.5 mr-1">
-                          {group.completedTests.slice(0, 6).map(id => {
-                            const result = assessCompleted[id];
-                            const spec = spectrumColors[id];
-                            if (!spec || result?.score === undefined) return null;
-                            const t = result.score / 100;
-                            const dotColor = t > 0.5 ? spec.right : spec.left;
-                            return (
-                              <div key={id} className="rounded-full" style={{
-                                width: 8, height: 8, background: dotColor,
-                                boxShadow: darkMode ? `0 0 6px ${dotColor}60` : 'none',
-                              }} />
-                            );
-                          })}
-                        </div>
-                      )}
-                      {!hasSpectrumScores && <span className={`text-xs ${colors.text} mr-1`}>{summary}</span>}
-                      <span className={`text-xs transition-transform ${isExpanded ? 'rotate-180' : ''} ${TH('text-dim', darkMode)}`}>▼</span>
-                    </button>
-                    {isExpanded && (
-                      <div className={`border-t ${darkMode ? 'border-gray-800/50' : 'border-gray-200'} p-3 space-y-4`}>
-                        {group.completedTests.map((id) => {
-                          const test = ASSESS_TESTS[id];
-                          const result = assessCompleted[id];
-                          const testColors = getAssessColor(test.color, darkMode);
-                          const hasSpectrum = spectrumColors[id] && result?.score !== undefined;
-                          const spec = spectrumColors[id] || { left: '#6b7280', right: '#8b5cf6', leftLabel: '', rightLabel: '' };
-                          const colorClass = group.color === 'slate' ? 'slate' : group.color === 'violet' ? 'violet' : group.color;
-
-                          if (hasSpectrum) {
-                            // Full gradient + white dot style — spectrum position, not a grade
-                            const leanLabel = result.score >= 50 ? spec.rightLabel : spec.leftLabel;
-                            return (
-                              <button key={id} onClick={() => { setAssessCurrentTestId(id); setScreen('assess-results'); }}
-                                className="w-full text-left space-y-1">
-                                <div className="flex justify-between items-baseline">
-                                  <span className={`text-sm font-medium ${darkMode ? `text-${colorClass}-400` : `text-${colorClass}-600`}`}>{test.name}</span>
-                                  <span className={`text-xs ${TH('text-dim', darkMode)}`}>{leanLabel}</span>
-                                </div>
-                                <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
-                                  <div
-                                    className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
-                                    style={{
-                                      left: `${Math.max(5, Math.min(95, result.score))}%`,
-                                      marginLeft: -8,
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
-                                    }}
-                                  />
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.leftLabel}</span>
-                                  <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{spec.rightLabel}</span>
-                                </div>
-                              </button>
-                            );
-                          }
-
-                          // Non-spectrum tests: simple row
-                          return (
-                            <button key={id} onClick={() => { setAssessCurrentTestId(id); setScreen('assess-results'); }}
-                              className="w-full flex items-center gap-2">
-                              <span className="text-sm">{test.icon}</span>
-                              <span className={`flex-1 text-left text-xs ${TH('text-secondary', darkMode)}`}>{test.name}</span>
-                              <span className={`text-xs font-medium ${testColors.text}`}>{getResultLabel(id, result)}</span>
-                            </button>
-                          );
-                        })}
-                        {group.tests.length > group.completedTests.length && (
-                          <div className={`text-xs text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                            {group.tests.length - group.completedTests.length} more to complete {group.name}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              };
-
-              return groupsWithData.length > 0 ? (
-                <div className="space-y-2">
-                  {groupsWithData.map(group => (
-                    <CollapsibleGroup key={group.id} group={group} />
-                  ))}
-                </div>
-              ) : null;
-            })()}
-
-            {/* CTA for incomplete users */}
-            {currentTier < 2 && (
-              <button onClick={() => setScreen('assess-picker')} className={`mt-4 w-full py-3 rounded-xl text-sm font-medium ${darkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}>
-                {currentTier === 1 ? 'Continue Starter Pack →' : 'Start Assessments →'}
-              </button>
-            )}
-
-            {/* Archetype Strengths & Tips */}
-            {(() => {
-              const archetype = calculateArchetype(assessCompleted);
-              if (!archetype?.primary) return null;
-              const { strengths, watchOuts, tips, color } = archetype.primary;
-              const colorClass = twColor(color);
-              return (
-                <div className={`mt-4 p-4 rounded-xl ${darkMode ? 'bg-gray-900/30 border border-gray-800/30' : 'bg-gray-50 border border-gray-200'}`}>
-                  {strengths?.length > 0 && (
-                    <div className="mb-3">
-                      <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? `text-${colorClass}-400` : `text-${colorClass}-600`}`}>💪 Strengths</h4>
-                      <ul className="space-y-1">
-                        {strengths.slice(0, 3).map((s, i) => (
-                          <li key={i} className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>• {s}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {watchOuts?.length > 0 && (
-                    <div className="mb-3">
-                      <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>⚡ Watch For</h4>
-                      <ul className="space-y-1">
-                        {watchOuts.slice(0, 2).map((w, i) => (
-                          <li key={i} className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>• {w}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {tips?.length > 0 && (
-                    <div>
-                      <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>💡 Tips</h4>
-                      <ul className="space-y-1">
-                        {tips.slice(0, 3).map((t, i) => (
-                          <li key={i} className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>• {t}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Meta Analysis - Shows connections between completed assessments */}
-            {insights.length > 0 && (
-              <div className={`mt-4 p-4 rounded-xl ${darkMode ? 'bg-gradient-to-br from-violet-950/30 to-purple-950/30 border border-violet-800/20' : 'bg-violet-50 border border-violet-200'}`}>
-                <h3 className={`text-sm font-semibold flex items-center gap-2 mb-3 ${TH('text-primary', darkMode)}`}>✨ Insights</h3>
-                <div className="space-y-2">
-                  {insights.slice(0, 5).map((ins, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <span className="text-base">{ins.icon}</span>
-                      <p className={`text-xs leading-relaxed flex-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{ins.text}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* AI Personality Profile — shown when entityType === 'ai' and enough tests completed */}
-            {entityType === 'ai' && Object.keys(assessCompleted).length >= 3 && (() => {
-              const aiInsights = generateAIInsights(assessCompleted);
-              return (
-                <div className={`mt-4 p-4 rounded-xl ${darkMode ? 'bg-gradient-to-br from-cyan-950/30 to-teal-950/30 border border-cyan-800/20' : 'bg-cyan-50 border border-cyan-200'}`}>
-                  <h3 className={`text-sm font-semibold flex items-center gap-2 mb-3 ${darkMode ? 'text-cyan-300' : 'text-cyan-700'}`}>🤖 AI Personality Profile</h3>
-                  {aiInsights.authentic.length > 0 && (
-                    <div className="mb-3">
-                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>Authentic Dimensions</div>
-                      <div className="space-y-1.5">
-                        {aiInsights.authentic.map((d, i) => (
-                          <div key={i} className="flex items-start gap-2">
-                            <span className={`text-xs font-medium w-20 shrink-0 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{d.trait}</span>
-                            {d.score !== null && <div className="flex-1 h-2 rounded-full mt-1" style={{ background: `linear-gradient(to right, ${darkMode ? '#164e63' : '#cffafe'}, ${darkMode ? '#06b6d4' : '#0891b2'})` }}><div className={`h-full rounded-full ${darkMode ? 'bg-cyan-400' : 'bg-cyan-600'}`} style={{ width: `${d.score}%` }} /></div>}
-                            <span className={`text-[10px] w-8 text-right ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{d.score !== null ? `${d.score}%` : '—'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {aiInsights.structural.length > 0 && (
-                    <div className="mb-3">
-                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Structural Artifacts</div>
-                      <div className="space-y-1">
-                        {aiInsights.structural.map((d, i) => (
-                          <div key={i} className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                            <span className="font-medium">{d.trait}:</span> {d.note}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {aiInsights.aiSpecific.length > 0 && (
-                    <div>
-                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>AI-Specific Observations</div>
-                      <div className="space-y-1">
-                        {aiInsights.aiSpecific.map((d, i) => (
-                          <div key={i} className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                            <span className="font-medium">{d.label}:</span> {d.text}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Locked teasers for tier < 2 */}
-            {currentTier < 2 && (
-              <div className="mt-4 space-y-2">
-                <div className={`text-xs font-medium uppercase tracking-wide px-1 ${TH('text-dim', darkMode)}`}>
-                  Coming soon
-                </div>
-                <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)} opacity-50`}>
-                  {[
-                    { icon: '🎭', name: 'Personality' },
-                    { icon: '🧠', name: 'Mind' },
-                    { icon: '🌑', name: 'Shadow Self' },
-                  ].map((item, idx) => (
-                    <div key={item.name} className={`px-3 py-2.5 flex items-center gap-3 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
-                        <span className="text-sm">{item.icon}</span>
-                      </div>
-                      <span className={`flex-1 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{item.name}</span>
-                      <span className="text-xs">🔒</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <AssessAnalysisScreen
+          darkMode={darkMode}
+          assessCompleted={assessCompleted}
+          entityType={entityType}
+          onboardingAnswers={onboardingAnswers}
+          analysisExpanded={analysisExpanded}
+          setAnalysisExpanded={setAnalysisExpanded}
+          onNavigate={(scr, opts) => {
+            if (opts?.testId) setAssessCurrentTestId(opts.testId);
+            setScreen(scr);
+          }}
+        />
       );
     }
 
@@ -11327,686 +12053,79 @@ function App() {
       />
     );
 
-    if (!currentQuestion) return (
-      <div className={`flex-1 flex items-center justify-center ${TH('text-primary', darkMode)}`}>
-        <div className="text-center p-8"><div className="text-4xl mb-4">🎉</div><div className="text-xl font-medium mb-2">All done!</div></div>
-      </div>
-    );
-
-    const progress = totalQuestions > 0 ? answeredCount / totalQuestions : 0;
-    const hasNext = findNextUnanswered(currentIndex) !== null || currentIndex < questions.length - 1;
-
-    // Generate results for current question if answered but no results yet
-    const currentQuestionResults = currentResults || (isAnswered ? generateFakeResults(currentQuestion) : null);
-    if (isAnswered && !currentResults) {
-      setCommunityResults(prev => ({ ...prev, [currentQuestion.id]: currentQuestionResults }));
-    }
-
     return (
-      <div
-        className="flex-1 flex flex-col overflow-hidden relative"
-        {...swipeHandlers}
-      >
-        {/* Dev: MC color mode toggle — floating outside app UI */}
-        {!isBinary && (
-          <div className="fixed top-2 right-2 z-[9999]" style={{ pointerEvents: 'auto' }}>
-            <div className="flex rounded-lg overflow-hidden shadow-lg" style={{
-              background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.1)',
-            }}>
-              {['color', 'gray'].map(m => (
-                <button key={m} onClick={() => setMcColorMode(m)}
-                  className="px-3 py-1.5 text-xs font-medium transition-colors"
-                  style={{
-                    color: mcColorMode === m ? '#fff' : '#6b7280',
-                    background: mcColorMode === m ? 'rgba(255,255,255,0.12)' : 'transparent',
-                  }}
-                >{m === 'color' ? 'Colored' : 'Gray'}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* Breathing ambient aura — dual-layer, onboarding-style */}
-        {(() => {
-          const catColorMap = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
-          const catSecondary = { prediction: 'rose', reasoning: 'blue', judgment: 'cyan' };
-          const c0 = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
-          const c1 = COLOR_HEX[catSecondary[currentQuestion?.category]] || COLOR_HEX.blue;
-          return (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-5%' }}>
-              <div style={{
-                position: 'absolute', width: 420, height: 420, borderRadius: '50%',
-                background: darkMode
-                  ? `radial-gradient(circle, rgba(${c0.rgb},0.14) 0%, rgba(${c0.rgb},0.06) 35%, transparent 65%)`
-                  : `radial-gradient(circle, rgba(${c0.rgb},0.10) 0%, rgba(${c0.rgb},0.04) 35%, transparent 65%)`,
-                animation: 'aura-breathe 8s ease-in-out infinite',
-              }} />
-              <div style={{
-                position: 'absolute', width: 350, height: 350, borderRadius: '50%',
-                background: darkMode
-                  ? `radial-gradient(circle, rgba(${c1.rgb},0.10) 0%, rgba(${c1.rgb},0.04) 40%, transparent 65%)`
-                  : `radial-gradient(circle, rgba(${c1.rgb},0.08) 0%, rgba(${c1.rgb},0.03) 40%, transparent 65%)`,
-                animation: 'aura-breathe 6s ease-in-out infinite 1s',
-              }} />
-            </div>
-          );
-        })()}
-        {/* Saved for later — mid-screen pop-up */}
-        {showSavedToast && (
-          <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
-            <div className={`px-6 py-4 rounded-2xl flex flex-col items-center gap-1 ${darkMode ? 'bg-gray-800/90' : 'bg-white/90'} shadow-xl`}
-              style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', animation: 'fadeSlideIn 0.3s ease forwards' }}>
-              <span className="text-3xl">✓</span>
-              <span className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Saved for later</span>
-            </div>
-          </div>
-        )}
-        {/* Undo toast — top-positioned, doesn't move buttons */}
-        {pendingSubmit && (() => {
-          const undoColor = isBinary
-            ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
-            : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
-          const answerLabel = isBinary
-            ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
-            : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
-          return (
-            <div className="absolute top-1 left-3 right-3 z-30">
-              <div
-                onClick={handleUndo}
-                className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-lg"
-                style={{
-                  background: darkMode
-                    ? `rgba(${undoColor.rgb}, 0.15)`
-                    : `rgba(${undoColor.rgb}, 0.12)`,
-                  border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                }}
-              >
-                {/* Countdown ring */}
-                <div className="flex-shrink-0 w-7 h-7 relative">
-                  <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
-                    <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
-                    <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
-                      strokeDasharray="75.4"
-                      strokeDashoffset="0"
-                      style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    Answered: {answerLabel}
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleUndo(); }}
-                  className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
-                  style={{
-                    background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
-                    color: undoColor.hex,
-                  }}
-                >
-                  Undo
-                </button>
-              </div>
-            </div>
-          );
-        })()}
-        {/* Circle Track Selector - remaining counts by type */}
-        <div className={`h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10 ${darkMode ? 'bg-gray-900/50' : 'bg-white/90'}`}
-          style={{
-            borderBottom: (() => {
-              const catColorMap = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
-              const qColor = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
-              return darkMode
-                ? `1px solid rgba(${qColor.rgb},0.15)`
-                : `1px solid rgba(${qColor.rgb},0.20)`;
-            })()
-          }}>
-          <button
-            onClick={goToPrev}
-            disabled={currentIndex === 0}
-            className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${
-              currentIndex === 0
-                ? (darkMode ? 'text-gray-700' : 'text-gray-300')
-                : (darkMode ? 'text-gray-300 active:text-white' : 'text-gray-600 active:text-gray-900')
-            }`}
-          >
-            ◀
-          </button>
-          {(() => {
-            const ynCount = questions.filter(q => q.type === 'binary' && !responses[q.id]).length;
-            const mcCount = questions.filter(q => q.type === 'multiple' && !responses[q.id]).length;
-            const allCount = ynCount + mcCount;
-
-            const switchTrack = (newTrack) => {
-              const toggledTrack = selectedTrack === newTrack ? null : newTrack;
-              setSelectedTrack(toggledTrack);
-              if (toggledTrack && currentQuestion?.type !== toggledTrack) {
-                const matchIdx = questions.findIndex(q => q.type === toggledTrack && !responses[q.id]);
-                if (matchIdx >= 0) setCurrentIndex(matchIdx);
-              }
-            };
-
-            return (
-              <div className="flex-1 flex items-center justify-center gap-3">
-                {/* Binary (Y/N) circle - green/red */}
-                <div
-                  className={`q-circle q-circle-binary ${selectedTrack === 'binary' ? 'q-circle-current' : 'q-circle-adjacent'}`}
-                  onClick={() => switchTrack('binary')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
-                    {ynCount > 0 ? 'Y/N' : '✓'}
-                  </div>
-                </div>
-                {/* MC circle - 5 colors */}
-                <div
-                  className={`q-circle q-circle-mc ${selectedTrack === 'multiple' ? 'q-circle-current' : 'q-circle-adjacent'}`}
-                  onClick={() => switchTrack('multiple')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
-                    {mcCount > 0 ? 'ABC' : '✓'}
-                  </div>
-                </div>
-                {/* All/Combined circle - white/silver */}
-                <div
-                  className={`q-circle q-circle-mixed ${!selectedTrack ? 'q-circle-current' : 'q-circle-adjacent'}`}
-                  onClick={() => switchTrack(null)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className={`q-circle-inner ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
-                    {allCount > 0 ? 'Mix' : '✓'}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-          <button
-            onClick={goToNext}
-            disabled={!hasNext}
-            className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${
-              !hasNext
-                ? (darkMode ? 'text-gray-700' : 'text-gray-300')
-                : (darkMode ? 'text-gray-300 active:text-white' : 'text-gray-600 active:text-gray-900')
-            }`}
-          >
-            ▶
-          </button>
-        </div>
-
-        {/* ANSWERED QUESTION VIEW - shows full results (only for questions answered THIS session) */}
-        {isAnswered && !pendingSubmit && sessionAnsweredIds.has(currentQuestion.id) ? (
-          <AnsweredQuestionView
-            question={currentQuestion}
-            response={currentResponse}
-            results={currentQuestionResults}
-            darkMode={darkMode}
-            questionFlag={questionFlags[currentQuestion.id]}
-            explanation={answerExplanations[currentQuestion.id]}
-            onFlagClick={() => setShowQuestionFlagModal(currentQuestion.id)}
-            onExplainClick={() => setShowExplanationModal(currentQuestion.id)}
-          />
-        ) : isAnswered && !pendingSubmit ? (
-          /* Previously answered question - show empty space to maintain layout */
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1" /> {/* Empty space */}
-            <div className={`flex-shrink-0 px-4 py-6 ${darkMode ? 'bg-white/[0.02]' : 'bg-black/[0.02]'}`}>
-              <div className={`text-center text-sm ${TH('text-faint', darkMode)}`}>
-                Already answered · Use arrows to navigate
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* QUESTION AREA - centered in available space, never scrolls */}
-            <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-hidden min-h-0 relative">
-              <QuestionCard
-                question={currentQuestion}
-                darkMode={darkMode}
-                evidenceExpanded={evidenceExpanded}
-                onToggleEvidence={() => setEvidenceExpanded(!evidenceExpanded)}
-              />
-              {/* Onboarding hint for early questions */}
-              {answeredCount < 3 && !isAnswered && (
-                <div className={`text-center mt-3 text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
-                  {answeredCount === 0 ? "we'll start easy — just tap what feels right" : 'tap more for higher confidence'}
-                </div>
-              )}
-
-              {/* === OVERLAYS — float at bottom of question zone, ABOVE the answer buttons === */}
-              {/* These are absolute so they NEVER push buttons. Prime Directive. */}
-
-              {/* Undone banner */}
-              {justUndone && (
-                <div className="absolute bottom-1 left-0 right-0 z-20 px-0">
-                  <div className={`rounded-xl px-4 py-2 flex items-center justify-between ${darkMode ? 'bg-amber-500/15 border border-amber-500/50' : 'bg-amber-100 border border-amber-300'}`}
-                    style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
-                    <span className={`text-sm font-bold ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>
-                      Undone — tap to change or resubmit
-                    </span>
-                    <button
-                      onClick={clearUndoneState}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                        darkMode ? 'bg-white/[0.06] text-gray-300 hover:bg-white/[0.10]' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                      }`}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Tip banner — auto-hides once user taps an answer */}
-              {showTips && showGestureHint && !isAnswered && !pendingSubmit && !justUndone && tappedAnswer === null && (
-                <div className="absolute bottom-1 left-0 right-0 z-20 px-0">
-                  <TipBanner darkMode={darkMode} onDismiss={() => setShowGestureHint(false)} />
-                </div>
-              )}
-
-              {/* Confirm/Cancel — appears when answer tapped, needs confirmation */}
-              {showConfirmOverlay && (
-                <div className="absolute bottom-1 left-0 right-0 z-20 flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => { setTappedAnswer(null); setTapCount(0); }}
-                    className={`w-9 h-9 rounded-full btn-feedback flex items-center justify-center text-sm transition-all ${
-                      darkMode ? 'text-gray-400 border border-white/[0.08]' : 'text-gray-500 border border-gray-200'
-                    }`}
-                    style={{ background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}
-                  >✕</button>
-                  <button
-                    onClick={() => submitAnswer(tappedAnswer, tapCount)}
-                    className="w-11 h-11 rounded-full btn-feedback flex items-center justify-center text-lg transition-all"
-                    style={{
-                      color: darkMode ? '#fff' : confirmColor?.base,
-                      background: darkMode
-                        ? `linear-gradient(135deg, rgba(${confirmColor?.rgb},0.30) 0%, rgba(${confirmColor?.rgb},0.15) 100%)`
-                        : `linear-gradient(135deg, rgba(${confirmColor?.rgb},0.20) 0%, rgba(${confirmColor?.rgb},0.08) 100%)`,
-                      border: `1px solid rgba(${confirmColor?.rgb}, 0.50)`,
-                      boxShadow: `0 0 18px rgba(${confirmColor?.rgb},0.25), 0 0 40px rgba(${confirmColor?.rgb},0.12)`,
-                    }}
-                  >✓</button>
-                </div>
-              )}
-            </div>
-
-            {/* FIXED BOTTOM AREA - answer zones */}
-            <div className="flex-shrink-0 border-t relative z-10"
-              style={(() => {
-                const catColorMap = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
-                const qColor = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
-                return darkMode
-                  ? { borderColor: `rgba(${qColor.rgb},0.12)`, background: `linear-gradient(180deg, rgba(3,7,18,1) 0%, rgba(${qColor.rgb},0.04) 100%)` }
-                  : { borderColor: `rgba(${qColor.rgb},0.15)`, background: `linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(${qColor.rgb},0.04) 100%)` };
-              })()}>
-
-              {/* Answer zone wrapper — FIXED position, nothing above can push these */}
-              <div className="relative">
-                {/* ZONE 1: Answer Buttons */}
-                <div className="relative px-4 pt-3">
-                  <div className={pendingSubmit ? 'opacity-60 pointer-events-none' : ''}>
-                    {isBinary ? (
-                      <BinaryButtons
-                        darkMode={darkMode}
-                        tappedAnswer={tappedAnswer}
-                        tapCount={tapCount}
-                        isAnswered={isAnswered}
-                        currentResponse={currentResponse}
-                        onTap={handleAnswerTap}
-                        onRightClick={handleAnswerRightClick}
-                        pendingSubmit={pendingSubmit}
-                        category={currentQuestion?.category}
-                      />
-                    ) : (
-                      <MCButtons
-                        options={currentQuestion.options}
-                        darkMode={darkMode}
-                        tappedAnswer={tappedAnswer}
-                        tapCount={tapCount}
-                        isAnswered={isAnswered}
-                        currentResponse={currentResponse}
-                        onTap={handleAnswerTap}
-                        onRightClick={handleAnswerRightClick}
-                        pendingSubmit={pendingSubmit}
-                        mcColorMode={mcColorMode}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {/* Action buttons row — ghost treatment matching button language */}
-                <div className="relative px-4 mt-3 mb-2 flex items-center justify-center max-w-sm mx-auto">
-                  {!isAnswered && !pendingSubmit ? (
-                    <div className="flex gap-2 w-full">
-                      {[
-                        { label: isBinary ? "Can't" : "None", onClick: () => isBinary ? setShowCantAnswerModal(currentQuestion?.id) : setShowNoneOptionModal(true), active: false },
-                        { label: 'Explain', onClick: () => setShowExplanationModal(currentQuestion?.id), active: !!answerExplanations[currentQuestion?.id], activeColor: COLOR_HEX.amber },
-                        { label: 'Skip', onClick: skipQuestion, active: false },
-                        { label: savedQuestions.has(currentQuestion?.id) ? '✓ Saved' : 'Save', onClick: saveForLater, active: savedQuestions.has(currentQuestion?.id), activeColor: COLOR_HEX.violet },
-                      ].map(btn => (
-                        <button
-                          key={btn.label}
-                          onClick={btn.onClick}
-                          className="flex-1 py-2 rounded-xl text-xs font-medium transition-all btn-feedback border"
-                          style={btn.active ? {
-                            borderColor: `rgba(${btn.activeColor.rgb}, ${darkMode ? 0.30 : 0.40})`,
-                            background: darkMode
-                              ? `rgba(${btn.activeColor.rgb}, 0.08)`
-                              : `rgba(${btn.activeColor.rgb}, 0.10)`,
-                            color: darkMode ? btn.activeColor.light : btn.activeColor.base,
-                          } : {
-                            borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.10)',
-                            background: darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)',
-                            color: darkMode ? '#6b7280' : '#6b7280',
-                          }}
-                        >
-                          {btn.label}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* ZONE 3: Community Browse */}
-              <div className="px-4 pb-3 pt-1">
-                {(() => {
-                  // Only show community results after user has answered the current question
-                  const currentIsAnswered = currentQuestion && responses[currentQuestion.id];
-
-                  // Get list of answered questions with results, sorted by answer time (most recent first)
-                  const answeredList = questions
-                    .filter(q => responses[q.id] && communityResults[q.id])
-                    .sort((a, b) => (responses[b.id]?.timestamp || 0) - (responses[a.id]?.timestamp || 0));
-                  if (answeredList.length === 0 || !currentIsAnswered) {
-                    return (
-                      <div className={`h-full flex items-center justify-center text-sm ${TH('text-faint', darkMode)}`}>
-                        Swipe for next →
-                      </div>
-                    );
-                  }
-                  const safeIdx = Math.min(communityBrowseIndex, answeredList.length - 1);
-                  const browseQ = answeredList[safeIdx];
-                  const browseResponse = responses[browseQ.id];
-                  const browseResults = communityResults[browseQ.id];
-
-                  // Get user's answer display
-                  const isBinaryQ = browseQ.type === 'binary';
-                  const userAnswer = browseResponse?.answer;
-                  const userAnswerText = isBinaryQ
-                    ? (userAnswer === 0 ? 'YES' : 'NO')
-                    : (browseQ.options?.[userAnswer] || '?');
-                  const userAnswerColor = isBinaryQ
-                    ? (userAnswer === 0 ? 'text-emerald-400' : 'text-rose-400')
-                    : 'text-violet-400';
-
-                  // Hidden mode - just a thin expandable line with + button
-                  if (communityDisplayMode === 'hidden') {
-                    return (
-                      <div className="flex items-center justify-center gap-2" onClick={() => { if (pendingSubmit) handleUndo(); }}>
-                        <div className={`flex-1 h-px ${TH('bg-elevated', darkMode)}`} />
-                        <button
-                          onClick={() => { if (pendingSubmit) { handleUndo(); return; } setCommunityDisplayMode('compact'); }}
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-lg font-light ${
-                            darkMode ? 'bg-white/[0.06] text-gray-400 hover:bg-white/[0.10]' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
-                          } transition-colors`}
-                        >+</button>
-                        <div className={`flex-1 h-px ${TH('bg-elevated', darkMode)}`} />
-                      </div>
-                    );
-                  }
-
-                  // Compact mode with confidence-segmented bars
-                  // Use aggregateResults for all aggregation (includeUserInCount=false to show community stats)
-                  const { rows: aggRows, total, maxCount, userConf } = aggregateResults(browseResults?.evaluators, browseQ, browseResponse, false);
-
-                  return (
-                    <div
-                      className="relative"
-                      onTouchStart={(e) => { e.stopPropagation(); e.currentTarget.dataset.touchX = e.touches[0].clientX; }}
-                      onTouchEnd={(e) => {
-                        e.stopPropagation();
-                        // During pending submit (non-grace), any touch should undo
-                        if (pendingSubmit) {
-                          handleUndo();
-                          return;
-                        }
-                        const startX = parseFloat(e.currentTarget.dataset.touchX);
-                        const endX = e.changedTouches[0].clientX;
-                        const diff = endX - startX;
-                        if (Math.abs(diff) > 50) {
-                          if (diff > 0 && safeIdx > 0) setCommunityBrowseIndex(safeIdx - 1);
-                          else if (diff < 0 && safeIdx < answeredList.length - 1) setCommunityBrowseIndex(safeIdx + 1);
-                        }
-                      }}
-                      onClick={() => {
-                        // During pending submit (non-grace), any click should undo
-                        if (pendingSubmit) {
-                          handleUndo();
-                        }
-                      }}
-                    >
-                      {/* Header with LAST and hide button - clickable to expand */}
-                      <div
-                        className="flex items-center gap-1 mb-1 cursor-pointer"
-                        onClick={() => {
-                          if (pendingSubmit) { handleUndo(); return; }
-                          setCommunityExpanded(true);
-                        }}
-                      >
-                        <span className={`text-base truncate flex-1 font-medium ${TH('text-bright', darkMode)}`}>{browseQ.text}</span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); if (pendingSubmit) { handleUndo(); return; } setCommunityDisplayMode('hidden'); }}
-                          className={`w-5 h-5 rounded flex items-center justify-center text-sm shrink-0 ${
-                            darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
-                          }`}
-                        >−</button>
-                      </div>
-
-                      {/* Content - clickable to expand */}
-                      <div
-                        className="cursor-pointer"
-                        onClick={() => {
-                          if (pendingSubmit) { handleUndo(); return; }
-                          setCommunityExpanded(true);
-                        }}
-                      >
-                        {isBinaryQ ? (() => {
-                          // Use pre-aggregated rows, sorted by pct
-                          const rows = [...aggRows].sort((a, b) => b.pct - a.pct);
-                          return (
-                            <div className="space-y-1">
-                              {rows.map(row => (
-                                <div key={row.label} className="flex items-center gap-1">
-                                  <div className="w-14 sm:w-12 flex-shrink-0">
-                                    <span className={`text-base sm:text-sm font-semibold px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`} style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>{row.label}</span>
-                                  </div>
-                                  <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
-                                  {renderConfidenceBar(row.byConf, row.colors, maxCount, row.isUser, userConf, 'h-5', darkMode)}
-                                </div>
-                              ))}
-                              <div className={`text-sm text-center pt-1 ${TH('text-subtle', darkMode)}`}>Tap to Expand</div>
-                            </div>
-                          );
-                        })() : (() => {
-                          /* MC: show user's pick + top pick, tap to expand all */
-                          // Use pre-aggregated rows
-                          const sorted = [...aggRows].sort((a, b) => b.count - a.count);
-                          const topRow = sorted[0];
-                          const secondRow = sorted[1];
-                          const userRow = aggRows.find(r => r.isUser);
-                          const otherRow = userRow === topRow ? secondRow : topRow;
-
-                          const renderRow = (row) => {
-                            if (!row) return null;
-                            return (
-                              <div key={row.answer} className="flex items-center gap-1">
-                                <div style={{ width: '40%' }} className="flex-shrink-0">
-                                  <span className={`text-base sm:text-sm font-semibold inline-block truncate max-w-full px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`} style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>{row.label}</span>
-                                </div>
-                                <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
-                                {renderConfidenceBar(row.byConf, row.colors, maxCount, row.isUser, userConf, 'h-5', darkMode)}
-                              </div>
-                            );
-                          };
-
-                          const rowsOrdered = (userRow?.pct || 0) >= (otherRow?.pct || 0)
-                            ? [userRow, otherRow]
-                            : [otherRow, userRow];
-
-                          return (
-                            <div className="space-y-1">
-                              {rowsOrdered.filter(Boolean).map(renderRow)}
-                              <div className={`text-sm text-center pt-1 ${TH('text-subtle', darkMode)}`}>Tap to Expand</div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                      <div
-                        className={`h-px mt-2 cursor-pointer ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`}
-                        onClick={() => {
-                          if (pendingSubmit) { handleUndo(); return; }
-                          setCommunityExpanded(true);
-                        }}
-                      />
-
-                      {/* Expanded slide-up panel */}
-                      {communityExpanded && (() => {
-                        // Use pre-aggregated rows
-                        const allRows = [...aggRows].sort((a, b) => b.pct - a.pct);
-
-                        return (
-                          <div
-                            className="fixed inset-0 z-50"
-                            onClick={() => setCommunityExpanded(false)}
-                          >
-                            {/* Slide-up panel - click anywhere closes */}
-                            <div
-                              className={`absolute bottom-0 left-0 right-0 rounded-t-2xl backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-t border-x border-white/[0.08]' : 'bg-white/95'} shadow-2xl`}
-                              style={{ animation: 'slideUp 0.2s ease-out' }}
-                            >
-                              {/* Header - full question text in expanded view */}
-                              <div className="px-4 pt-3 pb-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className={`text-sm font-black uppercase tracking-wide ${TH('text-sky', darkMode)}`}>LAST:</span>
-                                  <span className={`text-sm ${TH('text-subtle', darkMode)}`}>{total.toLocaleString()} responses</span>
-                                </div>
-                                <p className={`text-base font-medium ${TH('text-bright', darkMode)}`}>{browseQ.text}</p>
-                              </div>
-
-                              {/* All rows - same format as compact */}
-                              <div className="px-4 pb-4 pt-2 space-y-1">
-                                {allRows.map((row, i) => (
-                                  <div key={i} className="flex items-center gap-1">
-                                    <div className={isBinaryQ ? 'w-14 sm:w-12' : 'w-[40%]'} style={{ flexShrink: 0 }}>
-                                      <span className={`text-base sm:text-sm font-semibold inline-block truncate max-w-full px-2 py-0.5 rounded-full ${row.isUser ? 'border-2' : ''}`}
-                                        style={{ color: row.colors[1], borderColor: row.isUser ? row.colors[1] : 'transparent' }}>
-                                        {row.label}
-                                      </span>
-                                    </div>
-                                    <span className="text-base sm:text-sm w-8 sm:w-7 font-bold text-right" style={{ color: row.colors[1] }}>{row.pct}</span>
-                                    {renderConfidenceBar(row.byConf, row.colors, row.maxCount, row.isUser, userConf, 'h-5', darkMode)}
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Tap hint */}
-                              <div className={`text-sm text-center pb-4 ${TH('text-faint', darkMode)}`}>
-                                tap anywhere to close
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Full Results Modal */}
-        {showFullResults && (() => {
-          const answeredList = questions
-            .filter(q => responses[q.id] && communityResults[q.id])
-            .sort((a, b) => (responses[b.id]?.timestamp || 0) - (responses[a.id]?.timestamp || 0));
-          const currentIdx = answeredList.findIndex(q => q.id === showFullResults.question.id);
-          const goTo = (idx) => {
-            if (idx >= 0 && idx < answeredList.length) {
-              const q = answeredList[idx];
-              setShowFullResults({ question: q, results: communityResults[q.id], response: responses[q.id] });
-            }
-          };
-          return (
-            <FullResultsPanel
-              question={showFullResults.question}
-              results={showFullResults.results}
-              userResponse={showFullResults.response}
-              darkMode={darkMode}
-              onClose={() => setShowFullResults(null)}
-              onSwipeLeft={() => goTo(currentIdx + 1)}
-              onSwipeRight={() => goTo(currentIdx - 1)}
-              isLast={currentIdx === 0}
-            />
-          );
-        })()}
-
-        {/* Question Flag Modal */}
-        {showQuestionFlagModal && (
-          <QuestionFlagModal
-            darkMode={darkMode}
-            questionId={showQuestionFlagModal}
-            onClose={() => setShowQuestionFlagModal(null)}
-            onFlag={handleQuestionFlag}
-            onClear={handleClearQuestionFlag}
-            existingFlag={questionFlags[showQuestionFlagModal]}
-          />
-        )}
-
-        {/* Explanation Modal */}
-        {showExplanationModal && (
-          <ExplanationModal
-            darkMode={darkMode}
-            questionId={showExplanationModal}
-            onClose={() => setShowExplanationModal(null)}
-            onSave={handleSaveExplanation}
-            onClear={handleClearExplanation}
-            existingExplanation={answerExplanations[showExplanationModal]}
-            isAnswered={!!responses[showExplanationModal]}
-          />
-        )}
-
-        {/* Can't Answer Modal (binary) */}
-        {showCantAnswerModal && (
-          <CantAnswerModal
-            darkMode={darkMode}
-            questionId={showCantAnswerModal}
-            onClose={() => setShowCantAnswerModal(null)}
-            onSkip={(qId, reason) => {
-              setQuestionFlags(prev => ({ ...prev, [qId]: `Can't: ${reason}` }));
-              setSkippedQuestions(prev => new Set([...prev, qId]));
-              goToNext();
-            }}
-          />
-        )}
-
-        {/* None Option Modal (MC) */}
-        {showNoneOptionModal && (
-          <NoneOptionModal
-            darkMode={darkMode}
-            questionId={currentQuestion?.id}
-            onClose={() => setShowNoneOptionModal(false)}
-            onSubmit={(qId, answer) => {
-              setQuestionFlags(prev => ({ ...prev, [qId]: `None fit: ${answer}` }));
-              setSkippedQuestions(prev => new Set([...prev, qId]));
-              goToNext();
-            }}
-          />
-        )}
-      </div>
+      <QuestionFlowScreen
+        darkMode={darkMode}
+        currentQuestion={currentQuestion}
+        currentIndex={currentIndex}
+        questions={questions}
+        responses={responses}
+        currentResults={currentResults}
+        communityResults={communityResults}
+        setCommunityResults={setCommunityResults}
+        isAnswered={isAnswered}
+        isBinary={isBinary}
+        answeredCount={answeredCount}
+        totalQuestions={totalQuestions}
+        currentResponse={currentResponse}
+        swipeHandlers={swipeHandlers}
+        mcColorMode={mcColorMode}
+        setMcColorMode={setMcColorMode}
+        pendingSubmit={pendingSubmit}
+        undoDelay={undoDelay}
+        handleUndo={handleUndo}
+        goToPrev={goToPrev}
+        goToNext={goToNext}
+        findNextUnanswered={findNextUnanswered}
+        setCurrentIndex={setCurrentIndex}
+        selectedTrack={selectedTrack}
+        setSelectedTrack={setSelectedTrack}
+        showSavedToast={showSavedToast}
+        sessionAnsweredIds={sessionAnsweredIds}
+        questionFlags={questionFlags}
+        answerExplanations={answerExplanations}
+        evidenceExpanded={evidenceExpanded}
+        setEvidenceExpanded={setEvidenceExpanded}
+        justUndone={justUndone}
+        clearUndoneState={clearUndoneState}
+        showTips={showTips}
+        showGestureHint={showGestureHint}
+        setShowGestureHint={setShowGestureHint}
+        showConfirmOverlay={showConfirmOverlay}
+        confirmColor={confirmColor}
+        tappedAnswer={tappedAnswer}
+        setTappedAnswer={setTappedAnswer}
+        tapCount={tapCount}
+        setTapCount={setTapCount}
+        submitAnswer={submitAnswer}
+        handleAnswerTap={handleAnswerTap}
+        handleAnswerRightClick={handleAnswerRightClick}
+        savedQuestions={savedQuestions}
+        saveForLater={saveForLater}
+        skipQuestion={skipQuestion}
+        showFullResults={showFullResults}
+        setShowFullResults={setShowFullResults}
+        showQuestionFlagModal={showQuestionFlagModal}
+        setShowQuestionFlagModal={setShowQuestionFlagModal}
+        showExplanationModal={showExplanationModal}
+        setShowExplanationModal={setShowExplanationModal}
+        showCantAnswerModal={showCantAnswerModal}
+        setShowCantAnswerModal={setShowCantAnswerModal}
+        showNoneOptionModal={showNoneOptionModal}
+        setShowNoneOptionModal={setShowNoneOptionModal}
+        handleQuestionFlag={handleQuestionFlag}
+        handleClearQuestionFlag={handleClearQuestionFlag}
+        handleSaveExplanation={handleSaveExplanation}
+        handleClearExplanation={handleClearExplanation}
+        setQuestionFlags={setQuestionFlags}
+        setSkippedQuestions={setSkippedQuestions}
+        communityBrowseIndex={communityBrowseIndex}
+        setCommunityBrowseIndex={setCommunityBrowseIndex}
+        communityDisplayMode={communityDisplayMode}
+        setCommunityDisplayMode={setCommunityDisplayMode}
+        communityExpanded={communityExpanded}
+        setCommunityExpanded={setCommunityExpanded}
+      />
     );
   };
 
