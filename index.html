@@ -1556,8 +1556,154 @@ const AuraVisualization = React.memo(function AuraVisualization({
       return cur;
     }
 
+    // ═══ MAPPING LAYER — synced from playground v2 ═══
+
+    // Extract normalized scores from assessCompleted data
+    function extractScores(completed) {
+      const c = completed || {};
+      const bf = { O:50, C:50, E:50, A:50, N:50 };
+
+      // Big Five: individual tests first, quick-profile fallback
+      for (const k of TK) {
+        const key = 'bigfive-' + k;
+        if (c[key] && c[key].score != null) {
+          bf[k] = clamp(c[key].score, 0, 100);
+        } else if (c['quick-profile'] && c['quick-profile'].traits && c['quick-profile'].traits[k] != null) {
+          bf[k] = clamp(c['quick-profile'].traits[k], 0, 100);
+        }
+      }
+
+      // Shadow: M/N/P
+      const shadow = { M:25, N:20, P:15 };
+      for (const s of ['M','N','P']) {
+        const key = 'shadow-' + s;
+        if (c[key] && c[key].score != null) shadow[s] = clamp(c[key].score, 0, 100);
+      }
+
+      // Attachment: anxiety/avoidance as strings → floats (0-5 scale)
+      const attachment = { anxiety:1.5, avoidance:1.5 };
+      if (c['attachment']) {
+        if (c['attachment'].anxiety != null) attachment.anxiety = clamp(parseFloat(c['attachment'].anxiety) || 1.5, 0, 5);
+        if (c['attachment'].avoidance != null) attachment.avoidance = clamp(parseFloat(c['attachment'].avoidance) || 1.5, 0, 5);
+      }
+
+      // Risk: subcategories (fin/soc/phys/eth, 0-100)
+      const risk = { financial:40, social:50, physical:30, ethical:35 };
+      if (c['risk'] && c['risk'].subcategories) {
+        const sub = c['risk'].subcategories;
+        if (sub.fin != null) risk.financial = clamp(sub.fin, 0, 100);
+        if (sub.soc != null) risk.social = clamp(sub.soc, 0, 100);
+        if (sub.phys != null) risk.physical = clamp(sub.phys, 0, 100);
+        if (sub.eth != null) risk.ethical = clamp(sub.eth, 0, 100);
+      }
+
+      // Chronotype: 0-100 score
+      const chronotype = (c['chronotype'] && c['chronotype'].score != null) ? clamp(c['chronotype'].score, 0, 100) : 55;
+
+      // ADHD: 0-6 indicators
+      const adhd = (c['adhd'] && c['adhd'].indicators != null) ? clamp(c['adhd'].indicators, 0, 6) : 1;
+
+      // Depth: how many assessments completed
+      const depth = Object.keys(c).length;
+
+      return { bigFive: bf, shadow, attachment, risk, chronotype, adhd, depth };
+    }
+
+    // Derive modifier values from scores — controls all visual parameters
+    function deriveModifiers(scores) {
+      const md = {};
+      const bf = scores.bigFive;
+      const s = scores;
+
+      // Big Five → motion components
+      const oN = bf.O/100, cN = bf.C/100, eN = bf.E/100, aN = bf.A/100, nN = bf.N/100;
+      const bfDrift = 0.3 + oN * 0.6;
+      const bfSway  = 0.3 + eN * 0.8;
+      const bfWiggle = 0.15 + nN * 0.6;
+      const bfBreath = 0.4 + (1-cN)*0.5 + aN*0.3;
+      const bfSpeed = 0.6 + eN*0.3 - cN*0.15;
+
+      // Shadow — individual effects + motion
+      const mNorm = s.shadow.M/100, nNorm = s.shadow.N/100, pNorm = s.shadow.P/100;
+      md.machConn    = mNorm;
+      md.narcInflate = nNorm;
+      md.psychSharp  = pNorm;
+      md.psychCool   = pNorm * 0.6;
+      const shadowDrift = mNorm * 0.4;
+      const shadowSway  = nNorm * 0.3;
+      const shadowWiggle = pNorm * 0.5;
+
+      // Attachment
+      const anxN = s.attachment.anxiety/5, avdN = s.attachment.avoidance/5;
+      md.connDensity  = 0.3 + anxN*1.4 - avdN*1.0;
+      md.pulseSpeed   = 0.4 + anxN*1.2 - avdN*0.6;
+      md.breathRate   = bfBreath + anxN*0.8 - avdN*0.5;
+      md.breathAmp    = 0.3 + anxN*1.4 - avdN*0.8;
+      md.connPulseIrr = anxN*0.5 + avdN*0.3;
+      md.avoidSpread  = avdN;
+      md.avoidDim     = avdN;
+      const attachWiggle = anxN * 0.4;
+      const attachDrift  = avdN * 0.5;
+
+      // Risk
+      const rFin = s.risk.financial/100, rSoc = s.risk.social/100, rPhy = s.risk.physical/100, rEth = s.risk.ethical/100;
+      const riskDrift  = rFin*0.8;
+      const riskSway   = rSoc*0.7;
+      const riskWiggle = rPhy*0.6;
+      const riskSpeed  = rEth*0.5;
+
+      // Compose motion
+      md.driftAmp   = bfDrift + shadowDrift + attachDrift + riskDrift*0.6;
+      md.driftSpeed = bfSpeed + riskSpeed*0.4;
+      md.swayAmp    = bfSway + shadowSway + riskSway*0.5;
+      md.wiggleAmp  = bfWiggle + shadowWiggle + attachWiggle + riskWiggle*0.5 + (s.adhd/6)*1.5;
+      md.wiggleSpeed = 0.5 + riskSpeed*0.3 + (s.adhd/6)*0.8;
+
+      // Chronotype — subtle tempo (±15%)
+      const chronoMod = 0.92 + (s.chronotype/100)*0.16;
+      md.driftSpeed  *= chronoMod;
+      md.wiggleSpeed *= chronoMod;
+
+      // Risk structural
+      md.riskGlow       = rFin*0.5;
+      md.riskInflate    = rPhy*0.3;
+      md.riskConnChaos  = rEth*0.6;
+      md.riskMemBreathe = rSoc*0.5;
+
+      // Glow
+      md.glowRadius    = 1.0 + md.riskGlow*0.8;
+      md.glowIntensity = 1.0 + md.riskGlow*0.6 - md.avoidDim*0.4;
+      md.memOpacity    = 1.0 - pNorm*0.4 - md.avoidDim*0.2;
+      md.memThickness  = 1.0 - pNorm*0.3 + md.riskMemBreathe*0.3;
+
+      return md;
+    }
+
+    // Rank-based angular placement — dominant traits claim prominent positions
+    function computeTraitAngles(scores, seed) {
+      const bf = scores.bigFive;
+      const vals = TK.map(k => ({ k, v: bf[k]/100 }));
+      const ranked = [...vals].sort((a,b) => b.v - a.v);
+      const angles = {};
+      const n = ranked.length;
+      const totalV = ranked.reduce((s2,r) => s2 + r.v, 0) || 1;
+      const avgV = totalV / n;
+
+      for (let i = 0; i < n; i++) {
+        const r = ranked[i];
+        const baseA = (i/n)*TAU - PI/2;
+        const relStrength = (r.v - avgV) / avgV;
+        const neighborPull = relStrength * 0.2;
+        const seedJitter = Math.sin(seed * 0.1 + i * 2.7) * 0.15;
+        angles[r.k] = baseA + neighborPull + seedJitter;
+      }
+      return angles;
+    }
+
+    // ═══ END MAPPING LAYER ═══
+
     // ═══ GENOME FROM ANSWERS ═══
-    function deriveGenome(answers) {
+    function deriveGenome(answers, scores) {
       // Stable seed from answer state
       const keys = Object.keys(answers || {}).sort();
       let seed = 12345;
@@ -1572,14 +1718,21 @@ const AuraVisualization = React.memo(function AuraVisualization({
       const r = m32(seed);
 
       const tv = {};
-      for (let i = 0; i < 5; i++) {
-        const nm = NEURON_MAP[i];
-        const hasColor = nm.colorQ in answers;
-        const hasPos = nm.posQ in answers;
-        const base = r();
-        if (hasColor && hasPos) tv[TK[i]] = 0.60 + base * 0.40;
-        else if (hasColor || hasPos) tv[TK[i]] = 0.30 + base * 0.30;
-        else tv[TK[i]] = 0.03 + base * 0.10;
+      // If we have actual Big Five scores from assessments, use those
+      const hasBF = scores && scores.bigFive && TK.some(k => scores.bigFive[k] !== 50);
+      if (hasBF) {
+        for (const k of TK) tv[k] = clamp(scores.bigFive[k]/100, 0.02, 1.0);
+      } else {
+        // Existing onboarding-based derivation
+        for (let i = 0; i < 5; i++) {
+          const nm = NEURON_MAP[i];
+          const hasColor = nm.colorQ in answers;
+          const hasPos = nm.posQ in answers;
+          const base = r();
+          if (hasColor && hasPos) tv[TK[i]] = 0.60 + base * 0.40;
+          else if (hasColor || hasPos) tv[TK[i]] = 0.30 + base * 0.30;
+          else tv[TK[i]] = 0.03 + base * 0.10;
+        }
       }
 
       const so = [...TK].sort((a, b) => tv[b] - tv[a]);
@@ -1590,21 +1743,24 @@ const AuraVisualization = React.memo(function AuraVisualization({
     }
 
     // ═══ NODE FACTORY ═══
-    function mkNodes(g, oR) {
+    function mkNodes(g, oR, traitAngles, mods) {
       const r = m32(g.s + 3333), ns = [];
+      const inflate = 1 + (mods ? mods.narcInflate * 0.4 + (mods.riskInflate||0) * 0.3 : 0);
+      const spread = 1 + (mods ? (mods.avoidSpread||0) * 0.4 : 0);
+
       for (let i = 0; i < 5; i++) {
         const k = TK[i], v = g.tv[k];
-        const an = (i / 5) * TAU - PI / 2 + (v - 0.5) * 0.3;
-        const br = oR * (0.28 + 0.22 * v);
-        const rd = oR * (0.06 + v * 0.14);
+        const an = traitAngles ? traitAngles[k] : ((i / 5) * TAU - PI / 2 + (v - 0.5) * 0.3);
+        const br = oR * (0.28 + 0.22 * v) * spread;
+        const rd = oR * (0.06 + v * 0.14) * inflate;
         ns.push({ tp:'p', k, tv:v, rgb:TR[k].base, acc:TR[k].acc, iIdx:g.ints[k],
           bA:an, bR:br, x:0, y:0, dp:0, rd, sd:g.s+i*137.5, bp:i*1.47, stg:0 });
       }
       for (let i = 0; i < 5; i++) { const p = ns[i]; for (let c = 0; c < 5; c++) {
-        const o = p.bA + (c-2)*0.3 + (r()-0.5)*0.2, cr = p.bR + oR*(0.04+r()*0.06);
+        const o = p.bA + (c-2)*0.3 + (r()-0.5)*0.2, cr = (p.bR + oR*(0.04+r()*0.06)) * spread;
         const v = p.tv * (0.25 + r()*0.35);
         ns.push({ tp:'c', k:p.k, tv:v, rgb:p.rgb, acc:p.acc,
-          bA:o, bR:cr, x:0, y:0, dp:0, rd:oR*(0.010+v*0.025), sd:g.s+(10+i*5+c)*137.5, bp:(10+i*5+c)*0.9, stg:1 });
+          bA:o, bR:cr, x:0, y:0, dp:0, rd:oR*(0.010+v*0.025)*inflate, sd:g.s+(10+i*5+c)*137.5, bp:(10+i*5+c)*0.9, stg:1 });
       }}
       const AD = [
         {a:['O','C'],n:5},{a:['E','N'],n:5},{a:['O'],n:4},{a:['E','A'],n:5},{a:['C','N'],n:4},
@@ -1641,7 +1797,7 @@ const AuraVisualization = React.memo(function AuraVisualization({
       const pts = [];
       for (const n of ns) {
         const r = n.rd * sc;
-        const pad = n.tp==='p' ? r*0.6+oR*0.06 : r*0.5+oR*0.04;
+        const pad = n.tp==='p' ? r*0.5+oR*0.05 : r*0.4+oR*0.03;
         const totalR = r + pad;
         const count = 24;
         for (let i = 0; i < count; i++) {
@@ -1650,34 +1806,65 @@ const AuraVisualization = React.memo(function AuraVisualization({
         }
       }
       if (pts.length < 3) return [{ x:CX-20,y:CY-20 },{ x:CX+20,y:CY-20 },{ x:CX+20,y:CY+20 },{ x:CX-20,y:CY+20 }];
-      return chaikin(convexHull(pts), 8);
+      let hull = convexHull(pts);
+
+      // Corner smoothing: detect sharp angles and pull toward neighbors
+      const smoothed = [];
+      const n2 = hull.length;
+      for (let i = 0; i < n2; i++) {
+        const prev = hull[(i-1+n2)%n2], cur = hull[i], next = hull[(i+1)%n2];
+        const ax = prev.x-cur.x, ay = prev.y-cur.y;
+        const bx = next.x-cur.x, by = next.y-cur.y;
+        const dot = ax*bx+ay*by;
+        const la = Math.sqrt(ax*ax+ay*ay)||1, lb = Math.sqrt(bx*bx+by*by)||1;
+        const cosA = dot/(la*lb);
+        if (cosA > -0.3) {
+          const blend = 0.15+0.15*Math.max(0,cosA);
+          smoothed.push({
+            x: cur.x*(1-blend)+(prev.x+next.x)*0.5*blend,
+            y: cur.y*(1-blend)+(prev.y+next.y)*0.5*blend
+          });
+        } else {
+          smoothed.push(cur);
+        }
+      }
+
+      return chaikin(smoothed, 10);
     }
 
     function traceSmoothedHull(ctx, hull) {
       if (hull.length < 3) return;
+      const n = hull.length;
+      const tension = 0.4;
       ctx.beginPath();
-      ctx.moveTo(hull[0].x, hull[0].y);
-      for (let i = 1; i < hull.length; i++) ctx.lineTo(hull[i].x, hull[i].y);
+      for (let i = 0; i < n; i++) {
+        const p0 = hull[(i-1+n)%n], p1 = hull[i], p2 = hull[(i+1)%n], p3 = hull[(i+2)%n];
+        const cp1x = p1.x+(p2.x-p0.x)*tension, cp1y = p1.y+(p2.y-p0.y)*tension;
+        const cp2x = p2.x-(p3.x-p1.x)*tension, cp2y = p2.y-(p3.y-p1.y)*tension;
+        if (i === 0) ctx.moveTo(p1.x, p1.y);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+      }
       ctx.closePath();
     }
 
     // ═══ PHYSICS ═══
-    function updPhys(ns, t, CX, CY, oR, stg) {
-      const breath = Math.sin(t * 0.12) * 0.003;
+    function updPhys(ns, t, CX, CY, oR, stg, mods) {
+      const md = mods || { breathRate:1, breathAmp:1, driftAmp:1, driftSpeed:1, swayAmp:1, wiggleAmp:1, wiggleSpeed:1 };
+      const breath = Math.sin(t * 0.12 * md.breathRate) * 0.003 * md.breathAmp;
       const sc = SSC[stg];
       const bsc = 1 + breath;
       for (const n of ns) {
         const tOff = n.sd * 0.37;
-        const wanderA = n.bA + (fbm(n.sd*0.13, t*0.004+tOff, 3)-0.5)*TAU*0.65;
-        const wanderR = n.bR * (0.75 + fbm(n.sd*0.17+100, t*0.005+tOff, 3)*0.50);
+        const wanderA = n.bA + (fbm(n.sd*0.13, t*0.004*md.driftSpeed+tOff, 3)-0.5)*TAU*0.25*md.driftAmp;
+        const wanderR = n.bR * (0.88 + fbm(n.sd*0.17+100, t*0.005*md.driftSpeed+tOff, 3)*0.24*md.driftAmp);
         const baseX = CX + Math.cos(wanderA)*wanderR*bsc*sc;
         const baseY = CY + Math.sin(wanderA)*wanderR*bsc*sc;
-        const swayAmp = oR*sc*0.15;
-        const sx = (fbm(n.sd*0.1+t*0.035+tOff, t*0.028, 2)*2-1)*swayAmp;
-        const sy = (fbm(t*0.030, n.sd*0.1+t*0.038+tOff, 2)*2-1)*swayAmp;
-        const wigAmp = oR*sc*0.03;
-        const wx = (fbm(n.sd*0.3+t*0.15, t*0.12, 1)*2-1)*wigAmp;
-        const wy = (fbm(t*0.13, n.sd*0.3+t*0.16, 1)*2-1)*wigAmp;
+        const swayA = oR*sc*0.06*md.swayAmp;
+        const sx = (fbm(n.sd*0.1+t*0.025+tOff, t*0.020, 2)*2-1)*swayA;
+        const sy = (fbm(t*0.022, n.sd*0.1+t*0.028+tOff, 2)*2-1)*swayA;
+        const wigA = oR*sc*0.015*md.wiggleAmp;
+        const wx = (fbm(n.sd*0.3+t*0.15*md.wiggleSpeed, t*0.12*md.wiggleSpeed, 1)*2-1)*wigA;
+        const wy = (fbm(t*0.13*md.wiggleSpeed, n.sd*0.3+t*0.16*md.wiggleSpeed, 1)*2-1)*wigA;
         n.x = baseX+sx+wx;
         n.y = baseY+sy+wy;
       }
@@ -1690,8 +1877,9 @@ const AuraVisualization = React.memo(function AuraVisualization({
     }
 
     // ═══ CONNECTIONS ═══
-    function mkCon(ns) {
-      const cn=[], seen=new Set(), K=7;
+    function mkCon(ns, mods) {
+      const cn=[], seen=new Set();
+      const K = Math.max(3, Math.round(7 * (mods ? mods.connDensity : 1)));
       for (let i=0;i<ns.length;i++){const dd=[];
         for(let j=0;j<ns.length;j++){if(i===j)continue;
           const xi=Math.cos(ns[i].bA)*ns[i].bR, yi=Math.sin(ns[i].bA)*ns[i].bR;
@@ -1712,11 +1900,16 @@ const AuraVisualization = React.memo(function AuraVisualization({
       return cn;
     }
 
-    function mkPul(cn, sd) {
+    function mkPul(cn, sd, mods) {
       const r=m32(sd+5555), ps=[];
+      const irrMod = mods ? (mods.connPulseIrr||0) + (mods.riskConnChaos||0) : 0;
+      const spdMod = mods ? (mods.pulseSpeed||1) : 1;
       for(const c of cn){const ct=1+Math.floor(c.str*1.5);
-        for(let i=0;i<ct;i++)ps.push({a:c.a,b:c.b,cs:c.cs,p:r(),sp:0.03+r()*0.05,
-          dr:r()>0.5?1:-1,col:ltn(c.col,55),sz:0.8+c.str*1.5+(c.isPP?1:0)});}
+        for(let i=0;i<ct;i++){
+          const baseSpeed = 0.03+r()*0.05;
+          const irrF = 1+(r()-0.5)*irrMod*2;
+          ps.push({a:c.a,b:c.b,cs:c.cs,p:r(),sp:baseSpeed*irrF*spdMod,
+            dr:r()>0.5?1:-1,col:ltn(c.col,55),sz:0.8+c.str*1.5+(c.isPP?1:0)});}}
       return ps;
     }
     function updPul(ps,dt){for(const q of ps){q.p+=q.sp*q.dr*dt;if(q.p>1)q.p-=1;if(q.p<0)q.p+=1;}}
@@ -1822,9 +2015,12 @@ const AuraVisualization = React.memo(function AuraVisualization({
     ];
 
     // ═══ MEMBRANE ═══
-    function drawMem(ctx, gen, hull) {
+    function drawMem(ctx, gen, hull, mods) {
       if (hull.length < 3) return;
-      const widths=[18,8,3.5,1.0], alphas=[0.035,0.065,0.11,0.32];
+      const md = mods || { memThickness:1, memOpacity:1, riskMemBreathe:0 };
+      const memBreathe = 1 + (md.riskMemBreathe||0) * Math.sin(performance.now()*0.002) * 0.3;
+      const widths=[18,8,3.5,1.0].map(w => w * md.memThickness * memBreathe);
+      const alphas=[0.035,0.065,0.11,0.32].map(a => a * md.memOpacity);
       const mc = ltn(gen.glow, 30);
       for (let pass=0; pass<4; pass++) {
         traceSmoothedHull(ctx, hull);
@@ -1837,14 +2033,15 @@ const AuraVisualization = React.memo(function AuraVisualization({
     }
 
     // ═══ GLOW ═══
-    function drawGlow(ctx, prims, oR, stg, CW, CH) {
+    function drawGlow(ctx, prims, oR, stg, CW, CH, mods) {
+      const md = mods || { glowRadius:1, glowIntensity:1 };
       for (const p of prims) {
         const pc = p.rgb;
-        const str = p.tv * GSC[stg];
+        const str = p.tv * GSC[stg] * md.glowIntensity;
         if (str < 0.03) continue;
         const sc = SSC[stg];
         const nodeR = p.rd * sc;
-        const glowR = oR*2.5 + p.tv*oR*2.0;
+        const glowR = (oR*2.5 + p.tv*oR*2.0) * md.glowRadius;
         const g = ctx.createRadialGradient(p.x,p.y,nodeR*0.3,p.x,p.y,glowR);
         g.addColorStop(0,rga(pc,0.40*str));
         g.addColorStop(0.05,rga(pc,0.32*str));
@@ -1892,8 +2089,10 @@ const AuraVisualization = React.memo(function AuraVisualization({
     }
 
     // ═══ NEURAL NETWORK — only at larger sizes ═══
-    function drawNeural(ctx, prims, gen, hullPts, oR, CX, CY) {
+    function drawNeural(ctx, prims, gen, hullPts, oR, CX, CY, mods) {
       const sr = m32(gen.s+9999);
+      const md = mods || { machConn:0, avoidDim:0 };
+      const connAlpha = Math.max(0.02, (0.08 + md.machConn * 0.15) * (1 - (md.avoidDim||0)*0.7));
       for(let i=0;i<prims.length;i++){
         for(let j=i+1;j<prims.length;j++){
           const a=prims[i],b=prims[j];
@@ -1907,7 +2106,7 @@ const AuraVisualization = React.memo(function AuraVisualization({
             const off=spread*oR*0.08;
             const mx=(a.x+b.x)/2+nx*off,my=(a.y+b.y)/2+ny*off;
             ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mx,my,b.x,b.y);
-            ctx.strokeStyle=rga(bc,0.08);ctx.lineWidth=0.4+sr()*0.5;ctx.stroke();
+            ctx.strokeStyle=rga(bc,connAlpha);ctx.lineWidth=0.4+sr()*0.5;ctx.stroke();
           }
         }
       }
@@ -1935,6 +2134,7 @@ const AuraVisualization = React.memo(function AuraVisualization({
     let gen, allN, actN, cons, puls;
     let hullPts = [];
     let stg, ent;
+    let curScores, curMods, curTraitAngles;
     let t0 = performance.now(), tL = 0;
     const LOD_FULL = 200; // size threshold for full detail
 
@@ -1944,19 +2144,25 @@ const AuraVisualization = React.memo(function AuraVisualization({
       CX = CW / 2; CY = CH / 2;
       oR = Math.min(CW, CH) * 0.40;
 
-      const assessCount = Object.keys(p.assessCompleted || {}).length;
-      stg = assessCount >= 4 ? 3 : assessCount >= 2 ? 2 : assessCount >= 1 ? 1 : 0;
+      // Mapping layer: extract scores → derive mods → compute angles
+      curScores = extractScores(p.assessCompleted);
+      curMods = deriveModifiers(curScores);
       ent = p.entityType;
 
-      gen = deriveGenome(p.onboardingAnswers);
-      allN = mkNodes(gen, oR);
+      // Stage from scores.depth
+      stg = curScores.depth >= 4 ? 3 : curScores.depth >= 2 ? 2 : curScores.depth >= 1 ? 1 : 0;
+
+      gen = deriveGenome(p.onboardingAnswers, curScores);
+      curTraitAngles = computeTraitAngles(curScores, gen.s);
+      allN = mkNodes(gen, oR, curTraitAngles, curMods);
       actN = filt(allN, stg);
-      cons = mkCon(actN);
-      puls = mkPul(cons, gen.s);
+      cons = mkCon(actN, curMods);
+      puls = mkPul(cons, gen.s, curMods);
     }
 
     init();
     let prevSize = CW, prevStg = stg, prevAnswerCount = Object.keys(propsRef.current.onboardingAnswers || {}).length;
+    let prevAssessKeys = Object.keys(propsRef.current.assessCompleted || {}).sort().join(',');
 
     function frame(ts) {
       const p = propsRef.current;
@@ -1965,11 +2171,12 @@ const AuraVisualization = React.memo(function AuraVisualization({
       tL = ts;
 
       // Reinit on significant changes
-      const newAssessCount = Object.keys(p.assessCompleted || {}).length;
-      const newStg = newAssessCount >= 4 ? 3 : newAssessCount >= 2 ? 2 : newAssessCount >= 1 ? 1 : 0;
+      const newAssessKeys = Object.keys(p.assessCompleted || {}).sort().join(',');
+      const newScores = extractScores(p.assessCompleted);
+      const newStg = newScores.depth >= 4 ? 3 : newScores.depth >= 2 ? 2 : newScores.depth >= 1 ? 1 : 0;
       const newAnswerCount = Object.keys(p.onboardingAnswers || {}).length;
-      if (p.size !== prevSize || newStg !== prevStg || newAnswerCount !== prevAnswerCount) {
-        prevSize = p.size; prevStg = newStg; prevAnswerCount = newAnswerCount;
+      if (p.size !== prevSize || newStg !== prevStg || newAnswerCount !== prevAnswerCount || newAssessKeys !== prevAssessKeys) {
+        prevSize = p.size; prevStg = newStg; prevAnswerCount = newAnswerCount; prevAssessKeys = newAssessKeys;
         init();
       }
 
@@ -1987,18 +2194,18 @@ const AuraVisualization = React.memo(function AuraVisualization({
       // Transparent background — organism floats in the page
       ctx.clearRect(0, 0, CW, CH);
 
-      const breath = updPhys(actN, t, CX, CY, oR, stg);
+      const breath = updPhys(actN, t, CX, CY, oR, stg, curMods);
       updPul(puls, dt);
       hullPts = computeHull(actN, oR, stg, CX, CY);
 
       const prims = actN.filter(n => n.tp === 'p');
 
       // Layer 1: Glow
-      drawGlow(ctx, prims, oR, stg, CW, CH);
+      drawGlow(ctx, prims, oR, stg, CW, CH, curMods);
 
       // Layer 2: Membrane or AI fade
       if (ent === 'human') {
-        drawMem(ctx, gen, hullPts);
+        drawMem(ctx, gen, hullPts, curMods);
       } else {
         drawAIFade(ctx, d, CX, CY, CW, CH);
       }
@@ -2014,20 +2221,21 @@ const AuraVisualization = React.memo(function AuraVisualization({
       if (ent === 'human') drawBody(ctx, prims, gen, hullPts, CX, CY, CW, CH);
 
       // Neural network (skip at small sizes)
-      if (full) drawNeural(ctx, prims, gen, hullPts, oR, CX, CY);
+      if (full) drawNeural(ctx, prims, gen, hullPts, oR, CX, CY, curMods);
 
-      // Tissue connections
+      // Tissue connections — machConn boosts, avoidDim dampens
+      const cAlphaScale = curMods ? (1 + curMods.machConn * 0.5) * (1 - (curMods.avoidDim||0)*0.5) : 1;
       for (const c of cons) {
         const a = actN[c.a], b = actN[c.b]; if (!a || !b) continue;
         const mid = cMid(a, b), col = c.col;
         if (c.isPP) {
           ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
-          ctx.strokeStyle=rga(col,0.04+c.str*0.02); ctx.lineWidth=22+c.str*12; ctx.lineCap='round'; ctx.stroke();
+          ctx.strokeStyle=rga(col,(0.04+c.str*0.02)*cAlphaScale); ctx.lineWidth=22+c.str*12; ctx.lineCap='round'; ctx.stroke();
         }
         ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
-        ctx.strokeStyle=rga(col,0.05+c.str*0.025); ctx.lineWidth=6+c.str*4; ctx.lineCap='round'; ctx.stroke();
+        ctx.strokeStyle=rga(col,(0.05+c.str*0.025)*cAlphaScale); ctx.lineWidth=6+c.str*4; ctx.lineCap='round'; ctx.stroke();
         ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
-        ctx.strokeStyle=rga(ltn(col,25),0.35+c.str*0.12); ctx.lineWidth=0.5+c.str*0.7; ctx.stroke();
+        ctx.strokeStyle=rga(ltn(col,25),(0.35+c.str*0.12)*cAlphaScale); ctx.lineWidth=0.5+c.str*0.7; ctx.stroke();
       }
 
       // Energy pulses
