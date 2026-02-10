@@ -13,13 +13,19 @@
   <script> #3        Supabase config, sync, auth helpers
   <script babel>     Main React app (everything below)
 
-  MAIN APP SECTIONS — search: "== SECTION NAME =="
+  REACT APP SECTIONS — search: "== SECTION NAME =="
   ───────────────────────────────────────────────────────────────
+
+  Foundation
+  ··········
   "UNIFIED COLOR SYSTEM"       COLOR_HEX, twColor, BINARY_COLORS
   "CONFIDENCE HELPERS"         normalizeConf
   "THEME TOKENS"               TH() dark/light class helper
   "HELPERS"                    hexToRgba
-  "AURA VISUALIZATION"         AuraVisualization SVG component
+
+  Data & Config
+  ·············
+  "AURA VISUALIZATION"         AuraVisualization canvas component
   "DATA"                       CATEGORIES, MC_COLORS, scoring, community results
   "DEMO PRE-POPULATION"        Demo data seeding
   "ASSESSMENTS DATA"           ASSESS_SCALES
@@ -28,14 +34,40 @@
   "ASSESSMENT COLORS"          ASSESS_C, ASSESS_STYLES, PROGRESS_GRADIENTS
   "STORAGE"                    localStorage helpers
   "GAMIFICATION SYSTEM"        XP, levels, streaks
-  "HOOKS"                      useDisplayMode, custom React hooks
+
+  Hooks & Components
+  ··················
+  "HOOKS"                      useDisplayMode, useSwipe, custom React hooks
   "COMPONENTS"                 ProgressCircle, PhoneFrame, NavBar, WelcomeScreen
+  "ASSESSMENT PRIMITIVES"      QuestionCard, ResultsChart, analysis helpers
   "ONBOARDING FLOW"            OnboardingFlow component
-  "PATH CHOICE SCREEN"         PathChoiceScreen, modals, buttons, CategoryScreen
-  "MAIN APP"                   function App() — state, effects, render
-    "ASSESSMENT FUNCTIONS"       ↳ Assessment logic (useAssessment hook)
-    "ASSESSMENT SCREENS"         ↳ assess-picker, assess-question, assess-results, assess-analysis
-    "DEV NAVIGATION PANEL"       ↳ Dev-only screen switcher
+  "PATH CHOICE SCREEN"         PathChoiceScreen, modals, CategoryScreen
+
+  Verification
+  ············
+  "VERIFICATION DATA LAYER"    Mock subjects, storage, helpers
+  "VERIFICATION COMPONENTS"    VerifySubjectCard, VerifyCompare, full flow
+
+  Extracted Screen Components
+  ···························
+  "SCREEN COMPONENTS"          HistoryScreen, QotdScreen, ProfileScreen,
+                               AssessPickerScreen, AssessQuestionScreen
+  "ASSESS RESULTS SCREEN"      AssessResultsScreen, AssessAnalysisScreen
+  "QUESTION FLOW SCREEN"       QuestionFlowScreen
+
+  Custom Hooks (above App)
+  ························
+  useQotd                      QOTD state + handlers (4 state, 3 handlers)
+  useVerification              Verification state + persistence (5 state, ref, effect)
+  useAssessment                Assessment state + handlers (21 state, 14 handlers)
+                               Accepts { setScreen, darkMode }
+
+  App
+  ···
+  "ERROR BOUNDARY"             ErrorBoundary class component
+  "MAIN APP"                   function App() — remaining state, effects, render
+    renderContent()              Screen router (if/return chain)
+    "DEV NAVIGATION PANEL"       Dev-only screen switcher
 
   KEY CONSTANTS
   ───────────────────────────────────────────────────────────────
@@ -48,10 +80,11 @@
 
   KEY PATTERNS
   ───────────────────────────────────────────────────────────────
-  • Screens: if (screen === 'x') return (...) chain in renderContent()
+  • Screens: if (screen === 'x') return <XScreen .../> in renderContent()
   • Theme:   TH('token', darkMode) returns Tailwind classes
   • Colors:  ASSESS_C[color] for assessment colors, COLOR_HEX[name] for raw hex
   • Storage: localStorage key 'aura-demo-vI' for main data
+  • Hooks:   useQotd(), useVerification(), useAssessment({ setScreen, darkMode })
 -->
 <html lang="en">
 <head>
