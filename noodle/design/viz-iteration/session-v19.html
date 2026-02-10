@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Organism — v19</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+body.dark{background:#050A18;color:#e2e8f0;}
+body.light{background:#F0F2F5;color:#1e293b;}
+canvas{display:block;width:100vw;height:100vh;position:fixed;top:0;left:0;}
+.ctrls{position:fixed;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px;
+  align-items:center;z-index:10;padding:4px 8px;border-radius:8px;backdrop-filter:blur(8px);}
+body.dark .ctrls{background:rgba(5,10,24,0.7);}
+body.light .ctrls{background:rgba(240,242,245,0.7);}
+.ctrls button{border:1px solid;padding:3px 10px;border-radius:5px;cursor:pointer;
+  font-size:10px;letter-spacing:0.7px;transition:all 0.2s;font-family:inherit;}
+body.dark .ctrls button{background:rgba(15,23,42,0.6);border-color:#1e293b;color:#475569;}
+body.dark .ctrls button:hover{background:#1e293b;color:#94a3b8;}
+body.dark .ctrls button.on{background:rgba(78,205,196,0.12);color:#4ECDC4;border-color:rgba(78,205,196,0.25);}
+body.light .ctrls button{background:rgba(255,255,255,0.6);border-color:#d1d5db;color:#6b7280;}
+body.light .ctrls button:hover{background:#f3f4f6;color:#374151;}
+body.light .ctrls button.on{background:rgba(78,205,196,0.12);color:#0d9488;border-color:rgba(78,205,196,0.4);}
+.div{width:1px;height:16px;margin:0 2px;}
+body.dark .div{background:#1e293b;}body.light .div{background:#d1d5db;}
+.info{position:fixed;bottom:10px;left:12px;font-size:10px;letter-spacing:0.5px;z-index:10;
+  display:flex;gap:8px;align-items:center;}
+body.dark .info{color:#334155;}body.light .info{color:#94a3b8;}
+.info .trait{display:flex;align-items:center;gap:3px;}
+.info .dot{width:6px;height:6px;border-radius:50%;display:inline-block;}
+</style>
+</head>
+<body class="dark">
+<div class="ctrls">
+  <button onclick="newOrg()">Random</button>
+  <div class="div"></div>
+  <button onclick="sS(0)" id="s0">Seed</button>
+  <button onclick="sS(1)" id="s1">Young</button>
+  <button onclick="sS(2)" id="s2">Growing</button>
+  <button onclick="sS(3)" id="s3" class="on">Full</button>
+  <div class="div"></div>
+  <button onclick="sE('human')" id="eh" class="on">Human</button>
+  <button onclick="sE('ai')" id="ea">AI</button>
+  <div class="div"></div>
+  <button onclick="sT('dark')" id="td" class="on">Dark</button>
+  <button onclick="sT('light')" id="tl">Light</button>
+</div>
+<div class="info" id="info"></div>
+<canvas id="c"></canvas>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// AURA ORGANISM v19 — Rounder hull (Chaikin), more wiggle, soft AI fade.
+// ═══════════════════════════════════════════════════════════════
+
+const PI=Math.PI, TAU=PI*2;
+
+const TR={
+  O:{l:'Open',    base:[78,205,196],  acc:[255,154,139]},
+  C:{l:'Consc',   base:[69,183,209],  acc:[255,183,77]},
+  E:{l:'Extra',   base:[150,230,161], acc:[230,120,200]},
+  A:{l:'Agree',   base:[221,160,221], acc:[120,220,180]},
+  N:{l:'Neuro',   base:[247,220,111], acc:[140,160,240]}
+};
+const TK=Object.keys(TR);
+const SSC=[0.20,0.45,0.72,1.0], GSC=[0.35,0.55,0.78,1.0];
+
+let cvs,ctx,CW,CH,CX,CY,oR;
+let ent='human',thm='dark',stg=3;
+let gen,allN,actN,cons,puls;
+let t0=0,tL=0,breath=0;
+// Hull points for membrane (recomputed each frame)
+let hullPts=[];
+
+// ═══ HELPERS ═══
+function m32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function rga(c,a){return`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;}
+function ltn(c,n){return[Math.min(255,c[0]+n),Math.min(255,c[1]+n),Math.min(255,c[2]+n)];}
+function drk(c,n){return[Math.max(0,c[0]-n),Math.max(0,c[1]-n),Math.max(0,c[2]-n)];}
+function dst(x1,y1,x2,y2){const a=x1-x2,b=y1-y2;return Math.sqrt(a*a+b*b);}
+function bl(cs,ws){let r=0,g=0,b=0,w=0;for(let i=0;i<cs.length;i++){r+=cs[i][0]*ws[i];g+=cs[i][1]*ws[i];b+=cs[i][2]*ws[i];w+=ws[i];}return w?[r/w|0,g/w|0,b/w|0]:[128,128,128];}
+function lr3(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+function sat(c,s){const g=0.299*c[0]+0.587*c[1]+0.114*c[2];return[Math.min(255,g+(c[0]-g)*s)|0,Math.min(255,g+(c[1]-g)*s)|0,Math.min(255,g+(c[2]-g)*s)|0];}
+function vc(c,d){return d?c:sat(ltn(c,35),1.5);}
+function clamp(v,lo,hi){return v<lo?lo:v>hi?hi:v;}
+
+// Value noise
+const PERM=new Uint8Array(512);
+(function(){const r=m32(42);for(let i=0;i<256;i++)PERM[i]=i;
+  for(let i=255;i>0;i--){const j=(r()*i)|0;[PERM[i],PERM[j]]=[PERM[j],PERM[i]];}
+  for(let i=0;i<256;i++)PERM[i+256]=PERM[i];})();
+function noise2(x,y){
+  const xi=Math.floor(x)&255,yi=Math.floor(y)&255,xf=x-Math.floor(x),yf=y-Math.floor(y);
+  const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=PERM[xi]+yi,b=PERM[xi+1]+yi;
+  return((PERM[a]/255*(1-u)+PERM[b]/255*u)*(1-v)+(PERM[a+1]/255*(1-u)+PERM[b+1]/255*u)*v);
+}
+function fbm(x,y,oct){let v=0,a=0.5,f=1;for(let i=0;i<oct;i++){v+=a*noise2(x*f,y*f);a*=0.5;f*=2;}return v;}
+
+// ═══ CONVEX HULL ═══
+function convexHull(points){
+  if(points.length<3) return points.slice();
+  const sorted=points.slice().sort((a,b)=>a.x-b.x||a.y-b.y);
+  const cross=(O,A,B)=>(A.x-O.x)*(B.y-O.y)-(A.y-O.y)*(B.x-O.x);
+  const lower=[];
+  for(const p of sorted){
+    while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0) lower.pop();
+    lower.push(p);
+  }
+  const upper=[];
+  for(let i=sorted.length-1;i>=0;i--){
+    const p=sorted[i];
+    while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0) upper.pop();
+    upper.push(p);
+  }
+  return lower.slice(0,-1).concat(upper.slice(0,-1));
+}
+
+// ═══ CHAIKIN CORNER CUTTING — rounds hull vertices ═══
+function chaikin(pts, iters){
+  let cur=pts;
+  for(let it=0;it<iters;it++){
+    const next=[];
+    for(let i=0;i<cur.length;i++){
+      const a=cur[i], b=cur[(i+1)%cur.length];
+      next.push({x:a.x*0.75+b.x*0.25, y:a.y*0.75+b.y*0.25});
+      next.push({x:a.x*0.25+b.x*0.75, y:a.y*0.25+b.y*0.75});
+    }
+    cur=next;
+  }
+  return cur;
+}
+
+// ═══ GENOME ═══
+function mkGen(){
+  const s=Math.random()*99999|0, r=m32(s), tv={};
+  for(const k of TK)tv[k]=0.08+r()*0.15;
+  const rk=[...TK].sort(()=>r()-0.5);
+  tv[rk[0]]=0.93+r()*0.07;
+  tv[rk[1]]=0.62+r()*0.18;
+  tv[rk[2]]=0.30+r()*0.15;
+  tv[rk[3]]=0.08+r()*0.08;
+  tv[rk[4]]=0.01+r()*0.03;
+  const so=[...TK].sort((a,b)=>tv[b]-tv[a]);
+  const glow=bl([TR[so[0]].base,TR[so[1]].base],[0.65,0.35]);
+  const iord=[0,1,2,3,4,5].sort(()=>r()-0.5);
+  const ints={};for(let i=0;i<5;i++)ints[TK[i]]=iord[i];
+  return{tv,s,dom:rk[0],glow,glowAcc:TR[so[0]].acc,ints,so,rk};
+}
+
+// ═══ NODES ═══
+function mkNodes(g){
+  const r=m32(g.s+3333),ns=[];
+  for(let i=0;i<5;i++){
+    const k=TK[i],v=g.tv[k];
+    const an=(i/5)*TAU-PI/2 + (v-0.5)*0.3;
+    const br=oR*(0.28+0.22*v);
+    const rd=oR*(0.06+v*0.14);
+    ns.push({tp:'p',k,tv:v,rgb:TR[k].base,acc:TR[k].acc,iIdx:g.ints[k],
+      bA:an,bR:br,x:0,y:0,dp:0,
+      rd,sd:g.s+i*137.5,bp:i*1.47,stg:0});
+  }
+  for(let i=0;i<5;i++){const p=ns[i];for(let c=0;c<5;c++){
+    const o=p.bA+(c-2)*0.3+(r()-0.5)*0.2,cr=p.bR+oR*(0.04+r()*0.06);
+    const v=p.tv*(0.25+r()*0.35);
+    ns.push({tp:'c',k:p.k,tv:v,rgb:p.rgb,acc:p.acc,
+      bA:o,bR:cr,x:0,y:0,dp:0,
+      rd:oR*(0.010+v*0.025),sd:g.s+(10+i*5+c)*137.5,bp:(10+i*5+c)*0.9,stg:1});
+  }}
+  const AD=[
+    {a:['O','C'],n:5},{a:['E','N'],n:5},{a:['O'],n:4},{a:['E','A'],n:5},{a:['C','N'],n:4},
+    {a:['O','C','E','A','N'],n:7},{a:['A','E'],n:5},{a:['N','O'],n:5},
+    {a:['O','E'],n:4},{a:['C','A'],n:4},{a:['N','E','A'],n:5}
+  ];
+  let ai=0;
+  for(let a=0;a<AD.length;a++){const d=AD[a],sr2=a<5?2:3;
+    for(let n=0;n<d.n;n++){
+      const ak=d.a[n%d.a.length],ai2=TK.indexOf(ak),ap=ns[ai2];
+      const sc=oR*(0.04+r()*0.10),sa=r()*TAU,v=ap.tv*(0.12+r()*0.22);
+      const nb=ns[(ai2+1+Math.floor(r()*3))%5];
+      const rgb=lr3(ap.rgb,nb.acc,0.15+r()*0.2).map(x=>clamp(x|0,0,255));
+      ns.push({tp:'a',k:ak,tv:v,rgb,acc:ap.acc,
+        bA:ap.bA+(r()-0.5)*0.8,bR:ap.bR+sc*(0.5+r()*0.5),x:0,y:0,dp:0,
+        rd:oR*(0.004+v*0.012),sd:g.s+(40+ai)*137.5,bp:(40+ai)*0.7,stg:sr2});ai++;
+  }}
+  for(let h=0;h<18;h++){
+    const ha=(h/18)*TAU+(r()-0.5)*0.3;
+    const pi=h%5,pp=ns[pi],v=pp.tv*(0.08+r()*0.12);
+    const hr=pp.bR+oR*(0.02+r()*0.06);
+    const rgb=lr3(pp.rgb,pp.acc,0.2+r()*0.3).map(x=>clamp(x|0,0,255));
+    ns.push({tp:'a',k:TK[pi],tv:v,rgb,acc:pp.acc,
+      bA:ha,bR:hr,x:0,y:0,dp:0,
+      rd:oR*(0.003+v*0.006),sd:g.s+(120+h)*137.5,bp:(120+h)*0.5,stg:3});
+  }
+  return ns;
+}
+
+function filt(ns,si){return ns.filter(n=>n.tp==='p'||(n.tp==='c'&&si>=1)||(n.tp==='a'&&si>=n.stg));}
+
+// ═══ COMPUTE HULL from node positions ═══
+function computeHull(ns,t){
+  const sc=SSC[stg];
+  // Generate boundary points: for each node, emit points around its perimeter
+  const pts=[];
+  for(const n of ns){
+    const r=n.rd*sc;
+    const pad=r*0.25+oR*0.035; // slightly more padding for rounder feel
+    const totalR=r+pad;
+    const count=n.tp==='p'?10:5;
+    for(let i=0;i<count;i++){
+      const a=(i/count)*TAU;
+      pts.push({x:n.x+Math.cos(a)*totalR, y:n.y+Math.sin(a)*totalR});
+    }
+  }
+  if(pts.length<3) return [{x:CX-20,y:CY-20},{x:CX+20,y:CY-20},{x:CX+20,y:CY+20},{x:CX-20,y:CY+20}];
+  // Convex hull then Chaikin smooth 3 passes to round corners
+  return chaikin(convexHull(pts), 3);
+}
+
+// ═══ TRACE HULL as smooth path (already Chaikin-smoothed) ═══
+function traceSmoothedHull(ctx,hull){
+  if(hull.length<3) return;
+  const n=hull.length;
+  ctx.beginPath();
+  // Catmull-Rom through the smoothed points for buttery curves
+  for(let i=0;i<n;i++){
+    const p0=hull[(i-1+n)%n], p1=hull[i], p2=hull[(i+1)%n], p3=hull[(i+2)%n];
+    if(i===0) ctx.moveTo(p1.x,p1.y);
+    const segs=6;
+    for(let s=1;s<=segs;s++){
+      const t=s/segs, t2=t*t, t3=t2*t;
+      const x=0.5*((-p0.x+3*p1.x-3*p2.x+p3.x)*t3+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+p2.x)*t+2*p1.x);
+      const y=0.5*((-p0.y+3*p1.y-3*p2.y+p3.y)*t3+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+p2.y)*t+2*p1.y);
+      ctx.lineTo(x,y);
+    }
+  }
+  ctx.closePath();
+}
+
+// ═══ PHYSICS — liquid drift ═══
+function updPhys(ns,t){
+  breath=Math.sin(t*0.12)*0.003;
+  const sc=SSC[stg];
+  const bsc=1+breath;
+  const driftAmp=oR*sc*0.07;
+
+  for(const n of ns){
+    const baseX=CX+Math.cos(n.bA)*n.bR*bsc*sc;
+    const baseY=CY+Math.sin(n.bA)*n.bR*bsc*sc;
+    const nx=(fbm(n.sd*0.1+t*0.02, t*0.015, 3)*2-1);
+    const ny=(fbm(t*0.018, n.sd*0.1+t*0.022, 3)*2-1);
+    n.x=baseX+nx*driftAmp;
+    n.y=baseY+ny*driftAmp;
+  }
+
+  // Center all nodes so centroid = viewport center
+  let cx=0,cy=0;
+  for(const n of ns){cx+=n.x;cy+=n.y;}
+  cx/=ns.length;cy/=ns.length;
+  const sx=CX-cx, sy=CY-cy;
+  for(const n of ns){n.x+=sx;n.y+=sy;}
+
+  // Compute hull
+  hullPts=computeHull(ns,t);
+}
+
+// ═══ CONNECTIONS ═══
+function mkCon(ns){
+  const cn=[],seen=new Set(),K=7;
+  for(let i=0;i<ns.length;i++){const dd=[];
+    for(let j=0;j<ns.length;j++){if(i===j)continue;
+      const xi=CX+Math.cos(ns[i].bA)*ns[i].bR, yi=CY+Math.sin(ns[i].bA)*ns[i].bR;
+      const xj=CX+Math.cos(ns[j].bA)*ns[j].bR, yj=CY+Math.sin(ns[j].bA)*ns[j].bR;
+      dd.push({j,d:dst(xi,yi,xj,yj)});}
+    dd.sort((a,b)=>a.d-b.d);
+    for(let k=0;k<Math.min(K,dd.length);k++){const j=dd[k].j,ky=Math.min(i,j)+'-'+Math.max(i,j);
+      if(seen.has(ky))continue;seen.add(ky);
+      cn.push({a:i,b:j,col:bl([ns[i].rgb,ns[j].rgb],[0.5,0.5]),
+        str:(ns[i].tv+ns[j].tv)/2,cs:i*31+j*17,
+        isPP:ns[i].tp==='p'&&ns[j].tp==='p'});}}
+  const pI=[];ns.forEach((n,i)=>{if(n.tp==='p')pI.push(i);});
+  for(let i=0;i<pI.length;i++)for(let j=i+1;j<pI.length;j++){
+    const ky=pI[i]+'-'+pI[j];
+    if(!seen.has(ky)){seen.add(ky);const a=ns[pI[i]],b=ns[pI[j]];
+      cn.push({a:pI[i],b:pI[j],col:bl([a.rgb,b.rgb],[0.5,0.5]),
+        str:(a.tv+b.tv)/2,cs:pI[i]*31+pI[j]*17,isPP:true});}}
+  return cn;
+}
+function mkPul(cn,sd){
+  const r=m32(sd+5555),ps=[];
+  for(const c of cn){const ct=1+Math.floor(c.str*1.5);
+    for(let i=0;i<ct;i++)ps.push({a:c.a,b:c.b,cs:c.cs,p:r(),sp:0.03+r()*0.05,
+      dr:r()>0.5?1:-1,col:ltn(c.col,55),sz:0.8+c.str*1.5+(c.isPP?1:0)});}
+  return ps;
+}
+function updPul(ps,dt){for(const q of ps){q.p+=q.sp*q.dr*dt;if(q.p>1)q.p-=1;if(q.p<0)q.p+=1;}}
+function cMid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2};}
+
+// ═══ BLOB PATH ═══
+function blobP(ctx,cx,cy,r,sd,t){
+  ctx.beginPath();for(let i=0;i<=48;i++){const a=(i/48)*TAU;
+    const br=r+Math.sin(a*3+t*0.12+sd)*r*0.08+Math.sin(a*5+t*0.07+sd*1.3)*r*0.04
+      +Math.sin(a*2+t*0.15+sd*0.7)*r*0.05;
+    ctx.lineTo(cx+Math.cos(a)*br,cy+Math.sin(a)*br);}
+  ctx.closePath();
+}
+
+// ═══ INTERIORS ═══
+const INT=[
+{name:'Chromatin',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*8901|0),b=d?ltn(col,85):ltn(col,48),h=d?ltn(col,140):ltn(col,90);
+  for(let s=0;s<9;s++){const sa=sr()*TAU,sR=sr()*r*0.35;
+    let px=n.x+Math.cos(sa)*sR,py=n.y+Math.sin(sa)*sR;
+    cx.beginPath();cx.moveTo(px,py);
+    for(let p=0;p<30;p++){const da=sr()*1.0-0.5+Math.sin(t*0.03+s+p*0.3)*0.15,step=r*0.04+sr()*r*0.025;
+      px+=Math.cos(da+p*0.5+s)*step;py+=Math.sin(da+p*0.7+s)*step;cx.lineTo(px,py);}
+    cx.strokeStyle=rga(b,d?0.5:0.4);cx.lineWidth=0.7+sr()*0.5;cx.lineCap='round';cx.stroke();}
+  for(let i=0;i<8;i++){const a=sr()*TAU,dd=sr()*r*0.6;
+    const jx=n.x+Math.cos(a)*dd,jy=n.y+Math.sin(a)*dd,sz=1+sr()*2;
+    const jg=cx.createRadialGradient(jx,jy,0,jx,jy,sz*3);
+    jg.addColorStop(0,rga(h,d?0.7:0.6));jg.addColorStop(0.4,rga(b,d?0.2:0.15));jg.addColorStop(1,rga(b,0));
+    cx.fillStyle=jg;cx.beginPath();cx.arc(jx,jy,sz*3,0,TAU);cx.fill();}}},
+{name:'Constellation',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*7913|0),b=d?ltn(col,90):ltn(col,55),h=d?ltn(col,140):ltn(col,90);
+  const stars=14+Math.floor(sr()*8),pts=[];
+  for(let i=0;i<stars;i++){const a=sr()*TAU,dd=r*0.08+sr()*r*0.7;
+    pts.push({x:n.x+Math.cos(a)*dd,y:n.y+Math.sin(a)*dd});}
+  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+    const dd=dst(pts[i].x,pts[i].y,pts[j].x,pts[j].y);
+    if(dd<r*0.8&&sr()>0.2){cx.beginPath();cx.moveTo(pts[i].x,pts[i].y);cx.lineTo(pts[j].x,pts[j].y);
+      cx.strokeStyle=rga(b,(d?0.2:0.14)*(1-dd/(r*0.8)));cx.lineWidth=0.3;cx.stroke();}}
+  for(const p of pts){const sz=2+sr()*3;
+    const sg=cx.createRadialGradient(p.x,p.y,0,p.x,p.y,sz*2);
+    sg.addColorStop(0,rga(h,d?0.85:0.75));sg.addColorStop(0.4,rga(b,d?0.2:0.15));sg.addColorStop(1,rga(b,0));
+    cx.fillStyle=sg;cx.beginPath();cx.arc(p.x,p.y,sz*2,0,TAU);cx.fill();}}},
+{name:'Vesicles',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*4567|0),b=d?ltn(col,70):ltn(col,40),h=d?ltn(col,120):ltn(col,70);
+  const ct=8+Math.floor(sr()*7+n.tv*5),vpts=[];
+  for(let i=0;i<ct;i++){const a=sr()*TAU,dd=r*0.12+sr()*r*0.55,sz=r*0.06+sr()*r*0.12;
+    const vx=n.x+Math.cos(a)*dd,vy=n.y+Math.sin(a)*dd;vpts.push({x:vx,y:vy,sz});
+    blobP(cx,vx,vy,sz,n.sd+i*71,t);cx.fillStyle=rga(d?drk(b,20):ltn(b,10),d?0.45:0.35);cx.fill();
+    blobP(cx,vx,vy,sz,n.sd+i*71,t);cx.strokeStyle=rga(b,d?0.25:0.2);cx.lineWidth=0.5;cx.stroke();
+    const vg=cx.createRadialGradient(vx,vy,0,vx,vy,sz*0.6);
+    vg.addColorStop(0,rga(h,d?0.4:0.3));vg.addColorStop(1,rga(h,0));
+    cx.fillStyle=vg;cx.beginPath();cx.arc(vx,vy,sz*0.6,0,TAU);cx.fill();}
+  for(let i=0;i<vpts.length;i++)for(let j=i+1;j<vpts.length;j++){
+    if(dst(vpts[i].x,vpts[i].y,vpts[j].x,vpts[j].y)<r*0.5){
+      cx.beginPath();cx.moveTo(vpts[i].x,vpts[i].y);cx.lineTo(vpts[j].x,vpts[j].y);
+      cx.strokeStyle=rga(b,d?0.15:0.1);cx.lineWidth=0.3;cx.stroke();}}}},
+{name:'Axon Tree',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*1234|0),b=d?ltn(col,100):ltn(col,60),h=d?ltn(col,150):ltn(col,100);
+  const arms=4+Math.floor(sr()*2);
+  for(let a=0;a<arms;a++){const bA=(a/arms)*TAU+sr()*0.5;
+    let px=n.x,py=n.y,ca=bA,lw=2.5+sr()*1.5;
+    for(let seg=0;seg<12;seg++){const len=(r*0.1)*(1-seg*0.035)+sr()*r*0.025;
+      const nx=px+Math.cos(ca)*len,ny=py+Math.sin(ca)*len;
+      cx.beginPath();cx.moveTo(px,py);cx.lineTo(nx,ny);
+      cx.strokeStyle=rga(b,(d?0.55:0.45)*(1-seg*0.06));cx.lineWidth=lw;cx.lineCap='round';cx.stroke();
+      px=nx;py=ny;ca+=sr()*0.7-0.35;lw*=0.82;
+      if(seg>2&&sr()>0.35){const ba=ca+(sr()>0.5?0.5:-0.5);let bx=px,by=py,bw=lw*0.7;
+        for(let bb=0;bb<5;bb++){const bx2=bx+Math.cos(ba+sr()*0.3)*r*0.05,by2=by+Math.sin(ba+sr()*0.3)*r*0.05;
+          cx.beginPath();cx.moveTo(bx,by);cx.lineTo(bx2,by2);
+          cx.strokeStyle=rga(b,(d?0.35:0.25)*(1-bb*0.12));cx.lineWidth=bw;cx.lineCap='round';cx.stroke();
+          bx=bx2;by=by2;bw*=0.7;}}}}
+  const sg=cx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*0.22);
+  sg.addColorStop(0,rga(h,d?0.85:0.75));sg.addColorStop(0.4,rga(b,d?0.35:0.25));sg.addColorStop(1,rga(b,0));
+  cx.fillStyle=sg;cx.beginPath();cx.arc(n.x,n.y,r*0.22,0,TAU);cx.fill();}},
+{name:'Membrane Folds',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*6802|0),b=d?ltn(col,80):ltn(col,45),h=d?ltn(col,130):ltn(col,80);
+  for(let L=0;L<7;L++){const lr=r*(0.1+L*0.12),wa=lr*0.15+sr()*lr*0.1;
+    cx.beginPath();for(let s=0;s<=48;s++){const a=(s/48)*TAU;
+      const w=Math.sin(a*3+t*0.05+L*2+sr()*5)*wa+Math.sin(a*5+t*0.03+L)*wa*0.4;
+      cx.lineTo(n.x+Math.cos(a)*(lr+w),n.y+Math.sin(a)*(lr+w));}
+    cx.closePath();cx.strokeStyle=rga(b,(d?0.42:0.32)*(1-L*0.06));cx.lineWidth=0.7+sr()*0.4;cx.stroke();}
+  for(let i=0;i<10;i++){const a=sr()*TAU;
+    cx.beginPath();cx.moveTo(n.x+Math.cos(a)*r*0.1,n.y+Math.sin(a)*r*0.1);
+    cx.lineTo(n.x+Math.cos(a+sr()*0.2)*r*0.75,n.y+Math.sin(a+sr()*0.2)*r*0.75);
+    cx.strokeStyle=rga(h,d?0.15:0.1);cx.lineWidth=0.3;cx.stroke();}}},
+{name:'Synaptic',fn(cx,n,r,col,d,t){
+  const sr=m32(n.sd*3456|0),b=d?ltn(col,80):ltn(col,45),h=d?ltn(col,130):ltn(col,80);
+  const arms=6+Math.floor(sr()*3),jns=[];
+  for(let a=0;a<arms;a++){const ba=(a/arms)*TAU+sr()*0.4;
+    let px=n.x,py=n.y,ca=ba;
+    for(let s=0;s<8;s++){const len=r*0.09+sr()*r*0.05,nx=px+Math.cos(ca)*len,ny=py+Math.sin(ca)*len;
+      cx.beginPath();cx.moveTo(px,py);cx.lineTo(nx,ny);
+      cx.strokeStyle=rga(b,(d?0.45:0.35)*(1-s*0.08));cx.lineWidth=1.3-s*0.1;cx.lineCap='round';cx.stroke();
+      if(s>0&&sr()>0.25)jns.push({x:nx,y:ny,sz:1.2+sr()*2.5});
+      px=nx;py=ny;ca+=sr()*0.6-0.3;}}
+  for(const j of jns){const jg=cx.createRadialGradient(j.x,j.y,0,j.x,j.y,j.sz*3);
+    jg.addColorStop(0,rga(h,d?0.8:0.7));jg.addColorStop(0.3,rga(b,d?0.25:0.18));jg.addColorStop(1,rga(b,0));
+    cx.fillStyle=jg;cx.beginPath();cx.arc(j.x,j.y,j.sz*3,0,TAU);cx.fill();}
+  for(let i=0;i<jns.length;i++)for(let j=i+1;j<jns.length;j++){
+    if(dst(jns[i].x,jns[i].y,jns[j].x,jns[j].y)<r*0.5&&sr()>0.4){
+      cx.beginPath();cx.moveTo(jns[i].x,jns[i].y);cx.lineTo(jns[j].x,jns[j].y);
+      cx.strokeStyle=rga(b,d?0.12:0.08);cx.lineWidth=0.25;cx.stroke();}}}}
+];
+
+// ═══ MEMBRANE — smoothed convex hull ═══
+function drawMem(ctx,d,hull){
+  if(hull.length<3) return;
+  const widths=[18,8,3.5,1.0],alphas=[d?0.035:0.02,d?0.065:0.04,d?0.11:0.07,d?0.32:0.22];
+  const mc=d?ltn(gen.glow,30):drk(gen.glow,10);
+  for(let pass=0;pass<4;pass++){
+    traceSmoothedHull(ctx,hull);
+    ctx.strokeStyle=rga(mc,alphas[pass]);
+    ctx.lineWidth=widths[pass];
+    ctx.lineJoin='round';
+    ctx.lineCap='round';
+    ctx.stroke();
+  }
+}
+
+// ═══ GLOW — from each PRIMARY position, radiating into space ═══
+function drawGlow(ctx,d,prims){
+  for(const p of prims){
+    const pc=d?p.rgb:sat(p.rgb,1.4);
+    const str=p.tv*GSC[stg];
+    if(str<0.03) continue;
+    const sc=SSC[stg];
+    const nodeR=p.rd*sc;
+    const glowR=oR*1.5+p.tv*oR*1.5;
+    const g=ctx.createRadialGradient(p.x,p.y,nodeR*0.5,p.x,p.y,glowR);
+    g.addColorStop(0,rga(pc,(d?0.25:0.16)*str));
+    g.addColorStop(0.08,rga(pc,(d?0.18:0.11)*str));
+    g.addColorStop(0.2,rga(pc,(d?0.10:0.06)*str));
+    g.addColorStop(0.4,rga(pc,(d?0.04:0.025)*str));
+    g.addColorStop(0.7,rga(pc,(d?0.015:0.008)*str));
+    g.addColorStop(1,rga(pc,0));
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,CW,CH);
+  }
+}
+
+function drawAIFade(ctx,d){
+  // AI mode: no explicit boundary at all.
+  // The glow from primaries naturally fades. Nothing else needed.
+  // Just a very subtle, wide vignette at the far edges of the viewport to ground it.
+  const bg=d?'5,10,24':'240,242,245';
+  const vR=Math.max(CW,CH)*0.8;
+  const g=ctx.createRadialGradient(CX,CY,vR*0.5,CX,CY,vR);
+  g.addColorStop(0,`rgba(${bg},0)`);
+  g.addColorStop(0.7,`rgba(${bg},0)`);
+  g.addColorStop(1,`rgba(${bg},0.3)`);
+  ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);
+}
+
+// ═══ BODY FILL ═══
+function drawBody(ctx,prims,d,hull){
+  if(hull.length<3) return;
+  ctx.save();
+  traceSmoothedHull(ctx,hull);
+  ctx.clip();
+  // Compute rough extent
+  let maxR=0;
+  for(const h of hull){const d2=dst(h.x,h.y,CX,CY);if(d2>maxR)maxR=d2;}
+  maxR=Math.max(maxR,50);
+  const baseCol=d?ltn(gen.glow,15):drk(gen.glow,15);
+  const bg=ctx.createRadialGradient(CX,CY,0,CX,CY,maxR);
+  bg.addColorStop(0,rga(baseCol,d?0.12:0.08));
+  bg.addColorStop(0.6,rga(baseCol,d?0.08:0.05));
+  bg.addColorStop(1,rga(baseCol,d?0.04:0.025));
+  ctx.fillStyle=bg;ctx.fillRect(0,0,CW,CH);
+  for(const p of prims){
+    const pc=d?p.rgb:sat(p.rgb,1.3), strength=p.tv*(d?0.14:0.1);
+    const r=maxR*0.65;
+    const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+    g.addColorStop(0,rga(pc,strength));
+    g.addColorStop(0.4,rga(pc,strength*0.4));
+    g.addColorStop(1,rga(pc,0));
+    ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);
+  }
+  ctx.restore();
+}
+
+// ═══ NEURAL NETWORK ═══
+function drawNeural(ctx,prims,d){
+  const sr=m32(gen.s+9999);
+  for(let i=0;i<prims.length;i++){
+    for(let j=i+1;j<prims.length;j++){
+      const a=prims[i],b=prims[j];
+      const col=bl([a.rgb,b.rgb],[0.5,0.5]);
+      const bc=d?ltn(col,60):ltn(col,30);
+      const count=3+Math.floor((a.tv+b.tv)*2);
+      for(let f=0;f<count;f++){
+        const spread=(f/(count-1||1)-0.5)*0.6;
+        const dx=b.x-a.x, dy=b.y-a.y, len=Math.sqrt(dx*dx+dy*dy)||1;
+        const nx=-dy/len, ny=dx/len;
+        const off=spread*oR*0.08;
+        const mx=(a.x+b.x)/2+nx*off, my=(a.y+b.y)/2+ny*off;
+        ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mx,my,b.x,b.y);
+        ctx.strokeStyle=rga(bc,d?0.08:0.06);ctx.lineWidth=0.4+sr()*0.5;ctx.stroke();
+      }
+    }
+  }
+  const r2=m32(gen.s+1111);
+  const dotCount=20+stg*12;
+  let maxR=0;
+  for(const h of hullPts){const d2=dst(h.x,h.y,CX,CY);if(d2>maxR)maxR=d2;}
+  maxR=Math.max(maxR,50);
+  for(let i=0;i<dotCount;i++){
+    const a=r2()*TAU,dd=maxR*(0.1+r2()*0.35);
+    const px=CX+Math.cos(a)*dd,py=CY+Math.sin(a)*dd;
+    const dists=prims.map(p=>({p,d:dst(px,py,p.x,p.y)})).sort((a,b)=>a.d-b.d);
+    if(dists.length<2) continue;
+    const c=bl([dists[0].p.rgb,dists[1].p.rgb],[0.6,0.4]);
+    const bc=d?ltn(c,70):ltn(c,40);
+    const sz=0.8+r2()*1.5;
+    const g=ctx.createRadialGradient(px,py,0,px,py,sz*2.5);
+    g.addColorStop(0,rga(bc,d?0.4:0.3));g.addColorStop(0.4,rga(bc,d?0.1:0.07));g.addColorStop(1,rga(bc,0));
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(px,py,sz*2.5,0,TAU);ctx.fill();
+  }
+}
+
+// ═══ MAIN RENDER ═══
+function render(ts){
+  const t=(ts-t0)/1000, dt=tL?Math.min((ts-tL)/1000,0.05):0.016; tL=ts;
+  const d=thm==='dark', sc=SSC[stg];
+
+  cvs.width=CW; cvs.height=CH;
+  ctx.fillStyle=d?'#050A18':'#F0F2F5'; ctx.fillRect(0,0,CW,CH);
+
+  updPhys(actN,t);
+  updPul(puls,dt);
+
+  const prims=actN.filter(n=>n.tp==='p');
+
+  // ── Layer 1: Color glow from each primary ──
+  drawGlow(ctx,d,prims);
+
+  // ── Layer 2: Membrane or AI fade ──
+  if(ent==='human'){
+    drawMem(ctx,d,hullPts);
+    // ── Layer 3: Body fill (clipped to membrane) ──
+    drawBody(ctx,prims,d,hullPts);
+  } else {
+    drawAIFade(ctx,d);
+  }
+
+  // ══ Clip interior rendering to membrane (human) or render free (AI) ══
+  ctx.save();
+  if(ent==='human' && hullPts.length>=3){
+    traceSmoothedHull(ctx,hullPts);
+    ctx.clip();
+  }
+
+  drawNeural(ctx,prims,d);
+
+  // ── Tissue connections ──
+  for(const c of cons){
+    const a=actN[c.a],b=actN[c.b]; if(!a||!b)continue;
+    const mid=cMid(a,b), col=vc(c.col,d);
+    if(c.isPP){
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
+      ctx.strokeStyle=rga(col,(d?0.04:0.045)+c.str*0.02);ctx.lineWidth=22+c.str*12;ctx.lineCap='round';ctx.stroke();
+    }
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
+    ctx.strokeStyle=rga(col,(d?0.05:0.06)+c.str*0.025);ctx.lineWidth=6+c.str*4;ctx.lineCap='round';ctx.stroke();
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
+    ctx.strokeStyle=rga(d?ltn(col,25):col,(d?0.35:0.4)+c.str*0.12);ctx.lineWidth=0.5+c.str*0.7;ctx.stroke();
+  }
+
+  // ── Energy pulses ──
+  for(const p of puls){
+    const a=actN[p.a],b=actN[p.b]; if(!a||!b)continue;
+    const mid=cMid(a,b),pr=p.p,mt=1-pr;
+    const px=mt*mt*a.x+2*mt*pr*mid.x+pr*pr*b.x, py=mt*mt*a.y+2*mt*pr*mid.y+pr*pr*b.y;
+    const gr=ctx.createRadialGradient(px,py,0,px,py,p.sz*3);
+    gr.addColorStop(0,rga(vc(p.col,d),d?0.6:0.5));
+    gr.addColorStop(0.3,rga(p.col,d?0.18:0.12));
+    gr.addColorStop(1,rga(p.col,0));
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(px,py,p.sz*3,0,TAU);ctx.fill();
+  }
+
+  // ── Nodes ──
+  const sorted=[...actN].sort((a,b)=>a.dp-b.dp);
+  for(const n of sorted){
+    const r=n.rd*sc*(1+0.02*Math.sin(n.bp+t*0.3)+breath), col=vc(n.rgb,d);
+    if(n.tp==='p'){
+      const hr=ctx.createRadialGradient(n.x,n.y,r*0.6,n.x,n.y,r*2.5);
+      hr.addColorStop(0,rga(col,d?0.2:0.15));hr.addColorStop(0.4,rga(col,d?0.08:0.05));hr.addColorStop(1,rga(col,0));
+      ctx.fillStyle=hr;ctx.beginPath();ctx.arc(n.x,n.y,r*2.5,0,TAU);ctx.fill();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.fillStyle=rga(d?drk(col,55):ltn(col,10),d?0.88:0.78);ctx.fill();
+      ctx.save();blobP(ctx,n.x,n.y,r,n.sd,t);ctx.clip();INT[n.iIdx].fn(ctx,n,r,col,d,t);ctx.restore();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.strokeStyle=rga(col,d?0.12:0.08);ctx.lineWidth=5;ctx.stroke();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.strokeStyle=rga(col,d?0.28:0.18);ctx.lineWidth=2;ctx.stroke();
+      blobP(ctx,n.x,n.y,r,n.sd,t);ctx.strokeStyle=rga(d?ltn(col,40):col,d?0.65:0.55);ctx.lineWidth=0.7;ctx.stroke();
+    } else if(n.tp==='c'){
+      const g2=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*4);
+      g2.addColorStop(0,rga(col,d?0.28:0.2));g2.addColorStop(0.3,rga(col,d?0.1:0.06));g2.addColorStop(1,rga(col,0));
+      ctx.fillStyle=g2;ctx.beginPath();ctx.arc(n.x,n.y,r*4,0,TAU);ctx.fill();
+      ctx.fillStyle=rga(d?drk(col,25):ltn(col,10),d?0.82:0.72);ctx.beginPath();ctx.arc(n.x,n.y,r,0,TAU);ctx.fill();
+      ctx.fillStyle=rga(d?ltn(col,80):col,d?0.85:0.8);ctx.beginPath();ctx.arc(n.x,n.y,r*0.35,0,TAU);ctx.fill();
+      ctx.strokeStyle=rga(col,d?0.5:0.38);ctx.lineWidth=0.4;ctx.beginPath();ctx.arc(n.x,n.y,r,0,TAU);ctx.stroke();
+    } else {
+      const g3=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*3);
+      g3.addColorStop(0,rga(col,d?0.28:0.2));g3.addColorStop(0.3,rga(col,d?0.08:0.05));g3.addColorStop(1,rga(col,0));
+      ctx.fillStyle=g3;ctx.beginPath();ctx.arc(n.x,n.y,r*3,0,TAU);ctx.fill();
+      ctx.fillStyle=rga(col,d?0.7:0.58);ctx.beginPath();ctx.arc(n.x,n.y,r,0,TAU);ctx.fill();
+    }
+  }
+
+  ctx.restore();
+  requestAnimationFrame(render);
+}
+
+// ═══ CONTROLS ═══
+function newOrg(){
+  gen=mkGen(); allN=mkNodes(gen);
+  actN=filt(allN,stg); cons=mkCon(actN); puls=mkPul(cons,gen.s);
+  updInfo();
+}
+function rebuild(){actN=filt(allN,stg);cons=mkCon(actN);puls=mkPul(cons,gen.s);}
+function sS(i){stg=i;for(let j=0;j<4;j++)document.getElementById('s'+j).classList.toggle('on',j===i);rebuild();}
+function sE(m){ent=m;document.getElementById('eh').classList.toggle('on',m==='human');document.getElementById('ea').classList.toggle('on',m==='ai');}
+function sT(t){thm=t;document.body.className=t;document.getElementById('td').classList.toggle('on',t==='dark');document.getElementById('tl').classList.toggle('on',t==='light');}
+
+function updInfo(){
+  document.getElementById('info').innerHTML=TK.map(k=>{
+    const c=TR[k].base,v=gen.tv[k];
+    return`<span class="trait"><span class="dot" style="background:rgb(${c})"></span>${k} ${v.toFixed(2)}</span>`;
+  }).join('');
+}
+
+function resize(){
+  CW=cvs.width=window.innerWidth; CH=cvs.height=window.innerHeight;
+  CX=CW/2; CY=CH/2; oR=Math.min(CW,CH)*0.40;
+  if(gen){allN=mkNodes(gen);rebuild();}
+}
+
+cvs=document.getElementById('c'); ctx=cvs.getContext('2d');
+resize(); window.addEventListener('resize',resize);
+t0=performance.now();
+newOrg();
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
