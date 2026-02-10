@@ -2284,6 +2284,20 @@ const AuraVisualization = React.memo(function AuraVisualization({
       }
 
       ctx.restore();
+
+      // Edge vignette — fade to transparent so organism floats in app background
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      const vR = Math.max(CW, CH) * 0.5;
+      const vig = ctx.createRadialGradient(CX, CY, vR * 0.55, CX, CY, vR);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(0.7, 'rgba(0,0,0,0)');
+      vig.addColorStop(0.88, 'rgba(0,0,0,0.4)');
+      vig.addColorStop(1, 'rgba(0,0,0,1)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, CW, CH);
+      ctx.restore();
+
       animRef.current = requestAnimationFrame(frame);
     }
 
