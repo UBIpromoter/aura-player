@@ -4370,8 +4370,10 @@ const ProgressCircle = ({
       onClick={onClick}
     >
       {glow && hasProgress && (
-        <div className="absolute inset-0 rounded-full blur-md opacity-40"
-             style={{ background: `linear-gradient(135deg, ${grad.from}, ${grad.to})` }} />
+        <div className="absolute rounded-full pointer-events-none" style={{
+          inset: -Math.round(size * 0.25),
+          background: `radial-gradient(circle, ${grad.from}40 0%, ${grad.from}15 45%, transparent 70%)`,
+        }} />
       )}
       {orbit && (
         <div className="absolute inset-0 orbit-anim" style={{ width: size, height: size }}>
@@ -6023,7 +6025,7 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         </div>
 
         {/* DIVIDER — World ↔ Self */}
-        <div className="flex items-center gap-3 my-5">
+        <div className="flex items-center gap-3 my-4">
           <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
           <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Self</span>
           <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
@@ -6061,12 +6063,10 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
             </div>
           </button>
 
-          {/* Bottom spacer for comfortable scrolling */}
-          <div className="h-4" />
         </div>
 
         {/* DIVIDER — Self ↔ Work */}
-        <div className="flex items-center gap-3 my-3">
+        <div className="flex items-center gap-3 my-4">
           <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
           <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Work</span>
           <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
@@ -7831,7 +7831,7 @@ const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTa
             </div>
           </div>
           <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-800 bg-gray-950/80' : 'border-gray-200 bg-white/80'}`}>
-            <div className={`px-4 pt-3 ${isBinary ? 'h-[93px]' : ''}`}>
+            <div className="px-4 pt-3">
               {isBinary ? (
                 <BinaryButtons darkMode={darkMode} tappedAnswer={qotdTappedAnswer} tapCount={qotdTapCount}
                   isAnswered={false} currentResponse={null} onTap={onTap} onRightClick={() => {}}
@@ -12344,7 +12344,7 @@ function App() {
           {/* Global stars background for dark mode */}
           {darkMode && <div className="global-stars" />}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && !screen.startsWith('verify-') && (
+            {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && !screen.startsWith('verify-') && (
               <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} assessCompleted={assessCompleted} accentColor={navAccentColor} />
             )}
             {renderContent()}
@@ -12369,7 +12369,7 @@ function App() {
     >
       {/* Global stars background for dark mode */}
       {darkMode && <div className="global-stars" />}
-      {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && !screen.startsWith('verify-') && (
+      {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && !screen.startsWith('verify-') && (
         <div className="safe-top">
           <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} assessCompleted={assessCompleted} />
         </div>
