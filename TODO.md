@@ -17,10 +17,10 @@ These gate everything else. Nothing launches without them.
 
 ## Bugs
 
-- [ ] **Undo popup pushing content** — Undo elements moving button area on question screen. Violates "Never Move The Buttons" rule. Needs repro + fix. *(plans/bugfix-handoff.md)*
-- [ ] **QOD going off screen** — Header pushing things down, buttons shifting. Same core rule violation. *(plans/bugfix-handoff.md)*
-- [ ] **Assessment page glow cutoff** — ProgressCircle glow cut off with hard black edges on AssessPickerScreen. Overflow clipping issue. Previous fix attempt didn't resolve. *(plans/bugfix-handoff.md)*
-- [ ] **Work divider gap** — CategoryScreen "WORK" text divider spacing. Fix attempted (my-5 → my-3), needs visual confirmation. *(plans/bugfix-handoff.md)*
+- [x] **Undo popup pushing content** — Fixed: action buttons row was conditionally removed during pendingSubmit, causing layout reflow. Now uses visibility:hidden to preserve space.
+- [x] **QOD going off screen** — Fixed: removed duplicate NavBar + removed h-[93px] height constraint on button container.
+- [x] **Assessment page glow cutoff** — Fixed: replaced blur-md div with radial-gradient sized to fit within card padding.
+- [x] **Work divider gap** — Fixed: removed h-4 spacer, normalized both dividers to my-4.
 
 ---
 
