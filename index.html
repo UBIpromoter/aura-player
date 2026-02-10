@@ -10338,37 +10338,36 @@ const QuestionFlowScreen = ({
                 </div>
               </div>
 
-              {/* Action buttons row — ghost treatment matching button language */}
-              <div className="relative px-4 mt-3 mb-2 flex items-center justify-center max-w-sm mx-auto">
-                {!isAnswered && !pendingSubmit ? (
-                  <div className="flex gap-2 w-full">
-                    {[
-                      { label: isBinary ? "Can't" : "None", onClick: () => isBinary ? setShowCantAnswerModal(currentQuestion?.id) : setShowNoneOptionModal(true), active: false },
-                      { label: 'Explain', onClick: () => setShowExplanationModal(currentQuestion?.id), active: !!answerExplanations[currentQuestion?.id], activeColor: COLOR_HEX.amber },
-                      { label: 'Skip', onClick: skipQuestion, active: false },
-                      { label: savedQuestions.has(currentQuestion?.id) ? '✓ Saved' : 'Save', onClick: saveForLater, active: savedQuestions.has(currentQuestion?.id), activeColor: COLOR_HEX.violet },
-                    ].map(btn => (
-                      <button
-                        key={btn.label}
-                        onClick={btn.onClick}
-                        className="flex-1 py-2 rounded-xl text-xs font-medium transition-all btn-feedback border"
-                        style={btn.active ? {
-                          borderColor: `rgba(${btn.activeColor.rgb}, ${darkMode ? 0.30 : 0.40})`,
-                          background: darkMode
-                            ? `rgba(${btn.activeColor.rgb}, 0.08)`
-                            : `rgba(${btn.activeColor.rgb}, 0.10)`,
-                          color: darkMode ? btn.activeColor.light : btn.activeColor.base,
-                        } : {
-                          borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.10)',
-                          background: darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)',
-                          color: darkMode ? '#6b7280' : '#6b7280',
-                        }}
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+              {/* Action buttons row — always rendered, invisible during pending to preserve layout */}
+              <div className={`relative px-4 mt-3 mb-2 flex items-center justify-center max-w-sm mx-auto ${(isAnswered || pendingSubmit) ? 'invisible' : ''}`}>
+                <div className="flex gap-2 w-full">
+                  {[
+                    { label: isBinary ? "Can't" : "None", onClick: () => isBinary ? setShowCantAnswerModal(currentQuestion?.id) : setShowNoneOptionModal(true), active: false },
+                    { label: 'Explain', onClick: () => setShowExplanationModal(currentQuestion?.id), active: !!answerExplanations[currentQuestion?.id], activeColor: COLOR_HEX.amber },
+                    { label: 'Skip', onClick: skipQuestion, active: false },
+                    { label: savedQuestions.has(currentQuestion?.id) ? '✓ Saved' : 'Save', onClick: saveForLater, active: savedQuestions.has(currentQuestion?.id), activeColor: COLOR_HEX.violet },
+                  ].map(btn => (
+                    <button
+                      key={btn.label}
+                      onClick={btn.onClick}
+                      disabled={isAnswered || !!pendingSubmit}
+                      className="flex-1 py-2 rounded-xl text-xs font-medium transition-all btn-feedback border"
+                      style={btn.active ? {
+                        borderColor: `rgba(${btn.activeColor.rgb}, ${darkMode ? 0.30 : 0.40})`,
+                        background: darkMode
+                          ? `rgba(${btn.activeColor.rgb}, 0.08)`
+                          : `rgba(${btn.activeColor.rgb}, 0.10)`,
+                        color: darkMode ? btn.activeColor.light : btn.activeColor.base,
+                      } : {
+                        borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.10)',
+                        background: darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)',
+                        color: darkMode ? '#6b7280' : '#6b7280',
+                      }}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
