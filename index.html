@@ -33,7 +33,7 @@
   "ONBOARDING FLOW"            OnboardingFlow component
   "PATH CHOICE SCREEN"         PathChoiceScreen, modals, buttons, CategoryScreen
   "MAIN APP"                   function App() — state, effects, render
-    "ASSESSMENT FUNCTIONS"       ↳ Assessment logic inside App
+    "ASSESSMENT FUNCTIONS"       ↳ Assessment logic (useAssessment hook)
     "ASSESSMENT SCREENS"         ↳ assess-picker, assess-question, assess-results, assess-analysis
     "DEV NAVIGATION PANEL"       ↳ Dev-only screen switcher
 
@@ -10907,6 +10907,262 @@ const useVerification = () => {
   };
 };
 
+// --- useAssessment Hook ---
+const useAssessment = ({ setScreen, darkMode }) => {
+  const [assessCurrentTestId, setAssessCurrentTestId] = useState(null);
+  const [assessCurrentIndex, setAssessCurrentIndex] = useState(0);
+  const [assessEntering, setAssessEntering] = useState(false);
+  const [assessResponses, setAssessResponses] = useState({});
+  const [assessSkipped, setAssessSkipped] = useState([]);
+  const [assessCompleted, setAssessCompleted] = useState(() => {
+    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).completed || {} : {}; } catch { return {}; }
+  });
+  const [assessInProgress, setAssessInProgress] = useState(() => {
+    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).inProgress || {} : {}; } catch { return {}; }
+  });
+  const [assessPending, setAssessPending] = useState(null);
+  const [assessShowCompletion, setAssessShowCompletion] = useState(false);
+  const [assessShowDemoMenu, setAssessShowDemoMenu] = useState(false);
+  const [assessShowExitConfirm, setAssessShowExitConfirm] = useState(false);
+  const [assessExpandedCategory, setAssessExpandedCategory] = useState(null);
+  const [analysisExpanded, setAnalysisExpanded] = useState({});
+  const [assessDemoActive, setAssessDemoActive] = useState(() => {
+    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).demoActive || false : false; } catch { return false; }
+  });
+  const [assessDemoProfile, setAssessDemoProfile] = useState(() => {
+    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); const p = s ? JSON.parse(s).demoProfile : null; return p != null ? Number(p) : null; } catch { return null; }
+  });
+  const [showDemoControls, setShowDemoControls] = useState(() => {
+    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).showDemoControls || false : false; } catch { return false; }
+  });
+  const [assessSavedUserData, setAssessSavedUserData] = useState(() => {
+    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).savedUserData || null : null; } catch { return null; }
+  });
+  const [assessShowDemoInfo, setAssessShowDemoInfo] = useState(false);
+  const [assessProfileSwitching, setAssessProfileSwitching] = useState(false);
+  const assessTimeoutRef = useRef(null);
+  const [assessShowUndoToast, setAssessShowUndoToast] = useState(false);
+  const [assessUnlockMessage, setAssessUnlockMessage] = useState(null);
+
+  const assessSaveToStorage = (completed, progress, demoActive = assessDemoActive, savedUserData = assessSavedUserData, demoProfile = assessDemoProfile, demoControls = showDemoControls) => {
+    localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed, inProgress: progress, demoActive, savedUserData, demoProfile, showDemoControls: demoControls }));
+  };
+
+  const assessCurrentTest = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
+  const assessTestColor = assessCurrentTest ? getAssessColor(assessCurrentTest.color, darkMode) : null;
+  const assessCurrentScale = assessCurrentTest ? ASSESS_SCALES[assessCurrentTest.scale] : null;
+  const assessTotalQuestions = assessCurrentTest?.items.length || 0;
+
+  const assessStartTest = (testId) => {
+    setAssessCurrentTestId(testId);
+    const progress = assessInProgress[testId];
+    setAssessCurrentIndex(progress?.index || 0);
+    setAssessResponses(progress?.responses || {});
+    setAssessSkipped(progress?.skipped || []);
+    setAssessPending(null);
+    setScreen('assess-question');
+  };
+
+  const assessSaveAndExit = () => {
+    clearTimeout(assessTimeoutRef.current);
+    const newProgress = { ...assessInProgress, [assessCurrentTestId]: { index: assessCurrentIndex, responses: assessResponses, skipped: assessSkipped } };
+    setAssessInProgress(newProgress);
+    assessSaveToStorage(assessCompleted, newProgress);
+    setScreen('assess-picker');
+  };
+
+  const assessGoToQuestion = (index, direction) => {
+    setAssessEntering(false); // reset to retrigger
+    setAssessCurrentIndex(index);
+    setAssessPending(null);
+    // Trigger gentle breath animation on next frame
+    requestAnimationFrame(() => setAssessEntering(true));
+    setTimeout(() => setAssessEntering(false), 1700);
+  };
+
+  const assessHandleAnswerTap = (value) => {
+    // Tap and go — no pending state, no undo delay. Immediate submit.
+    assessFinalizeSubmit(value);
+  };
+
+  const assessHandleUndo = () => {
+    clearTimeout(assessTimeoutRef.current);
+    setAssessPending(null);
+    // Show undo confirmation
+    setAssessShowUndoToast(true);
+    setTimeout(() => setAssessShowUndoToast(false), 1000);
+  };
+
+  const assessFinalizeSubmit = (value) => {
+    const newResponses = { ...assessResponses, [assessCurrentIndex]: value };
+    setAssessResponses(newResponses);
+    const newSkipped = assessSkipped.filter(i => i !== assessCurrentIndex);
+    setAssessSkipped(newSkipped);
+    setAssessPending(null);
+    // Capture assessment response to Supabase
+    captureAssessResponse(assessCurrentTestId, assessCurrentIndex, value);
+    assessAdvanceToNext(newResponses, newSkipped);
+  };
+
+  const assessAdvanceToNext = (resp, skipped) => {
+    const total = assessCurrentTest.items.length;
+    const answeredCount = Object.keys(resp).length;
+    if (answeredCount >= total) { assessCompleteTest(resp); return; }
+    for (let i = assessCurrentIndex + 1; i < total; i++) {
+      if (resp[i] === undefined) { assessGoToQuestion(i, 'fwd'); return; }
+    }
+    for (let i = 0; i < assessCurrentIndex; i++) {
+      if (resp[i] === undefined) { assessGoToQuestion(i, 'fwd'); return; }
+    }
+  };
+
+  const assessCanFinish = () => {
+    if (!assessCurrentTest) return false;
+    return Object.keys(assessResponses).length >= assessCurrentTest.items.length;
+  };
+
+  const assessFinishAssessment = () => {
+    if (assessCanFinish()) assessCompleteTest(assessResponses);
+  };
+
+  const assessCompleteTest = (resp) => {
+    const results = calculateAssessResults(assessCurrentTestId, resp);
+    const newCompleted = { ...assessCompleted, [assessCurrentTestId]: results };
+    setAssessCompleted(newCompleted);
+    const { [assessCurrentTestId]: _, ...remainingProgress } = assessInProgress;
+    setAssessInProgress(remainingProgress);
+    assessSaveToStorage(newCompleted, remainingProgress);
+
+    // Check for unlock tier changes
+    const prevTier = calculateAssessTier(assessCompleted);
+    const newTier = calculateAssessTier(newCompleted);
+
+    if (newTier > prevTier) {
+      // Show unlock celebration
+      const unlockMessages = {
+        1: { title: "Starter Pack Unlocked!", subtitle: "Begin your deep dive into self-discovery" },
+        2: { title: "All Branches Unlocked!", subtitle: "Explore Personality, Mind, Shadow & more" }
+      };
+      setAssessUnlockMessage(unlockMessages[newTier]);
+    }
+
+    setAssessShowCompletion(true);
+    setTimeout(() => {
+      setAssessShowCompletion(false);
+      setAssessUnlockMessage(null);
+      // For quick-profile, go to assess-picker to show newly unlocked content
+      if (assessCurrentTestId === 'quick-profile') {
+        setScreen('assess-picker');
+      } else {
+        setScreen('assess-results');
+      }
+    }, assessCurrentTestId === 'quick-profile' ? 2500 : 1500);
+  };
+
+  const assessLoadDemoProfile = (profileNum) => {
+    // Save current user data before loading demo (only if not already in demo mode)
+    const savedData = !assessDemoActive ? {
+      completed: { ...assessCompleted },
+      inProgress: { ...assessInProgress }
+    } : assessSavedUserData;
+
+    if (!assessDemoActive) {
+      setAssessSavedUserData(savedData);
+    }
+
+    const profile = ASSESS_DEMO_PROFILES[profileNum];
+    const skipList = profile.skip || [];
+    const newCompleted = {};
+    Object.keys(ASSESS_TESTS).forEach(testId => {
+      // Skip tests in the profile's skip list
+      if (skipList.includes(testId)) return;
+      const test = ASSESS_TESTS[testId];
+      const answers = {};
+      if (test.parent === 'bigfive') {
+        const traitData = profile.bigfive?.[test.trait];
+        if (traitData) traitData.forEach((val, i) => { answers[i] = val; });
+        else return;
+      } else if (test.parent === 'shadow') {
+        const traitData = profile.shadow?.[test.trait];
+        if (traitData) traitData.forEach((val, i) => { answers[i] = val; });
+        else return;
+      } else if (profile[testId]) {
+        profile[testId].forEach((val, i) => { answers[i] = val; });
+      } else {
+        // Skip tests without demo data (e.g., quick-profile)
+        return;
+      }
+      newCompleted[testId] = calculateAssessResults(testId, answers);
+    });
+    setAssessCompleted(newCompleted);
+    setAssessInProgress({});
+    setAssessDemoActive(true);
+    setAssessDemoProfile(profileNum);
+    assessSaveToStorage(newCompleted, {}, true, savedData, profileNum);
+    setAssessShowDemoMenu(false);
+    setAssessProfileSwitching(true);
+    setTimeout(() => setAssessProfileSwitching(false), 600);
+  };
+
+  const assessClearDemo = () => {
+    // Restore user data from before demo
+    if (assessSavedUserData) {
+      setAssessCompleted(assessSavedUserData.completed);
+      setAssessInProgress(assessSavedUserData.inProgress);
+      assessSaveToStorage(assessSavedUserData.completed, assessSavedUserData.inProgress, false, null, null);
+    } else {
+      setAssessCompleted({});
+      setAssessInProgress({});
+      assessSaveToStorage({}, {}, false, null, null);
+    }
+    setAssessDemoActive(false);
+    setAssessDemoProfile(null);
+    setAssessSavedUserData(null);
+    setAssessProfileSwitching(true);
+    setTimeout(() => setAssessProfileSwitching(false), 600);
+  };
+
+  const assessClearAll = () => {
+    setAssessCompleted({});
+    setAssessInProgress({});
+    setAssessDemoActive(false);
+    setAssessSavedUserData(null);
+    assessSaveToStorage({}, {}, false, null);
+    setAssessShowDemoMenu(false);
+  };
+
+  return {
+    assessCurrentTestId, setAssessCurrentTestId,
+    assessCurrentIndex, setAssessCurrentIndex,
+    assessEntering, setAssessEntering,
+    assessResponses, setAssessResponses,
+    assessSkipped, setAssessSkipped,
+    assessCompleted, setAssessCompleted,
+    assessInProgress, setAssessInProgress,
+    assessPending, setAssessPending,
+    assessShowCompletion, setAssessShowCompletion,
+    assessShowDemoMenu, setAssessShowDemoMenu,
+    assessShowExitConfirm, setAssessShowExitConfirm,
+    assessExpandedCategory, setAssessExpandedCategory,
+    analysisExpanded, setAnalysisExpanded,
+    assessDemoActive, setAssessDemoActive,
+    assessDemoProfile, setAssessDemoProfile,
+    showDemoControls, setShowDemoControls,
+    assessSavedUserData, setAssessSavedUserData,
+    assessShowDemoInfo, setAssessShowDemoInfo,
+    assessProfileSwitching, setAssessProfileSwitching,
+    assessTimeoutRef,
+    assessShowUndoToast, setAssessShowUndoToast,
+    assessUnlockMessage, setAssessUnlockMessage,
+    assessSaveToStorage,
+    assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions,
+    assessStartTest, assessSaveAndExit, assessGoToQuestion,
+    assessHandleAnswerTap, assessHandleUndo, assessFinalizeSubmit,
+    assessAdvanceToNext, assessCanFinish, assessFinishAssessment,
+    assessCompleteTest, assessLoadDemoProfile, assessClearDemo, assessClearAll,
+  };
+};
+
 function App() {
 
   // --- Navigation & Auth ---
@@ -10974,39 +11230,25 @@ function App() {
   const [sessionAnsweredCategories, setSessionAnsweredCategories] = useState(new Set()); // Categories user has answered in this session
   const [sessionAnsweredIds, setSessionAnsweredIds] = useState(new Set()); // Question IDs answered THIS session (show results only for these)
 
-  // --- Assessment System ---
-  const [assessCurrentTestId, setAssessCurrentTestId] = useState(null);
-  const [assessCurrentIndex, setAssessCurrentIndex] = useState(0);
-  const [assessEntering, setAssessEntering] = useState(false);
-  const [assessResponses, setAssessResponses] = useState({});
-  const [assessSkipped, setAssessSkipped] = useState([]);
-  const [assessCompleted, setAssessCompleted] = useState(() => {
-    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).completed || {} : {}; } catch { return {}; }
-  });
-  const [assessInProgress, setAssessInProgress] = useState(() => {
-    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).inProgress || {} : {}; } catch { return {}; }
-  });
-  const [assessPending, setAssessPending] = useState(null);
-  const [assessShowCompletion, setAssessShowCompletion] = useState(false);
-  const [assessShowDemoMenu, setAssessShowDemoMenu] = useState(false);
-  const [assessShowExitConfirm, setAssessShowExitConfirm] = useState(false);
-  const [assessExpandedCategory, setAssessExpandedCategory] = useState(null);
-  const [analysisExpanded, setAnalysisExpanded] = useState({});
-  const [assessDemoActive, setAssessDemoActive] = useState(() => {
-    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).demoActive || false : false; } catch { return false; }
-  });
-  const [assessDemoProfile, setAssessDemoProfile] = useState(() => {
-    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); const p = s ? JSON.parse(s).demoProfile : null; return p != null ? Number(p) : null; } catch { return null; }
-  });
-  const [showDemoControls, setShowDemoControls] = useState(() => {
-    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).showDemoControls || false : false; } catch { return false; }
-  });
-  const [assessSavedUserData, setAssessSavedUserData] = useState(() => {
-    try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).savedUserData || null : null; } catch { return null; }
-  });
-  const [assessShowDemoInfo, setAssessShowDemoInfo] = useState(false);
-  const [assessProfileSwitching, setAssessProfileSwitching] = useState(false);
-  const assessTimeoutRef = useRef(null);
+  // --- Assessment System (via useAssessment hook) ---
+  const {
+    assessCurrentTestId, setAssessCurrentTestId, assessCurrentIndex, setAssessCurrentIndex,
+    assessEntering, setAssessEntering, assessResponses, setAssessResponses,
+    assessSkipped, setAssessSkipped, assessCompleted, setAssessCompleted,
+    assessInProgress, setAssessInProgress, assessPending, setAssessPending,
+    assessShowCompletion, setAssessShowCompletion, assessShowDemoMenu, setAssessShowDemoMenu,
+    assessShowExitConfirm, setAssessShowExitConfirm, assessExpandedCategory, setAssessExpandedCategory,
+    analysisExpanded, setAnalysisExpanded, assessDemoActive, setAssessDemoActive,
+    assessDemoProfile, setAssessDemoProfile, showDemoControls, setShowDemoControls,
+    assessSavedUserData, setAssessSavedUserData, assessShowDemoInfo, setAssessShowDemoInfo,
+    assessProfileSwitching, setAssessProfileSwitching, assessTimeoutRef,
+    assessShowUndoToast, setAssessShowUndoToast, assessUnlockMessage, setAssessUnlockMessage,
+    assessSaveToStorage, assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions,
+    assessStartTest, assessSaveAndExit, assessGoToQuestion,
+    assessHandleAnswerTap, assessHandleUndo, assessFinalizeSubmit,
+    assessAdvanceToNext, assessCanFinish, assessFinishAssessment,
+    assessCompleteTest, assessLoadDemoProfile, assessClearDemo, assessClearAll,
+  } = useAssessment({ setScreen, darkMode });
 
   // --- Verification (via useVerification hook) ---
   const { verifySubjectProfile, setVerifySubjectProfile, verifySubjectAnswers, setVerifySubjectAnswers, verifyCurrentSubjectId, setVerifyCurrentSubjectId, verifyEvaluatorData, setVerifyEvaluatorData, verifyEvaluations, setVerifyEvaluations, verifyPendingCount } = useVerification();
@@ -11579,198 +11821,6 @@ function App() {
     setAssessDemoProfile(null);
     setAssessSavedUserData(null);
     setScreen('welcome');
-  };
-
-  // ==================== ASSESSMENT FUNCTIONS ====================
-  const assessSaveToStorage = (completed, progress, demoActive = assessDemoActive, savedUserData = assessSavedUserData, demoProfile = assessDemoProfile, demoControls = showDemoControls) => {
-    localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed, inProgress: progress, demoActive, savedUserData, demoProfile, showDemoControls: demoControls }));
-  };
-
-  const assessCurrentTest = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
-  const assessTestColor = assessCurrentTest ? getAssessColor(assessCurrentTest.color, darkMode) : null;
-  const assessCurrentScale = assessCurrentTest ? ASSESS_SCALES[assessCurrentTest.scale] : null;
-  const assessTotalQuestions = assessCurrentTest?.items.length || 0;
-
-  const assessStartTest = (testId) => {
-    setAssessCurrentTestId(testId);
-    const progress = assessInProgress[testId];
-    setAssessCurrentIndex(progress?.index || 0);
-    setAssessResponses(progress?.responses || {});
-    setAssessSkipped(progress?.skipped || []);
-    setAssessPending(null);
-    setScreen('assess-question');
-  };
-
-  const assessSaveAndExit = () => {
-    clearTimeout(assessTimeoutRef.current);
-    const newProgress = { ...assessInProgress, [assessCurrentTestId]: { index: assessCurrentIndex, responses: assessResponses, skipped: assessSkipped } };
-    setAssessInProgress(newProgress);
-    assessSaveToStorage(assessCompleted, newProgress);
-    setScreen('assess-picker');
-  };
-
-  const assessGoToQuestion = (index, direction) => {
-    setAssessEntering(false); // reset to retrigger
-    setAssessCurrentIndex(index);
-    setAssessPending(null);
-    // Trigger gentle breath animation on next frame
-    requestAnimationFrame(() => setAssessEntering(true));
-    setTimeout(() => setAssessEntering(false), 1700);
-  };
-
-  const assessHandleAnswerTap = (value) => {
-    // Tap and go — no pending state, no undo delay. Immediate submit.
-    assessFinalizeSubmit(value);
-  };
-
-  const [assessShowUndoToast, setAssessShowUndoToast] = useState(false);
-
-  const assessHandleUndo = () => {
-    clearTimeout(assessTimeoutRef.current);
-    setAssessPending(null);
-    // Show undo confirmation
-    setAssessShowUndoToast(true);
-    setTimeout(() => setAssessShowUndoToast(false), 1000);
-  };
-
-  const assessFinalizeSubmit = (value) => {
-    const newResponses = { ...assessResponses, [assessCurrentIndex]: value };
-    setAssessResponses(newResponses);
-    const newSkipped = assessSkipped.filter(i => i !== assessCurrentIndex);
-    setAssessSkipped(newSkipped);
-    setAssessPending(null);
-    // Capture assessment response to Supabase
-    captureAssessResponse(assessCurrentTestId, assessCurrentIndex, value);
-    assessAdvanceToNext(newResponses, newSkipped);
-  };
-
-  const assessAdvanceToNext = (resp, skipped) => {
-    const total = assessCurrentTest.items.length;
-    const answeredCount = Object.keys(resp).length;
-    if (answeredCount >= total) { assessCompleteTest(resp); return; }
-    for (let i = assessCurrentIndex + 1; i < total; i++) {
-      if (resp[i] === undefined) { assessGoToQuestion(i, 'fwd'); return; }
-    }
-    for (let i = 0; i < assessCurrentIndex; i++) {
-      if (resp[i] === undefined) { assessGoToQuestion(i, 'fwd'); return; }
-    }
-  };
-
-  const assessCanFinish = () => {
-    if (!assessCurrentTest) return false;
-    return Object.keys(assessResponses).length >= assessCurrentTest.items.length;
-  };
-
-  const assessFinishAssessment = () => {
-    if (assessCanFinish()) assessCompleteTest(assessResponses);
-  };
-
-  const [assessUnlockMessage, setAssessUnlockMessage] = useState(null);
-
-  const assessCompleteTest = (resp) => {
-    const results = calculateAssessResults(assessCurrentTestId, resp);
-    const newCompleted = { ...assessCompleted, [assessCurrentTestId]: results };
-    setAssessCompleted(newCompleted);
-    const { [assessCurrentTestId]: _, ...remainingProgress } = assessInProgress;
-    setAssessInProgress(remainingProgress);
-    assessSaveToStorage(newCompleted, remainingProgress);
-
-    // Check for unlock tier changes
-    const prevTier = calculateAssessTier(assessCompleted);
-    const newTier = calculateAssessTier(newCompleted);
-
-    if (newTier > prevTier) {
-      // Show unlock celebration
-      const unlockMessages = {
-        1: { title: "Starter Pack Unlocked!", subtitle: "Begin your deep dive into self-discovery" },
-        2: { title: "All Branches Unlocked!", subtitle: "Explore Personality, Mind, Shadow & more" }
-      };
-      setAssessUnlockMessage(unlockMessages[newTier]);
-    }
-
-    setAssessShowCompletion(true);
-    setTimeout(() => {
-      setAssessShowCompletion(false);
-      setAssessUnlockMessage(null);
-      // For quick-profile, go to assess-picker to show newly unlocked content
-      if (assessCurrentTestId === 'quick-profile') {
-        setScreen('assess-picker');
-      } else {
-        setScreen('assess-results');
-      }
-    }, assessCurrentTestId === 'quick-profile' ? 2500 : 1500);
-  };
-
-  const assessLoadDemoProfile = (profileNum) => {
-    // Save current user data before loading demo (only if not already in demo mode)
-    const savedData = !assessDemoActive ? {
-      completed: { ...assessCompleted },
-      inProgress: { ...assessInProgress }
-    } : assessSavedUserData;
-
-    if (!assessDemoActive) {
-      setAssessSavedUserData(savedData);
-    }
-
-    const profile = ASSESS_DEMO_PROFILES[profileNum];
-    const skipList = profile.skip || [];
-    const newCompleted = {};
-    Object.keys(ASSESS_TESTS).forEach(testId => {
-      // Skip tests in the profile's skip list
-      if (skipList.includes(testId)) return;
-      const test = ASSESS_TESTS[testId];
-      const answers = {};
-      if (test.parent === 'bigfive') {
-        const traitData = profile.bigfive?.[test.trait];
-        if (traitData) traitData.forEach((val, i) => { answers[i] = val; });
-        else return;
-      } else if (test.parent === 'shadow') {
-        const traitData = profile.shadow?.[test.trait];
-        if (traitData) traitData.forEach((val, i) => { answers[i] = val; });
-        else return;
-      } else if (profile[testId]) {
-        profile[testId].forEach((val, i) => { answers[i] = val; });
-      } else {
-        // Skip tests without demo data (e.g., quick-profile)
-        return;
-      }
-      newCompleted[testId] = calculateAssessResults(testId, answers);
-    });
-    setAssessCompleted(newCompleted);
-    setAssessInProgress({});
-    setAssessDemoActive(true);
-    setAssessDemoProfile(profileNum);
-    assessSaveToStorage(newCompleted, {}, true, savedData, profileNum);
-    setAssessShowDemoMenu(false);
-    setAssessProfileSwitching(true);
-    setTimeout(() => setAssessProfileSwitching(false), 600);
-  };
-
-  const assessClearDemo = () => {
-    // Restore user data from before demo
-    if (assessSavedUserData) {
-      setAssessCompleted(assessSavedUserData.completed);
-      setAssessInProgress(assessSavedUserData.inProgress);
-      assessSaveToStorage(assessSavedUserData.completed, assessSavedUserData.inProgress, false, null, null);
-    } else {
-      setAssessCompleted({});
-      setAssessInProgress({});
-      assessSaveToStorage({}, {}, false, null, null);
-    }
-    setAssessDemoActive(false);
-    setAssessDemoProfile(null);
-    setAssessSavedUserData(null);
-    setAssessProfileSwitching(true);
-    setTimeout(() => setAssessProfileSwitching(false), 600);
-  };
-
-  const assessClearAll = () => {
-    setAssessCompleted({});
-    setAssessInProgress({});
-    setAssessDemoActive(false);
-    setAssessSavedUserData(null);
-    assessSaveToStorage({}, {}, false, null);
-    setAssessShowDemoMenu(false);
   };
 
   const renderContent = () => {
