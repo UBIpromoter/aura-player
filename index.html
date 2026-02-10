@@ -1466,7 +1466,7 @@ const hexToRgba = (hex, alpha) => {
 };
 
 // ==================== AURA VISUALIZATION ====================
-// v6: Ring-based constellation — Deep Bloom, 3D multi-harmonic drift, topology connections
+// Organism viz — blob primaries with interiors, membrane bubble, tissue connections
 const AuraVisualization = React.memo(function AuraVisualization({
   onboardingAnswers = {},
   assessCompleted = {},
@@ -1475,782 +1475,607 @@ const AuraVisualization = React.memo(function AuraVisualization({
   size = 200,
 }) {
   const canvasRef = React.useRef(null);
-  const stateRef = React.useRef(null);
   const animRef = React.useRef(null);
   const propsRef = React.useRef({ onboardingAnswers, assessCompleted, entityType, darkMode, size });
   propsRef.current = { onboardingAnswers, assessCompleted, entityType, darkMode, size };
 
-  // -------------------------------------------------------
-  // TIER DETECTION & TUNING (D — Deep Bloom, locked)
-  // -------------------------------------------------------
-  function detectTier(completed) {
-    const count = Object.keys(completed || {}).length;
-    if (count >= 4) return 'power';
-    if (count >= 1) return 'regular';
-    return 'new';
-  }
-
-  function getTuning(tier) {
-    // D — Deep Bloom tuning: massive saturated glow pools, bright connections
-    const base = {
-      earnedCompanions: true, companionGhostAlpha: 0, satThreshold: 8,
-      answeredR: 14, answeredHalo: 50, breathAmp: 0.06, breathSpd: 0.22,
-      connAlpha: 0.70, haloScale: 4, haloInner: 0.32, haloMid: 0.12,
-      stars: 35, ghostAlpha: 0, wanderStrength: 0.4, microDrift: 0.8,
-      connWidth: 1.4, glowAlpha: 1.0, glowRadius: 320, glowPasses: 4,
-      compGlow: true, compGlowScale: 0.5,
-    };
-    if (tier === 'new') return { ...base,
-      primariesOnly: true, wanderStrength: 0.3,
-      ringInner: 90,
-      answeredR: 20, answeredHalo: 70,
-      glowAlpha: 1.0, glowRadius: 380, glowPasses: 5,
-      haloScale: 6, haloInner: 0.50, haloMid: 0.20,
-      connAlpha: 0.85, connWidth: 1.8,
-      ghostAlpha: 0.30, ghostR: 8,
-    };
-    if (tier === 'power') return { ...base,
-      ghostAlpha: 0.06,
-      ringInner: 70, ringComp: 135, ringSat: 190,
-      answeredR: 15, answeredHalo: 52,
-      glowAlpha: 1.0, glowRadius: 340, glowPasses: 5,
-      haloScale: 5, haloInner: 0.40, haloMid: 0.15,
-      connAlpha: 0.80, connWidth: 1.6,
-      compGlow: true, compGlowScale: 0.55,
-    };
-    return base;
-  }
-
-  // -------------------------------------------------------
-  // PALETTE
-  // -------------------------------------------------------
-  const C = {
-    violet:'#8b5cf6', blue:'#3b82f6', teal:'#14b8a6', rose:'#f43f5e',
-    pink:'#d946ef', emerald:'#10b981', amber:'#f59e0b', indigo:'#6366f1', cyan:'#06b6d4',
-  };
-
-  // -------------------------------------------------------
-  // HELPERS
-  // -------------------------------------------------------
-  function hexRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n>>16)&255, (n>>8)&255, n&255]; }
-  function lerp(a, b, t) { return a + (b - a) * t; }
-  function lerpRgb(a, b, t) { return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
-  function rgbStr(c, a) { return `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${Math.max(0, a).toFixed(3)})`; }
-  function seededRng(seed) { let s = seed; return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; }; }
-
-  // -------------------------------------------------------
-  // NEURON MAPPING
-  // -------------------------------------------------------
-  const NEURON_MAP = [
-    { colorQ: 'onboard-1',  posQ: 'onboard-2',  colors: [C.violet, C.blue] },
-    { colorQ: 'onboard-4',  posQ: 'onboard-8',  colors: [C.indigo, C.rose] },
-    { colorQ: 'onboard-5',  posQ: 'onboard-3',  colors: [C.pink, C.teal] },
-    { colorQ: 'onboard-6',  posQ: 'onboard-9',  colors: [C.emerald, C.amber] },
-    { colorQ: 'onboard-7',  posQ: 'onboard-10', colors: [C.cyan, C.violet] },
-  ];
-
-  const SENSITIVE = [false, false, false, true, true];
-
-  // -------------------------------------------------------
-  // ASSESSMENT MAP
-  // -------------------------------------------------------
-  const ASSESS_MAP = [
-    { ids: ['starter-personality'], name: 'Personality', color: C.violet, tier: 1, nodes: 3, affinities: [0, 2] },
-    { ids: ['starter-motivation'], name: 'Motivation', color: C.amber, tier: 1, nodes: 3, affinities: [1, 3] },
-    { ids: ['starter-thinking'], name: 'Thinking', color: C.blue, tier: 1, nodes: 3, affinities: [0, 4] },
-    { ids: ['starter-connection'], name: 'Connection', color: C.pink, tier: 1, nodes: 3, affinities: [2, 3] },
-    { ids: ['starter-strategy'], name: 'Strategy', color: C.emerald, tier: 1, nodes: 3, affinities: [1, 4] },
-    { ids: ['bigfive-E','bigfive-A','bigfive-C','bigfive-N','bigfive-O'], name: 'Big Five', color: C.violet, tier: 2, nodes: 5, affinities: [0, 2, 4] },
-    { ids: ['integrity'], name: 'Character', color: C.emerald, tier: 2, nodes: 3, affinities: [3, 1] },
-    { ids: ['shadow-M','shadow-N','shadow-P'], name: 'Shadow', color: C.indigo, tier: 2, nodes: 4, affinities: [3, 4] },
-    { ids: ['adhd','cognitive','chronotype','reasoning'], name: 'Mind', color: C.cyan, tier: 2, nodes: 4, affinities: [4, 0] },
-    { ids: ['attachment'], name: 'Relationships', color: C.rose, tier: 2, nodes: 3, affinities: [2, 3] },
-    { ids: ['risk'], name: 'Behavior', color: C.amber, tier: 2, nodes: 3, affinities: [1, 4] },
-  ];
-
-  // -------------------------------------------------------
-  // DERIVE ANSWERS FROM PROPS
-  // -------------------------------------------------------
-  function deriveAnswers(answers) {
-    const colorAns = new Array(5).fill(null);
-    const posAns = new Array(5).fill(null);
-    for (let i = 0; i < 5; i++) {
-      const nm = NEURON_MAP[i];
-      if (nm.colorQ in answers) colorAns[i] = answers[nm.colorQ];
-      if (nm.posQ in answers) posAns[i] = answers[nm.posQ];
-    }
-    return { colorAns, posAns };
-  }
-
-  function deriveAssessState(completed) {
-    const state = {};
-    ASSESS_MAP.forEach((assess, idx) => {
-      state[idx] = assess.ids.some(id => id in completed);
-    });
-    return state;
-  }
-
-  // -------------------------------------------------------
-  // NODE FACTORY
-  // -------------------------------------------------------
-  function makeNode(o) {
-    return {
-      x: o.x || 300, y: o.y || 300, tx: o.x || 300, ty: o.y || 300,
-      baseX: o.x || 300, baseY: o.y || 300,
-      color: o.color ? hexRgb(o.color) : [70, 75, 90],
-      tcolor: o.color ? hexRgb(o.color) : [70, 75, 90],
-      r: o.r || 2, tr: o.r || 2, halo: o.halo || 8, thalo: o.halo || 8,
-      alpha: 0, talpha: 0,
-      // 3D multi-harmonic drift
-      driftSpeed: 0.25 + Math.random() * 0.55,
-      driftAmp: 6 + Math.random() * 9,
-      phaseX: Math.random() * Math.PI * 2 * 3,
-      phaseY: Math.random() * Math.PI * 2 * 3,
-      slowFreq: 0.025 + Math.random() * 0.045,
-      slowPhaseX: Math.random() * Math.PI * 2,
-      slowPhaseY: Math.random() * Math.PI * 2,
-      slowAmp: 0.3 + Math.random() * 0.4,
-      orbitAngle: Math.random() * Math.PI * 2,
-      orbitSpeed: (Math.random() - 0.5) * 0.005,
-      // Slow wander
-      wanderFreq1: 0.006 + Math.random() * 0.008,
-      wanderFreq2: 0.003 + Math.random() * 0.005,
-      wanderFreq3: 0.001 + Math.random() * 0.003,
-      wanderPhase1: Math.random() * Math.PI * 2,
-      wanderPhase2: Math.random() * Math.PI * 2,
-      wanderPhase3: Math.random() * Math.PI * 2,
-      flash: 0,
-      birthMix: 0,
-      birthDelay: o.birthDelay || 0,
-      baseAngle: o.baseAngle || 0,
-      baseR: o.baseR || 0,
-      type: o.type || 'primary',
-      parent: o.parent ?? -1,
-      sensitive: o.sensitive || false,
-      assessIdx: o.assessIdx ?? null,
-      affinities: o.affinities || null,
-      tier: o.tier || 0,
-    };
-  }
-
-  function answerHash(ca, pa) {
-    let h = 0;
-    for (let i = 0; i < 5; i++) {
-      h = h * 31 + (ca[i] !== null ? ca[i] + 1 : 0);
-      h = h * 37 + (pa[i] !== null ? pa[i] + 1 : 0);
-    }
-    return h;
-  }
-
-  // -------------------------------------------------------
-  // RING-BASED LAYOUT
-  // Inner ring: primaries (pentagon)
-  // Companion ring: 2 per primary (decagon)
-  // Satellite ring: 1 per primary (outer pentagon)
-  // Assess rings: tier-specific radii
-  // -------------------------------------------------------
-  function buildAllNodes(assessState, colorAns, posAns, isAI, t) {
-    const nodes = [], CX = 300, CY = 300;
-    const h = answerHash(colorAns, posAns);
-    const rng = seededRng(h + 7919);
-    const baseRot = (h % 628) / 100;
-
-    const INNER_R = t.ringInner ?? 80;
-    const COMP_R = t.ringComp ?? 140;
-    const SAT_R = t.ringSat ?? 185;
-
-    // Primaries: pentagon on inner ring
-    for (let i = 0; i < 5; i++) {
-      const angle = baseRot + (i / 5) * Math.PI * 2;
-      const nudge = (posAns[i] !== null ? (posAns[i] === 0 ? -0.12 : 0.12) : 0)
-                  + (colorAns[i] !== null ? (colorAns[i] === 0 ? -0.06 : 0.06) : 0);
-      const a = angle + nudge;
-      const x = CX + Math.cos(a) * INNER_R;
-      const y = CY + Math.sin(a) * INNER_R;
-      nodes.push(makeNode({ x, y, r: 5, halo: 22, type: 'primary', sensitive: SENSITIVE[i], baseAngle: a, baseR: INNER_R, birthDelay: i * 0.2 }));
-    }
-
-    // Companions + satellites + assess (only if not primaries-only)
-    if (!t.primariesOnly) {
-      // Companions: decagon on outer ring
-      for (let i = 0; i < 5; i++) {
-        const parentAngle = nodes[i].baseAngle;
-        for (let c = 0; c < 2; c++) {
-          const offset = c === 0 ? -0.20 : 0.20;
-          const a = parentAngle + offset;
-          const r = COMP_R + (rng() - 0.5) * 16;
-          const x = CX + Math.cos(a) * r;
-          const y = CY + Math.sin(a) * r;
-          nodes.push(makeNode({ x, y, type: 'companion', parent: i, r: 2.5, halo: 10, baseAngle: a, baseR: r, birthDelay: 1.2 + c * 0.2 + i * 0.15 }));
-        }
-      }
-
-      // Satellites: outer pentagon
-      for (let s = 0; s < 5; s++) {
-        const a = nodes[s].baseAngle;
-        const r = SAT_R + (rng() - 0.5) * 12;
-        const x = CX + Math.cos(a) * r;
-        const y = CY + Math.sin(a) * r;
-        nodes.push(makeNode({ x, y, type: 'satellite', parent: s, r: 2, halo: 7, baseAngle: a, baseR: r, birthDelay: 2.5 + s * 0.2 }));
-      }
-
-      // Assess nodes on tier rings
-      ASSESS_MAP.forEach((assess, ai) => {
-        if (!assessState[ai]) return;
-        const arng = seededRng(ai * 137 + 42);
-        const affs = assess.affinities;
-        let midAngle = 0;
-        for (const pi of affs) midAngle += nodes[pi].baseAngle;
-        midAngle /= affs.length;
-        const ringR = assess.tier === 1 ? (INNER_R + COMP_R) / 2 : (COMP_R + SAT_R) / 2;
-
-        for (let ni = 0; ni < assess.nodes; ni++) {
-          const spread = (ni / assess.nodes) * 0.6 - 0.3;
-          const a = midAngle + spread + (arng() - 0.5) * 0.15;
-          const r = ringR + (arng() - 0.5) * 30;
-          nodes.push(makeNode({
-            x: CX + Math.cos(a) * r, y: CY + Math.sin(a) * r,
-            r: 2 + arng() * 2, halo: 8 + arng() * 10,
-            type: 'assess', color: assess.color, assessIdx: ai, tier: assess.tier,
-            parent: affs[0], affinities: affs, baseAngle: a, baseR: r,
-            birthDelay: 3.0 + ni * 0.15,
-          }));
-        }
-      });
-    }
-
-    return nodes;
-  }
-
-  // -------------------------------------------------------
-  // TOPOLOGY-BASED CONNECTIONS
-  // -------------------------------------------------------
-  function buildConnections(nodes, isAI, colorAns, t) {
-    const conns = [], seen = new Set();
-    function add(a, b) {
-      if (a < 0 || b < 0 || a >= nodes.length || b >= nodes.length) return;
-      const k = Math.min(a, b) * 10000 + Math.max(a, b);
-      if (seen.has(k)) return;
-      seen.add(k);
-      conns.push([a, b]);
-    }
-
-    // Inner shape: pentagon edges
-    for (let i = 0; i < 5; i++) add(i, (i + 1) % 5);
-    // Star arms
-    if (isAI) {
-      for (let i = 0; i < 5; i++) add(i, (i + 2) % 5);
-    } else {
-      add(0, 2); add(1, 3);
-    }
-
-    if (!t.primariesOnly && nodes.length > 5) {
-      // Bridges: each primary → its first companion
-      for (let i = 0; i < 5; i++) add(i, 5 + i * 2);
-
-      // Outer shape: companion ring (decagon)
-      for (let i = 0; i < 10; i++) add(5 + i, 5 + (i + 1) % 10);
-
-      // Satellite ring + bridges
-      if (nodes.length >= 20) {
-        const answeredCount = colorAns.filter(a => a !== null).length;
-        for (let s = 0; s < 5; s++) add(nodes[15 + s].parent, 15 + s);
-        if (answeredCount >= 8) {
-          for (let s = 0; s < 5; s++) add(15 + s, 15 + (s + 1) % 5);
-        }
-      }
-
-      // Assess connections
-      for (let ai = 20; ai < nodes.length; ai++) {
-        const an = nodes[ai];
-        if (an.parent >= 0) add(an.parent, ai);
-        for (let aj = ai + 1; aj < nodes.length; aj++) {
-          if (nodes[aj].assessIdx === an.assessIdx) add(ai, aj);
-        }
-      }
-    }
-
-    return conns;
-  }
-
-  // -------------------------------------------------------
-  // APPEARANCE
-  // -------------------------------------------------------
-  function computeAppearance(nodes, isAI, colorAns, posAns, assessState, t) {
-    for (let i = 0; i < 5; i++) {
-      const node = nodes[i];
-      if (colorAns[i] !== null) {
-        node.tcolor = hexRgb(NEURON_MAP[i].colors[colorAns[i]]);
-        node.tr = t.answeredR ?? 12; node.thalo = t.answeredHalo ?? 45; node.talpha = 1;
-      } else if (posAns[i] !== null) {
-        node.tcolor = lerpRgb(hexRgb(NEURON_MAP[i].colors[0]), hexRgb(NEURON_MAP[i].colors[1]), 0.5);
-        node.talpha = 0.6; node.tr = 8; node.thalo = 32;
-      } else {
-        node.tcolor = lerpRgb(hexRgb(NEURON_MAP[i].colors[0]), hexRgb(NEURON_MAP[i].colors[1]), 0.5);
-        node.tr = t.ghostR ?? 6; node.thalo = 24; node.talpha = t.ghostAlpha ?? 0;
-      }
-    }
-    if (!t.primariesOnly && nodes.length > 5) {
-      const ac = colorAns.filter(a => a !== null).length + posAns.filter(a => a !== null).length;
-      for (let ci = 0; ci < 10; ci++) {
-        const node = nodes[5 + ci], parent = nodes[node.parent];
-        const ans = colorAns[node.parent] !== null || posAns[node.parent] !== null;
-        if (t.earnedCompanions && !ans) { node.talpha = 0; }
-        else if (ans) { node.tcolor = parent.tcolor; node.tr = 4 + (ci % 2) * 2; node.thalo = 16 + (ci % 2) * 6; node.talpha = parent.talpha * (t.companionAlpha ?? 0.6); }
-        else { node.tcolor = parent.tcolor; node.tr = 2.5; node.thalo = 10; node.talpha = t.companionGhostAlpha ?? 0; }
-      }
-      const satT = t.satThreshold ?? 8;
-      for (let si = 0; si < 5; si++) {
-        const node = nodes[15 + si], parent = nodes[node.parent];
-        if (ac >= satT && parent.talpha > 0.3) { node.tcolor = parent.tcolor; node.tr = 4; node.thalo = 14; node.talpha = 0.5 * Math.min(1, (ac - satT + 1) / 4); }
-        else { node.talpha = 0; }
-      }
-      for (let ai = 20; ai < nodes.length; ai++) {
-        const node = nodes[ai];
-        if (assessState[node.assessIdx]) {
-          node.talpha = 0.85; node.tr = 5; node.thalo = 18;
-          if (node.affinities && node.affinities.length >= 2) {
-            let ar = 0, ag = 0, ab = 0;
-            for (const pi of node.affinities) { ar += nodes[pi].color[0]; ag += nodes[pi].color[1]; ab += nodes[pi].color[2]; }
-            const n = node.affinities.length;
-            node.tcolor = lerpRgb(hexRgb(ASSESS_MAP[node.assessIdx].color), [ar / n, ag / n, ab / n], 0.6);
-          }
-        } else { node.talpha = 0; }
-      }
-    }
-  }
-
-  // -------------------------------------------------------
-  // TARGET UPDATE — wander + companion follow
-  // -------------------------------------------------------
-  function updateTargets(nodes, time, t) {
-    const wanderAmp = (t.wanderStrength ?? 0.4) * 25;
-
-    // Primaries: slow wander around base ring position
-    for (let i = 0; i < Math.min(5, nodes.length); i++) {
-      const n = nodes[i];
-      if (n.alpha < 0.03) continue;
-      const beat = Math.sin(time * n.wanderFreq3 + n.wanderPhase3);
-      const activity = Math.max(0, beat) * Math.max(0, beat);
-      const wx = Math.sin(time * n.wanderFreq1 + n.wanderPhase1) * wanderAmp * activity
-               + Math.sin(time * n.wanderFreq2 + n.wanderPhase2) * wanderAmp * 0.6 * activity;
-      const wy = Math.cos(time * n.wanderFreq1 * 0.73 + n.wanderPhase2) * wanderAmp * activity
-               + Math.cos(time * n.wanderFreq2 * 0.87 + n.wanderPhase1) * wanderAmp * 0.6 * activity;
-      n.tx = n.baseX + wx;
-      n.ty = n.baseY + wy;
-    }
-
-    // Companions: follow parent's wander at reduced strength
-    for (let ci = 0; ci < 10 && 5 + ci < nodes.length; ci++) {
-      const comp = nodes[5 + ci];
-      if (comp.alpha < 0.02) continue;
-      const parent = nodes[comp.parent];
-      const pdx = parent.x - parent.baseX;
-      const pdy = parent.y - parent.baseY;
-      comp.tx = comp.baseX + pdx * 0.5;
-      comp.ty = comp.baseY + pdy * 0.5;
-    }
-
-    // Satellites: follow parent at even less strength
-    for (let si = 0; si < 5 && 15 + si < nodes.length; si++) {
-      const sat = nodes[15 + si];
-      if (sat.alpha < 0.02) continue;
-      const parent = nodes[sat.parent];
-      const pdx = parent.x - parent.baseX;
-      const pdy = parent.y - parent.baseY;
-      sat.tx = sat.baseX + pdx * 0.3;
-      sat.ty = sat.baseY + pdy * 0.3;
-    }
-
-    // Assess: follow affinity centroid shift
-    for (let ai = 20; ai < nodes.length; ai++) {
-      const an = nodes[ai];
-      if (an.alpha < 0.02 || !an.affinities) continue;
-      let sx = 0, sy = 0;
-      for (const pi of an.affinities) { sx += nodes[pi].x - nodes[pi].baseX; sy += nodes[pi].y - nodes[pi].baseY; }
-      sx /= an.affinities.length; sy /= an.affinities.length;
-      an.tx = an.baseX + sx * 0.4;
-      an.ty = an.baseY + sy * 0.4;
-    }
-  }
-
-  // -------------------------------------------------------
-  // 3D MULTI-HARMONIC DRIFT
-  // Returns {x, y, depth} where depth (-1 to 1) modulates glow/size
-  // -------------------------------------------------------
-  function animPos(n, time, isAI, t) {
-    const bm = n.birthMix ?? 1;
-    const dm = (t.microDrift ?? 1.0) * bm * bm * bm;
-    const sp = n.driftSpeed;
-    const amp = n.driftAmp * (isAI ? 0.4 : 1.0) * dm;
-
-    const dx1 = Math.sin(time * sp + n.phaseX) * amp;
-    const dy1 = Math.cos(time * sp * 0.73 + n.phaseY) * amp;
-    const dx2 = Math.sin(time * sp * 0.4 + n.phaseX * 2.1) * amp * 0.45;
-    const dy2 = Math.cos(time * sp * 0.35 + n.phaseY * 1.7) * amp * 0.38;
-    const dx3 = Math.sin(time * n.slowFreq + n.slowPhaseX) * amp * n.slowAmp;
-    const dy3 = Math.cos(time * n.slowFreq * 0.8 + n.slowPhaseY) * amp * n.slowAmp;
-    const depth = Math.sin(time * sp * 0.22 + n.phaseX * 0.6 + n.phaseY * 0.3);
-
-    return { x: n.x + dx1 + dx2 + dx3, y: n.y + dy1 + dy2 + dy3, depth };
-  }
-
-  // -------------------------------------------------------
-  // SHAPE HELPERS
-  // -------------------------------------------------------
-  function diamond(ctx, cx, cy, s) { ctx.beginPath(); ctx.moveTo(cx, cy - s); ctx.lineTo(cx + s, cy); ctx.lineTo(cx, cy + s); ctx.lineTo(cx - s, cy); ctx.closePath(); }
-  function triangle(ctx, cx, cy, s) { const h = s * 1.15; ctx.beginPath(); ctx.moveTo(cx, cy - h); ctx.lineTo(cx + s, cy + h * 0.5); ctx.lineTo(cx - s, cy + h * 0.5); ctx.closePath(); }
-
-  // -------------------------------------------------------
-  // RENDER
-  // -------------------------------------------------------
-  function render(ctx, nodes, conns, stars, isAI, time, scale, t, darkMode) {
-    const W = 600, H = 600, CX = 300, CY = 300;
-    const breathAmp = t.breathAmp ?? 0.04, breathSpd = t.breathSpd ?? 0.22;
-    const breath = 1 + breathAmp * Math.sin(time * breathSpd);
-
-    // Auto-center: compute centroid of visible nodes, offset to center
-    let cx = 0, cy = 0, cw = 0;
-    for (const n of nodes) {
-      if (n.alpha < 0.05) continue;
-      cx += n.x * n.alpha; cy += n.y * n.alpha; cw += n.alpha;
-    }
-    const offX = cw > 0 ? CX - cx / cw : 0;
-    const offY = cw > 0 ? CY - cy / cw : 0;
-
-    ctx.save();
-    ctx.scale(scale, scale);
-    ctx.clearRect(0, 0, W, H);
-
-    // Background: deep black void — neurons are the only light
-    const bgColor = '#000000';
-    if (darkMode) {
-      ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, W, H);
-    } else {
-      // Light mode: large solid black center → gradual fade past constellation edge
-      const vg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 300);
-      vg.addColorStop(0, bgColor);
-      vg.addColorStop(0.65, bgColor);
-      vg.addColorStop(0.75, bgColor + 'dd');
-      vg.addColorStop(0.82, bgColor + '99');
-      vg.addColorStop(0.88, bgColor + '55');
-      vg.addColorStop(0.93, bgColor + '28');
-      vg.addColorStop(0.97, bgColor + '0c');
-      vg.addColorStop(1, bgColor + '00');
-      ctx.fillStyle = vg;
-      ctx.fillRect(0, 0, W, H);
-    }
-
-    // Apply centroid offset
-    ctx.translate(offX, offY);
-
-    // Stars
-    const starCount = t.stars ?? 35;
-    for (let i = 0; i < Math.min(starCount, stars.length); i++) {
-      const s = stars[i];
-      const tw = s.bright * (0.5 + 0.5 * Math.sin(time * s.speed + s.phase));
-      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fillStyle = rgbStr([180, 200, 255], tw); ctx.fill();
-    }
-
-    // AI hex grid
-    if (isAI) {
-      ctx.save(); ctx.translate(CX, CY); ctx.rotate(time * 0.015); ctx.translate(-CX, -CY);
-      ctx.strokeStyle = '#6b7b93'; ctx.lineWidth = 0.6;
-      for (let ring = 1; ring <= 7; ring++) {
-        ctx.globalAlpha = Math.max(0.005, 0.10 - ring * 0.012);
-        ctx.beginPath();
-        for (let i = 0; i <= 6; i++) {
-          const a = (i / 6) * Math.PI * 2 - Math.PI / 6, r = ring * 40;
-          i === 0 ? ctx.moveTo(CX + Math.cos(a) * r, CY + Math.sin(a) * r)
-                  : ctx.lineTo(CX + Math.cos(a) * r, CY + Math.sin(a) * r);
-        }
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    // Additive blending for all glow layers — overlapping pools ADD brightness
-    ctx.globalCompositeOperation = 'lighter';
-
-    // Nebula wash: massive saturated color pools (replicates old SVG glow zones)
-    for (let i = 0; i < 5; i++) {
-      const n = nodes[i]; if (n.alpha < 0.08) continue;
-      const p = animPos(n, time, isAI, t);
-      const nebR = 280 * breath;
-      const nebA = n.alpha * 0.45;
-      const ng = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, nebR);
-      ng.addColorStop(0, rgbStr(n.color, nebA));
-      ng.addColorStop(0.25, rgbStr(n.color, nebA * 0.75));
-      ng.addColorStop(0.50, rgbStr(n.color, nebA * 0.40));
-      ng.addColorStop(0.75, rgbStr(n.color, nebA * 0.12));
-      ng.addColorStop(1, rgbStr(n.color, 0));
-      ctx.fillStyle = ng; ctx.fillRect(0, 0, W, H);
-    }
-
-    // Glow: per-primary atmospheric radials — saturated pools centered on each node
-    const glowR = t.glowRadius ?? 150;
-    const glowAlpha = t.glowAlpha ?? 0.40;
-    const passes = t.glowPasses ?? 1;
-
-    for (let pass = 0; pass < passes; pass++) {
-      const ps = 1 - pass * 0.10, pa = pass === 0 ? 1.0 : 0.75;
-      for (let i = 0; i < 5; i++) {
-        const n = nodes[i]; if (n.alpha < 0.03) continue;
-        const p = animPos(n, time, isAI, t);
-        const depthScale = 0.88 + p.depth * 0.15;
-        const r = glowR * ps * (0.55 + n.alpha * 0.45) * breath * depthScale;
-        const a = n.alpha * glowAlpha * pa * (0.90 + p.depth * 0.12);
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-        // Saturated pools with additive blending — overlaps create vivid color
-        g.addColorStop(0, rgbStr(n.color, a * 0.45));
-        g.addColorStop(0.10, rgbStr(n.color, a * 0.72));
-        g.addColorStop(0.25, rgbStr(n.color, a * 0.80));
-        g.addColorStop(0.40, rgbStr(n.color, a * 0.55));
-        g.addColorStop(0.55, rgbStr(n.color, a * 0.30));
-        g.addColorStop(0.72, rgbStr(n.color, a * 0.10));
-        g.addColorStop(1, rgbStr(n.color, 0));
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    // Companion glow: bridges between primaries for cohesion
-    if (t.compGlow && nodes.length > 5) {
-      const cgScale = t.compGlowScale ?? 0.45;
-      for (let ci = 0; ci < 10 && 5 + ci < nodes.length; ci++) {
-        const n = nodes[5 + ci]; if (n.alpha < 0.05) continue;
-        const p = animPos(n, time, isAI, t);
-        const r = glowR * cgScale * (0.5 + n.alpha * 0.5) * breath;
-        const a = n.alpha * glowAlpha * 0.7;
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-        g.addColorStop(0, rgbStr(n.color, a * 0.40));
-        g.addColorStop(0.20, rgbStr(n.color, a * 0.65));
-        g.addColorStop(0.40, rgbStr(n.color, a * 0.42));
-        g.addColorStop(0.65, rgbStr(n.color, a * 0.15));
-        g.addColorStop(1, rgbStr(n.color, 0));
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    // Back to normal compositing for nodes and connections
-    ctx.globalCompositeOperation = 'source-over';
-
-    // Nodes: sorted by depth (far first → close on top) for 3D layering
-    const nodePositions = [];
-    for (let i = 0; i < nodes.length; i++) {
-      if (nodes[i].alpha < 0.02) continue;
-      nodePositions.push({ idx: i, pos: animPos(nodes[i], time, isAI, t) });
-    }
-    nodePositions.sort((a, b) => a.pos.depth - b.pos.depth);
-    const haloScale = t.haloScale ?? 3.5;
-
-    for (const { idx, pos: p } of nodePositions) {
-      const n = nodes[idx], c = n.color, ba = n.alpha;
-      const depthSize = 0.88 + p.depth * 0.15;
-      const cR = (n.r + n.flash * 3) * breath * depthSize;
-
-      // Outer halo
-      if (cR > 1) {
-        const outerR = cR * haloScale;
-        const g1 = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, outerR);
-        g1.addColorStop(0, rgbStr(c, ba * (t.haloInner ?? 0.24)));
-        g1.addColorStop(0.5, rgbStr(c, ba * (t.haloMid ?? 0.09)));
-        g1.addColorStop(1, rgbStr(c, 0));
-        if (isAI && n.type === 'primary') {
-          ctx.save();
-          if (n.sensitive) triangle(ctx, p.x, p.y, outerR * 1.3); else diamond(ctx, p.x, p.y, outerR * 1.3);
-          ctx.clip(); ctx.fillStyle = g1; ctx.fillRect(p.x - outerR, p.y - outerR, outerR * 2, outerR * 2); ctx.restore();
-        } else { ctx.beginPath(); ctx.arc(p.x, p.y, outerR, 0, Math.PI * 2); ctx.fillStyle = g1; ctx.fill(); }
-      }
-      // Mid glow
-      if (cR > 0.5) {
-        ctx.beginPath();
-        if (isAI && n.type === 'primary') { if (n.sensitive) triangle(ctx, p.x, p.y, cR * 1.8); else diamond(ctx, p.x, p.y, cR * 1.8); }
-        else ctx.arc(p.x, p.y, cR * 1.8, 0, Math.PI * 2);
-        ctx.fillStyle = rgbStr(c, ba * 0.35); ctx.fill();
-      }
-      // Bright core
-      if (cR > 0.3) {
-        ctx.beginPath();
-        if (isAI && n.type === 'primary') { if (n.sensitive) triangle(ctx, p.x, p.y, cR); else diamond(ctx, p.x, p.y, cR); }
-        else ctx.arc(p.x, p.y, cR, 0, Math.PI * 2);
-        ctx.fillStyle = rgbStr(c, ba * 0.95); ctx.fill();
-      }
-      // White pip
-      if (cR > 0.8) {
-        ctx.beginPath();
-        if (isAI && n.type === 'primary') { if (n.sensitive) triangle(ctx, p.x, p.y, cR * 0.4); else diamond(ctx, p.x, p.y, cR * 0.4); }
-        else ctx.arc(p.x, p.y, cR * 0.4, 0, Math.PI * 2);
-        ctx.fillStyle = rgbStr([255, 255, 255], ba * 0.65); ctx.fill();
-      }
-      // Flash ring
-      if (n.flash > 0.05) {
-        const fR = cR * (3 + (1 - n.flash) * 8);
-        ctx.beginPath();
-        if (isAI && n.type === 'primary' && n.sensitive) triangle(ctx, p.x, p.y, fR);
-        else if (isAI && n.type === 'primary') diamond(ctx, p.x, p.y, fR);
-        else ctx.arc(p.x, p.y, fR, 0, Math.PI * 2);
-        ctx.strokeStyle = rgbStr(c, n.flash * 0.4); ctx.lineWidth = 2 * n.flash; ctx.stroke();
-      }
-    }
-
-    // Connections: straight lines, rendered LAST (always visible)
-    const cAlpha = t.connAlpha ?? 0.45;
-    for (const [a, b] of conns) {
-      const na = nodes[a], nb = nodes[b];
-      if (na.alpha < 0.03 || nb.alpha < 0.03) continue;
-      const pa = animPos(na, time, isAI, t), pb = animPos(nb, time, isAI, t);
-      const dx = pa.x - pb.x, dy = pa.y - pb.y, dist = Math.sqrt(dx * dx + dy * dy);
-      const lineA = Math.max(0, 1 - dist / 350) * Math.min(na.alpha, nb.alpha) * cAlpha;
-      if (lineA < 0.008) continue;
-
-      const mc = [(na.color[0] + nb.color[0]) / 2, (na.color[1] + nb.color[1]) / 2, (na.color[2] + nb.color[2]) / 2];
-
-      // Glow layer — wide, visible atmospheric connection
-      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y);
-      ctx.strokeStyle = rgbStr(mc, lineA * 0.6); ctx.lineWidth = (t.connWidth ?? 1.4) * 4; ctx.lineCap = 'round'; ctx.stroke();
-
-      // Crisp core — bright, legible
-      const bright = [Math.min(255, mc[0] + 180), Math.min(255, mc[1] + 180), Math.min(255, mc[2] + 180)];
-      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y);
-      ctx.strokeStyle = rgbStr(bright, lineA * 1.4); ctx.lineWidth = t.connWidth ?? 1.4; ctx.lineCap = 'round'; ctx.stroke();
-    }
-
-    ctx.restore();
-  }
-
-  // -------------------------------------------------------
-  // INIT STATE
-  // -------------------------------------------------------
-  React.useEffect(() => {
-    const { onboardingAnswers, assessCompleted, entityType } = propsRef.current;
-    const tier = detectTier(assessCompleted);
-    const t = getTuning(tier);
-    const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
-    const assessState = deriveAssessState(assessCompleted);
-    const nodes = buildAllNodes(assessState, colorAns, posAns, entityType === 'ai', t);
-    const conns = buildConnections(nodes, entityType === 'ai', colorAns, t);
-
-    const stars = [];
-    for (let i = 0; i < 60; i++) stars.push({
-      x: Math.random() * 600, y: Math.random() * 600,
-      r: 0.2 + Math.random() * 0.8,
-      bright: Math.random() * 0.35 + 0.05,
-      phase: Math.random() * Math.PI * 2,
-      speed: 0.5 + Math.random() * 2.5,
-    });
-
-    // Nodes start at their ring positions — already there when page loads
-    for (const n of nodes) { n.x = n.baseX; n.y = n.baseY; n.alpha = n.talpha; n.birthMix = 1; }
-
-    stateRef.current = {
-      nodes, stars, conns,
-      lastTime: performance.now(),
-      birthStart: performance.now(),
-      prevAK: '', prevAsK: '', prevET: entityType,
-    };
-  }, []);
-
-  // -------------------------------------------------------
-  // PROP CHANGE DETECTION
-  // -------------------------------------------------------
-  React.useEffect(() => {
-    if (!stateRef.current) return;
-    const { nodes } = stateRef.current;
-    const { onboardingAnswers, assessCompleted, entityType } = propsRef.current;
-    const tier = detectTier(assessCompleted);
-    const t = getTuning(tier);
-    const ak = JSON.stringify(onboardingAnswers), ask = JSON.stringify(Object.keys(assessCompleted).sort());
-    const ac = ak !== stateRef.current.prevAK, asc = ask !== stateRef.current.prevAsK, ec = entityType !== stateRef.current.prevET;
-    stateRef.current.prevAK = ak; stateRef.current.prevAsK = ask; stateRef.current.prevET = entityType;
-
-    // Entity or assessment changed — full rebuild
-    if (ec || asc) {
-      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
-      const assessState = deriveAssessState(assessCompleted);
-      const isAI = entityType === 'ai';
-      const newNodes = buildAllNodes(assessState, colorAns, posAns, isAI, t);
-      const newConns = buildConnections(newNodes, isAI, colorAns, t);
-      for (let i = 0; i < newNodes.length; i++) {
-        if (i < nodes.length && nodes[i]) {
-          newNodes[i].x = nodes[i].x; newNodes[i].y = nodes[i].y;
-          newNodes[i].tx = nodes[i].x; newNodes[i].ty = nodes[i].y;
-        }
-        newNodes[i].flash = 0.6;
-      }
-      stateRef.current.nodes = newNodes;
-      stateRef.current.conns = newConns;
-      stateRef.current.birthStart = performance.now();
-      return;
-    }
-    // Answer changed — flash + rebuild connections
-    if (ac) {
-      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
-      const isAI = entityType === 'ai';
-      const h = answerHash(colorAns, posAns), baseRot = (h % 628) / 100;
-      const INNER_R = t.ringInner ?? 80;
-      for (let i = 0; i < 5 && i < nodes.length; i++) {
-        const angle = baseRot + (i / 5) * Math.PI * 2;
-        const nudge = (posAns[i] !== null ? (posAns[i] === 0 ? -0.12 : 0.12) : 0)
-                    + (colorAns[i] !== null ? (colorAns[i] === 0 ? -0.06 : 0.06) : 0);
-        const a = angle + nudge;
-        nodes[i].baseAngle = a; nodes[i].baseR = INNER_R;
-        nodes[i].baseX = 300 + Math.cos(a) * INNER_R;
-        nodes[i].baseY = 300 + Math.sin(a) * INNER_R;
-        nodes[i].flash = 1;
-      }
-      stateRef.current.conns = buildConnections(nodes, isAI, colorAns, t);
-    }
-  }, [onboardingAnswers, assessCompleted, entityType]);
-
-  // -------------------------------------------------------
-  // ANIMATION LOOP
-  // -------------------------------------------------------
   React.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    function frame(now) {
-      if (!stateRef.current) { animRef.current = requestAnimationFrame(frame); return; }
-      const { nodes, stars, conns } = stateRef.current;
-      const { onboardingAnswers, assessCompleted, entityType, size } = propsRef.current;
-      const tier = detectTier(assessCompleted);
-      const t = getTuning(tier);
-      const scale = size / 600, isAI = entityType === 'ai';
-      const { colorAns, posAns } = deriveAnswers(onboardingAnswers);
-      const assessState = deriveAssessState(assessCompleted);
-      const dt = Math.min((now - stateRef.current.lastTime) / 1000, 0.05);
-      stateRef.current.lastTime = now;
-      const time = now / 1000;
+    // ═══ CONSTANTS ═══
+    const PI = Math.PI, TAU = PI * 2;
+    const TR = {
+      O: { l:'Open',  base:[78,205,196],  acc:[255,154,139] },
+      C: { l:'Consc', base:[69,183,209],  acc:[255,183,77] },
+      E: { l:'Extra', base:[150,230,161], acc:[230,120,200] },
+      A: { l:'Agree', base:[221,160,221], acc:[120,220,180] },
+      N: { l:'Neuro', base:[247,220,111], acc:[140,160,240] },
+    };
+    const TK = Object.keys(TR);
+    const SSC = [0.20, 0.45, 0.72, 1.0];
+    const GSC = [0.35, 0.55, 0.78, 1.0];
 
-      computeAppearance(nodes, isAI, colorAns, posAns, assessState, t);
-      updateTargets(nodes, time, t);
+    // Onboarding question → primary mapping
+    const NEURON_MAP = [
+      { colorQ:'onboard-1', posQ:'onboard-2' },
+      { colorQ:'onboard-4', posQ:'onboard-8' },
+      { colorQ:'onboard-5', posQ:'onboard-3' },
+      { colorQ:'onboard-6', posQ:'onboard-9' },
+      { colorQ:'onboard-7', posQ:'onboard-10' },
+    ];
 
-      const spd = 4 * dt, cspd = 6 * dt;
-      for (const n of nodes) {
-        // Instant appearance — neurons are already there
-        n.birthMix = 1;
+    // ═══ HELPERS ═══
+    function m32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+    function rga(c,a){return`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;}
+    function ltn(c,n){return[Math.min(255,c[0]+n),Math.min(255,c[1]+n),Math.min(255,c[2]+n)];}
+    function drk(c,n){return[Math.max(0,c[0]-n),Math.max(0,c[1]-n),Math.max(0,c[2]-n)];}
+    function dst(x1,y1,x2,y2){const a=x1-x2,b=y1-y2;return Math.sqrt(a*a+b*b);}
+    function bl(cs,ws){let r=0,g=0,b=0,w=0;for(let i=0;i<cs.length;i++){r+=cs[i][0]*ws[i];g+=cs[i][1]*ws[i];b+=cs[i][2]*ws[i];w+=ws[i];}return w?[r/w|0,g/w|0,b/w|0]:[128,128,128];}
+    function lr3(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+    function clamp(v,lo,hi){return v<lo?lo:v>hi?hi:v;}
 
-        n.x = lerp(n.x, n.tx, spd);
-        n.y = lerp(n.y, n.ty, spd);
-        n.r = lerp(n.r, n.tr + n.flash * 5, spd);
-        n.halo = lerp(n.halo, n.thalo + n.flash * 20, spd);
-        n.alpha = lerp(n.alpha, n.talpha + n.flash * 0.3, spd * 2);
-        n.color = lerpRgb(n.color, n.tcolor, cspd);
-        n.orbitAngle += n.orbitSpeed * (isAI ? 0.3 : 1.0);
-        n.flash *= 0.91; if (n.flash < 0.01) n.flash = 0;
+    // ═══ VALUE NOISE ═══
+    const PERM=new Uint8Array(512);
+    (function(){const r=m32(42);for(let i=0;i<256;i++)PERM[i]=i;
+      for(let i=255;i>0;i--){const j=(r()*i)|0;[PERM[i],PERM[j]]=[PERM[j],PERM[i]];}
+      for(let i=0;i<256;i++)PERM[i+256]=PERM[i];})();
+    function noise2(x,y){
+      const xi=Math.floor(x)&255,yi=Math.floor(y)&255,xf=x-Math.floor(x),yf=y-Math.floor(y);
+      const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+      const a=PERM[xi]+yi,b=PERM[xi+1]+yi;
+      return((PERM[a]/255*(1-u)+PERM[b]/255*u)*(1-v)+(PERM[a+1]/255*(1-u)+PERM[b+1]/255*u)*v);
+    }
+    function fbm(x,y,oct){let v=0,a=0.5,f=1;for(let i=0;i<oct;i++){v+=a*noise2(x*f,y*f);a*=0.5;f*=2;}return v;}
+
+    // ═══ CONVEX HULL ═══
+    function convexHull(points){
+      if(points.length<3)return points.slice();
+      const sorted=points.slice().sort((a,b)=>a.x-b.x||a.y-b.y);
+      const cross=(O,A,B)=>(A.x-O.x)*(B.y-O.y)-(A.y-O.y)*(B.x-O.x);
+      const lower=[];
+      for(const p of sorted){while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop();lower.push(p);}
+      const upper=[];
+      for(let i=sorted.length-1;i>=0;i--){const p=sorted[i];while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop();upper.push(p);}
+      return lower.slice(0,-1).concat(upper.slice(0,-1));
+    }
+
+    // ═══ CHAIKIN CORNER CUTTING ═══
+    function chaikin(pts,iters){
+      let cur=pts;
+      for(let it=0;it<iters;it++){
+        const next=[];
+        for(let i=0;i<cur.length;i++){
+          const a=cur[i],b=cur[(i+1)%cur.length];
+          next.push({x:a.x*0.75+b.x*0.25,y:a.y*0.75+b.y*0.25});
+          next.push({x:a.x*0.25+b.x*0.75,y:a.y*0.25+b.y*0.75});
+        }
+        cur=next;
+      }
+      return cur;
+    }
+
+    // ═══ GENOME FROM ANSWERS ═══
+    function deriveGenome(answers) {
+      // Stable seed from answer state
+      const keys = Object.keys(answers || {}).sort();
+      let seed = 12345;
+      for (const k of keys) {
+        for (let i = 0; i < k.length; i++) seed = (seed * 31 + k.charCodeAt(i)) | 0;
+        const v = answers[k];
+        if (v && v.answer !== undefined) {
+          seed = (seed * 37 + (v.answer === 'A' ? 1 : v.answer === 'B' ? 2 : 3)) | 0;
+        }
+      }
+      seed = Math.abs(seed) || 42;
+      const r = m32(seed);
+
+      const tv = {};
+      for (let i = 0; i < 5; i++) {
+        const nm = NEURON_MAP[i];
+        const hasColor = nm.colorQ in answers;
+        const hasPos = nm.posQ in answers;
+        const base = r();
+        if (hasColor && hasPos) tv[TK[i]] = 0.60 + base * 0.40;
+        else if (hasColor || hasPos) tv[TK[i]] = 0.30 + base * 0.30;
+        else tv[TK[i]] = 0.03 + base * 0.10;
       }
 
-      // Match prototype: no DPR scaling — browser upscale softens gradients naturally
-      canvas.width = size;
-      canvas.height = size;
-      canvas.style.width = size + 'px';
-      canvas.style.height = size + 'px';
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const so = [...TK].sort((a, b) => tv[b] - tv[a]);
+      const glow = bl([TR[so[0]].base, TR[so[1]].base], [0.65, 0.35]);
+      const iord = [0,1,2,3,4,5].sort(() => r() - 0.5);
+      const ints = {}; for (let i = 0; i < 5; i++) ints[TK[i]] = iord[i];
+      return { tv, s: seed, dom: so[0], glow, glowAcc: TR[so[0]].acc, ints, so };
+    }
 
-      render(ctx, nodes, conns, stars, isAI, time, scale, t, propsRef.current.darkMode);
+    // ═══ NODE FACTORY ═══
+    function mkNodes(g, oR) {
+      const r = m32(g.s + 3333), ns = [];
+      for (let i = 0; i < 5; i++) {
+        const k = TK[i], v = g.tv[k];
+        const an = (i / 5) * TAU - PI / 2 + (v - 0.5) * 0.3;
+        const br = oR * (0.28 + 0.22 * v);
+        const rd = oR * (0.06 + v * 0.14);
+        ns.push({ tp:'p', k, tv:v, rgb:TR[k].base, acc:TR[k].acc, iIdx:g.ints[k],
+          bA:an, bR:br, x:0, y:0, dp:0, rd, sd:g.s+i*137.5, bp:i*1.47, stg:0 });
+      }
+      for (let i = 0; i < 5; i++) { const p = ns[i]; for (let c = 0; c < 5; c++) {
+        const o = p.bA + (c-2)*0.3 + (r()-0.5)*0.2, cr = p.bR + oR*(0.04+r()*0.06);
+        const v = p.tv * (0.25 + r()*0.35);
+        ns.push({ tp:'c', k:p.k, tv:v, rgb:p.rgb, acc:p.acc,
+          bA:o, bR:cr, x:0, y:0, dp:0, rd:oR*(0.010+v*0.025), sd:g.s+(10+i*5+c)*137.5, bp:(10+i*5+c)*0.9, stg:1 });
+      }}
+      const AD = [
+        {a:['O','C'],n:5},{a:['E','N'],n:5},{a:['O'],n:4},{a:['E','A'],n:5},{a:['C','N'],n:4},
+        {a:['O','C','E','A','N'],n:7},{a:['A','E'],n:5},{a:['N','O'],n:5},
+        {a:['O','E'],n:4},{a:['C','A'],n:4},{a:['N','E','A'],n:5}
+      ];
+      let ai = 0;
+      for (let a = 0; a < AD.length; a++) { const d = AD[a], sr2 = a < 5 ? 2 : 3;
+        for (let n = 0; n < d.n; n++) {
+          const ak = d.a[n % d.a.length], ai2 = TK.indexOf(ak), ap = ns[ai2];
+          const sc = oR*(0.04+r()*0.10), sa = r()*TAU, v = ap.tv*(0.12+r()*0.22);
+          const nb = ns[(ai2+1+Math.floor(r()*3))%5];
+          const rgb = lr3(ap.rgb, nb.acc, 0.15+r()*0.2).map(x => clamp(x|0,0,255));
+          ns.push({ tp:'a', k:ak, tv:v, rgb, acc:ap.acc,
+            bA:ap.bA+(r()-0.5)*0.8, bR:ap.bR+sc*(0.5+r()*0.5), x:0, y:0, dp:0,
+            rd:oR*(0.004+v*0.012), sd:g.s+(40+ai)*137.5, bp:(40+ai)*0.7, stg:sr2 }); ai++;
+      }}
+      for (let h = 0; h < 18; h++) {
+        const ha = (h/18)*TAU + (r()-0.5)*0.3;
+        const pi = h%5, pp = ns[pi], v = pp.tv*(0.08+r()*0.12);
+        const hr = pp.bR + oR*(0.02+r()*0.06);
+        const rgb = lr3(pp.rgb, pp.acc, 0.2+r()*0.3).map(x => clamp(x|0,0,255));
+        ns.push({ tp:'a', k:TK[pi], tv:v, rgb, acc:pp.acc,
+          bA:ha, bR:hr, x:0, y:0, dp:0, rd:oR*(0.003+v*0.006), sd:g.s+(120+h)*137.5, bp:(120+h)*0.5, stg:3 });
+      }
+      return ns;
+    }
+
+    function filt(ns, si) { return ns.filter(n => n.tp==='p' || (n.tp==='c' && si>=1) || (n.tp==='a' && si>=n.stg)); }
+
+    // ═══ CONTOUR ═══
+    function computeHull(ns, oR, stg, CX, CY) {
+      const sc = SSC[stg];
+      const pts = [];
+      for (const n of ns) {
+        const r = n.rd * sc;
+        const pad = n.tp==='p' ? r*0.6+oR*0.06 : r*0.5+oR*0.04;
+        const totalR = r + pad;
+        const count = 24;
+        for (let i = 0; i < count; i++) {
+          const a = (i/count) * TAU;
+          pts.push({ x: n.x + Math.cos(a)*totalR, y: n.y + Math.sin(a)*totalR });
+        }
+      }
+      if (pts.length < 3) return [{ x:CX-20,y:CY-20 },{ x:CX+20,y:CY-20 },{ x:CX+20,y:CY+20 },{ x:CX-20,y:CY+20 }];
+      return chaikin(convexHull(pts), 8);
+    }
+
+    function traceSmoothedHull(ctx, hull) {
+      if (hull.length < 3) return;
+      ctx.beginPath();
+      ctx.moveTo(hull[0].x, hull[0].y);
+      for (let i = 1; i < hull.length; i++) ctx.lineTo(hull[i].x, hull[i].y);
+      ctx.closePath();
+    }
+
+    // ═══ PHYSICS ═══
+    function updPhys(ns, t, CX, CY, oR, stg) {
+      const breath = Math.sin(t * 0.12) * 0.003;
+      const sc = SSC[stg];
+      const bsc = 1 + breath;
+      for (const n of ns) {
+        const tOff = n.sd * 0.37;
+        const wanderA = n.bA + (fbm(n.sd*0.13, t*0.004+tOff, 3)-0.5)*TAU*0.65;
+        const wanderR = n.bR * (0.75 + fbm(n.sd*0.17+100, t*0.005+tOff, 3)*0.50);
+        const baseX = CX + Math.cos(wanderA)*wanderR*bsc*sc;
+        const baseY = CY + Math.sin(wanderA)*wanderR*bsc*sc;
+        const swayAmp = oR*sc*0.15;
+        const sx = (fbm(n.sd*0.1+t*0.035+tOff, t*0.028, 2)*2-1)*swayAmp;
+        const sy = (fbm(t*0.030, n.sd*0.1+t*0.038+tOff, 2)*2-1)*swayAmp;
+        const wigAmp = oR*sc*0.03;
+        const wx = (fbm(n.sd*0.3+t*0.15, t*0.12, 1)*2-1)*wigAmp;
+        const wy = (fbm(t*0.13, n.sd*0.3+t*0.16, 1)*2-1)*wigAmp;
+        n.x = baseX+sx+wx;
+        n.y = baseY+sy+wy;
+      }
+      let cx=0, cy=0;
+      for (const n of ns) { cx+=n.x; cy+=n.y; }
+      cx /= ns.length; cy /= ns.length;
+      const ox = CX-cx, oy = CY-cy;
+      for (const n of ns) { n.x+=ox; n.y+=oy; }
+      return breath;
+    }
+
+    // ═══ CONNECTIONS ═══
+    function mkCon(ns) {
+      const cn=[], seen=new Set(), K=7;
+      for (let i=0;i<ns.length;i++){const dd=[];
+        for(let j=0;j<ns.length;j++){if(i===j)continue;
+          const xi=Math.cos(ns[i].bA)*ns[i].bR, yi=Math.sin(ns[i].bA)*ns[i].bR;
+          const xj=Math.cos(ns[j].bA)*ns[j].bR, yj=Math.sin(ns[j].bA)*ns[j].bR;
+          dd.push({j,d:dst(xi,yi,xj,yj)});}
+        dd.sort((a,b)=>a.d-b.d);
+        for(let k=0;k<Math.min(K,dd.length);k++){const j=dd[k].j,ky=Math.min(i,j)+'-'+Math.max(i,j);
+          if(seen.has(ky))continue;seen.add(ky);
+          cn.push({a:i,b:j,col:bl([ns[i].rgb,ns[j].rgb],[0.5,0.5]),
+            str:(ns[i].tv+ns[j].tv)/2,cs:i*31+j*17,
+            isPP:ns[i].tp==='p'&&ns[j].tp==='p'});}}
+      const pI=[];ns.forEach((n,i)=>{if(n.tp==='p')pI.push(i);});
+      for(let i=0;i<pI.length;i++)for(let j=i+1;j<pI.length;j++){
+        const ky=pI[i]+'-'+pI[j];
+        if(!seen.has(ky)){seen.add(ky);const a=ns[pI[i]],b=ns[pI[j]];
+          cn.push({a:pI[i],b:pI[j],col:bl([a.rgb,b.rgb],[0.5,0.5]),
+            str:(a.tv+b.tv)/2,cs:pI[i]*31+pI[j]*17,isPP:true});}}
+      return cn;
+    }
+
+    function mkPul(cn, sd) {
+      const r=m32(sd+5555), ps=[];
+      for(const c of cn){const ct=1+Math.floor(c.str*1.5);
+        for(let i=0;i<ct;i++)ps.push({a:c.a,b:c.b,cs:c.cs,p:r(),sp:0.03+r()*0.05,
+          dr:r()>0.5?1:-1,col:ltn(c.col,55),sz:0.8+c.str*1.5+(c.isPP?1:0)});}
+      return ps;
+    }
+    function updPul(ps,dt){for(const q of ps){q.p+=q.sp*q.dr*dt;if(q.p>1)q.p-=1;if(q.p<0)q.p+=1;}}
+    function cMid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2};}
+
+    // ═══ BLOB PATH ═══
+    function blobP(ctx,cx,cy,r,sd,t){
+      ctx.beginPath();for(let i=0;i<=48;i++){const a=(i/48)*TAU;
+        const br=r+Math.sin(a*3+t*0.12+sd)*r*0.08+Math.sin(a*5+t*0.07+sd*1.3)*r*0.04
+          +Math.sin(a*2+t*0.15+sd*0.7)*r*0.05;
+        ctx.lineTo(cx+Math.cos(a)*br,cy+Math.sin(a)*br);}
+      ctx.closePath();
+    }
+
+    // ═══ INTERIORS — only rendered at size >= 150 ═══
+    const INT=[
+    {name:'Chromatin',fn(cx,n,r,col,d,t){
+      const sr=m32(n.sd*8901|0),b=ltn(col,85),h=ltn(col,140);
+      for(let s=0;s<9;s++){const sa=sr()*TAU,sR=sr()*r*0.35;
+        let px=n.x+Math.cos(sa)*sR,py=n.y+Math.sin(sa)*sR;
+        cx.beginPath();cx.moveTo(px,py);
+        for(let p=0;p<30;p++){const da=sr()*1.0-0.5+Math.sin(t*0.03+s+p*0.3)*0.15,step=r*0.04+sr()*r*0.025;
+          px+=Math.cos(da+p*0.5+s)*step;py+=Math.sin(da+p*0.7+s)*step;cx.lineTo(px,py);}
+        cx.strokeStyle=rga(b,0.5);cx.lineWidth=0.7+sr()*0.5;cx.lineCap='round';cx.stroke();}
+      for(let i=0;i<8;i++){const a=sr()*TAU,dd=sr()*r*0.6;
+        const jx=n.x+Math.cos(a)*dd,jy=n.y+Math.sin(a)*dd,sz=1+sr()*2;
+        const jg=cx.createRadialGradient(jx,jy,0,jx,jy,sz*3);
+        jg.addColorStop(0,rga(h,0.7));jg.addColorStop(0.4,rga(b,0.2));jg.addColorStop(1,rga(b,0));
+        cx.fillStyle=jg;cx.beginPath();cx.arc(jx,jy,sz*3,0,TAU);cx.fill();}}},
+    {name:'Constellation',fn(cx,n,r,col,d,t){
+      const sr=m32(n.sd*7913|0),b=ltn(col,90),h=ltn(col,140);
+      const stars=14+Math.floor(sr()*8),pts=[];
+      for(let i=0;i<stars;i++){const a=sr()*TAU,dd=r*0.08+sr()*r*0.7;
+        pts.push({x:n.x+Math.cos(a)*dd,y:n.y+Math.sin(a)*dd});}
+      for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+        const dd=dst(pts[i].x,pts[i].y,pts[j].x,pts[j].y);
+        if(dd<r*0.8&&sr()>0.2){cx.beginPath();cx.moveTo(pts[i].x,pts[i].y);cx.lineTo(pts[j].x,pts[j].y);
+          cx.strokeStyle=rga(b,0.2*(1-dd/(r*0.8)));cx.lineWidth=0.3;cx.stroke();}}
+      for(const p of pts){const sz=2+sr()*3;
+        const sg=cx.createRadialGradient(p.x,p.y,0,p.x,p.y,sz*2);
+        sg.addColorStop(0,rga(h,0.85));sg.addColorStop(0.4,rga(b,0.2));sg.addColorStop(1,rga(b,0));
+        cx.fillStyle=sg;cx.beginPath();cx.arc(p.x,p.y,sz*2,0,TAU);cx.fill();}}},
+    {name:'Vesicles',fn(cx,n,r,col,d,t){
+      const sr=m32(n.sd*4567|0),b=ltn(col,70),h=ltn(col,120);
+      const ct=8+Math.floor(sr()*7+n.tv*5),vpts=[];
+      for(let i=0;i<ct;i++){const a=sr()*TAU,dd=r*0.12+sr()*r*0.55,sz=r*0.06+sr()*r*0.12;
+        const vx=n.x+Math.cos(a)*dd,vy=n.y+Math.sin(a)*dd;vpts.push({x:vx,y:vy,sz});
+        blobP(cx,vx,vy,sz,n.sd+i*71,t);cx.fillStyle=rga(drk(b,20),0.45);cx.fill();
+        blobP(cx,vx,vy,sz,n.sd+i*71,t);cx.strokeStyle=rga(b,0.25);cx.lineWidth=0.5;cx.stroke();
+        const vg=cx.createRadialGradient(vx,vy,0,vx,vy,sz*0.6);
+        vg.addColorStop(0,rga(h,0.4));vg.addColorStop(1,rga(h,0));
+        cx.fillStyle=vg;cx.beginPath();cx.arc(vx,vy,sz*0.6,0,TAU);cx.fill();}
+      for(let i=0;i<vpts.length;i++)for(let j=i+1;j<vpts.length;j++){
+        if(dst(vpts[i].x,vpts[i].y,vpts[j].x,vpts[j].y)<r*0.5){
+          cx.beginPath();cx.moveTo(vpts[i].x,vpts[i].y);cx.lineTo(vpts[j].x,vpts[j].y);
+          cx.strokeStyle=rga(b,0.15);cx.lineWidth=0.3;cx.stroke();}}}},
+    {name:'Axon Tree',fn(cx,n,r,col,d,t){
+      const sr=m32(n.sd*1234|0),b=ltn(col,100),h=ltn(col,150);
+      const arms=4+Math.floor(sr()*2);
+      for(let a=0;a<arms;a++){const bA=(a/arms)*TAU+sr()*0.5;
+        let px=n.x,py=n.y,ca=bA,lw=2.5+sr()*1.5;
+        for(let seg=0;seg<12;seg++){const len=(r*0.1)*(1-seg*0.035)+sr()*r*0.025;
+          const nx=px+Math.cos(ca)*len,ny=py+Math.sin(ca)*len;
+          cx.beginPath();cx.moveTo(px,py);cx.lineTo(nx,ny);
+          cx.strokeStyle=rga(b,0.55*(1-seg*0.06));cx.lineWidth=lw;cx.lineCap='round';cx.stroke();
+          px=nx;py=ny;ca+=sr()*0.7-0.35;lw*=0.82;
+          if(seg>2&&sr()>0.35){const ba=ca+(sr()>0.5?0.5:-0.5);let bx=px,by=py,bw=lw*0.7;
+            for(let bb=0;bb<5;bb++){const bx2=bx+Math.cos(ba+sr()*0.3)*r*0.05,by2=by+Math.sin(ba+sr()*0.3)*r*0.05;
+              cx.beginPath();cx.moveTo(bx,by);cx.lineTo(bx2,by2);
+              cx.strokeStyle=rga(b,0.35*(1-bb*0.12));cx.lineWidth=bw;cx.lineCap='round';cx.stroke();
+              bx=bx2;by=by2;bw*=0.7;}}}}
+      const sg=cx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*0.22);
+      sg.addColorStop(0,rga(h,0.85));sg.addColorStop(0.4,rga(b,0.35));sg.addColorStop(1,rga(b,0));
+      cx.fillStyle=sg;cx.beginPath();cx.arc(n.x,n.y,r*0.22,0,TAU);cx.fill();}},
+    {name:'Membrane Folds',fn(cx,n,r,col,d,t){
+      const sr=m32(n.sd*6802|0),b=ltn(col,80),h=ltn(col,130);
+      for(let L=0;L<7;L++){const lr=r*(0.1+L*0.12),wa=lr*0.15+sr()*lr*0.1;
+        cx.beginPath();for(let s=0;s<=48;s++){const a=(s/48)*TAU;
+          const w=Math.sin(a*3+t*0.05+L*2+sr()*5)*wa+Math.sin(a*5+t*0.03+L)*wa*0.4;
+          cx.lineTo(n.x+Math.cos(a)*(lr+w),n.y+Math.sin(a)*(lr+w));}
+        cx.closePath();cx.strokeStyle=rga(b,0.42*(1-L*0.06));cx.lineWidth=0.7+sr()*0.4;cx.stroke();}
+      for(let i=0;i<10;i++){const a=sr()*TAU;
+        cx.beginPath();cx.moveTo(n.x+Math.cos(a)*r*0.1,n.y+Math.sin(a)*r*0.1);
+        cx.lineTo(n.x+Math.cos(a+sr()*0.2)*r*0.75,n.y+Math.sin(a+sr()*0.2)*r*0.75);
+        cx.strokeStyle=rga(h,0.15);cx.lineWidth=0.3;cx.stroke();}}},
+    {name:'Synaptic',fn(cx,n,r,col,d,t){
+      const sr=m32(n.sd*3456|0),b=ltn(col,80),h=ltn(col,130);
+      const arms=6+Math.floor(sr()*3),jns=[];
+      for(let a=0;a<arms;a++){const ba=(a/arms)*TAU+sr()*0.4;
+        let px=n.x,py=n.y,ca=ba;
+        for(let s=0;s<8;s++){const len=r*0.09+sr()*r*0.05,nx=px+Math.cos(ca)*len,ny=py+Math.sin(ca)*len;
+          cx.beginPath();cx.moveTo(px,py);cx.lineTo(nx,ny);
+          cx.strokeStyle=rga(b,0.45*(1-s*0.08));cx.lineWidth=1.3-s*0.1;cx.lineCap='round';cx.stroke();
+          if(s>0&&sr()>0.25)jns.push({x:nx,y:ny,sz:1.2+sr()*2.5});
+          px=nx;py=ny;ca+=sr()*0.6-0.3;}}
+      for(const j of jns){const jg=cx.createRadialGradient(j.x,j.y,0,j.x,j.y,j.sz*3);
+        jg.addColorStop(0,rga(h,0.8));jg.addColorStop(0.3,rga(b,0.25));jg.addColorStop(1,rga(b,0));
+        cx.fillStyle=jg;cx.beginPath();cx.arc(j.x,j.y,j.sz*3,0,TAU);cx.fill();}
+      for(let i=0;i<jns.length;i++)for(let j=i+1;j<jns.length;j++){
+        if(dst(jns[i].x,jns[i].y,jns[j].x,jns[j].y)<r*0.5&&sr()>0.4){
+          cx.beginPath();cx.moveTo(jns[i].x,jns[i].y);cx.lineTo(jns[j].x,jns[j].y);
+          cx.strokeStyle=rga(b,0.12);cx.lineWidth=0.25;cx.stroke();}}}}
+    ];
+
+    // ═══ MEMBRANE ═══
+    function drawMem(ctx, gen, hull) {
+      if (hull.length < 3) return;
+      const widths=[18,8,3.5,1.0], alphas=[0.035,0.065,0.11,0.32];
+      const mc = ltn(gen.glow, 30);
+      for (let pass=0; pass<4; pass++) {
+        traceSmoothedHull(ctx, hull);
+        ctx.strokeStyle = rga(mc, alphas[pass]);
+        ctx.lineWidth = widths[pass];
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+    }
+
+    // ═══ GLOW ═══
+    function drawGlow(ctx, prims, oR, stg, CW, CH) {
+      for (const p of prims) {
+        const pc = p.rgb;
+        const str = p.tv * GSC[stg];
+        if (str < 0.03) continue;
+        const sc = SSC[stg];
+        const nodeR = p.rd * sc;
+        const glowR = oR*2.5 + p.tv*oR*2.0;
+        const g = ctx.createRadialGradient(p.x,p.y,nodeR*0.3,p.x,p.y,glowR);
+        g.addColorStop(0,rga(pc,0.40*str));
+        g.addColorStop(0.05,rga(pc,0.32*str));
+        g.addColorStop(0.12,rga(pc,0.22*str));
+        g.addColorStop(0.25,rga(pc,0.13*str));
+        g.addColorStop(0.45,rga(pc,0.06*str));
+        g.addColorStop(0.7,rga(pc,0.025*str));
+        g.addColorStop(1,rga(pc,0));
+        ctx.fillStyle = g;
+        ctx.fillRect(0,0,CW,CH);
+      }
+    }
+
+    // ═══ AI FADE ═══
+    function drawAIFade(ctx, d, CX, CY, CW, CH) {
+      const bg = d ? '5,10,24' : '240,242,245';
+      const vR = Math.max(CW,CH)*0.8;
+      const g = ctx.createRadialGradient(CX,CY,vR*0.5,CX,CY,vR);
+      g.addColorStop(0,`rgba(${bg},0)`);
+      g.addColorStop(0.7,`rgba(${bg},0)`);
+      g.addColorStop(1,`rgba(${bg},0.3)`);
+      ctx.fillStyle=g; ctx.fillRect(0,0,CW,CH);
+    }
+
+    // ═══ BODY FILL ═══
+    function drawBody(ctx, prims, gen, hull, CX, CY, CW, CH) {
+      if (hull.length < 3) return;
+      let maxR = 0;
+      for (const h of hull) { const d2 = dst(h.x,h.y,CX,CY); if (d2>maxR) maxR=d2; }
+      maxR = Math.max(maxR, 50);
+      const baseCol = ltn(gen.glow, 15);
+      const bg = ctx.createRadialGradient(CX,CY,0,CX,CY,maxR);
+      bg.addColorStop(0,rga(baseCol,0.12));
+      bg.addColorStop(0.6,rga(baseCol,0.08));
+      bg.addColorStop(1,rga(baseCol,0.04));
+      ctx.fillStyle=bg; ctx.fillRect(0,0,CW,CH);
+      for (const p of prims) {
+        const pc=p.rgb, strength=p.tv*0.14, r=maxR*0.65;
+        const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+        g.addColorStop(0,rga(pc,strength));
+        g.addColorStop(0.4,rga(pc,strength*0.4));
+        g.addColorStop(1,rga(pc,0));
+        ctx.fillStyle=g; ctx.fillRect(0,0,CW,CH);
+      }
+    }
+
+    // ═══ NEURAL NETWORK — only at larger sizes ═══
+    function drawNeural(ctx, prims, gen, hullPts, oR, CX, CY) {
+      const sr = m32(gen.s+9999);
+      for(let i=0;i<prims.length;i++){
+        for(let j=i+1;j<prims.length;j++){
+          const a=prims[i],b=prims[j];
+          const col=bl([a.rgb,b.rgb],[0.5,0.5]);
+          const bc=ltn(col,60);
+          const count=3+Math.floor((a.tv+b.tv)*2);
+          for(let f=0;f<count;f++){
+            const spread=(f/(count-1||1)-0.5)*0.6;
+            const dx=b.x-a.x,dy=b.y-a.y,len=Math.sqrt(dx*dx+dy*dy)||1;
+            const nx=-dy/len,ny=dx/len;
+            const off=spread*oR*0.08;
+            const mx=(a.x+b.x)/2+nx*off,my=(a.y+b.y)/2+ny*off;
+            ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mx,my,b.x,b.y);
+            ctx.strokeStyle=rga(bc,0.08);ctx.lineWidth=0.4+sr()*0.5;ctx.stroke();
+          }
+        }
+      }
+      const r2=m32(gen.s+1111);
+      const dotCount=20+stg*12;
+      let maxR=0;
+      for(const h of hullPts){const d2=dst(h.x,h.y,CX,CY);if(d2>maxR)maxR=d2;}
+      maxR=Math.max(maxR,50);
+      for(let i=0;i<dotCount;i++){
+        const a=r2()*TAU,dd=maxR*(0.1+r2()*0.35);
+        const px=CX+Math.cos(a)*dd,py=CY+Math.sin(a)*dd;
+        const dists=prims.map(p=>({p,d:dst(px,py,p.x,p.y)})).sort((a,b)=>a.d-b.d);
+        if(dists.length<2)continue;
+        const c=bl([dists[0].p.rgb,dists[1].p.rgb],[0.6,0.4]);
+        const bc=ltn(c,70);
+        const sz=0.8+r2()*1.5;
+        const g=ctx.createRadialGradient(px,py,0,px,py,sz*2.5);
+        g.addColorStop(0,rga(bc,0.4));g.addColorStop(0.4,rga(bc,0.1));g.addColorStop(1,rga(bc,0));
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(px,py,sz*2.5,0,TAU);ctx.fill();
+      }
+    }
+
+    // ═══ STATE ═══
+    let CW, CH, CX, CY, oR;
+    let gen, allN, actN, cons, puls;
+    let hullPts = [];
+    let stg, ent;
+    let t0 = performance.now(), tL = 0;
+    const LOD_FULL = 200; // size threshold for full detail
+
+    function init() {
+      const p = propsRef.current;
+      CW = CH = p.size;
+      CX = CW / 2; CY = CH / 2;
+      oR = Math.min(CW, CH) * 0.40;
+
+      const assessCount = Object.keys(p.assessCompleted || {}).length;
+      stg = assessCount >= 4 ? 3 : assessCount >= 2 ? 2 : assessCount >= 1 ? 1 : 0;
+      ent = p.entityType;
+
+      gen = deriveGenome(p.onboardingAnswers);
+      allN = mkNodes(gen, oR);
+      actN = filt(allN, stg);
+      cons = mkCon(actN);
+      puls = mkPul(cons, gen.s);
+    }
+
+    init();
+    let prevSize = CW, prevStg = stg, prevAnswerCount = Object.keys(propsRef.current.onboardingAnswers || {}).length;
+
+    function frame(ts) {
+      const p = propsRef.current;
+      const t = (ts - t0) / 1000;
+      const dt = tL ? Math.min((ts - tL) / 1000, 0.05) : 0.016;
+      tL = ts;
+
+      // Reinit on significant changes
+      const newAssessCount = Object.keys(p.assessCompleted || {}).length;
+      const newStg = newAssessCount >= 4 ? 3 : newAssessCount >= 2 ? 2 : newAssessCount >= 1 ? 1 : 0;
+      const newAnswerCount = Object.keys(p.onboardingAnswers || {}).length;
+      if (p.size !== prevSize || newStg !== prevStg || newAnswerCount !== prevAnswerCount) {
+        prevSize = p.size; prevStg = newStg; prevAnswerCount = newAnswerCount;
+        init();
+      }
+
+      ent = p.entityType;
+      const d = p.darkMode;
+      const sc = SSC[stg];
+      const full = CW >= LOD_FULL;
+
+      // Canvas reset per frame
+      canvas.width = CW;
+      canvas.height = CH;
+      canvas.style.width = CW + 'px';
+      canvas.style.height = CH + 'px';
+
+      // Transparent background — organism floats in the page
+      ctx.clearRect(0, 0, CW, CH);
+
+      const breath = updPhys(actN, t, CX, CY, oR, stg);
+      updPul(puls, dt);
+      hullPts = computeHull(actN, oR, stg, CX, CY);
+
+      const prims = actN.filter(n => n.tp === 'p');
+
+      // Layer 1: Glow
+      drawGlow(ctx, prims, oR, stg, CW, CH);
+
+      // Layer 2: Membrane or AI fade
+      if (ent === 'human') {
+        drawMem(ctx, gen, hullPts);
+      } else {
+        drawAIFade(ctx, d, CX, CY, CW, CH);
+      }
+
+      // Clip ALL organism content to membrane
+      ctx.save();
+      if (ent === 'human' && hullPts.length >= 3) {
+        traceSmoothedHull(ctx, hullPts);
+        ctx.clip();
+      }
+
+      // Layer 3: Body fill
+      if (ent === 'human') drawBody(ctx, prims, gen, hullPts, CX, CY, CW, CH);
+
+      // Neural network (skip at small sizes)
+      if (full) drawNeural(ctx, prims, gen, hullPts, oR, CX, CY);
+
+      // Tissue connections
+      for (const c of cons) {
+        const a = actN[c.a], b = actN[c.b]; if (!a || !b) continue;
+        const mid = cMid(a, b), col = c.col;
+        if (c.isPP) {
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
+          ctx.strokeStyle=rga(col,0.04+c.str*0.02); ctx.lineWidth=22+c.str*12; ctx.lineCap='round'; ctx.stroke();
+        }
+        ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
+        ctx.strokeStyle=rga(col,0.05+c.str*0.025); ctx.lineWidth=6+c.str*4; ctx.lineCap='round'; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(mid.x,mid.y,b.x,b.y);
+        ctx.strokeStyle=rga(ltn(col,25),0.35+c.str*0.12); ctx.lineWidth=0.5+c.str*0.7; ctx.stroke();
+      }
+
+      // Energy pulses
+      for (const p of puls) {
+        const a = actN[p.a], b = actN[p.b]; if (!a || !b) continue;
+        const mid = cMid(a, b), pr = p.p, mt = 1 - pr;
+        const px = mt*mt*a.x + 2*mt*pr*mid.x + pr*pr*b.x;
+        const py = mt*mt*a.y + 2*mt*pr*mid.y + pr*pr*b.y;
+        const gr = ctx.createRadialGradient(px,py,0,px,py,p.sz*3);
+        gr.addColorStop(0,rga(p.col,0.6));
+        gr.addColorStop(0.3,rga(p.col,0.18));
+        gr.addColorStop(1,rga(p.col,0));
+        ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(px,py,p.sz*3,0,TAU); ctx.fill();
+      }
+
+      // Nodes
+      const sorted = [...actN].sort((a,b) => a.dp - b.dp);
+      for (const n of sorted) {
+        const r = n.rd * sc * (1 + 0.02*Math.sin(n.bp + t*0.3) + breath);
+        const col = n.rgb;
+        if (n.tp === 'p') {
+          const hr = ctx.createRadialGradient(n.x,n.y,r*0.6,n.x,n.y,r*2.5);
+          hr.addColorStop(0,rga(col,0.2)); hr.addColorStop(0.4,rga(col,0.08)); hr.addColorStop(1,rga(col,0));
+          ctx.fillStyle=hr; ctx.beginPath(); ctx.arc(n.x,n.y,r*2.5,0,TAU); ctx.fill();
+          blobP(ctx,n.x,n.y,r,n.sd,t); ctx.fillStyle=rga(drk(col,55),0.88); ctx.fill();
+          // Interiors only at larger sizes
+          if (full) {
+            ctx.save(); blobP(ctx,n.x,n.y,r,n.sd,t); ctx.clip(); INT[n.iIdx].fn(ctx,n,r,col,d,t); ctx.restore();
+          }
+          blobP(ctx,n.x,n.y,r,n.sd,t); ctx.strokeStyle=rga(col,0.12); ctx.lineWidth=5; ctx.stroke();
+          blobP(ctx,n.x,n.y,r,n.sd,t); ctx.strokeStyle=rga(col,0.28); ctx.lineWidth=2; ctx.stroke();
+          blobP(ctx,n.x,n.y,r,n.sd,t); ctx.strokeStyle=rga(ltn(col,40),0.65); ctx.lineWidth=0.7; ctx.stroke();
+        } else if (n.tp === 'c') {
+          const g2 = ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*4);
+          g2.addColorStop(0,rga(col,0.28)); g2.addColorStop(0.3,rga(col,0.1)); g2.addColorStop(1,rga(col,0));
+          ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(n.x,n.y,r*4,0,TAU); ctx.fill();
+          ctx.fillStyle=rga(drk(col,25),0.82); ctx.beginPath(); ctx.arc(n.x,n.y,r,0,TAU); ctx.fill();
+          ctx.fillStyle=rga(ltn(col,80),0.85); ctx.beginPath(); ctx.arc(n.x,n.y,r*0.35,0,TAU); ctx.fill();
+          ctx.strokeStyle=rga(col,0.5); ctx.lineWidth=0.4; ctx.beginPath(); ctx.arc(n.x,n.y,r,0,TAU); ctx.stroke();
+        } else {
+          const g3 = ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*3);
+          g3.addColorStop(0,rga(col,0.28)); g3.addColorStop(0.3,rga(col,0.08)); g3.addColorStop(1,rga(col,0));
+          ctx.fillStyle=g3; ctx.beginPath(); ctx.arc(n.x,n.y,r*3,0,TAU); ctx.fill();
+          ctx.fillStyle=rga(col,0.7); ctx.beginPath(); ctx.arc(n.x,n.y,r,0,TAU); ctx.fill();
+        }
+      }
+
+      ctx.restore();
       animRef.current = requestAnimationFrame(frame);
     }
 
@@ -2265,10 +2090,11 @@ const AuraVisualization = React.memo(function AuraVisualization({
       margin: '0 auto',
       width: size + 'px',
       height: size + 'px',
-      borderRadius: darkMode ? '8px' : '0',
+      background: 'transparent',
     },
   });
 });
+
 
 // ==================== DATA ====================
 const CATEGORIES = getCategoryList();
@@ -6240,7 +6066,7 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         </div>
 
         {/* DIVIDER — Self ↔ Work */}
-        <div className="flex items-center gap-3 my-5">
+        <div className="flex items-center gap-3 my-3">
           <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
           <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Work</span>
           <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
@@ -8325,8 +8151,8 @@ const AssessPickerScreen = ({
 
           return (
             <div className="mb-3">
-              <button onClick={handleHeroClick} className={`w-full relative overflow-hidden rounded-2xl ${darkMode ? `border border-${t}-500/30` : `border border-${t}-300`} text-left`}>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <button onClick={handleHeroClick} className={`w-full relative rounded-2xl ${darkMode ? `border border-${t}-500/30` : `border border-${t}-300`} text-left`}>
+                <div className="absolute inset-0 overflow-hidden rounded-2xl flex items-center justify-center pointer-events-none">
                   <div className="aura-breathe rounded-full" style={{
                     width: 240, height: 240,
                     background: `radial-gradient(ellipse at center, rgba(${hex.rgb}, ${darkMode ? 0.12 : 0.08}) 0%, transparent 70%)`,
@@ -8380,7 +8206,7 @@ const AssessPickerScreen = ({
               const tw = twColor(cat.color);
 
               return (
-                <div key={catId} className={`rounded-2xl overflow-hidden ${TH('bg-card', darkMode)}`}>
+                <div key={catId} className={`rounded-2xl ${TH('bg-card', darkMode)}`}>
                   <div className={`p-3.5 hover-glow hover-glow-${cat.color} cursor-pointer`} onClick={() => onSetExpandedCategory(isExpanded ? null : catId)}>
                     <div className="flex items-center gap-3">
                       <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={incompleteModules} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-sm" orbit={assessProfileSwitching} />
@@ -8618,7 +8444,7 @@ const AssessPickerScreen = ({
 
         {!isFirstTimeUser && completedCategories.length > 0 && (
           <div className="mt-3">
-            <div className={`rounded-xl overflow-hidden ${TH('bg-card', darkMode)}`}>
+            <div className={`rounded-xl ${TH('bg-card', darkMode)}`}>
               {completedCategories.map(({ catId, cat, catTests }, idx) => (
                 <button key={catId} onClick={() => onNavigate('assess-results', { testId: catTests[0][0] })} className={`w-full px-3 py-2 flex items-center gap-3 opacity-70 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
                   <ProgressCircle progress={100} size={28} strokeWidth={2} color={cat.color} icon={cat.icon} gradientId={`complete-${catId}`} darkMode={darkMode} iconSize="text-xs" />
@@ -9673,8 +9499,8 @@ const AssessAnalysisScreen = ({ darkMode, assessCompleted, entityType, onboardin
           </div>
           <div className="flex-1 overflow-auto p-4 pb-8 hide-scrollbar">
 
-            {/* Aura Visualization - Force-directed constellation */}
-            <div className="mb-3 rounded-xl overflow-hidden">
+            {/* Aura Visualization — organism floats free */}
+            <div className="mb-3">
               <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
                 entityType={entityType} darkMode={darkMode} size={360} />
             </div>
