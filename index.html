@@ -10846,6 +10846,67 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// --- useQotd Hook ---
+const useQotd = () => {
+  const [qotdData, setQotdData] = useState(() => getRandomQOTD());
+  const [qotdResponse, setQotdResponse] = useState(null);
+  const [qotdTappedAnswer, setQotdTappedAnswer] = useState(null);
+  const [qotdTapCount, setQotdTapCount] = useState(0);
+
+  const resetQotd = () => {
+    setQotdData(getRandomQOTD());
+    setQotdResponse(null);
+    setQotdTappedAnswer(null);
+    setQotdTapCount(0);
+  };
+
+  const handleQotdTap = (answer) => {
+    if (qotdResponse) return;
+    if (qotdTappedAnswer === answer) {
+      setQotdTapCount(Math.min(4, qotdTapCount + 1));
+    } else {
+      setQotdTappedAnswer(answer);
+      setQotdTapCount(1);
+    }
+  };
+
+  const submitQotdAnswer = () => {
+    if (qotdTappedAnswer === null) return;
+    setQotdResponse({ answer: qotdTappedAnswer, confidence: qotdTapCount });
+    setQotdTappedAnswer(null);
+    setQotdTapCount(0);
+  };
+
+  return { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, setQotdTappedAnswer, qotdTapCount, setQotdTapCount, resetQotd, handleQotdTap, submitQotdAnswer };
+};
+
+// --- useVerification Hook ---
+const useVerification = () => {
+  const verifyStored = useRef(verifyLoadFromStorage());
+  const [verifySubjectProfile, setVerifySubjectProfile] = useState(() => verifyStored.current?.subjectProfile || null);
+  const [verifySubjectAnswers, setVerifySubjectAnswers] = useState({});
+  const [verifyCurrentSubjectId, setVerifyCurrentSubjectId] = useState(null);
+  const [verifyEvaluatorData, setVerifyEvaluatorData] = useState(null);
+  const [verifyEvaluations, setVerifyEvaluations] = useState(() => verifyStored.current?.evaluations || {});
+
+  const verifySaveAll = useCallback(() => {
+    verifySaveToStorage(verifySubjectProfile, verifyEvaluations);
+  }, [verifySubjectProfile, verifyEvaluations]);
+
+  useEffect(() => { verifySaveAll(); }, [verifySaveAll]);
+
+  const verifyPendingCount = VERIFY_MOCK_SUBJECTS.filter(s => !verifyEvaluations[s.id]).length;
+
+  return {
+    verifySubjectProfile, setVerifySubjectProfile,
+    verifySubjectAnswers, setVerifySubjectAnswers,
+    verifyCurrentSubjectId, setVerifyCurrentSubjectId,
+    verifyEvaluatorData, setVerifyEvaluatorData,
+    verifyEvaluations, setVerifyEvaluations,
+    verifyPendingCount,
+  };
+};
+
 function App() {
 
   // --- Navigation & Auth ---
@@ -10903,37 +10964,8 @@ function App() {
   // --- Entity Type ---
   const [entityType, setEntityType] = useState(() => demoStorage.get().entityType || 'human');
 
-  // --- Question of the Day ---
-  const [qotdData, setQotdData] = useState(() => getRandomQOTD());
-  const [qotdResponse, setQotdResponse] = useState(null); // { answer, confidence }
-
-  // Reset QOD to a new random question
-  const resetQotd = () => {
-    setQotdData(getRandomQOTD());
-    setQotdResponse(null);
-    setQotdTappedAnswer(null);
-    setQotdTapCount(0);
-  };
-  const [qotdTappedAnswer, setQotdTappedAnswer] = useState(null);
-  const [qotdTapCount, setQotdTapCount] = useState(0);
-
-  // QOTD tap handler (same logic as regular questions)
-  const handleQotdTap = (answer) => {
-    if (qotdResponse) return; // Already answered
-    if (qotdTappedAnswer === answer) {
-      setQotdTapCount(Math.min(4, qotdTapCount + 1));
-    } else {
-      setQotdTappedAnswer(answer);
-      setQotdTapCount(1);
-    }
-  };
-
-  const submitQotdAnswer = () => {
-    if (qotdTappedAnswer === null) return;
-    setQotdResponse({ answer: qotdTappedAnswer, confidence: qotdTapCount });
-    setQotdTappedAnswer(null);
-    setQotdTapCount(0);
-  };
+  // --- QOTD (via useQotd hook) ---
+  const { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, setQotdTappedAnswer, qotdTapCount, setQotdTapCount, resetQotd, handleQotdTap, submitQotdAnswer } = useQotd();
 
   // --- Profile & History ---
   const [showStreak, setShowStreak] = useState(true);
@@ -10976,18 +11008,8 @@ function App() {
   const [assessProfileSwitching, setAssessProfileSwitching] = useState(false);
   const assessTimeoutRef = useRef(null);
 
-  // --- Verification System ---
-  const verifyStored = useRef(verifyLoadFromStorage());
-  const [verifySubjectProfile, setVerifySubjectProfile] = useState(() => verifyStored.current?.subjectProfile || null);
-  const [verifySubjectAnswers, setVerifySubjectAnswers] = useState({});
-  const [verifyCurrentSubjectId, setVerifyCurrentSubjectId] = useState(null);
-  const [verifyEvaluatorData, setVerifyEvaluatorData] = useState(null);
-  const [verifyEvaluations, setVerifyEvaluations] = useState(() => verifyStored.current?.evaluations || {});
-  const verifySaveAll = useCallback(() => {
-    verifySaveToStorage(verifySubjectProfile, verifyEvaluations);
-  }, [verifySubjectProfile, verifyEvaluations]);
-  useEffect(() => { verifySaveAll(); }, [verifySaveAll]);
-  const verifyPendingCount = VERIFY_MOCK_SUBJECTS.filter(s => !verifyEvaluations[s.id]).length;
+  // --- Verification (via useVerification hook) ---
+  const { verifySubjectProfile, setVerifySubjectProfile, verifySubjectAnswers, setVerifySubjectAnswers, verifyCurrentSubjectId, setVerifyCurrentSubjectId, verifyEvaluatorData, setVerifyEvaluatorData, verifyEvaluations, setVerifyEvaluations, verifyPendingCount } = useVerification();
 
   // --- Refs & Derived ---
   const submitTimeoutRef = useRef(null);
