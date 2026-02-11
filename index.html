@@ -5418,7 +5418,7 @@ const PathChoiceScreen = ({ darkMode, entityType, onboardingAnswers, onReveal, o
             }`}
           >
             <span className={`text-base font-semibold ${darkMode ? 'text-violet-300' : 'text-violet-700'}`}>
-              More about yourself
+              🪞 Reveal yourself
             </span>
           </button>
 
@@ -5431,7 +5431,7 @@ const PathChoiceScreen = ({ darkMode, entityType, onboardingAnswers, onReveal, o
             }`}
           >
             <span className={`text-base font-semibold ${darkMode ? 'text-teal-300' : 'text-teal-700'}`}>
-              More about the world
+              🌍 Explore the world
             </span>
           </button>
         </div>
@@ -7335,15 +7335,15 @@ const VerifyHub = ({ darkMode, onSubject, onEvaluator, onBack, subjectProfile })
         <div style={{
           position: 'absolute', width: 420, height: 420, borderRadius: '50%',
           background: darkMode
-            ? `radial-gradient(circle, rgba(${vc.rgb}, 0.12) 0%, rgba(${ec.rgb}, 0.08) 40%, transparent 70%)`
-            : `radial-gradient(circle, rgba(${vc.rgb}, 0.08) 0%, rgba(${ec.rgb}, 0.06) 40%, transparent 70%)`,
+            ? `radial-gradient(circle, rgba(${COLOR_HEX.blue.rgb}, 0.14) 0%, rgba(${COLOR_HEX.blue.rgb}, 0.06) 35%, transparent 65%)`
+            : `radial-gradient(circle, rgba(${COLOR_HEX.blue.rgb}, 0.10) 0%, rgba(${COLOR_HEX.blue.rgb}, 0.04) 35%, transparent 65%)`,
           animation: 'aura-breathe 8s ease-in-out infinite',
         }} />
         <div style={{
           position: 'absolute', width: 350, height: 350, borderRadius: '50%',
           background: darkMode
-            ? `radial-gradient(circle, rgba(${ec.rgb}, 0.10) 0%, transparent 60%)`
-            : `radial-gradient(circle, rgba(${ec.rgb}, 0.07) 0%, transparent 60%)`,
+            ? `radial-gradient(circle, rgba(${COLOR_HEX.violet.rgb}, 0.10) 0%, rgba(${COLOR_HEX.violet.rgb}, 0.04) 40%, transparent 65%)`
+            : `radial-gradient(circle, rgba(${COLOR_HEX.violet.rgb}, 0.08) 0%, rgba(${COLOR_HEX.violet.rgb}, 0.03) 40%, transparent 65%)`,
           animation: 'aura-breathe 6s ease-in-out infinite 1s',
         }} />
       </div>
@@ -7361,23 +7361,25 @@ const VerifyHub = ({ darkMode, onSubject, onEvaluator, onBack, subjectProfile })
       <div className="relative z-10 flex flex-col h-full w-full">
         <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm mx-auto px-5">
           <div className="flex flex-col items-center gap-2" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-            <div className="w-14 h-14 rounded-full mb-3"
-              style={{
-                background: `linear-gradient(135deg, rgba(${vc.rgb}, 0.3), rgba(${ec.rgb}, 0.3))`,
-                border: darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
-                boxShadow: `0 0 40px rgba(${vc.rgb}, 0.15), 0 0 40px rgba(${ec.rgb}, 0.1)`,
-              }} />
-            <h1 className={`text-2xl font-bold tracking-tight ${TH('text-primary', darkMode)}`}>Unique Humanity</h1>
-            <h2 className={`text-lg font-medium ${TH('text-muted', darkMode)}`}>Verification</h2>
-            <p className={`text-xs text-center mt-3 leading-relaxed max-w-xs ${TH('text-subtle', darkMode)}`}>
-              Prove you're a unique human, or help evaluate someone else's claim. Multiple evaluators, weighted confidence, no single point of failure.
+            <div className="flex items-center gap-5 mb-5">
+              <svg width="44" height="44" viewBox="0 0 32 32" fill="none" style={{ position: 'relative', zIndex: 1 }}>
+                <rect x="0.29" y="0.33" width="5.7" height="5.9" fill="#fb8a61"/>
+                <path d="m11.141,11.328 v 5.099 c 0,2.815 2.284,5.099 5.102,5.099 2.815,0 5.099-2.283 5.099-5.099 0-2.816-2.283-5.099-5.099-5.099-0.006,0-0.015,0-0.021,0 v 0 z" fill="#fb8a61"/>
+                <path d="M 17.047,0.327 H 14.991 11.14 v 5.899 h 5.081 v 0 c 0.006,0 0.015,0 0.021,0 5.633,0 10.199,4.568 10.199,10.2 0,5.632-4.566,10.2-10.199,10.2-5.635,0-10.198-4.568-10.198-10.2 V 11.327 H 0.291 v 4.666 h 0.037 c 0.009,8.66 7.029,15.679 15.691,15.679 8.666,0 15.689-7.024 15.689-15.693 C 31.709,7.661 25.233,0.855 17.047,0.327 Z" fill="#fb8a61"/>
+                <rect x="11.14" y="0.327" width="5.851" height="5.899" fill="#fb8a61"/>
+              </svg>
+              <span style={{ fontSize: 44, lineHeight: 1, position: 'relative', zIndex: 1 }}>🌀</span>
+            </div>
+            <h1 className={`text-2xl font-bold tracking-tight ${TH('text-primary', darkMode)}`}>Verify</h1>
+            <p className={`text-sm text-center mt-2 leading-relaxed max-w-[260px] ${TH('text-muted', darkMode)}`}>
+              Prove you're uniquely human, or help verify someone who is.
             </p>
           </div>
         </div>
         <div className="flex-shrink-0 w-full max-w-sm mx-auto px-5 pb-8">
           <div className="flex flex-col gap-3 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both', animationDelay: '0.15s' }}>
-            <VerifyActionButton label={subjectProfile ? 'View my profile' : "I'm a new subject"} color="violet" darkMode={darkMode} onClick={onSubject} />
-            <VerifyActionButton label="I'm evaluating someone" color="emerald" darkMode={darkMode} onClick={onEvaluator} />
+            <VerifyActionButton label={subjectProfile ? 'View my profile' : "🙋 Get verified"} color="violet" darkMode={darkMode} onClick={onSubject} />
+            <VerifyActionButton label="🔍 Evaluate someone" color="emerald" darkMode={darkMode} onClick={onEvaluator} />
           </div>
         </div>
       </div>
@@ -8381,12 +8383,15 @@ const AssessPickerScreen = ({
           return { catId, cat, catTests, allComplete, hasProgress };
         });
         const heroPriority = entityType === 'ai'
-          ? ['ai-identity', 'quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior']
-          : ['quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior'];
+          ? ['ai-identity', 'quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow']
+          : ['quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow'];
         const allIncomplete = categoriesWithStatus.filter(c => !c.allComplete);
         const heroItem = heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
         const heroCategory = heroItem || null;
-        const incompleteCategories = allIncomplete.filter(c => c !== heroCategory);
+        const incompleteCategories = allIncomplete.filter(c => c !== heroCategory).sort((a, b) => {
+          const ai = heroPriority.indexOf(a.catId), bi = heroPriority.indexOf(b.catId);
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        });
         const completedCategories = categoriesWithStatus.filter(c => c.allComplete);
 
         return (
