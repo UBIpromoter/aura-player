@@ -19,9 +19,7 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
 
 ### Assess Picker
 - [x] **Light mode low contrast** — MERGED: solid white cards, stronger borders (0.10 vs 0.06), hero card solid bg
-- [ ] **Smart category ordering** — hero card + full list ordered by what's best for the user. Three factors: enjoyment, journey-ideal, data-useful. Everything stays visible and tappable — ordering is recommendation, not restriction. Gates stay for hard dependencies (tier system). **Approved static order:** Quick Profile → Starter Pack → Personality → Relationships → Character → Behavior → Mind → Shadow Self. Arc: light → personal → deep → provocative
-  > "We should have that top card and the whole ordered list be based on what we think would be ideal for the user"
-  > "That person that wants to jump right down to Shadow Self is welcome to. It's just at the bottom of the list."
+- [x] **Smart category ordering** — SHIPPED: static order + Layer 2 dynamic reordering. In-progress categories float to top. Hero card prefers what you already started. Everything stays visible and tappable. Insight gating (2+ categories for Analysis).
   > Architecture note: categories may eventually have sub-assessments with intra-category dependencies. Not building now, but logic should accommodate it.
 
 ### Assessment Flow
@@ -29,12 +27,10 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
   > "We should probably offer them the chance to continue right on to the next test." · "Offer 2"
 - [ ] **DECIDED: Multi-select → sequential yes/no** — replace all multi-select questions with sequential single-trait screens. One trait per screen, one tap, auto-advance. Identical rhythm to single-answer questions. Three response options: **Yes / No / Not Sure**. "Not Sure" captures uncertainty vs. negative signal — critical for verification data quality. Panel-reviewed 4/4 models, strong consensus. Implementation: progress indicator ("3 of 5"), smooth transitions (trait label stays, options refresh), consider swipe gestures (Yes right, No left). One interaction pattern across both self-assessment and verification
   > "We either need to have all the questions be instant submittal, or almost all of them." · Panel consensus: sequential yes/no wins on cognitive load, flow consistency, data quality, and fatigue. "Not Sure" is the killer feature for verification.
-- [ ] **Responsive: fix now — buttons dinky on phones** — assessment screens look good on desktop but buttons undersized on large phones with too much whitespace. Small screens cramped. **Priority: fix now**, blocks showing Aura on phones. Target: **full range** (small Android to large iPhone)
-  > "Fix now — it looks bad on phones" · "Full range (small Android to large iPhone)"
+- [x] **Responsive: fix now — buttons dinky on phones** — SHIPPED: responsive pass across assessment screens (`bce0c59`). Touch targets, spacing, scrollbar cleanup.
 
 ### Verify
-- [ ] **General quality sweep** — invest in polish alongside core features. No specific items flagged — general quality pass across verify screens
-  > "Polish verify now" · "Keep balanced" · "General quality sweep"
+- [x] **General quality sweep** — SHIPPED: verify flow overhaul (`22a6423`). Toggle switches, aggressive single-select conversion, softened copy, two-line button layout, combined verdict screen, dev shortcuts.
 - [x] **URGENT: Remove gold shimmer ring on multi-choice answers** — DONE: removed ring-2, ring-offset, ring-{color}-400 from assess answer buttons. Selected answers show filled bg + border only.
 - [x] **Undo toast: move from top-of-screen to answer row** — DONE: moved to overlay answer button area. Assess screen toast moved to bottom. Awaiting Philip review.
 
@@ -61,3 +57,6 @@ _Moved here on merge. Cleaned out periodically._
 - **QotD — banner cleanup** — merged to production (removed day, slimmed timer to "Xh left", removed +25)
 - **Settings — collapsible keyboard shortcuts** — merged to production (click-to-expand)
 - **Welcome — bloom animation** — shipped: mature organism replaces emoji, bloom-in + breathing (`6487fce`)
+- **Smart category ordering** — static order + Layer 2 dynamic reordering (in-progress floats, hero prefers active, insight gating)
+- **Responsive buttons** — responsive pass across assessment screens (`bce0c59`)
+- **Verify quality sweep** — flow overhaul: toggles, softened copy, verdict screen, dev shortcuts (`22a6423`)

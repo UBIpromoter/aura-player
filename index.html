@@ -8409,6 +8409,26 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
           </div>
         </div>
 
+        {/* Profile Depth — Layer 2 intelligence */}
+        {(() => {
+          const tier = calculateAssessTier(assessCompleted);
+          const done = getCompletedCategoryCount(assessCompleted, entityType);
+          const total = getVisibleCategoryCount(tier, entityType);
+          if (total === 0) return null;
+          const pct = Math.round((done / total) * 100);
+          return (
+            <div className={`rounded-xl px-4 py-3 ${darkMode ? 'bg-violet-950/20 border border-violet-800/20' : 'bg-violet-50 border border-violet-200'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-xs font-medium ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Profile Depth</span>
+                <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{done} of {total}</span>
+              </div>
+              <div className={`h-1.5 rounded-full ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
+                <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Personality Section - clickable to Analysis */}
         <button
           onClick={() => onNavigate('assess-analysis')}
@@ -10067,6 +10087,29 @@ const AssessAnalysisScreen = ({ darkMode, assessCompleted, entityType, onboardin
           </div>
           <div className="flex-1 overflow-auto p-4 pb-8 hide-scrollbar">
 
+            {/* Layer 2: Insight gating — encouragement when < 2 categories done */}
+            {getCompletedCategoryCount(assessCompleted, entityType) < 2 && (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                <div className="mb-4">
+                  <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
+                    entityType={entityType} darkMode={darkMode} size={200} />
+                </div>
+                <h3 className={`text-lg font-semibold mb-2 ${TH('text-primary', darkMode)}`}>Your profile is growing</h3>
+                <p className={`text-sm mb-4 ${TH('text-subtle', darkMode)}`}>
+                  Complete {2 - getCompletedCategoryCount(assessCompleted, entityType)} more {getCompletedCategoryCount(assessCompleted, entityType) === 1 ? 'assessment' : 'assessments'} to unlock your full analysis.
+                </p>
+                <div className={`w-48 h-2 rounded-full mb-3 ${darkMode ? 'bg-white/[0.08]' : 'bg-gray-200'}`}>
+                  <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${(getCompletedCategoryCount(assessCompleted, entityType) / 2) * 100}%` }} />
+                </div>
+                <span className={`text-xs mb-6 ${TH('text-dim', darkMode)}`}>{getCompletedCategoryCount(assessCompleted, entityType)} of 2 needed</span>
+                <button onClick={() => onNavigate('assess-picker')}
+                  className="px-6 py-2.5 rounded-xl text-sm font-medium bg-violet-600 text-white hover:bg-violet-500">
+                  Continue Assessments →
+                </button>
+              </div>
+            )}
+
+            {getCompletedCategoryCount(assessCompleted, entityType) >= 2 && (<>
             {/* Aura Visualization — organism floats free */}
             <div className="mb-3">
               <AuraVisualization onboardingAnswers={onboardingAnswers} assessCompleted={assessCompleted}
@@ -10526,6 +10569,7 @@ const AssessAnalysisScreen = ({ darkMode, assessCompleted, entityType, onboardin
                 </div>
               </div>
             )}
+            </>)}
           </div>
         </div>
       );
