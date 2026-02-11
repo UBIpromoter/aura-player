@@ -5172,6 +5172,20 @@ const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSett
   );
 };
 
+// Showcase data for welcome screen — mature organism (~75% complete)
+const WELCOME_SHOWCASE_DATA = {
+  'quick-profile': { traits: { O: 72, C: 61, E: 55, A: 68, N: 38 } },
+  'bigfive-O': { score: 72 }, 'bigfive-A': { score: 68 }, 'bigfive-C': { score: 61 },
+  'bigfive-E': { score: 55 }, 'bigfive-N': { score: 38 },
+  'shadow-M': { score: 42 }, 'shadow-N': { score: 30 }, 'shadow-P': { score: 22 },
+  'attachment': { anxiety: 2.1, avoidance: 1.3 },
+  'risk': { subcategories: { fin: 55, soc: 65, phys: 45, eth: 35 } },
+  'chronotype': { score: 62 }, 'adhd': { indicators: 2 },
+  'integrity': { score: 74 },
+  'starter-personality': true, 'starter-motivation': true, 'starter-thinking': true,
+  'starter-connection': true, 'starter-strategy': true,
+};
+
 // WelcomeScreen - First visit onboarding
 const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
   const [mode, setMode] = React.useState('welcome'); // 'welcome', 'signin', 'signup'
@@ -5220,7 +5234,7 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
       <div className="flex-1 flex flex-col items-center justify-center p-8" style={{backgroundColor: darkMode ? '#030712' : '#f9fafb'}}>
         <div className="mb-6" style={{animation: 'bloom-in 0.8s ease-out both'}}>
           <AuraVisualization
-            assessCompleted={{}}
+            assessCompleted={WELCOME_SHOWCASE_DATA}
             onboardingAnswers={{}}
             entityType="human"
             darkMode={darkMode}
