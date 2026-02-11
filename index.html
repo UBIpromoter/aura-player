@@ -136,6 +136,7 @@
     @keyframes fill { from { width: 100%; } to { width: 0%; } }
     @keyframes shrink { from { width: 100%; } to { width: 0%; } }
     @keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    @keyframes bloom-in { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: scale(1); } }
     @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     @keyframes sweepFill { from { width: 0%; } to { width: 100%; } }
@@ -5217,7 +5218,15 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
   if (mode === 'welcome') {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8" style={{backgroundColor: darkMode ? '#030712' : '#f9fafb'}}>
-        <div className="text-6xl mb-6">🌀</div>
+        <div className="mb-6" style={{animation: 'bloom-in 0.8s ease-out both'}}>
+          <AuraVisualization
+            assessCompleted={{}}
+            onboardingAnswers={{}}
+            entityType="human"
+            darkMode={darkMode}
+            size={Math.min(window.innerHeight * 0.20, 180)}
+          />
+        </div>
         <h1 className="text-3xl font-bold mb-3" style={{color: darkMode ? '#fff' : '#111'}}>Aura</h1>
         <p className="text-base mb-12 text-center" style={{color: darkMode ? '#9ca3af' : '#6b7280'}}>Discover yourself, one question at a time</p>
         <div className="w-full max-w-xs space-y-4">
