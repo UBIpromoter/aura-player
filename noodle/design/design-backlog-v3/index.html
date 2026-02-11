@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Design Backlog — Batch 2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px 20px; }
+
+  .section-header { max-width: 900px; margin: 60px auto 24px; }
+  .section-header:first-of-type { margin-top: 0; }
+  .section-header h1 { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .section-header h2 { font-size: 20px; font-weight: 600; color: #c4b5fd; }
+  .section-header p { color: #64748b; font-size: 13px; margin-top: 4px; }
+
+  .comparison-row { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+  .phone-frame { width: 375px; height: 720px; border-radius: 32px; overflow: hidden; border: 2px solid rgba(255,255,255,0.08); position: relative; }
+  .phone-inner { width: 100%; height: 100%; overflow-y: auto; position: relative; }
+  .phone-label { text-align: center; margin-bottom: 8px; }
+  .label-tag { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .label-before { background: rgba(239,68,68,0.15); color: #f87171; }
+  .label-after { background: rgba(52,211,153,0.15); color: #34d399; }
+
+  /* MC option buttons */
+  .mc-btn { width: 100%; height: 48px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .mc-btn-gray { border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); color: #d1d5db; }
+  .mc-btn-selected { border: 1px solid rgba(139,92,246,0.5); background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(139,92,246,0.06)); color: #c4b5fd; box-shadow: 0 0 20px rgba(139,92,246,0.15), 0 0 35px rgba(139,92,246,0.07); }
+  .mc-btn-dimmed { border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: #6b7280; opacity: 0.4; }
+  /* Colored MC defaults (before) */
+  .mc-blue { border: 1px solid rgba(59,130,246,0.25); background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(59,130,246,0.03)); color: #93c5fd; }
+  .mc-violet { border: 1px solid rgba(139,92,246,0.25); background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(139,92,246,0.03)); color: #c4b5fd; }
+  .mc-teal { border: 1px solid rgba(20,184,166,0.25); background: linear-gradient(135deg, rgba(20,184,166,0.08), rgba(20,184,166,0.03)); color: #5eead4; }
+  .mc-cyan { border: 1px solid rgba(6,182,212,0.25); background: linear-gradient(135deg, rgba(6,182,212,0.08), rgba(6,182,212,0.03)); color: #67e8f9; }
+
+  /* Light mode variants */
+  .mc-btn-gray-light { border: 1px solid rgba(0,0,0,0.12); background: rgba(0,0,0,0.03); color: #1f2937; }
+  .mc-btn-selected-light { border: 1px solid rgba(139,92,246,0.5); background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(139,92,246,0.08)); color: #7c3aed; box-shadow: 0 0 20px rgba(139,92,246,0.18), 0 0 35px rgba(139,92,246,0.10); }
+  .mc-btn-dimmed-light { border: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.02); color: #9ca3af; opacity: 0.4; }
+
+  /* Assess picker cards */
+  .assess-card { border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.15s; }
+  .assess-card-dark { border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
+  .assess-card-light-before { border: 1px solid rgba(0,0,0,0.06); background: rgba(255,255,255,0.6); }
+  .assess-card-light-after { border: 1px solid rgba(0,0,0,0.12); background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  /* Progress circle placeholder */
+  .progress-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+
+  /* Stats pill */
+  .stat-pill { text-align: center; flex: 1; }
+  .stat-num { font-size: 18px; font-weight: 700; }
+  .stat-label { font-size: 10px; color: #6b7280; }
+
+  /* Breathing aura animation */
+  @keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.08); opacity: 1; } }
+  .aura-breathe { animation: breathe 4s ease-in-out infinite; }
+
+  /* Glow scaling demo */
+  @keyframes drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(4px, -3px); } }
+  .glow-drift { animation: drift 6s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<div class="section-header">
+  <h1>Aura Design Backlog — Batch 2</h1>
+  <p>MC Questions · Profile · Assess Picker · Path Choice</p>
+</div>
+
+
+<!-- ============================================ -->
+<!-- 1. MC QUESTIONS — Gray default, selected colorizes -->
+<!-- ============================================ -->
+<div class="section-header">
+  <h2>1. MC Questions — Gray Default, Selected Colorizes</h2>
+  <p>Options start gray. Only the tapped option gets color. Rest dim further.</p>
+</div>
+
+<div class="comparison-row">
+  <!-- BEFORE (dark) — all colored -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-before">Before (Dark)</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="padding: 20px;">
+        <!-- Header -->
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 20px;">
+          <span style="color: #6b7280;">←</span>
+          <span style="font-size: 11px; padding: 3px 10px; border-radius: 99px; background: rgba(139,92,246,0.15); color: #a78bfa;">Think</span>
+          <span style="flex: 1;"></span>
+          <span style="font-size: 12px; color: #4b5563;">4/20</span>
+        </div>
+        <!-- Question -->
+        <p style="font-size: 20px; font-weight: 600; color: #fff; line-height: 1.4; margin-bottom: 32px;">Is it more important to be kind or to be honest?</p>
+        <!-- All colored options -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="mc-btn mc-blue">Kind — always</div>
+          <div class="mc-btn mc-violet">Honest — always</div>
+          <div class="mc-btn mc-teal">Depends on the situation</div>
+          <div class="mc-btn mc-cyan">They're the same thing</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AFTER (dark) — gray default, one selected -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-after">After (Dark)</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="padding: 20px;">
+        <!-- Header -->
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 20px;">
+          <span style="color: #6b7280;">←</span>
+          <span style="font-size: 11px; padding: 3px 10px; border-radius: 99px; background: rgba(139,92,246,0.15); color: #a78bfa;">Think</span>
+          <span style="flex: 1;"></span>
+          <span style="font-size: 12px; color: #4b5563;">4/20</span>
+        </div>
+        <!-- Question -->
+        <p style="font-size: 20px; font-weight: 600; color: #fff; line-height: 1.4; margin-bottom: 32px;">Is it more important to be kind or to be honest?</p>
+        <!-- Gray default — none selected yet -->
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 40px;">
+          <div class="mc-btn mc-btn-gray">Kind — always</div>
+          <div class="mc-btn mc-btn-gray">Honest — always</div>
+          <div class="mc-btn mc-btn-gray">Depends on the situation</div>
+          <div class="mc-btn mc-btn-gray">They're the same thing</div>
+        </div>
+        <!-- Divider label -->
+        <div style="text-align: center; font-size: 11px; color: #4b5563; margin-bottom: 16px;">↓ after tapping one ↓</div>
+        <!-- One selected, rest dimmed -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="mc-btn mc-btn-dimmed">Kind — always</div>
+          <div class="mc-btn mc-btn-selected">Depends on the situation ★★</div>
+          <div class="mc-btn mc-btn-dimmed">Honest — always</div>
+          <div class="mc-btn mc-btn-dimmed">They're the same thing</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- 2. PROFILE — Stats lead, viz replaces guest image -->
+<!-- ============================================ -->
+<div class="section-header">
+  <h2>2. Profile — Stats Lead, Viz Replaces Guest Image</h2>
+  <p>Level bar + top trait up top. Organism viz replaces the gradient avatar circle.</p>
+</div>
+
+<div class="comparison-row">
+  <!-- BEFORE -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-before">Before</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="padding: 0;">
+        <!-- Header -->
+        <div style="height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+          <span style="color: #6b7280;">←</span>
+          <span style="font-weight: 500; color: #fff; flex: 1;">Profile</span>
+        </div>
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
+          <!-- Avatar row -->
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <!-- Gradient circle avatar -->
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #d946ef); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; color: #fff; box-shadow: 0 0 20px rgba(139,92,246,0.3), 0 0 30px rgba(139,92,246,0.15); border: 2px solid rgba(139,92,246,0.5);">G</div>
+            <div>
+              <div style="font-weight: 600; font-size: 18px; color: #fff;">Guest</div>
+              <div style="display: flex; gap: 12px; margin-top: 4px;">
+                <span style="font-size: 14px; color: #a78bfa;">Lv.3</span>
+                <span style="font-size: 14px; color: #fb923c;">🔥4</span>
+                <span style="font-size: 14px; color: #6b7280;">340 XP</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Personality card -->
+          <div style="border-radius: 16px; overflow: hidden; border: 1px solid rgba(139,92,246,0.3); background: linear-gradient(135deg, rgba(76,29,149,0.2), rgba(49,46,129,0.25));">
+            <div style="display: flex; min-height: 100px;">
+              <!-- Placeholder for 100px viz -->
+              <div style="width: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3);">
+                <div style="width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(circle, rgba(139,92,246,0.4), transparent 70%);"></div>
+              </div>
+              <div style="flex: 1; padding: 12px 16px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                  <span style="font-weight: 600; color: #fff;">The Analyst</span>
+                  <span style="font-size: 14px; color: #a78bfa;">→</span>
+                </div>
+                <p style="font-size: 14px; color: #9ca3af;">Precise mind, systematic thinker</p>
+                <span style="font-size: 12px; color: #6b7280; margin-top: 8px;">5 assessments</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stats bar -->
+          <div style="border-radius: 16px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-around; background: rgba(17,24,39,0.4); border: 1px solid rgba(31,41,55,0.4);">
+            <div class="stat-pill"><div class="stat-num" style="color: #fff;">47</div><div class="stat-label">Answered</div></div>
+            <div style="width: 1px; height: 32px; background: rgba(31,41,55,1);"></div>
+            <div class="stat-pill"><div class="stat-num" style="color: #fff;">5</div><div class="stat-label">Assessments</div></div>
+            <div style="width: 1px; height: 32px; background: rgba(31,41,55,1);"></div>
+            <div class="stat-pill"><div class="stat-num" style="color: #fff;">3.2</div><div class="stat-label">Avg Conf</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AFTER -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-after">After</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="padding: 0;">
+        <!-- Header -->
+        <div style="height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+          <span style="color: #6b7280;">←</span>
+          <span style="font-weight: 500; color: #fff; flex: 1;">Profile</span>
+        </div>
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
+          <!-- NEW: Stats row with level bar at top -->
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div>
+              <span style="font-weight: 600; font-size: 18px; color: #fff;">Guest</span>
+              <div style="display: flex; gap: 10px; margin-top: 3px;">
+                <span style="font-size: 13px; color: #fb923c;">🔥4</span>
+                <span style="font-size: 13px; color: #6b7280;">340 XP</span>
+              </div>
+            </div>
+            <div style="flex: 1;"></div>
+            <!-- Level badge -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 13px; color: #a78bfa; font-weight: 600;">Lv.3</span>
+              <div style="width: 80px; height: 6px; border-radius: 3px; background: rgba(139,92,246,0.15); overflow: hidden;">
+                <div style="width: 65%; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #8b5cf6, #a78bfa);"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NEW: Organism viz replaces avatar circle — personality card -->
+          <div style="border-radius: 16px; overflow: hidden; border: 1px solid rgba(139,92,246,0.3); background: linear-gradient(135deg, rgba(76,29,149,0.2), rgba(49,46,129,0.25));">
+            <div style="display: flex; min-height: 100px;">
+              <!-- Real organism viz rendered by canvas -->
+              <div id="profile-viz-mount" style="width: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); overflow: hidden;"></div>
+              <div style="flex: 1; padding: 12px 16px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                  <span style="font-weight: 600; color: #fff;">The Analyst</span>
+                  <span style="font-size: 14px; color: #a78bfa;">→</span>
+                </div>
+                <p style="font-size: 14px; color: #9ca3af;">Precise mind, systematic thinker</p>
+                <!-- Top trait badge -->
+                <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
+                  <span style="font-size: 11px; padding: 2px 8px; border-radius: 99px; background: rgba(96,165,250,0.15); color: #60a5fa; font-weight: 500;">Conscientiousness 88%</span>
+                  <span style="font-size: 12px; color: #6b7280;">· 5 tests</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stats bar — unchanged -->
+          <div style="border-radius: 16px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-around; background: rgba(17,24,39,0.4); border: 1px solid rgba(31,41,55,0.4);">
+            <div class="stat-pill"><div class="stat-num" style="color: #fff;">47</div><div class="stat-label">Answered</div></div>
+            <div style="width: 1px; height: 32px; background: rgba(31,41,55,1);"></div>
+            <div class="stat-pill"><div class="stat-num" style="color: #fff;">5</div><div class="stat-label">Assessments</div></div>
+            <div style="width: 1px; height: 32px; background: rgba(31,41,55,1);"></div>
+            <div class="stat-pill"><div class="stat-num" style="color: #fff;">3.2</div><div class="stat-label">Avg Conf</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- 3. ASSESS PICKER — Light mode contrast fix -->
+<!-- ============================================ -->
+<div class="section-header">
+  <h2>3. Assess Picker — Light Mode Contrast</h2>
+  <p>Cards too washed out in light mode → solid white cards, stronger borders, deeper text colors</p>
+</div>
+
+<div class="comparison-row">
+  <!-- BEFORE (light mode) -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-before">Before (Light)</span></div>
+    <div class="phone-frame" style="background: #f9fafb;">
+      <div class="phone-inner" style="padding: 0;">
+        <!-- Header -->
+        <div style="height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid rgba(0,0,0,0.06);">
+          <span style="color: #9ca3af;">←</span>
+          <span style="font-size: 20px;">🪞</span>
+          <span style="font-weight: 600; color: #111827; flex: 1;">Reveal</span>
+          <span style="padding: 6px 12px; border-radius: 99px; font-size: 14px; font-weight: 500; background: #7c3aed; color: #fff;">Analysis</span>
+        </div>
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+
+          <!-- Hero card — low contrast -->
+          <div style="border-radius: 16px; padding: 14px; border: 1px solid rgba(139,92,246,0.15); background: rgba(255,255,255,0.6); position: relative; overflow: hidden;">
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+              <div style="width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(139,92,246,0.05), transparent 70%);"></div>
+            </div>
+            <div style="position: relative; display: flex; align-items: center; gap: 12px;">
+              <div class="progress-circle" style="border: 2px solid rgba(139,92,246,0.2); color: #a78bfa; font-size: 12px;">42%</div>
+              <span style="flex: 1; font-weight: 600; color: #374151;">Big Five</span>
+              <span style="font-size: 12px; padding: 6px 12px; border-radius: 99px; background: rgba(139,92,246,0.08); color: #a78bfa;">Continue →</span>
+            </div>
+          </div>
+
+          <!-- Category cards — low contrast -->
+          <div class="assess-card assess-card-light-before">
+            <div class="progress-circle" style="border: 2px solid rgba(20,184,166,0.15); color: #5eead4;">🧭</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #6b7280;">Values</div>
+              <div style="font-size: 12px; color: #9ca3af;">3 modules</div>
+            </div>
+            <span style="font-size: 12px; color: #d1d5db;">→</span>
+          </div>
+
+          <div class="assess-card assess-card-light-before">
+            <div class="progress-circle" style="border: 2px solid rgba(244,63,94,0.15); color: #fda4af;">💭</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #6b7280;">Shadow</div>
+              <div style="font-size: 12px; color: #9ca3af;">2 modules</div>
+            </div>
+            <span style="font-size: 12px; color: #d1d5db;">→</span>
+          </div>
+
+          <div class="assess-card assess-card-light-before">
+            <div class="progress-circle" style="border: 2px solid rgba(59,130,246,0.15); color: #93c5fd;">🔗</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #6b7280;">Relationships</div>
+              <div style="font-size: 12px; color: #9ca3af;">2 modules</div>
+            </div>
+            <span style="font-size: 12px; color: #d1d5db;">→</span>
+          </div>
+
+          <div class="assess-card assess-card-light-before">
+            <div class="progress-circle" style="border: 2px solid rgba(245,158,11,0.15); color: #fcd34d;">⚡</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #6b7280;">Drives</div>
+              <div style="font-size: 12px; color: #9ca3af;">2 modules</div>
+            </div>
+            <span style="font-size: 12px; color: #d1d5db;">→</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AFTER (light mode) — better contrast -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-after">After (Light)</span></div>
+    <div class="phone-frame" style="background: #f9fafb;">
+      <div class="phone-inner" style="padding: 0;">
+        <!-- Header -->
+        <div style="height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid rgba(0,0,0,0.08);">
+          <span style="color: #6b7280;">←</span>
+          <span style="font-size: 20px;">🪞</span>
+          <span style="font-weight: 600; color: #111827; flex: 1;">Reveal</span>
+          <span style="padding: 6px 12px; border-radius: 99px; font-size: 14px; font-weight: 500; background: #7c3aed; color: #fff;">Analysis</span>
+        </div>
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+
+          <!-- Hero card — stronger contrast -->
+          <div style="border-radius: 16px; padding: 14px; border: 1px solid rgba(139,92,246,0.3); background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.06); position: relative; overflow: hidden;">
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+              <div style="width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(139,92,246,0.06), transparent 70%);"></div>
+            </div>
+            <div style="position: relative; display: flex; align-items: center; gap: 12px;">
+              <div class="progress-circle" style="border: 2.5px solid rgba(139,92,246,0.4); color: #7c3aed; font-size: 12px; font-weight: 600;">42%</div>
+              <span style="flex: 1; font-weight: 600; color: #111827;">Big Five</span>
+              <span style="font-size: 12px; padding: 6px 12px; border-radius: 99px; background: rgba(139,92,246,0.12); color: #7c3aed; font-weight: 500; border: 1px solid rgba(139,92,246,0.2);">Continue →</span>
+            </div>
+          </div>
+
+          <!-- Category cards — solid white, stronger borders -->
+          <div class="assess-card assess-card-light-after">
+            <div class="progress-circle" style="border: 2.5px solid rgba(20,184,166,0.35); color: #0d9488;">🧭</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #111827;">Values</div>
+              <div style="font-size: 12px; color: #6b7280;">3 modules</div>
+            </div>
+            <span style="font-size: 12px; color: #9ca3af; font-weight: 500;">→</span>
+          </div>
+
+          <div class="assess-card assess-card-light-after">
+            <div class="progress-circle" style="border: 2.5px solid rgba(244,63,94,0.35); color: #e11d48;">💭</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #111827;">Shadow</div>
+              <div style="font-size: 12px; color: #6b7280;">2 modules</div>
+            </div>
+            <span style="font-size: 12px; color: #9ca3af; font-weight: 500;">→</span>
+          </div>
+
+          <div class="assess-card assess-card-light-after">
+            <div class="progress-circle" style="border: 2.5px solid rgba(59,130,246,0.35); color: #2563eb;">🔗</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #111827;">Relationships</div>
+              <div style="font-size: 12px; color: #6b7280;">2 modules</div>
+            </div>
+            <span style="font-size: 12px; color: #9ca3af; font-weight: 500;">→</span>
+          </div>
+
+          <div class="assess-card assess-card-light-after">
+            <div class="progress-circle" style="border: 2.5px solid rgba(245,158,11,0.35); color: #d97706;">⚡</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #111827;">Drives</div>
+              <div style="font-size: 12px; color: #6b7280;">2 modules</div>
+            </div>
+            <span style="font-size: 12px; color: #9ca3af; font-weight: 500;">→</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Profile viz mount point -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script id="aura-viz-script" src="../../index.html" type="text/not-loaded"></script>
+<script>
+// Extract and run AuraVisualization from production index.html
+(async function() {
+  const resp = await fetch('../../index.html');
+  const text = await resp.text();
+
+  // Extract COLOR_HEX
+  const colorMatch = text.match(/const COLOR_HEX\s*=\s*\{[\s\S]*?\n\s{4}\};/);
+  // Extract AuraVisualization component
+  const vizStart = text.indexOf('const AuraVisualization = React.memo(');
+  const vizBlock = text.substring(vizStart);
+  // Find the closing of React.memo — it ends with `});` at indent 4
+  let depth = 0; let vizEnd = 0;
+  for (let i = 0; i < vizBlock.length; i++) {
+    if (vizBlock[i] === '{') depth++;
+    if (vizBlock[i] === '}') { depth--; if (depth === 0) { vizEnd = i + 1; break; } }
+  }
+  let vizCode = vizBlock.substring(0, vizEnd);
+  // Close the React.memo call
+  if (!vizCode.endsWith(');')) vizCode += ');';
+
+  // Helper functions needed by viz
+  const helperNames = ['valueNoise2D', 'chaikinSmooth', 'getConvexHull'];
+  let helpers = '';
+  for (const name of helperNames) {
+    const re = new RegExp(`(const ${name}\\s*=\\s*(?:function|\\()[\\s\\S]*?)\\n\\s{4}(?:const |function |let |var |\/\\/)`);
+    const m = text.match(re);
+    if (m) helpers += m[1] + '\n';
+  }
+
+  // Also need deriveModifiers, getStage, deriveNodes, etc — grab the full block between COLOR_HEX and AuraVisualization
+  const colorEnd = text.indexOf(colorMatch[0]) + colorMatch[0].length;
+  const betweenBlock = text.substring(colorEnd, vizStart);
+
+  const fullCode = colorMatch[0] + '\n' + betweenBlock + '\n' + vizCode;
+
+  // Execute in a function scope with React available
+  const fn = new Function('React', fullCode + `; return AuraVisualization;`);
+  const AuraViz = fn(React);
+
+  // Render into profile card
+  const container = document.getElementById('profile-viz-mount');
+  if (container && AuraViz) {
+    const root = ReactDOM.createRoot(container);
+    root.render(React.createElement(AuraViz, {
+      size: 100,
+      darkMode: true,
+      entityType: 'human',
+      assessCompleted: {
+        'quick-profile': { traits: { O: 70, C: 85, E: 65, A: 55, N: 25 } },
+        'bigfive-C': { score: 88 },
+        'bigfive-O': { score: 72 },
+        'bigfive-E': { score: 65 },
+        'bigfive-A': { score: 58 },
+        'bigfive-N': { score: 30 },
+        'values-core': { score: 74 },
+        'values-moral': { score: 68 },
+        'shadow-P': { score: 45 },
+        'shadow-M': { score: 52 },
+        'attachment': { score: 62 },
+        'drives-achieve': { score: 78 },
+        'drives-power': { score: 55 },
+      },
+      onboardingAnswers: {
+        introvert_extrovert: 'ambivert', thinking_feeling: 'thinking',
+        routine_spontaneous: 'routine', competitive_cooperative: 'cooperative',
+        optimist_realist: 'realist', logic_intuition: 'logic',
+        leader_supporter: 'depends', night_morning: 'night',
+        big_picture_details: 'details', change_stability: 'stability'
+      }
+    }));
+  }
+})();
+</script>
+
+</body>
+</html>
