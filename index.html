@@ -1419,8 +1419,8 @@ const TH = (token, dark) => { const val = {
   'text-inverted': dark ? 'text-gray-900' : 'text-white',
   // Background colors
   'bg-main': dark ? 'bg-gray-950' : 'bg-gray-50',
-  'bg-card': dark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-white/80 border border-black/[0.06] shadow-sm',
-  'bg-card-shine': dark ? 'bg-white/[0.04] shine-card shine-gray border border-white/[0.06]' : 'bg-white/80 border border-black/[0.06] shadow-sm',
+  'bg-card': dark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-white border border-black/[0.10] shadow-sm',
+  'bg-card-shine': dark ? 'bg-white/[0.04] shine-card shine-gray border border-white/[0.06]' : 'bg-white border border-black/[0.10] shadow-sm',
   'bg-elevated': dark ? 'bg-white/[0.06]' : 'bg-gray-200',
   'bg-input': dark ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400',
   'bg-surface': dark ? 'bg-white/[0.03]' : 'bg-white/90',
@@ -4084,7 +4084,7 @@ const ASSESS_STYLES = (() => {
     })),
     selectedStyles: Object.fromEntries(ASSESS_COLORS.map(c => {
       const t = twColor(c);
-      return [c, `bg-${t}-600 ring-${t}-400 border-${t}-400`];
+      return [c, `bg-${t}-600 border-${t}-400`];
     })),
     pendingStyles: Object.fromEntries(ASSESS_COLORS.map(c => {
       const t = twColor(c);
@@ -4106,7 +4106,7 @@ const ASSESS_STYLES = (() => {
     })),
     selectedStyles: Object.fromEntries(ASSESS_COLORS.map(c => {
       const t = twColor(c);
-      return [c, `bg-${t}-600 ring-${t}-400 border-${t}-400 text-white`];
+      return [c, `bg-${t}-600 border-${t}-400 text-white`];
     })),
     pendingStyles: Object.fromEntries(ASSESS_COLORS.map(c => {
       const t = twColor(c);
@@ -7865,17 +7865,27 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
           </button>
         </div>
       </div>
-      {/* Keyboard shortcuts */}
-      <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-900/50 border border-gray-800' : 'bg-white border border-gray-200'}`}>
-        <div className={`text-sm font-medium mb-2 ${TH('text-dim', darkMode)}`}>Keyboard Shortcuts</div>
-        <div className={`text-sm space-y-1 ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>
-          <div className="flex justify-between"><span>Yes / Option A</span><span className="font-mono">Y or 1</span></div>
-          <div className="flex justify-between"><span>No / Option B-E</span><span className="font-mono">N or 2-5</span></div>
-          <div className="flex justify-between"><span>Next question</span><span className="font-mono">→ or Space</span></div>
-          <div className="flex justify-between"><span>Previous question</span><span className="font-mono">←</span></div>
-          <div className="flex justify-between"><span>Undo</span><span className="font-mono">Esc</span></div>
-        </div>
-      </div>
+      {/* Keyboard shortcuts — collapsible */}
+      {(() => {
+        const [kbOpen, setKbOpen] = React.useState(false);
+        return (
+          <div className={`rounded-lg p-3 cursor-pointer ${darkMode ? 'bg-gray-900/50 border border-gray-800' : 'bg-white border border-gray-200'}`} onClick={() => setKbOpen(!kbOpen)}>
+            <div className="flex items-center justify-between">
+              <div className={`text-sm font-medium ${TH('text-dim', darkMode)}`}>⌨️ Keyboard Shortcuts</div>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={`transition-transform duration-200 ${kbOpen ? 'rotate-180' : ''}`} style={{stroke: darkMode ? '#6b7280' : '#9ca3af', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round'}}><polyline points="4 6 8 10 12 6"/></svg>
+            </div>
+            {kbOpen && (
+              <div className={`text-sm space-y-1 mt-3 ${darkMode ? 'text-gray-500' : 'text-gray-600'}`} onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between"><span>Yes / Option A</span><span className="font-mono">Y or 1</span></div>
+                <div className="flex justify-between"><span>No / Option B-E</span><span className="font-mono">N or 2-5</span></div>
+                <div className="flex justify-between"><span>Next question</span><span className="font-mono">→ or Space</span></div>
+                <div className="flex justify-between"><span>Previous question</span><span className="font-mono">←</span></div>
+                <div className="flex justify-between"><span>Undo</span><span className="font-mono">Esc</span></div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {/* Data Management */}
       <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
         <div className={`text-sm font-medium mb-2 ${TH('text-primary', darkMode)}`}>Your Data</div>
@@ -8380,7 +8390,7 @@ const AssessPickerScreen = ({
                     background: `radial-gradient(ellipse at center, rgba(${hex.rgb}, ${darkMode ? 0.12 : 0.08}) 0%, transparent 70%)`,
                   }} />
                 </div>
-                <div className={`relative z-10 p-3.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-white/60'}`}>
+                <div className={`relative z-10 p-3.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-white'}`}>
                   <div className="flex items-center gap-3">
                     <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : cat.icon} gradientId={`hero-${catId}`} darkMode={darkMode} textSize="text-xs" />
                     <div className={`flex-1 font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
@@ -8740,9 +8750,9 @@ const AssessQuestionScreen = ({
           </div>
         </div>
       )}
-      {/* Undo Toast */}
+      {/* Undo Toast — positioned near answer buttons */}
       {assessShowUndoToast && (
-        <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg animate-pulse ${darkMode ? 'bg-white/[0.08] border border-white/[0.12] text-white' : 'bg-gray-900/[0.08] border border-gray-900/[0.12] text-gray-900'}`}>
+        <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg animate-pulse ${darkMode ? 'bg-white/[0.08] border border-white/[0.12] text-white' : 'bg-gray-900/[0.08] border border-gray-900/[0.12] text-gray-900'}`}>
           ↩ Undone
         </div>
       )}
@@ -8811,7 +8821,7 @@ const AssessQuestionScreen = ({
             const fillColor = COLOR_HEX[assessCurrentTest.color]?.rgb || COLOR_HEX.violet.rgb;
             return (
               <button key={option.v} onClick={(e) => { e.stopPropagation(); if (assessPending) { onHandleUndo(); } else { onHandleAnswerTap(option.v); } }}
-                className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-between transition-all border relative overflow-hidden hover-glow hover-glow-${assessCurrentTest.color} ${isSelected ? `${selStyle} text-white ring-2 ring-offset-1 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-white'}` : `${colorTint} ${isPending ? 'text-white' : darkMode ? 'text-gray-200' : 'text-gray-700'}`}`}
+                className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-between transition-all border relative overflow-hidden hover-glow hover-glow-${assessCurrentTest.color} ${isSelected ? `${selStyle} text-white` : `${colorTint} ${isPending ? 'text-white' : darkMode ? 'text-gray-200' : 'text-gray-700'}`}`}
                 style={isPending ? { transform: 'scale(1.03)', boxShadow: `0 0 20px rgba(${fillColor},0.4), 0 0 40px rgba(${fillColor},0.15)` } : {}}
               >
                 {isPending && <div className="absolute inset-0" style={{ background: `rgba(${fillColor}, ${darkMode ? 0.85 : 0.75})`, animation: `countdownFill ${undoDelay}s linear forwards`, transformOrigin: 'left' }} />}
@@ -10285,58 +10295,6 @@ const QuestionFlowScreen = ({
           </div>
         </div>
       )}
-      {/* Undo toast — top-positioned, doesn't move buttons */}
-      {pendingSubmit && (() => {
-        const undoColor = isBinary
-          ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
-          : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
-        const answerLabel = isBinary
-          ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
-          : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
-        return (
-          <div className="absolute top-1 left-3 right-3 z-30">
-            <div
-              onClick={handleUndo}
-              className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-lg"
-              style={{
-                background: darkMode
-                  ? `rgba(${undoColor.rgb}, 0.15)`
-                  : `rgba(${undoColor.rgb}, 0.12)`,
-                border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-              }}
-            >
-              {/* Countdown ring */}
-              <div className="flex-shrink-0 w-7 h-7 relative">
-                <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
-                  <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
-                  <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
-                    strokeDasharray="75.4"
-                    strokeDashoffset="0"
-                    style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
-                  />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Answered: {answerLabel}
-                </div>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleUndo(); }}
-                className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
-                style={{
-                  background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
-                  color: undoColor.hex,
-                }}
-              >
-                Undo
-              </button>
-            </div>
-          </div>
-        );
-      })()}
       {/* Circle Track Selector - remaining counts by type */}
       <div className={`h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10 ${darkMode ? 'bg-gray-900/50' : 'bg-white/90'}`}
         style={{
@@ -10559,6 +10517,55 @@ const QuestionFlowScreen = ({
                   )}
                 </div>
               </div>
+              {/* Undo toast — inline below answer buttons */}
+              {pendingSubmit && (() => {
+                const undoColor = isBinary
+                  ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+                  : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
+                const answerLabel = isBinary
+                  ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
+                  : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
+                return (
+                  <div className="px-4 mt-2">
+                    <div
+                      onClick={handleUndo}
+                      className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3"
+                      style={{
+                        background: darkMode
+                          ? `rgba(${undoColor.rgb}, 0.15)`
+                          : `rgba(${undoColor.rgb}, 0.12)`,
+                        border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
+                      }}
+                    >
+                      <div className="flex-shrink-0 w-7 h-7 relative">
+                        <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                          <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                          <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                            strokeDasharray="75.4"
+                            strokeDashoffset="0"
+                            style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {answerLabel}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleUndo(); }}
+                        className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                        style={{
+                          background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
+                          color: undoColor.hex,
+                        }}
+                      >
+                        Undo
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Action buttons row — always rendered, invisible during pending to preserve layout */}
               <div className={`relative px-4 mt-3 mb-2 flex items-center justify-center max-w-sm mx-auto ${(isAnswered || pendingSubmit) ? 'invisible' : ''}`}>
