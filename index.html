@@ -1444,7 +1444,7 @@ const COLOR_HEX = {
   rose:    { base: '#f43f5e', light: '#fb7185', rgb: '244, 63, 94' },
   pink:    { base: '#d946ef', light: '#e879f9', rgb: '217, 70, 239', tw: 'fuchsia' },
   emerald: { base: '#10b981', light: '#34d399', rgb: '16, 185, 129' },
-  slate:   { base: '#64748b', light: '#94a3b8', rgb: '100, 116, 139' },
+  slate:   { base: '#7c85a6', light: '#a0a8c8', rgb: '124, 133, 166' },
   amber:   { base: '#f59e0b', light: '#fbbf24', rgb: '245, 158, 11' },
   indigo:  { base: '#6366f1', light: '#818cf8', rgb: '99, 102, 241' },
   cyan:    { base: '#06b6d4', light: '#67e8f9', rgb: '6, 182, 212' },
@@ -4290,7 +4290,7 @@ const ASSESS_NUDGE_COPY = {
 
 // Find next assessment action after completing a test
 // Returns { type: 'same-category', ... } if more tests remain in current category
-// Returns { type: 'next-category', ... } if category is complete and another awaits
+// Returns { type: 'next-category', recommendations: [...] } with up to 2 picks if category complete
 // Returns null if everything is done
 const getAssessNudge = (completedTestId, newCompleted, entityType) => {
   const fromCatId = ASSESS_TEST_TO_CATEGORY[completedTestId];
@@ -4303,8 +4303,9 @@ const getAssessNudge = (completedTestId, newCompleted, entityType) => {
     return { type: 'same-category', toCatId: fromCatId, toCategory: fromCat, nextTestId: nextInCategory };
   }
 
-  // Category complete: find next category in static order
+  // Category complete: collect up to 2 recommended next categories
   const tier = calculateAssessTier(newCompleted);
+  const recommendations = [];
   for (const catId of ASSESS_CATEGORY_ORDER) {
     if (catId === fromCatId) continue;
     const cat = ASSESS_CATEGORIES[catId];
@@ -4313,9 +4314,22 @@ const getAssessNudge = (completedTestId, newCompleted, entityType) => {
     const nextTestId = cat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id]);
     if (!nextTestId) continue;
     const message = ASSESS_NUDGE_COPY[`${fromCatId}-${catId}`] || ASSESS_NUDGE_COPY[`_${catId}`] || "Continue your journey.";
-    return { type: 'next-category', toCatId: catId, toCategory: cat, nextTestId, message };
+    recommendations.push({ toCatId: catId, toCategory: cat, nextTestId, message });
+    if (recommendations.length >= 2) break;
   }
-  return null;
+
+  if (recommendations.length === 0) return null;
+
+  // Backward compat: keep toCategory/nextTestId/message from primary pick
+  const primary = recommendations[0];
+  return {
+    type: 'next-category',
+    toCatId: primary.toCatId,
+    toCategory: primary.toCategory,
+    nextTestId: primary.nextTestId,
+    message: primary.message,
+    recommendations,
+  };
 };
 
 const ASSESS_DEMO_PROFILES = {
@@ -4854,9 +4868,10 @@ const HintCard = ({ color, text, subtitle, darkMode = true }) => {
 // ResultCard - Assessment result card with gradient header
 const ResultCard = ({ icon, title, subtitle, children, darkMode, gradientClass }) => (
   <div onClick={(e) => e.stopPropagation()} className={`rounded-2xl overflow-hidden backdrop-blur-xl ${darkMode ? 'bg-white/[0.06] border border-white/[0.08]' : 'bg-white/90 border border-black/[0.06] shadow-lg'}`}>
-    <div className={`px-4 py-3 bg-gradient-to-br ${gradientClass} flex items-center gap-3`}>
-      <span className="text-2xl">{icon}</span>
-      <div>
+    <div className="relative px-4 py-3 flex items-center gap-3">
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradientClass}`} style={{ opacity: darkMode ? 0.45 : 0.35 }} />
+      <span className="text-2xl relative">{icon}</span>
+      <div className="relative">
         <h2 className="text-white text-lg font-bold">{title}</h2>
         {subtitle && <p className="text-white/70 text-xs">{subtitle}</p>}
       </div>
@@ -9760,26 +9775,54 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
           );
         })()}
 
-        {/* Cross-category nudge card: only when current category is fully complete */}
-        {nudgeData?.type === 'next-category' && (() => {
-          const nc = COLOR_HEX[nudgeData.toCategory.color] || COLOR_HEX.violet;
+        {/* Post-completion recommendations: up to 2 next categories as clear CTAs */}
+        {nudgeData?.type === 'next-category' && nudgeData.recommendations && (() => {
+          const recs = nudgeData.recommendations;
+          const primary = recs[0];
+          const secondary = recs[1];
+          const pc = COLOR_HEX[primary.toCategory.color] || COLOR_HEX.violet;
           return (
-            <div className={`rounded-xl p-4 ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'}`}>
-              <div className={`text-xs font-medium uppercase tracking-wider mb-1.5`} style={{ color: darkMode ? nc.light : nc.base }}>Next up</div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-lg">{nudgeData.toCategory.icon}</span>
-                <span className={`font-semibold ${TH('text-primary', darkMode)}`}>{nudgeData.toCategory.name}</span>
-              </div>
-              <p className={`text-xs leading-relaxed mb-3 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{nudgeData.message}</p>
-              <button onClick={(e) => { e.stopPropagation(); onNudgeContinue(nudgeData.nextTestId); }}
-                className={`w-full py-3 rounded-xl font-medium text-white transition-all hover-glow hover-glow-${nudgeData.toCategory.color}`}
-                style={{ background: `linear-gradient(135deg, ${nc.base}, ${nc.light})` }}>
-                Continue
+            <div className="space-y-3 mt-2">
+              <div className={`text-center text-sm font-semibold uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>What's next</div>
+              {/* Primary: full gradient button — the obvious next step */}
+              <button onClick={(e) => { e.stopPropagation(); onNudgeContinue(primary.nextTestId); }}
+                className={`w-full rounded-xl p-4 text-left transition-all hover-glow hover-glow-${primary.toCategory.color}`}
+                style={{ background: `linear-gradient(135deg, ${pc.base}, ${pc.light})` }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 bg-white/20">
+                    {primary.toCategory.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-white">{primary.toCategory.name}</div>
+                    <div className="text-xs leading-relaxed mt-0.5 text-white/70">{primary.message}</div>
+                  </div>
+                  <span className="text-white/50 text-lg flex-shrink-0">→</span>
+                </div>
               </button>
+              {/* Secondary: soft color wash — clearly tappable but not as loud */}
+              {secondary && (() => {
+                const sc = COLOR_HEX[secondary.toCategory.color] || COLOR_HEX.violet;
+                return (
+                  <button onClick={(e) => { e.stopPropagation(); onNudgeContinue(secondary.nextTestId); }}
+                    className={`w-full rounded-xl p-4 text-left transition-all hover-glow hover-glow-${secondary.toCategory.color}`}
+                    style={{ border: `1.5px solid ${darkMode ? sc.base + '35' : sc.base + '25'}`, background: darkMode ? `linear-gradient(135deg, ${sc.base}18, ${sc.base}08)` : `linear-gradient(135deg, ${sc.base}12, ${sc.base}06)` }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{ background: `${sc.base}25` }}>
+                        {secondary.toCategory.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-semibold text-sm`} style={{ color: darkMode ? sc.light : sc.base }}>{secondary.toCategory.name}</div>
+                        <div className={`text-xs leading-relaxed mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{secondary.message}</div>
+                      </div>
+                      <span className={`text-lg flex-shrink-0`} style={{ color: darkMode ? sc.light + '60' : sc.base + '50' }}>→</span>
+                    </div>
+                  </button>
+                );
+              })()}
             </div>
           );
         })()}
-        {/* Bottom action: Next (mid-category), Continue (cross-category), or Done (all done) */}
+        {/* Bottom action: Next (mid-category), Back (cross-category), or Done (all done) */}
         {nudgeData?.type === 'same-category' ? (() => {
           const remaining = nudgeData.toCategory.tests.filter(id => !assessCompleted[id] && ASSESS_TESTS[id]).length;
           return (
@@ -13145,6 +13188,7 @@ function App() {
               setAssessCompleted(fakeCompleted);
               localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed: fakeCompleted, inProgress: {}, demoActive: false, savedUserData: null, demoProfile: null, showDemoControls: false }));
             }} className={`px-2.5 py-1.5 rounded ${btnAccent}`} style={{fontSize:'11px'}}>Unlock</button>
+            <button onClick={() => { if (screen !== 'assess-question') { setAssessCurrentTestId('bigfive-E'); setScreen('assess-question'); } setAssessShowCompletion(p => !p); }} className={`px-2.5 py-1.5 rounded ${assessShowCompletion ? 'bg-amber-600 text-white' : btnBase}`} style={{fontSize:'11px'}}>Celeb</button>
             <select onChange={(e) => { if (e.target.value) { setAssessCurrentTestId(e.target.value); setScreen('assess-question'); }}}
               className={`px-2 py-1.5 rounded border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-300'}`}
               style={{fontSize:'11px', minWidth:'120px'}}

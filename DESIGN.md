@@ -23,10 +23,12 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
   > Architecture note: categories may eventually have sub-assessments with intra-category dependencies. Not building now, but logic should accommodate it.
 
 ### Assessment Flow
-- [ ] **Continue to next test after completion** — when user finishes a test and sees results, **offer 2 recommended next assessments** instead of just "Done". Smooth flow into the next assessment with choice
+- [x] **Continue to next test after completion** — SHIPPED: 2 recommended next assessments after completing a category. Primary = full gradient CTA button, secondary = soft color-wash card. "What's next" header. ResultCard header dimmed so CTAs win visual hierarchy. Shadow Self slate color boosted to purple-slate for visibility.
   > "We should probably offer them the chance to continue right on to the next test." · "Offer 2"
-- [ ] **DECIDED: Multi-select → sequential yes/no** — replace all multi-select questions with sequential single-trait screens. One trait per screen, one tap, auto-advance. Identical rhythm to single-answer questions. Three response options: **Yes / No / Not Sure**. "Not Sure" captures uncertainty vs. negative signal — critical for verification data quality. Panel-reviewed 4/4 models, strong consensus. Implementation: progress indicator ("3 of 5"), smooth transitions (trait label stays, options refresh), consider swipe gestures (Yes right, No left). One interaction pattern across both self-assessment and verification
-  > "We either need to have all the questions be instant submittal, or almost all of them." · Panel consensus: sequential yes/no wins on cognitive load, flow consistency, data quality, and fatigue. "Not Sure" is the killer feature for verification.
+- [ ] **Celebration glow clipping** — completion animation glow has hard vertical clip lines on both sides. `blur-3xl` output clipped by ancestor `overflow-hidden` chain. Needs restructuring — possibly render celebration outside the overflow chain, or replace blur with a different glow technique. Dev panel "Celeb" button toggles it for testing.
+  > "The glow is being cut off on the two sides. It has like straight vertical cutoff lines."
+- [x] **Multi-select resolution** — SHIPPED: Sequential yes/no tested and rejected (tedious, broke flow — "are they a family member? are they a neighbor?" felt annoying). Solution: eliminated multi-select where possible, remaining multi-answer questions use radio buttons for distinct visual difference. Radio buttons make it obvious this is a different interaction type. Sticking with this.
+  > "Sequential yes/no really didn't work. It was annoying. Radio buttons have a distinct visual difference in the flow. It's more obvious to the user."
 - [x] **Responsive: fix now — buttons dinky on phones** — SHIPPED: responsive pass across assessment screens (`bce0c59`). Touch targets, spacing, scrollbar cleanup.
 
 ### Verify
