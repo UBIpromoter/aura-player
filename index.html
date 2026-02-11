@@ -136,6 +136,7 @@
     @keyframes fill { from { width: 100%; } to { width: 0%; } }
     @keyframes shrink { from { width: 100%; } to { width: 0%; } }
     @keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    @keyframes bloom-in { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: scale(1); } }
     @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     @keyframes sweepFill { from { width: 0%; } to { width: 100%; } }
@@ -5171,6 +5172,20 @@ const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSett
   );
 };
 
+// Showcase data for welcome screen — mature organism (~75% complete)
+const WELCOME_SHOWCASE_DATA = {
+  'quick-profile': { traits: { O: 72, C: 61, E: 55, A: 68, N: 38 } },
+  'bigfive-O': { score: 72 }, 'bigfive-A': { score: 68 }, 'bigfive-C': { score: 61 },
+  'bigfive-E': { score: 55 }, 'bigfive-N': { score: 38 },
+  'shadow-M': { score: 42 }, 'shadow-N': { score: 30 }, 'shadow-P': { score: 22 },
+  'attachment': { anxiety: 2.1, avoidance: 1.3 },
+  'risk': { subcategories: { fin: 55, soc: 65, phys: 45, eth: 35 } },
+  'chronotype': { score: 62 }, 'adhd': { indicators: 2 },
+  'integrity': { score: 74 },
+  'starter-personality': true, 'starter-motivation': true, 'starter-thinking': true,
+  'starter-connection': true, 'starter-strategy': true,
+};
+
 // WelcomeScreen - First visit onboarding
 const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
   const [mode, setMode] = React.useState('welcome'); // 'welcome', 'signin', 'signup'
@@ -5217,7 +5232,15 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
   if (mode === 'welcome') {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8" style={{backgroundColor: darkMode ? '#030712' : '#f9fafb'}}>
-        <div className="text-6xl mb-6">🌀</div>
+        <div className="mb-6" style={{animation: 'bloom-in 0.8s ease-out both'}}>
+          <AuraVisualization
+            assessCompleted={WELCOME_SHOWCASE_DATA}
+            onboardingAnswers={{}}
+            entityType="human"
+            darkMode={darkMode}
+            size={Math.min(window.innerHeight * 0.20, 180)}
+          />
+        </div>
         <h1 className="text-3xl font-bold mb-3" style={{color: darkMode ? '#fff' : '#111'}}>Aura</h1>
         <p className="text-base mb-12 text-center" style={{color: darkMode ? '#9ca3af' : '#6b7280'}}>Discover yourself, one question at a time</p>
         <div className="w-full max-w-xs space-y-4">
