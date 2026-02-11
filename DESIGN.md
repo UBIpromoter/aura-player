@@ -7,34 +7,40 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
 ## Open
 
 ### Welcome
-- [ ] **Mini bloom animation ~20% of screen** — aura viz replaces current logo. Medium-sized animated bloom that settles. Not icon-tiny, not dominant — fills roughly 20% of the welcome screen
-  > "Mini bloom animation" · "Medium — fills ~20%"
+- [ ] **Bloom: breathing, above tagline, ~20%** — aura viz replaces logo. Positioned above the tagline in the logo area. Medium-sized (~20% of screen). Continuously alive with subtle breathing — **calm resting pace, 2-3 sec cycle**. Animated bloom on load, then stays gently alive.
+  > "Mini bloom animation" · "Medium — fills ~20%" · "Breathing (alive)" · "Above tagline" · "Calm resting (2-3s)"
 
 ### Profile
-- [ ] **Stats lead, viz replaces guest image** — level bar + top trait up top. Viz takes over guest image slot. Move level/XP elsewhere to simplify the whole top section
+- [ ] **Stats lead, viz replaces guest image** — level bar + top trait up top. Viz takes over guest image slot at **current guest image size**, **contained circle with glow bleeding out** (not fully unbounded, but glow escapes the boundary). Trait label medium prominence — clear but not showy. Move level/XP elsewhere to simplify the whole top section
   > "Stats lead" · "Mix — level bar + top trait" · "Viz should take over the profile guest image, incorporate level and XP elsewhere so we can simplify the whole top"
+  > "Contained but with glow bleeding out" · "Medium — clear but not showy" · "Current guest image size"
 
 ### Path Choice
-- [ ] **Fork is right, visuals need work** — two-button fork is correct but looks bland. Try different framing and copy
-- [ ] **Aura glow scales to node count** — tiny starting aura glows way too much. Glow should be proportional to how many nodes exist. Few nodes = dim. Big constellation = big glow
-  > "Fork is good but not interesting looking" · "A little aura doesn't glow a lot. Only a big aura glows a lot." · "Scale to node count"
+- [ ] **Fork is right, better copy/framing** — two-button fork is correct but looks bland. Direction: better copy and framing, not visual drama or effects. Try different metaphors in the text. **Deprioritized** — leave for now
+  > "Fork is good but not interesting looking" · "Better copy/framing" · "Leave for now"
+- [ ] **Aura glow scales to node count** — tiny starting aura glows way too much. Glow proportional to node count. Few nodes = dim. Big constellation = big glow. Brand new user gets a **tiny seed glow** (promise of growth) — not completely dark, not bright
+  > "A little aura doesn't glow a lot. Only a big aura glows a lot." · "Scale to node count" · "Tiny seed glow (promise of growth)"
 
 ### Assess Picker
 - [x] **Light mode low contrast** — MERGED: solid white cards, stronger borders (0.10 vs 0.06), hero card solid bg
-- [ ] **Smart category ordering** — hero card + full list should be ordered by what's best for the user, not hardcoded. Three factors: what they'd enjoy, what's ideal for their journey, what gives us the most useful data to provide good insights back. Everything stays visible and tappable — ordering is recommendation, not restriction. Gates stay for hard dependencies (tier system). Recommended static order as starting point: Quick Profile → Starter Pack → Personality → Relationships → Character → Behavior → Mind → Shadow Self. Arc: light → personal → deep → provocative. Shadow Self last because it lands better when we already know them well.
-  > "We should have that top card and the whole ordered list be based on what we think would be ideal for the user, what they would enjoy, and what we would find most useful to know from them to be able to provide good information back."
+- [ ] **Smart category ordering** — hero card + full list ordered by what's best for the user. Three factors: enjoyment, journey-ideal, data-useful. Everything stays visible and tappable — ordering is recommendation, not restriction. Gates stay for hard dependencies (tier system). **Approved static order:** Quick Profile → Starter Pack → Personality → Relationships → Character → Behavior → Mind → Shadow Self. Arc: light → personal → deep → provocative
+  > "We should have that top card and the whole ordered list be based on what we think would be ideal for the user"
   > "That person that wants to jump right down to Shadow Self is welcome to. It's just at the bottom of the list."
-  > Architecture note: categories may eventually have sub-assessments with intra-category dependencies (e.g. reasoning level 2 requires level 1). Not building now, but logic should accommodate it.
+  > Architecture note: categories may eventually have sub-assessments with intra-category dependencies. Not building now, but logic should accommodate it.
+
+### Assessment Flow
+- [ ] **Continue to next test after completion** — when user finishes a test and sees results, **offer 2 recommended next assessments** instead of just "Done". Smooth flow into the next assessment with choice
+  > "We should probably offer them the chance to continue right on to the next test." · "Offer 2"
+- [ ] **DECIDED: Multi-select → sequential yes/no** — replace all multi-select questions with sequential single-trait screens. One trait per screen, one tap, auto-advance. Identical rhythm to single-answer questions. Three response options: **Yes / No / Not Sure**. "Not Sure" captures uncertainty vs. negative signal — critical for verification data quality. Panel-reviewed 4/4 models, strong consensus. Implementation: progress indicator ("3 of 5"), smooth transitions (trait label stays, options refresh), consider swipe gestures (Yes right, No left). One interaction pattern across both self-assessment and verification
+  > "We either need to have all the questions be instant submittal, or almost all of them." · Panel consensus: sequential yes/no wins on cognitive load, flow consistency, data quality, and fatigue. "Not Sure" is the killer feature for verification.
+- [ ] **Responsive: fix now — buttons dinky on phones** — assessment screens look good on desktop but buttons undersized on large phones with too much whitespace. Small screens cramped. **Priority: fix now**, blocks showing Aura on phones. Target: **full range** (small Android to large iPhone)
+  > "Fix now — it looks bad on phones" · "Full range (small Android to large iPhone)"
 
 ### Verify
-- [ ] **Polish now, balanced** — invest in polish alongside core features, not after
-  > "Polish verify now" · "Keep balanced"
+- [ ] **General quality sweep** — invest in polish alongside core features. No specific items flagged — general quality pass across verify screens
+  > "Polish verify now" · "Keep balanced" · "General quality sweep"
 - [x] **URGENT: Remove gold shimmer ring on multi-choice answers** — DONE: removed ring-2, ring-offset, ring-{color}-400 from assess answer buttons. Selected answers show filled bg + border only.
 - [x] **Undo toast: move from top-of-screen to answer row** — DONE: moved to overlay answer button area. Assess screen toast moved to bottom. Awaiting Philip review.
-- [ ] **Responsive: buttons dinky on large mobile, cramped on small** — assessment screens look good on desktop but buttons are undersized on large phones with too much whitespace. Small screens need to fit satisfyingly. Sizing/spacing/touch-target sweep needed
-  > "When I looked on my mobile, suddenly all the buttons look dinky on the screen with tons of space. And on the flip side, if someone's got a small screen, we need to make sure it fits."
-- [ ] **DESIGN DECISION: Instant submit vs confirm on multi-select** — single-answer auto-progresses (good). Multi-select requires continue button (breaks flow). Proposal: "pick N" with auto-advance on Nth tap + "none of these" single-tap escape. Needs design decision before building
-  > "When there's a single answer, they click it and it auto-progresses. But if we're having them click multiple things, they have to click a continue button. That flow is not great. Maybe we could change it so on some screens you pick two, but it's instant submit. If we were offering two, you also need 'none of these.'"
 
 ### Settings
 - [ ] **UX audit later** — looks fine, but ensure right order, right items, easy to use. Revisit when more features land

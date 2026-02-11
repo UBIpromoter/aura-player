@@ -4205,6 +4205,64 @@ const calculateAssessTier = (completed) => {
   return 0;
 };
 
+// Static category ordering for post-assessment nudge (excludes ai-identity)
+const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow'];
+
+// Reverse mapping: testId → categoryId
+const ASSESS_TEST_TO_CATEGORY = {};
+Object.entries(ASSESS_CATEGORIES).forEach(([catId, cat]) => {
+  cat.tests.forEach(testId => { ASSESS_TEST_TO_CATEGORY[testId] = catId; });
+});
+
+// Nudge copy — specific transitions keyed "from-to", fallbacks keyed "_to"
+const ASSESS_NUDGE_COPY = {
+  'quickstart-starter': "Great sketch — now let's fill in the details.",
+  'starter-personality': "Your quick reads are in. Time to see the full personality behind them.",
+  'personality-relationships': "Now that we know your personality, see how it plays out in Relationships.",
+  'relationships-character': "You've mapped how you connect. Let's see what's underneath.",
+  'character-behavior': "Your character's clear. How does it show up in action?",
+  'behavior-mind': "We know what you do. Now let's explore how you think.",
+  'mind-shadow': "One more layer — the parts you might not show everyone.",
+  _quickstart: "Start with a quick personality sketch.",
+  _starter: "Get a fuller picture with the Starter Pack.",
+  _personality: "Map the full picture of who you are.",
+  _relationships: "See how you show up when you connect with others.",
+  _character: "Discover what drives you beneath the surface.",
+  _behavior: "Explore how your personality shows up in action.",
+  _mind: "See how you think, learn, and process.",
+  _shadow: "One last layer — the parts you don't show everyone.",
+};
+
+// Find next assessment action after completing a test
+// Returns { type: 'same-category', ... } if more tests remain in current category
+// Returns { type: 'next-category', ... } if category is complete and another awaits
+// Returns null if everything is done
+const getAssessNudge = (completedTestId, newCompleted, entityType) => {
+  const fromCatId = ASSESS_TEST_TO_CATEGORY[completedTestId];
+  if (!fromCatId) return null;
+  const fromCat = ASSESS_CATEGORIES[fromCatId];
+
+  // Mid-category: next test in same category
+  const nextInCategory = fromCat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id]);
+  if (nextInCategory) {
+    return { type: 'same-category', toCatId: fromCatId, toCategory: fromCat, nextTestId: nextInCategory };
+  }
+
+  // Category complete: find next category in static order
+  const tier = calculateAssessTier(newCompleted);
+  for (const catId of ASSESS_CATEGORY_ORDER) {
+    if (catId === fromCatId) continue;
+    const cat = ASSESS_CATEGORIES[catId];
+    if (!cat || (cat.tier || 0) > tier) continue;
+    if (cat.entityHint && cat.entityHint !== entityType) continue;
+    const nextTestId = cat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id]);
+    if (!nextTestId) continue;
+    const message = ASSESS_NUDGE_COPY[`${fromCatId}-${catId}`] || ASSESS_NUDGE_COPY[`_${catId}`] || "Continue your journey.";
+    return { type: 'next-category', toCatId: catId, toCategory: cat, nextTestId, message };
+  }
+  return null;
+};
+
 const ASSESS_DEMO_PROFILES = {
   1: {
     name: 'Alex', desc: 'Confident exterior, sensitive soul', color: 'violet',
@@ -8894,7 +8952,7 @@ const AssessQuestionScreen = ({
 };
 
 // ==================== ASSESS RESULTS SCREEN ====================
-const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, entityType, onNavigate }) => {
+const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, entityType, onNavigate, nudgeData, onNudgeContinue }) => {
   const test = ASSESS_TESTS[assessCurrentTestId];
   const results = assessCompleted[assessCurrentTestId];
   const colors = getAssessColor(test.color, darkMode);
@@ -9494,7 +9552,52 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
           );
         })()}
 
-        <button onClick={(e) => { e.stopPropagation(); onNavigate('assess-picker'); }} className={`w-full py-4 rounded-xl bg-gradient-to-r ${colors.grad} text-white font-medium`}>Done</button>
+        {/* Cross-category nudge card: only when current category is fully complete */}
+        {nudgeData?.type === 'next-category' && (() => {
+          const nc = COLOR_HEX[nudgeData.toCategory.color] || COLOR_HEX.violet;
+          return (
+            <div className={`rounded-xl p-4 ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'}`}>
+              <div className={`text-xs font-medium uppercase tracking-wider mb-1.5`} style={{ color: darkMode ? nc.light : nc.base }}>Next up</div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-lg">{nudgeData.toCategory.icon}</span>
+                <span className={`font-semibold ${TH('text-primary', darkMode)}`}>{nudgeData.toCategory.name}</span>
+              </div>
+              <p className={`text-xs leading-relaxed mb-3 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{nudgeData.message}</p>
+              <button onClick={(e) => { e.stopPropagation(); onNudgeContinue(nudgeData.nextTestId); }}
+                className={`w-full py-3 rounded-xl font-medium text-white transition-all hover-glow hover-glow-${nudgeData.toCategory.color}`}
+                style={{ background: `linear-gradient(135deg, ${nc.base}, ${nc.light})` }}>
+                Continue
+              </button>
+            </div>
+          );
+        })()}
+        {/* Bottom action: Next (mid-category), Continue (cross-category), or Done (all done) */}
+        {nudgeData?.type === 'same-category' ? (() => {
+          const remaining = nudgeData.toCategory.tests.filter(id => !assessCompleted[id] && ASSESS_TESTS[id]).length;
+          return (
+            <div className="space-y-3">
+              <button onClick={(e) => { e.stopPropagation(); onNudgeContinue(nudgeData.nextTestId); }}
+                className={`w-full py-4 rounded-xl font-medium text-white bg-gradient-to-r ${colors.grad}`}>
+                <div>Continue</div>
+                <div className="text-xs font-normal opacity-75 mt-0.5">{remaining} more complete{remaining === 1 ? 's' : ''} {nudgeData.toCategory.name}</div>
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); onNavigate('assess-picker'); }}
+                className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${darkMode ? 'text-gray-400 hover:text-gray-200 bg-white/[0.04] hover:bg-white/[0.08]' : 'text-gray-500 hover:text-gray-700 bg-black/[0.04] hover:bg-black/[0.08]'}`}>
+                Back to categories
+              </button>
+            </div>
+          );
+        })() : nudgeData?.type === 'next-category' ? (
+          <button onClick={(e) => { e.stopPropagation(); onNavigate('assess-picker'); }}
+            className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${darkMode ? 'text-gray-400 hover:text-gray-200 bg-white/[0.04] hover:bg-white/[0.08]' : 'text-gray-500 hover:text-gray-700 bg-black/[0.04] hover:bg-black/[0.08]'}`}>
+            Back to categories
+          </button>
+        ) : (
+          <button onClick={(e) => { e.stopPropagation(); onNavigate('assess-picker'); }}
+            className={`w-full py-4 rounded-xl bg-gradient-to-r ${colors.grad} text-white font-medium`}>
+            Done
+          </button>
+        )}
       </div>
     </div>
   );
@@ -11091,7 +11194,7 @@ const useVerification = () => {
 };
 
 // --- useAssessment Hook ---
-const useAssessment = ({ setScreen, darkMode }) => {
+const useAssessment = ({ setScreen, darkMode, entityType }) => {
   const [assessCurrentTestId, setAssessCurrentTestId] = useState(null);
   const [assessCurrentIndex, setAssessCurrentIndex] = useState(0);
   const [assessEntering, setAssessEntering] = useState(false);
@@ -11126,6 +11229,7 @@ const useAssessment = ({ setScreen, darkMode }) => {
   const assessTimeoutRef = useRef(null);
   const [assessShowUndoToast, setAssessShowUndoToast] = useState(false);
   const [assessUnlockMessage, setAssessUnlockMessage] = useState(null);
+  const [assessNudgeData, setAssessNudgeData] = useState(null);
 
   const assessSaveToStorage = (completed, progress, demoActive = assessDemoActive, savedUserData = assessSavedUserData, demoProfile = assessDemoProfile, demoControls = showDemoControls) => {
     localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed, inProgress: progress, demoActive, savedUserData, demoProfile, showDemoControls: demoControls }));
@@ -11230,6 +11334,9 @@ const useAssessment = ({ setScreen, darkMode }) => {
     }
 
     setAssessShowCompletion(true);
+    // Pre-compute nudge for the results screen
+    const nudge = getAssessNudge(assessCurrentTestId, newCompleted, entityType);
+    setAssessNudgeData(nudge);
     setTimeout(() => {
       setAssessShowCompletion(false);
       setAssessUnlockMessage(null);
@@ -11337,6 +11444,7 @@ const useAssessment = ({ setScreen, darkMode }) => {
     assessTimeoutRef,
     assessShowUndoToast, setAssessShowUndoToast,
     assessUnlockMessage, setAssessUnlockMessage,
+    assessNudgeData, setAssessNudgeData,
     assessSaveToStorage,
     assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions,
     assessStartTest, assessSaveAndExit, assessGoToQuestion,
@@ -11455,12 +11563,13 @@ function App() {
     assessSavedUserData, setAssessSavedUserData, assessShowDemoInfo, setAssessShowDemoInfo,
     assessProfileSwitching, setAssessProfileSwitching, assessTimeoutRef,
     assessShowUndoToast, setAssessShowUndoToast, assessUnlockMessage, setAssessUnlockMessage,
+    assessNudgeData, setAssessNudgeData,
     assessSaveToStorage, assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions,
     assessStartTest, assessSaveAndExit, assessGoToQuestion,
     assessHandleAnswerTap, assessHandleUndo, assessFinalizeSubmit,
     assessAdvanceToNext, assessCanFinish, assessFinishAssessment,
     assessCompleteTest, assessLoadDemoProfile, assessClearDemo, assessClearAll,
-  } = useAssessment({ setScreen, darkMode });
+  } = useAssessment({ setScreen, darkMode, entityType });
 
   // --- Verification (via useVerification hook) ---
   const { verifySubjectProfile, setVerifySubjectProfile, verifySubjectAnswers, setVerifySubjectAnswers, verifyCurrentSubjectId, setVerifyCurrentSubjectId, verifyEvaluatorData, setVerifyEvaluatorData, verifyEvaluations, setVerifyEvaluations, verifyPendingCount } = useVerification();
@@ -12234,7 +12343,12 @@ function App() {
           assessCurrentTestId={assessCurrentTestId}
           assessCompleted={assessCompleted}
           entityType={entityType}
-          onNavigate={(scr) => setScreen(scr)}
+          onNavigate={(scr) => { setAssessNudgeData(null); setScreen(scr); }}
+          nudgeData={assessNudgeData}
+          onNudgeContinue={(testId) => {
+            setAssessNudgeData(null);
+            assessStartTest(testId);
+          }}
         />
       );
     }
@@ -12444,9 +12558,7 @@ function App() {
   // Claude removes answered questions and adds new ones each session.
   // tier: 'big' = decisions that change what gets built. 'little' = polish details, opt-in.
   const DEV_QUESTIONS = [
-    // ── Round 4: Execution-ready questions — answers here feed directly into builds ──
-    // No more questions pending. Builder window picks up from DESIGN.md.
-    // Load new questions when new design topics emerge.
+    // ── All caught up. Load new questions when new design topics emerge. ──
   ];
 
   const [devQASkipped, setDevQASkipped] = useState([]);
@@ -12479,8 +12591,37 @@ function App() {
     setDevQASkipped(prev => [...prev.filter(id => id !== qId), qId]);
   };
 
-  const devCopyAllAnswers = () => {
-    const lines = Object.entries(devQAAnswers).map(([qId, a]) => {
+  // Session start time — answers newer than this are "this session"
+  const [devSessionStart] = useState(() => Date.now());
+  const [devCopyFlash, setDevCopyFlash] = useState(null); // 'main' | round.start | null
+
+  // Group answers into rounds by timestamp clusters (>30 min gap = new round)
+  const devAnswerRounds = useMemo(() => {
+    const entries = Object.entries(devQAAnswers).filter(([, a]) => a.ts).sort((a, b) => a[1].ts - b[1].ts);
+    if (entries.length === 0) return [];
+    const rounds = [];
+    let current = { entries: [entries[0]], start: entries[0][1].ts, end: entries[0][1].ts };
+    for (let i = 1; i < entries.length; i++) {
+      const gap = entries[i][1].ts - current.end;
+      if (gap > 30 * 60 * 1000) {
+        rounds.push(current);
+        current = { entries: [entries[i]], start: entries[i][1].ts, end: entries[i][1].ts };
+      } else {
+        current.entries.push(entries[i]);
+        current.end = entries[i][1].ts;
+      }
+    }
+    rounds.push(current);
+    return rounds;
+  }, [devQAAnswers]);
+
+  // Session answers = answered during this page load
+  const devSessionAnswers = useMemo(() => {
+    return Object.entries(devQAAnswers).filter(([, a]) => a.ts && a.ts >= devSessionStart).sort((a, b) => a[1].ts - b[1].ts);
+  }, [devQAAnswers, devSessionStart]);
+
+  const devCopyEntries = (entries, flashKey) => {
+    const lines = entries.map(([qId, a]) => {
       const orig = DEV_QUESTIONS.find(q => q.id === qId);
       const qText = a.question || (orig ? orig.question : qId);
       const tier = a.tier || (orig ? orig.tier : '?');
@@ -12490,7 +12631,16 @@ function App() {
     });
     const header = 'Dev Q&A answers from Aura.\n1. Update DESIGN.md — add new items, update existing ones with new detail.\n2. Replace answered DEV_QUESTIONS with fresh follow-ups.\n3. Remove questions I already answered from the array.';
     const text = header + '\n\n' + lines.join('\n\n');
-    navigator.clipboard.writeText(text).catch(() => {});
+    navigator.clipboard.writeText(text).then(() => {
+      setDevCopyFlash(flashKey);
+      setTimeout(() => setDevCopyFlash(null), 1200);
+    }).catch(() => {});
+  };
+
+  const devCopySessionAnswers = () => {
+    if (devSessionAnswers.length > 0) {
+      devCopyEntries(devSessionAnswers, 'main');
+    }
   };
 
   const devPanelEl = IS_DEV && showDevPanel ? (() => {
@@ -12603,38 +12753,81 @@ function App() {
                 </div>
               )}
 
-              {/* Footer: copy + history */}
+              {/* Footer: copy + history (grouped by round) */}
               {answeredEntries.length > 0 && (
-                <div className={`px-4 py-1.5 flex items-center gap-3 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
-                  <button onClick={devCopyAllAnswers}
-                    className={`font-medium transition-colors ${darkMode ? 'text-violet-400 hover:text-violet-300' : 'text-violet-500 hover:text-violet-600'}`}
-                    style={{fontSize:'11px'}}>
-                    Copy All
+                <div className={`px-4 py-2 flex items-center gap-2 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
+                  <button onClick={devCopySessionAnswers}
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                      devCopyFlash === 'main'
+                        ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/40'
+                        : devSessionAnswers.length === 0
+                          ? (darkMode ? 'bg-gray-800/60 text-gray-600 cursor-not-allowed' : 'bg-gray-100 text-gray-400 cursor-not-allowed')
+                          : (darkMode ? 'bg-violet-600/20 text-violet-300 ring-1 ring-violet-500/30 hover:bg-violet-600/40 hover:ring-violet-400/50' : 'bg-violet-50 text-violet-700 ring-1 ring-violet-300 hover:bg-violet-100 hover:ring-violet-400')
+                    }`}
+                    disabled={devSessionAnswers.length === 0}
+                    style={{fontSize:'12px'}}>
+                    {devCopyFlash === 'main' ? 'Copied!' : `Copy New (${devSessionAnswers.length})`}
                   </button>
                   <button onClick={() => setDevQAShowHistory(h => !h)}
-                    className={`${darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-500'} transition-colors`}
-                    style={{fontSize:'11px'}}>
-                    {devQAShowHistory ? 'Hide' : 'Show'} answered ({answeredEntries.length})
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                      darkMode ? 'bg-gray-800/60 text-gray-400 ring-1 ring-gray-700/30 hover:bg-gray-700/80 hover:text-gray-300' : 'bg-gray-100 text-gray-500 ring-1 ring-gray-300 hover:bg-gray-200 hover:text-gray-600'
+                    }`}
+                    style={{fontSize:'12px'}}>
+                    {devQAShowHistory ? 'Hide' : 'Show'} Answers ({answeredEntries.length})
                   </button>
                   {devQAShowHistory && (
                     <button onClick={() => { setDevQAAnswers({}); localStorage.removeItem('aura-dev-qa'); setDevQASkipped([]); }}
-                      className={`${darkMode ? 'text-rose-700 hover:text-rose-500' : 'text-rose-400 hover:text-rose-500'} transition-colors`}
-                      style={{fontSize:'10px'}}>Clear</button>
+                      className={`px-2 py-1.5 rounded-lg transition-all ${darkMode ? 'text-rose-700 hover:text-rose-500 hover:bg-rose-900/20' : 'text-rose-400 hover:text-rose-500 hover:bg-rose-50'}`}
+                      style={{fontSize:'11px'}}>Clear</button>
                   )}
                 </div>
               )}
-              {devQAShowHistory && answeredEntries.length > 0 && (
-                <div className={`px-4 pb-2 space-y-1 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
-                  {answeredEntries.map(([qId, a]) => {
-                    const orig = DEV_QUESTIONS.find(q => q.id === qId);
-                    const qText = a.question || (orig ? orig.question : qId);
+              {devQAShowHistory && devAnswerRounds.length > 0 && (
+                <div className={`px-4 pb-2 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
+                  {devAnswerRounds.slice().reverse().map((round, ri) => {
+                    const isLatest = ri === 0;
+                    const dateStr = new Date(round.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const timeStr = new Date(round.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    const roundLabel = `${round.entries.length} answers — ${dateStr} ${timeStr}`;
                     return (
-                      <div key={qId} className={`${darkMode ? 'text-gray-600' : 'text-gray-400'}`} style={{fontSize:'11px'}}>
-                        <div className="flex items-baseline gap-2">
-                          <span className="shrink-0">{qText.slice(0, 50)}:</span>
-                          <span className={`font-medium ${darkMode ? 'text-violet-500' : 'text-violet-400'}`}>{a.answer}</span>
+                      <div key={round.start} className={`${ri > 0 ? 'mt-2 pt-2 border-t' : ''} ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <button
+                            onClick={() => {
+                              const key = `devRound-${round.start}`;
+                              setDevQANotes(prev => ({ ...prev, [key]: prev[key] ? '' : '1' }));
+                            }}
+                            className={`${darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'} transition-colors flex items-center gap-1.5`}
+                            style={{fontSize:'11px'}}>
+                            <span style={{fontSize:'9px'}}>{(isLatest || devQANotes[`devRound-${round.start}`]) ? '▼' : '▶'}</span>
+                            {isLatest && <span className={`font-medium ${darkMode ? 'text-violet-500' : 'text-violet-400'}`}>Latest</span>}
+                            <span>{roundLabel}</span>
+                          </button>
+                          <button onClick={() => devCopyEntries(round.entries, round.start)}
+                            className={`px-2 py-0.5 rounded transition-all ${
+                              devCopyFlash === round.start
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : (darkMode ? 'text-gray-600 hover:text-gray-400 hover:bg-gray-800' : 'text-gray-400 hover:text-gray-500 hover:bg-gray-100')
+                            }`}
+                            style={{fontSize:'10px'}}>{devCopyFlash === round.start ? 'Copied!' : 'Copy'}</button>
                         </div>
-                        {a.note && <div className={`ml-4 mt-0.5 italic ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{a.note}</div>}
+                        {(isLatest || devQANotes[`devRound-${round.start}`]) && (
+                          <div className="space-y-1">
+                            {round.entries.map(([qId, a]) => {
+                              const orig = DEV_QUESTIONS.find(q => q.id === qId);
+                              const qText = a.question || (orig ? orig.question : qId);
+                              return (
+                                <div key={qId} className={`${darkMode ? 'text-gray-600' : 'text-gray-400'}`} style={{fontSize:'11px'}}>
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="shrink-0">{qText.slice(0, 50)}:</span>
+                                    <span className={`font-medium ${darkMode ? 'text-violet-500' : 'text-violet-400'}`}>{a.answer}</span>
+                                  </div>
+                                  {a.note && <div className={`ml-4 mt-0.5 italic ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{a.note}</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
