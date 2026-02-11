@@ -220,34 +220,40 @@
     .light-theme .shine-rose { --accent-color: rgba(244, 63, 94, 0.4); --accent-bright: rgba(251, 113, 133, 0.7); }
 
     /* Hover glow classes - subtle color-matched glow on hover/hold */
-    /* Uses inset box-shadow + background to work within overflow:hidden containers */
-    .hover-glow { transition: background-color 0.2s ease, box-shadow 0.2s ease; }
-    .hover-glow-amber:hover, .hover-glow-amber:active { background-color: rgba(251, 191, 36, 0.08); box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.3); }
-    .hover-glow-violet:hover, .hover-glow-violet:active { background-color: rgba(139, 92, 246, 0.08); box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.3); }
-    .hover-glow-teal:hover, .hover-glow-teal:active { background-color: rgba(45, 212, 191, 0.08); box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.3); }
-    .hover-glow-cyan:hover, .hover-glow-cyan:active { background-color: rgba(6, 182, 212, 0.08); box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.3); }
-    .hover-glow-blue:hover, .hover-glow-blue:active { background-color: rgba(59, 130, 246, 0.08); box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3); }
-    .hover-glow-gray:hover, .hover-glow-gray:active { background-color: rgba(156, 163, 175, 0.08); box-shadow: inset 0 0 0 1px rgba(156, 163, 175, 0.3); }
-    .hover-glow-emerald:hover, .hover-glow-emerald:active { background-color: rgba(16, 185, 129, 0.08); box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.3); }
-    .hover-glow-rose:hover, .hover-glow-rose:active { background-color: rgba(244, 63, 94, 0.08); box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.3); }
-    .hover-glow-pink:hover, .hover-glow-pink:active { background-color: rgba(236, 72, 153, 0.08); box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.3); }
-    .hover-glow-slate:hover, .hover-glow-slate:active { background-color: rgba(100, 116, 139, 0.08); box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.3); }
-    .hover-glow-sky:hover, .hover-glow-sky:active { background-color: rgba(14, 165, 233, 0.08); box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.3); }
-    .hover-glow-indigo:hover, .hover-glow-indigo:active { background-color: rgba(99, 102, 241, 0.08); box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.3); }
+    /* Uses ::before overlay so it works even on elements with inline styles */
+    /* :not(.shine-card) prevents conflict — shine-card has its own ::before/::after shimmer */
+    .hover-glow:not(.shine-card) { position: relative; isolation: isolate; }
+    .hover-glow:not(.shine-card)::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      opacity: 0; transition: opacity 0.2s ease; pointer-events: none; z-index: -1;
+    }
+    .hover-glow:not(.shine-card):hover::before, .hover-glow:not(.shine-card):active::before { opacity: 1; }
+    .hover-glow-amber:not(.shine-card)::before { background-color: rgba(251, 191, 36, 0.08); box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.3); }
+    .hover-glow-violet:not(.shine-card)::before { background-color: rgba(139, 92, 246, 0.08); box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.3); }
+    .hover-glow-teal:not(.shine-card)::before { background-color: rgba(45, 212, 191, 0.08); box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.3); }
+    .hover-glow-cyan:not(.shine-card)::before { background-color: rgba(6, 182, 212, 0.08); box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.3); }
+    .hover-glow-blue:not(.shine-card)::before { background-color: rgba(59, 130, 246, 0.08); box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3); }
+    .hover-glow-gray:not(.shine-card)::before { background-color: rgba(156, 163, 175, 0.08); box-shadow: inset 0 0 0 1px rgba(156, 163, 175, 0.3); }
+    .hover-glow-emerald:not(.shine-card)::before { background-color: rgba(16, 185, 129, 0.08); box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.3); }
+    .hover-glow-rose:not(.shine-card)::before { background-color: rgba(244, 63, 94, 0.08); box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.3); }
+    .hover-glow-pink:not(.shine-card)::before { background-color: rgba(236, 72, 153, 0.08); box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.3); }
+    .hover-glow-slate:not(.shine-card)::before { background-color: rgba(100, 116, 139, 0.08); box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.3); }
+    .hover-glow-sky:not(.shine-card)::before { background-color: rgba(14, 165, 233, 0.08); box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.3); }
+    .hover-glow-indigo:not(.shine-card)::before { background-color: rgba(99, 102, 241, 0.08); box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.3); }
 
     /* Light theme hover glow overrides — ~3x opacity, tighter inset shadow */
-    .light-theme .hover-glow-amber:hover, .light-theme .hover-glow-amber:active { background-color: rgba(251, 191, 36, 0.15); box-shadow: inset 0 0 0 1.5px rgba(251, 191, 36, 0.4); }
-    .light-theme .hover-glow-violet:hover, .light-theme .hover-glow-violet:active { background-color: rgba(139, 92, 246, 0.15); box-shadow: inset 0 0 0 1.5px rgba(139, 92, 246, 0.4); }
-    .light-theme .hover-glow-teal:hover, .light-theme .hover-glow-teal:active { background-color: rgba(45, 212, 191, 0.15); box-shadow: inset 0 0 0 1.5px rgba(45, 212, 191, 0.4); }
-    .light-theme .hover-glow-cyan:hover, .light-theme .hover-glow-cyan:active { background-color: rgba(6, 182, 212, 0.15); box-shadow: inset 0 0 0 1.5px rgba(6, 182, 212, 0.4); }
-    .light-theme .hover-glow-blue:hover, .light-theme .hover-glow-blue:active { background-color: rgba(59, 130, 246, 0.15); box-shadow: inset 0 0 0 1.5px rgba(59, 130, 246, 0.4); }
-    .light-theme .hover-glow-gray:hover, .light-theme .hover-glow-gray:active { background-color: rgba(156, 163, 175, 0.15); box-shadow: inset 0 0 0 1.5px rgba(156, 163, 175, 0.4); }
-    .light-theme .hover-glow-emerald:hover, .light-theme .hover-glow-emerald:active { background-color: rgba(16, 185, 129, 0.15); box-shadow: inset 0 0 0 1.5px rgba(16, 185, 129, 0.4); }
-    .light-theme .hover-glow-rose:hover, .light-theme .hover-glow-rose:active { background-color: rgba(244, 63, 94, 0.15); box-shadow: inset 0 0 0 1.5px rgba(244, 63, 94, 0.4); }
-    .light-theme .hover-glow-pink:hover, .light-theme .hover-glow-pink:active { background-color: rgba(236, 72, 153, 0.15); box-shadow: inset 0 0 0 1.5px rgba(236, 72, 153, 0.4); }
-    .light-theme .hover-glow-slate:hover, .light-theme .hover-glow-slate:active { background-color: rgba(100, 116, 139, 0.15); box-shadow: inset 0 0 0 1.5px rgba(100, 116, 139, 0.4); }
-    .light-theme .hover-glow-sky:hover, .light-theme .hover-glow-sky:active { background-color: rgba(14, 165, 233, 0.15); box-shadow: inset 0 0 0 1.5px rgba(14, 165, 233, 0.4); }
-    .light-theme .hover-glow-indigo:hover, .light-theme .hover-glow-indigo:active { background-color: rgba(99, 102, 241, 0.15); box-shadow: inset 0 0 0 1.5px rgba(99, 102, 241, 0.4); }
+    .light-theme .hover-glow-amber:not(.shine-card)::before { background-color: rgba(251, 191, 36, 0.15); box-shadow: inset 0 0 0 1.5px rgba(251, 191, 36, 0.4); }
+    .light-theme .hover-glow-violet:not(.shine-card)::before { background-color: rgba(139, 92, 246, 0.15); box-shadow: inset 0 0 0 1.5px rgba(139, 92, 246, 0.4); }
+    .light-theme .hover-glow-teal:not(.shine-card)::before { background-color: rgba(45, 212, 191, 0.15); box-shadow: inset 0 0 0 1.5px rgba(45, 212, 191, 0.4); }
+    .light-theme .hover-glow-cyan:not(.shine-card)::before { background-color: rgba(6, 182, 212, 0.15); box-shadow: inset 0 0 0 1.5px rgba(6, 182, 212, 0.4); }
+    .light-theme .hover-glow-blue:not(.shine-card)::before { background-color: rgba(59, 130, 246, 0.15); box-shadow: inset 0 0 0 1.5px rgba(59, 130, 246, 0.4); }
+    .light-theme .hover-glow-gray:not(.shine-card)::before { background-color: rgba(156, 163, 175, 0.15); box-shadow: inset 0 0 0 1.5px rgba(156, 163, 175, 0.4); }
+    .light-theme .hover-glow-emerald:not(.shine-card)::before { background-color: rgba(16, 185, 129, 0.15); box-shadow: inset 0 0 0 1.5px rgba(16, 185, 129, 0.4); }
+    .light-theme .hover-glow-rose:not(.shine-card)::before { background-color: rgba(244, 63, 94, 0.15); box-shadow: inset 0 0 0 1.5px rgba(244, 63, 94, 0.4); }
+    .light-theme .hover-glow-pink:not(.shine-card)::before { background-color: rgba(236, 72, 153, 0.15); box-shadow: inset 0 0 0 1.5px rgba(236, 72, 153, 0.4); }
+    .light-theme .hover-glow-slate:not(.shine-card)::before { background-color: rgba(100, 116, 139, 0.15); box-shadow: inset 0 0 0 1.5px rgba(100, 116, 139, 0.4); }
+    .light-theme .hover-glow-sky:not(.shine-card)::before { background-color: rgba(14, 165, 233, 0.15); box-shadow: inset 0 0 0 1.5px rgba(14, 165, 233, 0.4); }
+    .light-theme .hover-glow-indigo:not(.shine-card)::before { background-color: rgba(99, 102, 241, 0.15); box-shadow: inset 0 0 0 1.5px rgba(99, 102, 241, 0.4); }
 
     .starry-bg {
       background: linear-gradient(135deg, rgba(30, 20, 10, 0.9) 0%, rgba(50, 30, 15, 0.8) 100%);
@@ -425,6 +431,40 @@
     @keyframes star-twinkle {
       0%, 100% { opacity: 0.3; }
       50% { opacity: 0.8; }
+    }
+
+    /* === RESPONSIVE BUTTON SIZING ===
+       Scales touch targets and spacing to viewport width on actual mobile.
+       Desktop/PhoneFrame keeps current fixed values. */
+    @media (max-width: 768px) {
+      /* Assessment answer buttons — uses existing .assess-btns class */
+      .assess-btns {
+        padding-left: clamp(12px, 4.2vw, 24px) !important;
+        padding-right: clamp(12px, 4.2vw, 24px) !important;
+        padding-bottom: clamp(12px, 4.2vw, 24px) !important;
+      }
+      .assess-btns > button {
+        padding-top: clamp(12px, 3.6vw, 18px) !important;
+        padding-bottom: clamp(12px, 3.6vw, 18px) !important;
+        padding-left: clamp(14px, 4.2vw, 22px) !important;
+        padding-right: clamp(14px, 4.2vw, 22px) !important;
+      }
+      .assess-btns > * + * {
+        margin-top: clamp(6px, 2.2vw, 12px) !important;
+      }
+      /* Button height utilities */
+      .resp-h-lg { height: clamp(52px, 14.3vw, 66px) !important; }
+      .resp-h-md { height: clamp(44px, 12.2vw, 56px) !important; }
+      /* Container max-width for button groups */
+      .resp-max-w { max-width: clamp(320px, 92vw, 430px) !important; }
+      /* Stacked button spacing (resp-gap = 12px baseline, resp-gap-sm = 10px baseline) */
+      .resp-gap > * + * { margin-top: clamp(10px, 3.1vw, 14px) !important; }
+      .resp-gap-sm > * + * { margin-top: clamp(8px, 2.5vw, 12px) !important; }
+      /* Container padding */
+      .resp-px {
+        padding-left: clamp(12px, 4.2vw, 24px) !important;
+        padding-right: clamp(12px, 4.2vw, 24px) !important;
+      }
     }
   </style>
 </head>
@@ -1419,8 +1459,8 @@ const TH = (token, dark) => { const val = {
   'text-inverted': dark ? 'text-gray-900' : 'text-white',
   // Background colors
   'bg-main': dark ? 'bg-gray-950' : 'bg-gray-50',
-  'bg-card': dark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-white/80 border border-black/[0.06] shadow-sm',
-  'bg-card-shine': dark ? 'bg-white/[0.04] shine-card shine-gray border border-white/[0.06]' : 'bg-white/80 border border-black/[0.06] shadow-sm',
+  'bg-card': dark ? 'bg-white/[0.04] border border-white/[0.06] hover-glow' : 'bg-white border border-black/[0.10] shadow-sm hover-glow',
+  'bg-card-shine': dark ? 'bg-white/[0.04] shine-card shine-gray border border-white/[0.06] hover-glow' : 'bg-white border border-black/[0.10] shadow-sm hover-glow',
   'bg-elevated': dark ? 'bg-white/[0.06]' : 'bg-gray-200',
   'bg-input': dark ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400',
   'bg-surface': dark ? 'bg-white/[0.03]' : 'bg-white/90',
@@ -2475,7 +2515,7 @@ const getQotdTimeRemaining = () => {
   const diff = end - now;
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return `${hours}h ${mins}m`;
+  return `${hours}h left`;
 };
 
 const shuffleArray = (array) => {
@@ -4084,7 +4124,7 @@ const ASSESS_STYLES = (() => {
     })),
     selectedStyles: Object.fromEntries(ASSESS_COLORS.map(c => {
       const t = twColor(c);
-      return [c, `bg-${t}-600 ring-${t}-400 border-${t}-400`];
+      return [c, `bg-${t}-600 border-${t}-400`];
     })),
     pendingStyles: Object.fromEntries(ASSESS_COLORS.map(c => {
       const t = twColor(c);
@@ -4106,7 +4146,7 @@ const ASSESS_STYLES = (() => {
     })),
     selectedStyles: Object.fromEntries(ASSESS_COLORS.map(c => {
       const t = twColor(c);
-      return [c, `bg-${t}-600 ring-${t}-400 border-${t}-400 text-white`];
+      return [c, `bg-${t}-600 border-${t}-400 text-white`];
     })),
     pendingStyles: Object.fromEntries(ASSESS_COLORS.map(c => {
       const t = twColor(c);
@@ -5291,7 +5331,7 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
                 key={idx}
                 onClick={() => handleTap(idx)}
                 disabled={isAnswered}
-                className="w-full h-14 rounded-2xl flex items-center justify-center gap-4 transition-all btn-feedback shine-card border"
+                className="w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-4 transition-all btn-feedback shine-card border"
                 style={btnStyle}
               >
                 {icon && (
@@ -5368,30 +5408,30 @@ const PathChoiceScreen = ({ darkMode, entityType, onboardingAnswers, onReveal, o
 
       {/* Lower zone — buttons pinned, same position as onboarding */}
       <div className="flex-shrink-0 flex flex-col items-center px-6 pb-8">
-        <div className="w-full max-w-sm space-y-3">
+        <div className="w-full max-w-sm resp-max-w space-y-3 resp-gap">
           <button
             onClick={onReveal}
-            className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-violet glow-violet border btn-feedback ${
+            className={`w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-violet glow-violet hover-glow hover-glow-violet border btn-feedback ${
               darkMode
                 ? 'border-violet-500/60 hover:border-violet-400/80 bg-gradient-to-br from-violet-900/50 to-violet-950/70'
                 : 'border-violet-400 hover:border-violet-500 bg-gradient-to-br from-violet-100 to-violet-50'
             }`}
           >
             <span className={`text-base font-semibold ${darkMode ? 'text-violet-300' : 'text-violet-700'}`}>
-              More about yourself
+              🪞 Reveal yourself
             </span>
           </button>
 
           <button
             onClick={onExplore}
-            className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-teal glow-teal border btn-feedback ${
+            className={`w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-teal glow-teal hover-glow hover-glow-teal border btn-feedback ${
               darkMode
                 ? 'border-teal-500/40 hover:border-teal-400/70 bg-gradient-to-br from-teal-900/30 to-teal-950/50'
                 : 'border-teal-300 hover:border-teal-400 bg-gradient-to-br from-teal-100 to-teal-50'
             }`}
           >
             <span className={`text-base font-semibold ${darkMode ? 'text-teal-300' : 'text-teal-700'}`}>
-              More about the world
+              🌍 Explore the world
             </span>
           </button>
         </div>
@@ -6188,7 +6228,7 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         )}
 
         {/* SECTION 1: World Questions */}
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2.5">
           {categories.map(cat => {
             const config = categoryConfig[cat.id];
             if (!config) return null;
@@ -6213,11 +6253,11 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
                 key={cat.id}
                 onClick={() => handleCategoryClick(cat.id)}
                 disabled={available === 0}
-                className={`w-full ${isFeatured ? 'py-4 px-5' : 'py-3.5 px-5'} rounded-2xl text-left transition-colors shine-card ${cc.shine} ${cc.glow} border ${cc.border} ${isFeatured ? (darkMode ? 'starry-bg overflow-hidden' : 'bg-gradient-to-r from-amber-100 to-yellow-50 overflow-hidden') : cc.bg} ${available === 0 ? 'opacity-40' : ''}`}
+                className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card ${cc.shine} ${cc.glow} border ${cc.border} ${isFeatured ? (darkMode ? 'starry-bg overflow-hidden' : 'bg-gradient-to-r from-amber-100 to-yellow-50 overflow-hidden') : cc.bg} ${available === 0 ? 'opacity-40' : ''}`}
               >
-                <div className={`flex items-center gap-4 ${isFeatured ? 'relative z-10' : ''}`}>
-                  <span className={isFeatured ? 'text-2xl' : 'text-xl'}>{config.icon}</span>
-                  <div className={`${isFeatured ? 'text-lg' : 'text-base'} font-semibold ${TH('text-primary', darkMode)}`}>{config.name}</div>
+                <div className={`flex items-center justify-center gap-2.5 ${isFeatured ? 'relative z-10' : ''}`}>
+                  <span className="text-xl">{config.icon}</span>
+                  <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>{config.name}</div>
                 </div>
               </button>
             );
@@ -6231,13 +6271,13 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
               <button
                 onClick={() => handleCategoryClick('random')}
                 disabled={available === 0}
-                className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-rose glow-rose border ${
+                className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card shine-rose glow-rose border ${
                   darkMode
                     ? 'border-rose-500/40 hover:border-rose-400/80 active:border-rose-300 bg-gradient-to-r from-rose-900/30 to-rose-950/50'
                     : 'border-rose-400 hover:border-rose-500 active:border-rose-600 bg-gradient-to-r from-rose-100 to-rose-50'
                 } ${available === 0 ? 'opacity-40' : ''}`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center gap-2.5">
                   <span className="text-xl">✨</span>
                   <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Surprise me</div>
                 </div>
@@ -6254,32 +6294,32 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         </div>
 
         {/* SECTION 2: Self Assessments */}
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2.5">
           {/* Reveal Card - cyan/sky accent for self-discovery */}
           <button
             onClick={onAssessments}
-            className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-blue glow-blue border ${
+            className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card shine-blue glow-blue border ${
               darkMode
                 ? 'border-blue-500/40 hover:border-blue-400/80 active:border-blue-300 bg-gradient-to-r from-blue-900/30 to-blue-950/50'
                 : 'border-blue-300 hover:border-blue-400 bg-gradient-to-r from-blue-50 to-blue-50'
             }`}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center gap-2.5">
               <span className="text-xl">🪞</span>
-              <div className={`flex-1 text-base font-semibold ${TH('text-primary', darkMode)}`}>Reveal</div>
+              <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Reveal</div>
             </div>
           </button>
 
           {/* Assessment Surprise Me — random test, no picking */}
           <button
             onClick={onAssessSurprise}
-            className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-violet glow-violet border ${
+            className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card shine-violet glow-violet border ${
               darkMode
                 ? 'border-violet-500/40 hover:border-violet-400/80 active:border-violet-300 bg-gradient-to-r from-violet-900/30 to-violet-950/50'
                 : 'border-violet-400 hover:border-violet-500 active:border-violet-600 bg-gradient-to-r from-violet-100 to-violet-50'
             }`}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center gap-2.5">
               <span className="text-xl">🎲</span>
               <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Surprise me</div>
             </div>
@@ -6295,18 +6335,18 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         </div>
 
         {/* SECTION 3: Work Tasks */}
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2.5">
           <button
             onClick={onVerify}
-            className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-emerald glow-emerald border ${
+            className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card shine-emerald glow-emerald border ${
               darkMode
                 ? 'border-emerald-500/40 hover:border-emerald-400/80 active:border-emerald-300 bg-gradient-to-r from-emerald-900/30 to-emerald-950/50'
                 : 'border-emerald-300 hover:border-emerald-400 bg-gradient-to-r from-emerald-50 to-emerald-50'
             }`}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center gap-2.5">
               <span className="text-xl">🛡️</span>
-              <div className={`flex-1 text-base font-semibold ${TH('text-primary', darkMode)}`}>Verify</div>
+              <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Verify</div>
               {verifyPendingCount > 0 && (
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
                   {verifyPendingCount}
@@ -6314,7 +6354,6 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
               )}
             </div>
           </button>
-          <div className="h-4" />
         </div>
       </div>
 
@@ -6564,7 +6603,7 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-3">
+    <div className="w-full max-w-sm resp-max-w mx-auto space-y-3 resp-gap">
       {[0, 1].map(answer => {
         const c = colors[answer];
         const style = getStyle(answer);
@@ -6574,7 +6613,7 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
             onClick={() => !isAnswered && !pendingSubmit && onTap(answer)}
             onContextMenu={(e) => onRightClick && onRightClick(e, answer)}
             disabled={isAnswered || pendingSubmit}
-            className="w-full h-14 rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none"
+            className="w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none"
             style={style}
           >
             <span className="text-base font-semibold" style={{
@@ -6680,7 +6719,7 @@ const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, curr
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-2.5">
+    <div className="w-full max-w-sm resp-max-w mx-auto space-y-2.5 resp-gap-sm">
       {options.map((option, index) => {
         const style = getStyle(index);
         return (
@@ -6689,7 +6728,7 @@ const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, curr
             onClick={() => !isAnswered && !pendingSubmit && onTap(index)}
             onContextMenu={(e) => onRightClick && onRightClick(e, index)}
             disabled={isAnswered || pendingSubmit}
-            className="w-full h-12 rounded-2xl flex items-center justify-center relative px-5 transition-all btn-feedback shine-card border select-none"
+            className="w-full h-12 resp-h-md rounded-2xl flex items-center justify-center relative px-5 transition-all btn-feedback shine-card border select-none"
             style={{
               borderColor: style.borderColor,
               background: style.background,
@@ -7100,7 +7139,7 @@ const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, seconda
   if (secondary) {
     return (
       <button onClick={onClick} disabled={disabled}
-        className="w-full h-14 rounded-2xl font-medium text-sm transition-all duration-200 disabled:opacity-30"
+        className={`w-full h-14 resp-h-lg rounded-2xl font-medium text-sm transition-all duration-200 disabled:opacity-30 hover-glow hover-glow-${color}`}
         style={{
           background: darkMode ? `rgba(${c.rgb}, 0.08)` : `rgba(${c.rgb}, 0.06)`,
           border: `1px solid ${darkMode ? `rgba(${c.rgb}, 0.25)` : `rgba(${c.rgb}, 0.2)`}`,
@@ -7112,7 +7151,7 @@ const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, seconda
   }
   return (
     <button onClick={onClick} disabled={disabled}
-      className="w-full h-14 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-30"
+      className={`w-full h-14 resp-h-lg rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-30 hover-glow hover-glow-${color}`}
       style={{
         background: darkMode
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.15))`
@@ -7133,7 +7172,7 @@ const VerifyOptionButton = ({ label, selected, color, darkMode, onClick }) => {
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
   return (
     <button onClick={onClick}
-      className="w-full h-14 rounded-2xl font-medium text-sm text-left px-5 transition-all duration-200"
+      className={`w-full h-14 resp-h-lg rounded-2xl font-medium text-sm text-left px-5 transition-all duration-200 hover-glow hover-glow-${color}`}
       style={{
         background: selected
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.25), rgba(${c.rgb}, 0.12))`
@@ -7264,7 +7303,7 @@ const VerifyToggleSwitch = ({ label, subtitle, color, darkMode, isOn, onToggle }
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
   return (
     <button onClick={onToggle}
-      className="w-full flex items-center justify-between rounded-2xl px-5 py-4 transition-all duration-200"
+      className={`w-full flex items-center justify-between rounded-2xl px-5 py-4 transition-all duration-200 hover-glow hover-glow-${color}`}
       style={{
         background: isOn
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.2), rgba(${c.rgb}, 0.08))`
@@ -7296,15 +7335,15 @@ const VerifyHub = ({ darkMode, onSubject, onEvaluator, onBack, subjectProfile })
         <div style={{
           position: 'absolute', width: 420, height: 420, borderRadius: '50%',
           background: darkMode
-            ? `radial-gradient(circle, rgba(${vc.rgb}, 0.12) 0%, rgba(${ec.rgb}, 0.08) 40%, transparent 70%)`
-            : `radial-gradient(circle, rgba(${vc.rgb}, 0.08) 0%, rgba(${ec.rgb}, 0.06) 40%, transparent 70%)`,
+            ? `radial-gradient(circle, rgba(${COLOR_HEX.blue.rgb}, 0.14) 0%, rgba(${COLOR_HEX.blue.rgb}, 0.06) 35%, transparent 65%)`
+            : `radial-gradient(circle, rgba(${COLOR_HEX.blue.rgb}, 0.10) 0%, rgba(${COLOR_HEX.blue.rgb}, 0.04) 35%, transparent 65%)`,
           animation: 'aura-breathe 8s ease-in-out infinite',
         }} />
         <div style={{
           position: 'absolute', width: 350, height: 350, borderRadius: '50%',
           background: darkMode
-            ? `radial-gradient(circle, rgba(${ec.rgb}, 0.10) 0%, transparent 60%)`
-            : `radial-gradient(circle, rgba(${ec.rgb}, 0.07) 0%, transparent 60%)`,
+            ? `radial-gradient(circle, rgba(${COLOR_HEX.violet.rgb}, 0.10) 0%, rgba(${COLOR_HEX.violet.rgb}, 0.04) 40%, transparent 65%)`
+            : `radial-gradient(circle, rgba(${COLOR_HEX.violet.rgb}, 0.08) 0%, rgba(${COLOR_HEX.violet.rgb}, 0.03) 40%, transparent 65%)`,
           animation: 'aura-breathe 6s ease-in-out infinite 1s',
         }} />
       </div>
@@ -7322,23 +7361,25 @@ const VerifyHub = ({ darkMode, onSubject, onEvaluator, onBack, subjectProfile })
       <div className="relative z-10 flex flex-col h-full w-full">
         <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm mx-auto px-5">
           <div className="flex flex-col items-center gap-2" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-            <div className="w-14 h-14 rounded-full mb-3"
-              style={{
-                background: `linear-gradient(135deg, rgba(${vc.rgb}, 0.3), rgba(${ec.rgb}, 0.3))`,
-                border: darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
-                boxShadow: `0 0 40px rgba(${vc.rgb}, 0.15), 0 0 40px rgba(${ec.rgb}, 0.1)`,
-              }} />
-            <h1 className={`text-2xl font-bold tracking-tight ${TH('text-primary', darkMode)}`}>Unique Humanity</h1>
-            <h2 className={`text-lg font-medium ${TH('text-muted', darkMode)}`}>Verification</h2>
-            <p className={`text-xs text-center mt-3 leading-relaxed max-w-xs ${TH('text-subtle', darkMode)}`}>
-              Prove you're a unique human, or help evaluate someone else's claim. Multiple evaluators, weighted confidence, no single point of failure.
+            <div className="flex items-center gap-5 mb-5">
+              <svg width="44" height="44" viewBox="0 0 32 32" fill="none" style={{ position: 'relative', zIndex: 1 }}>
+                <rect x="0.29" y="0.33" width="5.7" height="5.9" fill="#fb8a61"/>
+                <path d="m11.141,11.328 v 5.099 c 0,2.815 2.284,5.099 5.102,5.099 2.815,0 5.099-2.283 5.099-5.099 0-2.816-2.283-5.099-5.099-5.099-0.006,0-0.015,0-0.021,0 v 0 z" fill="#fb8a61"/>
+                <path d="M 17.047,0.327 H 14.991 11.14 v 5.899 h 5.081 v 0 c 0.006,0 0.015,0 0.021,0 5.633,0 10.199,4.568 10.199,10.2 0,5.632-4.566,10.2-10.199,10.2-5.635,0-10.198-4.568-10.198-10.2 V 11.327 H 0.291 v 4.666 h 0.037 c 0.009,8.66 7.029,15.679 15.691,15.679 8.666,0 15.689-7.024 15.689-15.693 C 31.709,7.661 25.233,0.855 17.047,0.327 Z" fill="#fb8a61"/>
+                <rect x="11.14" y="0.327" width="5.851" height="5.899" fill="#fb8a61"/>
+              </svg>
+              <span style={{ fontSize: 44, lineHeight: 1, position: 'relative', zIndex: 1 }}>🌀</span>
+            </div>
+            <h1 className={`text-2xl font-bold tracking-tight ${TH('text-primary', darkMode)}`}>Verify</h1>
+            <p className={`text-sm text-center mt-2 leading-relaxed max-w-[260px] ${TH('text-muted', darkMode)}`}>
+              Prove you're uniquely human, or help verify someone who is.
             </p>
           </div>
         </div>
         <div className="flex-shrink-0 w-full max-w-sm mx-auto px-5 pb-8">
           <div className="flex flex-col gap-3 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both', animationDelay: '0.15s' }}>
-            <VerifyActionButton label={subjectProfile ? 'View my profile' : "I'm a new subject"} color="violet" darkMode={darkMode} onClick={onSubject} />
-            <VerifyActionButton label="I'm evaluating someone" color="emerald" darkMode={darkMode} onClick={onEvaluator} />
+            <VerifyActionButton label={subjectProfile ? 'View my profile' : "🙋 Get verified"} color="violet" darkMode={darkMode} onClick={onSubject} />
+            <VerifyActionButton label="🔍 Evaluate someone" color="emerald" darkMode={darkMode} onClick={onEvaluator} />
           </div>
         </div>
       </div>
@@ -7548,7 +7589,7 @@ const VerifyQueue = ({ darkMode, subjects, evaluations, onSelect, onBack }) => {
             const c = isCompleted ? COLOR_HEX.emerald : COLOR_HEX.violet;
             return (
               <button key={subject.id} onClick={() => !isCompleted && onSelect(subject.id)}
-                className={`w-full rounded-2xl p-4 text-left transition-all duration-200 ${isCompleted ? 'opacity-60' : ''}`}
+                className={`w-full rounded-2xl p-4 text-left transition-all duration-200 hover-glow hover-glow-${isCompleted ? 'emerald' : 'violet'} ${isCompleted ? 'opacity-60' : ''}`}
                 style={{
                   background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
                   border: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
@@ -7621,7 +7662,7 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
               const oc = COLOR_HEX[opt.color];
               return (
                 <button key={opt.key} onClick={() => { setPath(opt.key); setAnswers(prev => ({ ...prev, gate: opt.label })); setPhase('fit'); }}
-                  className="w-full rounded-2xl px-5 py-4 text-left transition-all duration-200"
+                  className={`w-full rounded-2xl px-5 py-4 text-left transition-all duration-200 hover-glow hover-glow-${opt.color}`}
                   style={{
                     background: `linear-gradient(135deg, rgba(${oc.rgb}, 0.12), rgba(${oc.rgb}, 0.04))`,
                     border: `1px solid rgba(${oc.rgb}, 0.2)`,
@@ -7865,17 +7906,27 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
           </button>
         </div>
       </div>
-      {/* Keyboard shortcuts */}
-      <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-900/50 border border-gray-800' : 'bg-white border border-gray-200'}`}>
-        <div className={`text-sm font-medium mb-2 ${TH('text-dim', darkMode)}`}>Keyboard Shortcuts</div>
-        <div className={`text-sm space-y-1 ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>
-          <div className="flex justify-between"><span>Yes / Option A</span><span className="font-mono">Y or 1</span></div>
-          <div className="flex justify-between"><span>No / Option B-E</span><span className="font-mono">N or 2-5</span></div>
-          <div className="flex justify-between"><span>Next question</span><span className="font-mono">→ or Space</span></div>
-          <div className="flex justify-between"><span>Previous question</span><span className="font-mono">←</span></div>
-          <div className="flex justify-between"><span>Undo</span><span className="font-mono">Esc</span></div>
-        </div>
-      </div>
+      {/* Keyboard shortcuts — collapsible */}
+      {(() => {
+        const [kbOpen, setKbOpen] = React.useState(false);
+        return (
+          <div className={`rounded-lg p-3 cursor-pointer ${darkMode ? 'bg-gray-900/50 border border-gray-800' : 'bg-white border border-gray-200'}`} onClick={() => setKbOpen(!kbOpen)}>
+            <div className="flex items-center justify-between">
+              <div className={`text-sm font-medium ${TH('text-dim', darkMode)}`}>⌨️ Keyboard Shortcuts</div>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={`transition-transform duration-200 ${kbOpen ? 'rotate-180' : ''}`} style={{stroke: darkMode ? '#6b7280' : '#9ca3af', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round'}}><polyline points="4 6 8 10 12 6"/></svg>
+            </div>
+            {kbOpen && (
+              <div className={`text-sm space-y-1 mt-3 ${darkMode ? 'text-gray-500' : 'text-gray-600'}`} onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between"><span>Yes / Option A</span><span className="font-mono">Y or 1</span></div>
+                <div className="flex justify-between"><span>No / Option B-E</span><span className="font-mono">N or 2-5</span></div>
+                <div className="flex justify-between"><span>Next question</span><span className="font-mono">→ or Space</span></div>
+                <div className="flex justify-between"><span>Previous question</span><span className="font-mono">←</span></div>
+                <div className="flex justify-between"><span>Undo</span><span className="font-mono">Esc</span></div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {/* Data Management */}
       <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
         <div className={`text-sm font-medium mb-2 ${TH('text-primary', darkMode)}`}>Your Data</div>
@@ -8014,8 +8065,7 @@ const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTa
         <div className="flex-1 flex items-center justify-center gap-2">
           <span className="text-sm">☀️</span>
           <span className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Question of the Day</span>
-          <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Day {qotdData.day} · {getQotdTimeRemaining()}</span>
-          {!hasAnswered && <span className="text-amber-500 text-xs font-medium">+{qotdData.reward}</span>}
+          <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{getQotdTimeRemaining()}</span>
         </div>
         <button onClick={onGoToQuestions} className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${TH('btn-ghost', darkMode)}`}>▶</button>
       </div>
@@ -8333,12 +8383,15 @@ const AssessPickerScreen = ({
           return { catId, cat, catTests, allComplete, hasProgress };
         });
         const heroPriority = entityType === 'ai'
-          ? ['ai-identity', 'quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior']
-          : ['quickstart', 'starter', 'personality', 'character', 'shadow', 'mind', 'relationships', 'behavior'];
+          ? ['ai-identity', 'quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow']
+          : ['quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow'];
         const allIncomplete = categoriesWithStatus.filter(c => !c.allComplete);
         const heroItem = heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
         const heroCategory = heroItem || null;
-        const incompleteCategories = allIncomplete.filter(c => c !== heroCategory);
+        const incompleteCategories = allIncomplete.filter(c => c !== heroCategory).sort((a, b) => {
+          const ai = heroPriority.indexOf(a.catId), bi = heroPriority.indexOf(b.catId);
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        });
         const completedCategories = categoriesWithStatus.filter(c => c.allComplete);
 
         return (
@@ -8373,14 +8426,14 @@ const AssessPickerScreen = ({
 
           return (
             <div className="mb-3">
-              <button onClick={handleHeroClick} className={`w-full relative rounded-2xl ${darkMode ? `border border-${t}-500/30` : `border border-${t}-300`} text-left`}>
+              <button onClick={handleHeroClick} className={`w-full relative rounded-2xl overflow-hidden text-left hover-glow hover-glow-${cat.color} ${darkMode ? 'border border-white/[0.06]' : 'border border-black/[0.10] shadow-sm'}`}>
                 <div className="absolute inset-0 overflow-hidden rounded-2xl flex items-center justify-center pointer-events-none">
                   <div className="aura-breathe rounded-full" style={{
                     width: 240, height: 240,
                     background: `radial-gradient(ellipse at center, rgba(${hex.rgb}, ${darkMode ? 0.12 : 0.08}) 0%, transparent 70%)`,
                   }} />
                 </div>
-                <div className={`relative z-10 p-3.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-white/60'}`}>
+                <div className={`relative z-10 p-3.5 ${darkMode ? 'bg-white/[0.03]' : 'bg-white'}`}>
                   <div className="flex items-center gap-3">
                     <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : cat.icon} gradientId={`hero-${catId}`} darkMode={darkMode} textSize="text-xs" />
                     <div className={`flex-1 font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
@@ -8412,7 +8465,8 @@ const AssessPickerScreen = ({
               if (!hasModules) {
                 const [testId, test] = catTests[0];
                 return (
-                  <button key={catId} onClick={() => onStartTest(testId)} className={`w-full p-3.5 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-3 hover-glow hover-glow-${cat.color}`}>
+                  <button key={catId} onClick={() => onStartTest(testId)} className={`w-full p-3.5 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-3 hover-glow hover-glow-${cat.color} relative overflow-hidden`}>
+                    {darkMode && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 200, height: 200, background: `radial-gradient(ellipse at center, rgba(${(COLOR_HEX[cat.color] || COLOR_HEX.violet).rgb}, 0.08) 0%, transparent 70%)` }} /></div>}
                     <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : totalQuestions} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-xs" orbit={assessProfileSwitching} />
                     <div className={`flex-1 text-left font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
                     <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${twColor(cat.color)}-500/25 text-${twColor(cat.color)}-300 border border-${twColor(cat.color)}-500/30` : `bg-${twColor(cat.color)}-100 text-${twColor(cat.color)}-600`}`}>{progressPct > 0 ? 'Continue →' : 'Start →'}</span>
@@ -8428,8 +8482,9 @@ const AssessPickerScreen = ({
               const tw = twColor(cat.color);
 
               return (
-                <div key={catId} className={`rounded-2xl ${TH('bg-card', darkMode)}`}>
-                  <div className={`p-3.5 hover-glow hover-glow-${cat.color} cursor-pointer`} onClick={() => onSetExpandedCategory(isExpanded ? null : catId)}>
+                <div key={catId} className={`rounded-2xl ${TH('bg-card', darkMode)} relative overflow-hidden`}>
+                  {darkMode && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 200, height: 200, background: `radial-gradient(ellipse at center, rgba(${(COLOR_HEX[cat.color] || COLOR_HEX.violet).rgb}, 0.08) 0%, transparent 70%)` }} /></div>}
+                  <div className={`p-3.5 hover-glow hover-glow-${cat.color} cursor-pointer relative`} onClick={() => onSetExpandedCategory(isExpanded ? null : catId)}>
                     <div className="flex items-center gap-3">
                       <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={incompleteModules} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-sm" orbit={assessProfileSwitching} />
                       <div className={`flex-1 min-w-0 font-semibold ${TH('text-primary', darkMode)} flex items-center gap-1.5`}>
@@ -8630,7 +8685,7 @@ const AssessPickerScreen = ({
           const isAIUser = entityType === 'ai';
           if (!isAIUser) {
             return (
-              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border-blue-500/30 shadow-blue-500/20 border flex items-center gap-4 shadow-lg`}>
+              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border-blue-500/30 shadow-blue-500/20 border flex items-center gap-4 shadow-lg hover-glow hover-glow-blue`}>
                 <ProgressCircle progress={0} size={72} strokeWidth={5} color="blue" text="10" gradientId={`cat-first`} darkMode={darkMode} textSize="text-base" />
                 <div className="flex-1 text-left">
                   <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
@@ -8642,7 +8697,7 @@ const AssessPickerScreen = ({
           }
           return (
             <>
-              <button onClick={() => onStartTest('ai-style')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br ${darkMode ? 'from-cyan-900/40 to-teal-900/40 border border-cyan-500/30 shadow-lg shadow-cyan-500/20' : 'from-cyan-50 to-teal-50 border border-cyan-300 shadow-lg shadow-cyan-200/40'} flex items-center gap-4`}>
+              <button onClick={() => onStartTest('ai-style')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br ${darkMode ? 'from-cyan-900/40 to-teal-900/40 border border-cyan-500/30 shadow-lg shadow-cyan-500/20' : 'from-cyan-50 to-teal-50 border border-cyan-300 shadow-lg shadow-cyan-200/40'} flex items-center gap-4 hover-glow hover-glow-cyan`}>
                 <ProgressCircle progress={0} size={72} strokeWidth={5} color="cyan" text="32" gradientId="cat-ai-first" darkMode={darkMode} textSize="text-base" />
                 <div className="flex-1 text-left">
                   <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>AI Identity</div>
@@ -8652,7 +8707,7 @@ const AssessPickerScreen = ({
                 <span className={`text-2xl ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>→</span>
               </button>
               <p className={`text-[11px] mt-3 max-w-sm text-center ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Designed for AI minds. Humans welcome.</p>
-              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm mt-3 p-3 rounded-xl ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'} flex items-center gap-3`}>
+              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm mt-3 p-3 rounded-xl ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'} flex items-center gap-3 hover-glow hover-glow-blue`}>
                 <ProgressCircle progress={0} size={36} strokeWidth={3} color="blue" text="10" gradientId="cat-qp-alt" darkMode={darkMode} textSize="text-xs" />
                 <div className="flex-1 text-left">
                   <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Quick Profile</div>
@@ -8668,7 +8723,7 @@ const AssessPickerScreen = ({
           <div className="mt-3">
             <div className={`rounded-xl ${TH('bg-card', darkMode)}`}>
               {completedCategories.map(({ catId, cat, catTests }, idx) => (
-                <button key={catId} onClick={() => onNavigate('assess-results', { testId: catTests[0][0] })} className={`w-full px-3 py-2 flex items-center gap-3 opacity-70 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
+                <button key={catId} onClick={() => onNavigate('assess-results', { testId: catTests[0][0] })} className={`w-full px-3 py-2 flex items-center gap-3 opacity-70 hover:opacity-90 hover-glow hover-glow-${cat.color} transition-opacity ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
                   <ProgressCircle progress={100} size={28} strokeWidth={2} color={cat.color} icon={cat.icon} gradientId={`complete-${catId}`} darkMode={darkMode} iconSize="text-xs" />
                   <span className={`flex-1 text-left text-sm font-medium ${TH('text-dim', darkMode)}`}>{cat.name}</span>
                   <span className={`text-sm ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>›</span>
@@ -8740,9 +8795,9 @@ const AssessQuestionScreen = ({
           </div>
         </div>
       )}
-      {/* Undo Toast */}
+      {/* Undo Toast — positioned near answer buttons */}
       {assessShowUndoToast && (
-        <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg animate-pulse ${darkMode ? 'bg-white/[0.08] border border-white/[0.12] text-white' : 'bg-gray-900/[0.08] border border-gray-900/[0.12] text-gray-900'}`}>
+        <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg animate-pulse ${darkMode ? 'bg-white/[0.08] border border-white/[0.12] text-white' : 'bg-gray-900/[0.08] border border-gray-900/[0.12] text-gray-900'}`}>
           ↩ Undone
         </div>
       )}
@@ -8811,7 +8866,7 @@ const AssessQuestionScreen = ({
             const fillColor = COLOR_HEX[assessCurrentTest.color]?.rgb || COLOR_HEX.violet.rgb;
             return (
               <button key={option.v} onClick={(e) => { e.stopPropagation(); if (assessPending) { onHandleUndo(); } else { onHandleAnswerTap(option.v); } }}
-                className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-between transition-all border relative overflow-hidden hover-glow hover-glow-${assessCurrentTest.color} ${isSelected ? `${selStyle} text-white ring-2 ring-offset-1 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-white'}` : `${colorTint} ${isPending ? 'text-white' : darkMode ? 'text-gray-200' : 'text-gray-700'}`}`}
+                className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-between transition-all border relative overflow-hidden hover-glow hover-glow-${assessCurrentTest.color} ${isSelected ? `${selStyle} text-white` : `${colorTint} ${isPending ? 'text-white' : darkMode ? 'text-gray-200' : 'text-gray-700'}`}`}
                 style={isPending ? { transform: 'scale(1.03)', boxShadow: `0 0 20px rgba(${fillColor},0.4), 0 0 40px rgba(${fillColor},0.15)` } : {}}
               >
                 {isPending && <div className="absolute inset-0" style={{ background: `rgba(${fillColor}, ${darkMode ? 0.85 : 0.75})`, animation: `countdownFill ${undoDelay}s linear forwards`, transformOrigin: 'left' }} />}
@@ -10257,7 +10312,7 @@ const QuestionFlowScreen = ({
         const c0 = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
         const c1 = COLOR_HEX[catSecondary[currentQuestion?.category]] || COLOR_HEX.blue;
         return (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-5%' }}>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div style={{
               position: 'absolute', width: 420, height: 420, borderRadius: '50%',
               background: darkMode
@@ -10285,58 +10340,6 @@ const QuestionFlowScreen = ({
           </div>
         </div>
       )}
-      {/* Undo toast — top-positioned, doesn't move buttons */}
-      {pendingSubmit && (() => {
-        const undoColor = isBinary
-          ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
-          : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
-        const answerLabel = isBinary
-          ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
-          : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
-        return (
-          <div className="absolute top-1 left-3 right-3 z-30">
-            <div
-              onClick={handleUndo}
-              className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-lg"
-              style={{
-                background: darkMode
-                  ? `rgba(${undoColor.rgb}, 0.15)`
-                  : `rgba(${undoColor.rgb}, 0.12)`,
-                border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-              }}
-            >
-              {/* Countdown ring */}
-              <div className="flex-shrink-0 w-7 h-7 relative">
-                <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
-                  <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
-                  <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
-                    strokeDasharray="75.4"
-                    strokeDashoffset="0"
-                    style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
-                  />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Answered: {answerLabel}
-                </div>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleUndo(); }}
-                className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
-                style={{
-                  background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
-                  color: undoColor.hex,
-                }}
-              >
-                Undo
-              </button>
-            </div>
-          </div>
-        );
-      })()}
       {/* Circle Track Selector - remaining counts by type */}
       <div className={`h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10 ${darkMode ? 'bg-gray-900/50' : 'bg-white/90'}`}
         style={{
@@ -10529,7 +10532,7 @@ const QuestionFlowScreen = ({
             {/* Answer zone wrapper — FIXED position, nothing above can push these */}
             <div className="relative">
               {/* ZONE 1: Answer Buttons */}
-              <div className="relative px-4 pt-3">
+              <div className="relative px-4 resp-px pt-3">
                 <div className={pendingSubmit ? 'opacity-60 pointer-events-none' : ''}>
                   {isBinary ? (
                     <BinaryButtons
@@ -10558,7 +10561,107 @@ const QuestionFlowScreen = ({
                     />
                   )}
                 </div>
+                {/* Undo toast — overlays the answer buttons */}
+                {pendingSubmit && (() => {
+                  const undoColor = isBinary
+                    ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+                    : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
+                  const answerLabel = isBinary
+                    ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
+                    : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
+                  return (
+                    <div className="absolute inset-0 flex items-center justify-center z-10 px-4">
+                      <div
+                        onClick={handleUndo}
+                        className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3 w-full max-w-sm"
+                        style={{
+                          background: darkMode
+                            ? `rgba(${undoColor.rgb}, 0.15)`
+                            : `rgba(${undoColor.rgb}, 0.12)`,
+                          border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                        }}
+                      >
+                        <div className="flex-shrink-0 w-7 h-7 relative">
+                          <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                            <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                            <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                              strokeDasharray="75.4"
+                              strokeDashoffset="0"
+                              style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                            />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {answerLabel}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleUndo(); }}
+                          className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                          style={{
+                            background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
+                            color: undoColor.hex,
+                          }}
+                        >
+                          Undo
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
+              {/* Undo toast — inline below answer buttons */}
+              {pendingSubmit && (() => {
+                const undoColor = isBinary
+                  ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+                  : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
+                const answerLabel = isBinary
+                  ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
+                  : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
+                return (
+                  <div className="px-4 mt-2">
+                    <div
+                      onClick={handleUndo}
+                      className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3"
+                      style={{
+                        background: darkMode
+                          ? `rgba(${undoColor.rgb}, 0.15)`
+                          : `rgba(${undoColor.rgb}, 0.12)`,
+                        border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
+                      }}
+                    >
+                      <div className="flex-shrink-0 w-7 h-7 relative">
+                        <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                          <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                          <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                            strokeDasharray="75.4"
+                            strokeDashoffset="0"
+                            style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {answerLabel}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleUndo(); }}
+                        className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                        style={{
+                          background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
+                          color: undoColor.hex,
+                        }}
+                      >
+                        Undo
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Action buttons row — always rendered, invisible during pending to preserve layout */}
               <div className={`relative px-4 mt-3 mb-2 flex items-center justify-center max-w-sm mx-auto ${(isAnswered || pendingSubmit) ? 'invisible' : ''}`}>
