@@ -19,18 +19,6 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
 - [ ] **Aura glow scales to node count** — tiny starting aura glows way too much. Glow should be proportional to how many nodes exist. Few nodes = dim. Big constellation = big glow
   > "Fork is good but not interesting looking" · "A little aura doesn't glow a lot. Only a big aura glows a lot." · "Scale to node count"
 
-### Categories
-- [ ] **2-across square grid, name only** — current bubbles too packed, words only fill half. Switch to square layout, two columns, category name only (no progress indicators)
-  > "Too packed" · "Square layout with two across" · "Name only"
-
-### QotD
-- [ ] **Banner text cleanup** — "Question of the Day" on one line, timer on the next. Remove day indication. Skinny up time remaining. Remove the +25
-  > "Don't need the day indication. Skinny up time remaining. Not sure why we need the +25."
-
-### Binary Questions
-- [ ] **Glow from center of question** — soft radiation emanating from the center of the question text, not from below. Increase intensity
-  > "Soft radiation, but it's coming from below the question. We want it from the center of the question."
-
 ### Assess Picker
 - [x] **Light mode low contrast** — MERGED: solid white cards, stronger borders (0.10 vs 0.06), hero card solid bg
 
@@ -60,7 +48,8 @@ _Moved here on merge. Cleaned out periodically._
 
 - **MC Questions — gray default** — already shipped in production (useState('gray'), inline toggle exists)
 - **Assess Picker — light mode contrast** — solid white cards, border-black/[0.10], hero bg-white
-- **Categories — 2-across grid** — noodled, approved (v2 noodle), pending merge
-- **Binary glow — center of question** — noodled, approved (v2 noodle), pending merge
-- **QotD — banner cleanup** — noodled, approved (v2 noodle), pending merge
+- **Categories — 2-across grid** — merged to production (grid-cols-2, centered icon+text, all sections)
+- **Binary glow — center of question** — merged to production (removed marginTop: -5% offset)
+- **QotD — banner cleanup** — merged to production (removed day, slimmed timer to "Xh left", removed +25)
+- **Settings — collapsible keyboard shortcuts** — merged to production (click-to-expand)
 - **Welcome — bloom animation** — noodled (v2 noodle), iterating

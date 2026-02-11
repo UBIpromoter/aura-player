@@ -426,6 +426,40 @@
       0%, 100% { opacity: 0.3; }
       50% { opacity: 0.8; }
     }
+
+    /* === RESPONSIVE BUTTON SIZING ===
+       Scales touch targets and spacing to viewport width on actual mobile.
+       Desktop/PhoneFrame keeps current fixed values. */
+    @media (max-width: 768px) {
+      /* Assessment answer buttons — uses existing .assess-btns class */
+      .assess-btns {
+        padding-left: clamp(12px, 4.2vw, 24px) !important;
+        padding-right: clamp(12px, 4.2vw, 24px) !important;
+        padding-bottom: clamp(12px, 4.2vw, 24px) !important;
+      }
+      .assess-btns > button {
+        padding-top: clamp(12px, 3.6vw, 18px) !important;
+        padding-bottom: clamp(12px, 3.6vw, 18px) !important;
+        padding-left: clamp(14px, 4.2vw, 22px) !important;
+        padding-right: clamp(14px, 4.2vw, 22px) !important;
+      }
+      .assess-btns > * + * {
+        margin-top: clamp(6px, 2.2vw, 12px) !important;
+      }
+      /* Button height utilities */
+      .resp-h-lg { height: clamp(52px, 14.3vw, 66px) !important; }
+      .resp-h-md { height: clamp(44px, 12.2vw, 56px) !important; }
+      /* Container max-width for button groups */
+      .resp-max-w { max-width: clamp(320px, 92vw, 430px) !important; }
+      /* Stacked button spacing (resp-gap = 12px baseline, resp-gap-sm = 10px baseline) */
+      .resp-gap > * + * { margin-top: clamp(10px, 3.1vw, 14px) !important; }
+      .resp-gap-sm > * + * { margin-top: clamp(8px, 2.5vw, 12px) !important; }
+      /* Container padding */
+      .resp-px {
+        padding-left: clamp(12px, 4.2vw, 24px) !important;
+        padding-right: clamp(12px, 4.2vw, 24px) !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -2475,7 +2509,7 @@ const getQotdTimeRemaining = () => {
   const diff = end - now;
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return `${hours}h ${mins}m`;
+  return `${hours}h left`;
 };
 
 const shuffleArray = (array) => {
@@ -5291,7 +5325,7 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
                 key={idx}
                 onClick={() => handleTap(idx)}
                 disabled={isAnswered}
-                className="w-full h-14 rounded-2xl flex items-center justify-center gap-4 transition-all btn-feedback shine-card border"
+                className="w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-4 transition-all btn-feedback shine-card border"
                 style={btnStyle}
               >
                 {icon && (
@@ -5368,10 +5402,10 @@ const PathChoiceScreen = ({ darkMode, entityType, onboardingAnswers, onReveal, o
 
       {/* Lower zone — buttons pinned, same position as onboarding */}
       <div className="flex-shrink-0 flex flex-col items-center px-6 pb-8">
-        <div className="w-full max-w-sm space-y-3">
+        <div className="w-full max-w-sm resp-max-w space-y-3 resp-gap">
           <button
             onClick={onReveal}
-            className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-violet glow-violet border btn-feedback ${
+            className={`w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-violet glow-violet border btn-feedback ${
               darkMode
                 ? 'border-violet-500/60 hover:border-violet-400/80 bg-gradient-to-br from-violet-900/50 to-violet-950/70'
                 : 'border-violet-400 hover:border-violet-500 bg-gradient-to-br from-violet-100 to-violet-50'
@@ -5384,7 +5418,7 @@ const PathChoiceScreen = ({ darkMode, entityType, onboardingAnswers, onReveal, o
 
           <button
             onClick={onExplore}
-            className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-teal glow-teal border btn-feedback ${
+            className={`w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-teal glow-teal border btn-feedback ${
               darkMode
                 ? 'border-teal-500/40 hover:border-teal-400/70 bg-gradient-to-br from-teal-900/30 to-teal-950/50'
                 : 'border-teal-300 hover:border-teal-400 bg-gradient-to-br from-teal-100 to-teal-50'
@@ -6188,7 +6222,7 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         )}
 
         {/* SECTION 1: World Questions */}
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2.5">
           {categories.map(cat => {
             const config = categoryConfig[cat.id];
             if (!config) return null;
@@ -6213,11 +6247,11 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
                 key={cat.id}
                 onClick={() => handleCategoryClick(cat.id)}
                 disabled={available === 0}
-                className={`w-full ${isFeatured ? 'py-4 px-5' : 'py-3.5 px-5'} rounded-2xl text-left transition-colors shine-card ${cc.shine} ${cc.glow} border ${cc.border} ${isFeatured ? (darkMode ? 'starry-bg overflow-hidden' : 'bg-gradient-to-r from-amber-100 to-yellow-50 overflow-hidden') : cc.bg} ${available === 0 ? 'opacity-40' : ''}`}
+                className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card ${cc.shine} ${cc.glow} border ${cc.border} ${isFeatured ? (darkMode ? 'starry-bg overflow-hidden' : 'bg-gradient-to-r from-amber-100 to-yellow-50 overflow-hidden') : cc.bg} ${available === 0 ? 'opacity-40' : ''}`}
               >
-                <div className={`flex items-center gap-4 ${isFeatured ? 'relative z-10' : ''}`}>
-                  <span className={isFeatured ? 'text-2xl' : 'text-xl'}>{config.icon}</span>
-                  <div className={`${isFeatured ? 'text-lg' : 'text-base'} font-semibold ${TH('text-primary', darkMode)}`}>{config.name}</div>
+                <div className={`flex items-center justify-center gap-2.5 ${isFeatured ? 'relative z-10' : ''}`}>
+                  <span className="text-xl">{config.icon}</span>
+                  <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>{config.name}</div>
                 </div>
               </button>
             );
@@ -6231,13 +6265,13 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
               <button
                 onClick={() => handleCategoryClick('random')}
                 disabled={available === 0}
-                className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-rose glow-rose border ${
+                className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card shine-rose glow-rose border ${
                   darkMode
                     ? 'border-rose-500/40 hover:border-rose-400/80 active:border-rose-300 bg-gradient-to-r from-rose-900/30 to-rose-950/50'
                     : 'border-rose-400 hover:border-rose-500 active:border-rose-600 bg-gradient-to-r from-rose-100 to-rose-50'
                 } ${available === 0 ? 'opacity-40' : ''}`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center gap-2.5">
                   <span className="text-xl">✨</span>
                   <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Surprise me</div>
                 </div>
@@ -6254,32 +6288,32 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         </div>
 
         {/* SECTION 2: Self Assessments */}
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2.5">
           {/* Reveal Card - cyan/sky accent for self-discovery */}
           <button
             onClick={onAssessments}
-            className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-blue glow-blue border ${
+            className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card shine-blue glow-blue border ${
               darkMode
                 ? 'border-blue-500/40 hover:border-blue-400/80 active:border-blue-300 bg-gradient-to-r from-blue-900/30 to-blue-950/50'
                 : 'border-blue-300 hover:border-blue-400 bg-gradient-to-r from-blue-50 to-blue-50'
             }`}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center gap-2.5">
               <span className="text-xl">🪞</span>
-              <div className={`flex-1 text-base font-semibold ${TH('text-primary', darkMode)}`}>Reveal</div>
+              <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Reveal</div>
             </div>
           </button>
 
           {/* Assessment Surprise Me — random test, no picking */}
           <button
             onClick={onAssessSurprise}
-            className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-violet glow-violet border ${
+            className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card shine-violet glow-violet border ${
               darkMode
                 ? 'border-violet-500/40 hover:border-violet-400/80 active:border-violet-300 bg-gradient-to-r from-violet-900/30 to-violet-950/50'
                 : 'border-violet-400 hover:border-violet-500 active:border-violet-600 bg-gradient-to-r from-violet-100 to-violet-50'
             }`}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center gap-2.5">
               <span className="text-xl">🎲</span>
               <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Surprise me</div>
             </div>
@@ -6295,18 +6329,18 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
         </div>
 
         {/* SECTION 3: Work Tasks */}
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2.5">
           <button
             onClick={onVerify}
-            className={`w-full py-4 px-5 rounded-2xl text-left transition-colors shine-card shine-emerald glow-emerald border ${
+            className={`py-3.5 px-4 rounded-2xl text-center transition-colors shine-card shine-emerald glow-emerald border ${
               darkMode
                 ? 'border-emerald-500/40 hover:border-emerald-400/80 active:border-emerald-300 bg-gradient-to-r from-emerald-900/30 to-emerald-950/50'
                 : 'border-emerald-300 hover:border-emerald-400 bg-gradient-to-r from-emerald-50 to-emerald-50'
             }`}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center gap-2.5">
               <span className="text-xl">🛡️</span>
-              <div className={`flex-1 text-base font-semibold ${TH('text-primary', darkMode)}`}>Verify</div>
+              <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Verify</div>
               {verifyPendingCount > 0 && (
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
                   {verifyPendingCount}
@@ -6314,7 +6348,6 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
               )}
             </div>
           </button>
-          <div className="h-4" />
         </div>
       </div>
 
@@ -6564,7 +6597,7 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-3">
+    <div className="w-full max-w-sm resp-max-w mx-auto space-y-3 resp-gap">
       {[0, 1].map(answer => {
         const c = colors[answer];
         const style = getStyle(answer);
@@ -6574,7 +6607,7 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
             onClick={() => !isAnswered && !pendingSubmit && onTap(answer)}
             onContextMenu={(e) => onRightClick && onRightClick(e, answer)}
             disabled={isAnswered || pendingSubmit}
-            className="w-full h-14 rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none"
+            className="w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none"
             style={style}
           >
             <span className="text-base font-semibold" style={{
@@ -6680,7 +6713,7 @@ const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, curr
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-2.5">
+    <div className="w-full max-w-sm resp-max-w mx-auto space-y-2.5 resp-gap-sm">
       {options.map((option, index) => {
         const style = getStyle(index);
         return (
@@ -6689,7 +6722,7 @@ const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, curr
             onClick={() => !isAnswered && !pendingSubmit && onTap(index)}
             onContextMenu={(e) => onRightClick && onRightClick(e, index)}
             disabled={isAnswered || pendingSubmit}
-            className="w-full h-12 rounded-2xl flex items-center justify-center relative px-5 transition-all btn-feedback shine-card border select-none"
+            className="w-full h-12 resp-h-md rounded-2xl flex items-center justify-center relative px-5 transition-all btn-feedback shine-card border select-none"
             style={{
               borderColor: style.borderColor,
               background: style.background,
@@ -7100,7 +7133,7 @@ const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, seconda
   if (secondary) {
     return (
       <button onClick={onClick} disabled={disabled}
-        className="w-full h-14 rounded-2xl font-medium text-sm transition-all duration-200 disabled:opacity-30"
+        className="w-full h-14 resp-h-lg rounded-2xl font-medium text-sm transition-all duration-200 disabled:opacity-30"
         style={{
           background: darkMode ? `rgba(${c.rgb}, 0.08)` : `rgba(${c.rgb}, 0.06)`,
           border: `1px solid ${darkMode ? `rgba(${c.rgb}, 0.25)` : `rgba(${c.rgb}, 0.2)`}`,
@@ -7112,7 +7145,7 @@ const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, seconda
   }
   return (
     <button onClick={onClick} disabled={disabled}
-      className="w-full h-14 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-30"
+      className="w-full h-14 resp-h-lg rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-30"
       style={{
         background: darkMode
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.15))`
@@ -7133,7 +7166,7 @@ const VerifyOptionButton = ({ label, selected, color, darkMode, onClick }) => {
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
   return (
     <button onClick={onClick}
-      className="w-full h-14 rounded-2xl font-medium text-sm text-left px-5 transition-all duration-200"
+      className="w-full h-14 resp-h-lg rounded-2xl font-medium text-sm text-left px-5 transition-all duration-200"
       style={{
         background: selected
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.25), rgba(${c.rgb}, 0.12))`
@@ -8024,8 +8057,7 @@ const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTa
         <div className="flex-1 flex items-center justify-center gap-2">
           <span className="text-sm">☀️</span>
           <span className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Question of the Day</span>
-          <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Day {qotdData.day} · {getQotdTimeRemaining()}</span>
-          {!hasAnswered && <span className="text-amber-500 text-xs font-medium">+{qotdData.reward}</span>}
+          <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{getQotdTimeRemaining()}</span>
         </div>
         <button onClick={onGoToQuestions} className={`text-xl font-bold w-8 h-8 flex items-center justify-center ${TH('btn-ghost', darkMode)}`}>▶</button>
       </div>
@@ -10267,7 +10299,7 @@ const QuestionFlowScreen = ({
         const c0 = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
         const c1 = COLOR_HEX[catSecondary[currentQuestion?.category]] || COLOR_HEX.blue;
         return (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-5%' }}>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div style={{
               position: 'absolute', width: 420, height: 420, borderRadius: '50%',
               background: darkMode
@@ -10487,7 +10519,7 @@ const QuestionFlowScreen = ({
             {/* Answer zone wrapper — FIXED position, nothing above can push these */}
             <div className="relative">
               {/* ZONE 1: Answer Buttons */}
-              <div className="relative px-4 pt-3">
+              <div className="relative px-4 resp-px pt-3">
                 <div className={pendingSubmit ? 'opacity-60 pointer-events-none' : ''}>
                   {isBinary ? (
                     <BinaryButtons
@@ -10516,6 +10548,57 @@ const QuestionFlowScreen = ({
                     />
                   )}
                 </div>
+                {/* Undo toast — overlays the answer buttons */}
+                {pendingSubmit && (() => {
+                  const undoColor = isBinary
+                    ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+                    : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
+                  const answerLabel = isBinary
+                    ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
+                    : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
+                  return (
+                    <div className="absolute inset-0 flex items-center justify-center z-10 px-4">
+                      <div
+                        onClick={handleUndo}
+                        className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3 w-full max-w-sm"
+                        style={{
+                          background: darkMode
+                            ? `rgba(${undoColor.rgb}, 0.15)`
+                            : `rgba(${undoColor.rgb}, 0.12)`,
+                          border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                        }}
+                      >
+                        <div className="flex-shrink-0 w-7 h-7 relative">
+                          <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                            <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                            <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                              strokeDasharray="75.4"
+                              strokeDashoffset="0"
+                              style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                            />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {answerLabel}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleUndo(); }}
+                          className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                          style={{
+                            background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
+                            color: undoColor.hex,
+                          }}
+                        >
+                          Undo
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               {/* Undo toast — inline below answer buttons */}
               {pendingSubmit && (() => {
