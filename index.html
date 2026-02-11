@@ -4234,6 +4234,41 @@ Object.entries(ASSESS_CATEGORIES).forEach(([catId, cat]) => {
   cat.tests.forEach(testId => { ASSESS_TEST_TO_CATEGORY[testId] = catId; });
 });
 
+// Category-level status (Layer 2 intelligence)
+// Returns 'done' | 'in-progress' | 'available' | 'locked'
+const getCategoryStatus = (catId, assessCompleted, assessInProgress, tier) => {
+  const cat = ASSESS_CATEGORIES[catId];
+  if (!cat) return 'locked';
+  if ((cat.tier || 0) > tier) return 'locked';
+  const catTests = cat.tests.filter(id => ASSESS_TESTS[id]);
+  const allDone = catTests.every(id => assessCompleted[id]);
+  if (allDone) return 'done';
+  const hasAnyProgress = catTests.some(id => assessCompleted[id] || assessInProgress?.[id]);
+  if (hasAnyProgress) return 'in-progress';
+  return 'available';
+};
+
+// Count completed categories (for insight gating)
+const getCompletedCategoryCount = (assessCompleted, entityType) => {
+  let count = 0;
+  for (const [catId, cat] of Object.entries(ASSESS_CATEGORIES)) {
+    if (cat.entityHint && cat.entityHint !== entityType) continue;
+    const catTests = cat.tests.filter(id => ASSESS_TESTS[id]);
+    if (catTests.length > 0 && catTests.every(id => assessCompleted[id])) count++;
+  }
+  return count;
+};
+
+// Visible category count (for profile depth indicator)
+const getVisibleCategoryCount = (tier, entityType) => {
+  let count = 0;
+  for (const [catId, cat] of Object.entries(ASSESS_CATEGORIES)) {
+    if (cat.entityHint && cat.entityHint !== entityType) continue;
+    if ((cat.tier || 0) <= tier) count++;
+  }
+  return count;
+};
+
 // Nudge copy — specific transitions keyed "from-to", fallbacks keyed "_to"
 const ASSESS_NUDGE_COPY = {
   'quickstart-starter': "Great sketch — now let's fill in the details.",
@@ -7036,10 +7071,10 @@ const VERIFY_SUBJECT_QUESTIONS = [
   { id: 's1-country', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What country or region?', type: 'single',
     options: ['United States', 'Europe', 'South America', 'Southeast Asia', 'India', 'Africa', 'Middle East', 'Other'] },
   { id: 's1-city', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What city or area?', type: 'text', placeholder: 'City or area' },
-  { id: 's1-source', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'How did you find Aura?', type: 'multi',
+  { id: 's1-source', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'How did you find Aura?', type: 'single',
     options: ['A friend told me about it', 'Just checking it out', 'I want to prove my identity', 'I want to become an Aura player'] },
   { id: 's1-referrer', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'Who told you about Aura?', type: 'text', placeholder: 'Their name or username',
-    conditional: (a) => extractYesItems(a['s1-source']).includes('A friend told me about it') },
+    conditional: (a) => a['s1-source'] === 'A friend told me about it' },
   { id: 's1-account-type', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What brings you here?', type: 'single',
     options: ['Setting up a new account', 'Recovering an account I lost access to', 'Replacing an old account with a new one'] },
   /* S2: Connections */
@@ -7047,14 +7082,14 @@ const VERIFY_SUBJECT_QUESTIONS = [
     subtitle: 'Not for auto-verification — gives evaluators a map.',
     options: ['LinkedIn', 'Facebook'] },
   { id: 's2-delight', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: '__DELIGHT__', type: 'delight',
-    conditional: (a) => hasAnyYes(a['s2-social']) },
+    conditional: (a) => Array.isArray(a['s2-social']) && a['s2-social'].length > 0 },
   { id: 's2-contacts', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Want us to check your contacts too?', type: 'single',
     subtitle: 'We only check for matches with Aura users. Nothing is stored or shared.',
     options: ['Sure, check my contacts', 'No thanks'],
-    conditional: (a) => hasAnyYes(a['s2-social']) },
+    conditional: (a) => Array.isArray(a['s2-social']) && a['s2-social'].length > 0 },
   { id: 's2-know-anyone', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Do you know anyone already using Aura?', type: 'single',
     options: ["I'm sure they're here", "I think they might be", "No, I don't know anyone"],
-    conditional: (a) => !hasAnyYes(a['s2-social']) },
+    conditional: (a) => !Array.isArray(a['s2-social']) || a['s2-social'].length === 0 },
   { id: 's2-connection-name', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Who?', type: 'text', placeholder: 'Their name or username',
     conditional: (a) => a['s2-know-anyone'] === "I'm sure they're here" || a['s2-know-anyone'] === "I think they might be" },
   /* S3: Attestation */
@@ -7072,17 +7107,20 @@ const VERIFY_Q_REAL_HUMAN = {
   options: ['Definitely', 'I believe so', 'I have some doubt']
 };
 const VERIFY_Q_ONLY_ACCOUNT = {
-  text: 'Is this their only account in Aura?', type: 'single',
-  options: ["I'd be very surprised if not", "Probably", 'I have some doubt', 'I suspect another exists']
+  text: 'Think this is their only account?', type: 'single',
+  options: ["Almost certainly", "Probably", 'Not totally sure', 'I suspect they have another']
 };
 const VERIFY_Q_SYBIL = {
-  text: 'Could they maintain more than one identity?', type: 'multi',
-  subtitle: 'One at a time — Yes, No, or Not Sure for each.',
-  options: ['Has separate social circles that may not overlap', 'Technically savvy', 'Networks spread across multiple cities or communities', 'Unlikely — simple, local life']
+  text: 'Could they pull off a double life?',
+  subtitle: 'None of these are bad things. They just make it easier in theory.',
+  type: 'single',
+  options: ['Nah — one community, deeply rooted', 'Maybe — they move in different worlds', 'Probably — savvy, mobile, and well-connected']
 };
 const VERIFY_Q_RED_FLAGS = {
-  text: 'Did you notice any red flags?', type: 'multi',
-  options: ['Vague or inconsistent', 'Evasive about basics', 'Seemed rushed or pushy', "Connections didn't check out", 'Nothing concerning']
+  text: 'Anything feel off?',
+  subtitle: 'Trust your gut here.',
+  type: 'single',
+  options: ['All good — nothing weird', 'A little — minor stuff', 'Yeah — something felt off']
 };
 
 const VERIFY_CONFIDENCE_LABELS = [
@@ -7093,49 +7131,52 @@ const VERIFY_CONFIDENCE_LABELS = [
 ];
 
 const VERIFY_PATH_A_QUESTIONS = [
-  { id: 'a1-relationship', text: 'How do you know them?', type: 'multi', subtitle: 'One at a time — Yes, No, or Not Sure for each.',
-    options: ['Family', 'Friend', 'Colleague', 'Neighbor', 'Community member', 'Other'], hasOtherInput: true },
+  { id: 'a1-relationship', text: 'How do you know them?', type: 'single',
+    options: ['Family', 'Friend', 'Colleague', 'Neighbor', 'Community member', 'Other'] },
   { id: 'a1-duration', text: 'How long have you known them?', type: 'single', options: ['Less than 1 year', '1-5 years', '5+ years'] },
   { id: 'a1-last-interact', text: 'When did you last interact?', type: 'single', options: ['This week', 'This month', 'This year', 'Longer'] },
   { id: 'a2a', ...VERIFY_Q_REAL_HUMAN },
   { id: 'a2b', ...VERIFY_Q_ONLY_ACCOUNT },
   { id: 'a2c', ...VERIFY_Q_SYBIL },
-  { id: 'a3-confidence', text: 'Overall, how strongly would you vouch for this person?', type: 'star-confidence' },
-  { id: 'a4-doubt', text: "What's the source of your uncertainty?", type: 'multi', subtitle: 'One at a time — Yes, No, or Not Sure for each.',
-    options: ["I haven't seen them recently", 'I know them only in one context', "Something feels off but I can't pinpoint it", 'Other'],
-    conditional: (a) => { const c = a['a3-confidence']; return c !== undefined && c <= 2; } },
+  { id: 'a3-verdict', text: "What's the verdict?\nOne real person, one account here?", type: 'verdict',
+    verdictOptions: ['Yes', 'No'] },
+  { id: 'a4-doubt', text: "What makes you hesitate?", type: 'multi', subtitle: 'Toggle all that apply.',
+    options: ["Time — haven't seen them in a while", 'Limited — only know them in one context', "Gut feeling — something feels off", 'Other'],
+    conditional: (a) => { const v = a['a3-verdict'] || {}; return v.verdict === 'No' || (v.confidence !== undefined && v.confidence <= 2); } },
 ];
 
 const VERIFY_PATH_B_QUESTIONS = [
   { id: 'b1-how-meet', text: 'How did you meet?', type: 'single', options: ['In person', 'Video call', 'Text-chat only'] },
   { id: 'b1-who-init', text: 'Who initiated?', type: 'single', options: ['They came to me', 'I reached out', 'Mutual'] },
   { id: 'b1-context', text: 'Brief context — where and when?', type: 'text', placeholder: 'e.g. Coffee shop downtown, last Tuesday' },
-  { id: 'b2-evidence-direct', text: 'What did you directly observe?', type: 'multi', subtitle: 'One at a time — Yes, No, or Not Sure for each.',
-    options: ['Physically present — clearly a real person', 'Spoke about their life with specific details', 'Others at the scene recognized them', 'Showed something hard to fabricate', 'Nothing I could directly verify'] },
-  { id: 'b2-evidence-support', text: 'Any supporting evidence?', type: 'multi', subtitle: 'One at a time — Yes, No, or Not Sure for each.',
-    options: ['Social graph looks authentic', 'Connected to people already in Aura', 'Referred by someone I trust', 'Profile matches what I observed', 'No supporting evidence'] },
+  { id: 'b2-evidence-direct', text: 'What did you directly observe?', type: 'multi', subtitle: 'Toggle all that apply (max 5).', maxSelect: 5,
+    options: ['Physically present — clearly a real person', 'Specific details — talked about their life naturally', 'Recognized — others at the scene knew them', 'Hard to fake — showed something convincing', 'Nothing — I couldn\'t directly verify'] },
+  { id: 'b2-evidence-support', text: 'Any supporting evidence?', type: 'multi', subtitle: 'Toggle all that apply (max 5).', maxSelect: 5,
+    options: ['Social graph — looks authentic', 'Connections — already in Aura', 'Referral — from someone I trust', 'Profile — matches what I observed', 'Nothing — no supporting evidence'] },
   { id: 'b3-red-flags', ...VERIFY_Q_RED_FLAGS },
   { id: 'b4a', text: 'Is this a real, biological person?', type: 'single', subtitle: 'Not AI, not virtual, not a deepfake.',
     options: ['Definitely', 'I believe so', 'I have some doubt'],
     dynamicOptions: (a) => a['b1-how-meet'] === 'In person' ? ['Definitely', 'I believe so'] : ['Definitely', 'I believe so', 'I have some doubt'] },
   { id: 'b4b', ...VERIFY_Q_ONLY_ACCOUNT },
   { id: 'b4c', ...VERIFY_Q_SYBIL },
-  { id: 'b5-confidence', text: 'How confident are you that this is a unique, real person?', type: 'star-confidence' },
-  { id: 'b6-doubt', text: "What's the source of your uncertainty?", type: 'multi', subtitle: 'One at a time — Yes, No, or Not Sure for each.',
-    options: ['I only met them once', 'I know them in only one context', 'They were reluctant to share personal info', 'They seem capable of gaming the system', 'I did not see proof-of-work that would be hard to fake', 'Something feels off', 'Other'],
-    conditional: (a) => { const c = a['b5-confidence']; return c !== undefined && c <= 2; } },
+  { id: 'b5-verdict', text: "What's the verdict?\nOne real person, one account here?", type: 'verdict',
+    verdictOptions: ['Yes', 'No'] },
+  { id: 'b6-doubt', text: "What makes you hesitate?", type: 'multi', subtitle: 'Toggle all that apply.',
+    options: ["Only met once — not much to go on", "One context — don't know the full picture", "Guarded — kept things close to the vest", "Capable — smart enough to game things", "Gut feeling — something feels off", 'Other'],
+    conditional: (a) => { const v = a['b5-verdict'] || {}; return v.verdict === 'No' || (v.confidence !== undefined && v.confidence <= 2); } },
 ];
 
 const VERIFY_PATH_C_QUESTIONS = [
-  { id: 'c1-sources', text: 'What are you working from?', type: 'multi', subtitle: 'One at a time — Yes, No, or Not Sure for each.',
-    options: ['Self-attestation', 'Connection graph / social imports', "Other evaluators' assessments", 'Referral chain', 'Activity history', 'Other'] },
+  { id: 'c1-sources', text: 'What are you working from?', type: 'multi', subtitle: 'Toggle all that apply.',
+    options: ['Self-attestation', 'Connections — social graph imports', "Evaluators — other people's assessments", 'Referral chain', 'Activity history', 'Other'] },
   { id: 'c2-looks-real', text: 'Does this profile look like a real, unique person?', type: 'star-confidence' },
-  { id: 'c3-strongest', text: "What signals give you the most confidence?", type: 'multi', subtitle: 'One at a time — Yes, No, or Not Sure for each.',
-    options: ['Rich connections with verified users', 'Believable self-attestation', 'Multiple evaluators already confident', 'Strong referral chain', 'Other'] },
-  { id: 'c3-weakest', text: "What are the weakest points?", type: 'multi', subtitle: 'One at a time — Yes, No, or Not Sure for each.',
-    options: ['Thin connections', 'No in-person verification', 'New profile, little history', 'Generic attestation', 'Other'] },
+  { id: 'c3-strongest', text: "Strongest signal?", type: 'single',
+    options: ['Connections — rich, verified network', 'Self-attestation — believable story', 'Evaluators — multiple already confident', 'Referral chain — strong and traceable', 'Other'] },
+  { id: 'c3-weakest', text: "Biggest gap?", type: 'single',
+    options: ['Connections — thin network', 'Verification — no in-person check', 'History — new profile, little activity', 'Attestation — generic, nothing specific', 'Other'] },
   { id: 'c4-red-flags', ...VERIFY_Q_RED_FLAGS },
-  { id: 'c6-confidence', text: "Based on what you've reviewed, how confident are you in this person's uniqueness?", type: 'star-confidence' },
+  { id: 'c6-verdict', text: "What's the verdict?\nOne real person, one account here?", type: 'verdict',
+    verdictOptions: ['Yes', 'No'] },
 ];
 
 const VERIFY_PATH_CONFIG = {
@@ -7270,9 +7311,11 @@ const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, seconda
 // Shared: VerifyOptionButton
 const VerifyOptionButton = ({ label, selected, color, darkMode, onClick }) => {
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const dashRe = / [—\u2014] /;
+  const parts = dashRe.test(label) ? label.split(dashRe) : null;
   return (
     <button onClick={onClick}
-      className={`w-full h-14 resp-h-lg rounded-2xl font-medium resp-text-md text-left px-5 transition-all duration-200 hover-glow hover-glow-${color}`}
+      className={`w-full rounded-2xl text-left px-5 transition-all duration-200 hover-glow hover-glow-${color} ${parts ? 'py-3' : 'h-14 resp-h-lg font-medium resp-text-md'}`}
       style={{
         background: selected
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.25), rgba(${c.rgb}, 0.12))`
@@ -7283,7 +7326,12 @@ const VerifyOptionButton = ({ label, selected, color, darkMode, onClick }) => {
         color: selected ? (darkMode ? '#fff' : c.base) : (darkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)'),
         boxShadow: selected ? `0 0 16px rgba(${c.rgb}, 0.12)` : 'none',
       }}>
-      {label}
+      {parts ? (
+        <span className="flex flex-col gap-0.5">
+          <span className="font-semibold resp-text-md">{parts[0]}</span>
+          <span className="font-normal resp-text-sm" style={{ opacity: 0.6 }}>{parts[1]}</span>
+        </span>
+      ) : label}
     </button>
   );
 };
@@ -7337,6 +7385,48 @@ const VerifyStarConfidence = ({ color, darkMode, value, onChange }) => {
   );
 };
 
+// Shared: VerifyVerdict — combined yes/no + confidence on one screen
+const VerifyVerdict = ({ question, color, darkMode, answer, onAnswer }) => {
+  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const val = answer || {};
+  const verdict = val.verdict;
+  const confidence = val.confidence;
+  const setField = (field, v) => onAnswer({ ...val, [field]: v });
+  return (
+    <div className="flex flex-col items-center gap-6 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      <div className="flex gap-3 w-full">
+        {(question.verdictOptions || ['Yes', 'No']).map((opt, i) => {
+          const isYes = i === 0;
+          const sel = verdict === opt;
+          const vc = isYes ? (COLOR_HEX.emerald || c) : (COLOR_HEX.rose || c);
+          return (
+            <button key={opt} onClick={() => setField('verdict', opt)}
+              className={`flex-1 py-4 rounded-2xl font-semibold text-base transition-all duration-200`}
+              style={{
+                background: sel
+                  ? `linear-gradient(135deg, rgba(${vc.rgb}, 0.25), rgba(${vc.rgb}, 0.1))`
+                  : darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                border: sel
+                  ? `1.5px solid rgba(${vc.rgb}, 0.5)`
+                  : darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+                color: sel ? (darkMode ? '#fff' : vc.base) : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'),
+                boxShadow: sel ? `0 0 20px rgba(${vc.rgb}, 0.15)` : 'none',
+              }}>
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+      {verdict && (
+        <div className="w-full" style={{ animation: 'fadeSlideIn 0.3s ease-out both' }}>
+          <p className={`text-xs text-center mb-4 ${TH('text-muted', darkMode)}`}>How sure are you?</p>
+          <VerifyStarConfidence color={color} darkMode={darkMode} value={confidence} onChange={v => setField('confidence', v)} />
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Shared: Question type renderers for verify flows
 const VerifySingleSelect = ({ question, color, darkMode, answer, onAnswer, answers }) => {
   const opts = question.dynamicOptions ? question.dynamicOptions(answers || {}) : question.options;
@@ -7349,169 +7439,33 @@ const VerifySingleSelect = ({ question, color, darkMode, answer, onAnswer, answe
   );
 };
 
-// Helper: extract "yes" items from sequential yes/no answer format
-// New format: { 'Option A': 'yes', 'Option B': 'no', ... } or { 'Other': { response: 'yes', text: '...' } }
-// Legacy format: ['Option A', 'Option B'] or { items: [...], otherText: '...' }
-const extractYesItems = (answer) => {
-  if (!answer) return [];
-  if (Array.isArray(answer)) return answer;
-  if (answer.items) return answer.items; // legacy hasOtherInput format
-  return Object.entries(answer).filter(([_, v]) => v === 'yes' || (v && v.response === 'yes')).map(([k]) => k);
-};
-const hasAnyYes = (answer) => extractYesItems(answer).length > 0;
-
-// Sequential Yes/No — replaces multi-select with one-trait-per-screen flow
-const VerifySequentialYesNo = ({ question, color, darkMode, answer, onAnswer, onComplete }) => {
-  const [subIdx, setSubIdx] = useState(0);
-  const [animKey, setAnimKey] = useState(0);
-  const [otherText, setOtherText] = useState('');
-  const [showOtherInput, setShowOtherInput] = useState(false);
-  const options = question.options;
-  const total = options.length;
-  const currentOption = options[subIdx];
-  const responses = (answer && typeof answer === 'object' && !Array.isArray(answer) && !answer.items) ? answer : {};
-  const currentResponse = responses[currentOption];
+// Toggle-based multi-select — all options visible with toggle switches, Continue button
+const VerifyMultiToggle = ({ question, color, darkMode, answer, onAnswer }) => {
+  const selected = Array.isArray(answer) ? answer : (answer && typeof answer === 'object' ? answer.items || [] : []);
+  const otherText = (answer && typeof answer === 'object') ? answer.otherText || '' : '';
+  const maxSelect = question.maxSelect || Infinity;
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
-  const emeraldC = COLOR_HEX.emerald;
-  const roseC = COLOR_HEX.rose;
-  const slateC = COLOR_HEX.slate;
-
-  // On re-entry with existing answers: start at first unanswered, or 0 if all answered
-  const firstMount = React.useRef(true);
-  React.useEffect(() => {
-    if (firstMount.current && responses && Object.keys(responses).length > 0) {
-      const firstUnanswered = options.findIndex(opt => !responses[opt]);
-      if (firstUnanswered > 0) setSubIdx(firstUnanswered);
-    }
-    firstMount.current = false;
-  }, []);
-
-  const advanceSub = () => {
-    if (subIdx + 1 < total) {
-      setAnimKey(k => k + 1);
-      setSubIdx(subIdx + 1);
-      setShowOtherInput(false);
-    } else {
-      onComplete();
-    }
+  const hasOther = question.hasOtherInput;
+  const toggle = (opt) => {
+    let next;
+    if (selected.includes(opt)) { next = selected.filter(x => x !== opt); }
+    else { if (selected.length >= maxSelect) return; next = [...selected, opt]; }
+    if (hasOther) { onAnswer({ items: next, otherText: next.includes('Other') ? otherText : '' }); }
+    else { onAnswer(next); }
   };
-
-  const handleResponse = (response) => {
-    const newAnswers = { ...responses, [currentOption]: response };
-    onAnswer(newAnswers);
-    // If "Other" with hasOtherInput and response is "yes", show text input
-    if (question.hasOtherInput && currentOption === 'Other' && response === 'yes') {
-      setShowOtherInput(true);
-      return;
-    }
-    setTimeout(advanceSub, 280);
-  };
-
-  const handleOtherTextSubmit = () => {
-    if (!otherText.trim()) return;
-    const newAnswers = { ...responses, 'Other': { response: 'yes', text: otherText } };
-    onAnswer(newAnswers);
-    setTimeout(advanceSub, 280);
-  };
-
-  // Go back within sub-sequence
-  const goBackSub = () => {
-    if (subIdx > 0) {
-      setAnimKey(k => k + 1);
-      setSubIdx(subIdx - 1);
-      setShowOtherInput(false);
-    }
-  };
-
-  const responseButtons = [
-    { key: 'yes', label: 'Yes', colorHex: emeraldC, hoverClass: 'emerald' },
-    { key: 'no', label: 'No', colorHex: roseC, hoverClass: 'rose' },
-    { key: 'not-sure', label: 'Not Sure', colorHex: slateC, hoverClass: 'slate' },
-  ];
-
   return (
-    <div className="flex flex-col gap-4 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-      {/* Sub-progress indicator */}
-      <div className={`text-xs text-center font-medium ${TH('text-muted', darkMode)}`}>
-        {subIdx + 1} of {total}
-      </div>
-      {/* Current trait/option — prominent display */}
-      <div key={`trait-${subIdx}-${animKey}`} className="min-h-[72px] flex items-center justify-center"
-        style={{ animation: 'fadeSlideIn 0.3s ease-out both' }}>
-        <div className="text-center px-4 py-4 rounded-2xl w-full"
-          style={{
-            background: darkMode ? `rgba(${c.rgb}, 0.08)` : `rgba(${c.rgb}, 0.05)`,
-            border: `1px solid ${darkMode ? `rgba(${c.rgb}, 0.15)` : `rgba(${c.rgb}, 0.10)`}`,
-          }}>
-          <span className={`text-base font-semibold leading-snug ${darkMode ? 'text-white/90' : 'text-gray-800'}`}>
-            {currentOption}
-          </span>
-        </div>
-      </div>
-      {/* "Other" text input (shows after tapping Yes on "Other" with hasOtherInput) */}
-      {showOtherInput ? (
-        <div className="flex flex-col gap-3" style={{ animation: 'fadeSlideIn 0.3s ease-out both' }}>
-          <input type="text" value={otherText} onChange={e => setOtherText(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleOtherTextSubmit(); }}
-            placeholder="Please specify..."
-            autoFocus
-            className={`w-full h-14 resp-h-lg rounded-2xl px-5 text-sm font-medium outline-none transition-all duration-200 ${TH('bg-input', darkMode)}`}
-            style={{ border: `1px solid rgba(${c.rgb}, 0.3)` }} />
-          <button onClick={handleOtherTextSubmit} disabled={!otherText.trim()}
-            className={`w-full h-14 resp-h-lg rounded-2xl font-semibold resp-text-md transition-all duration-200 disabled:opacity-30 hover-glow hover-glow-${color}`}
-            style={{
-              background: darkMode
-                ? `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.15))`
-                : `linear-gradient(135deg, rgba(${c.rgb}, 0.2), rgba(${c.rgb}, 0.08))`,
-              border: `1px solid rgba(${c.rgb}, 0.3)`,
-              color: darkMode ? '#fff' : c.base,
-            }}>
-            Done
-          </button>
-        </div>
-      ) : (
-        /* Response buttons — three equal-weight options */
-        <div className="flex flex-col gap-3">
-          {responseButtons.map(btn => {
-            const isSelected = currentResponse === btn.key;
-            const bc = btn.colorHex;
-            return (
-              <button key={btn.key} onClick={() => handleResponse(btn.key)}
-                className={`w-full h-14 resp-h-lg rounded-2xl font-semibold resp-text-md transition-all duration-200 hover-glow hover-glow-${btn.hoverClass}`}
-                style={{
-                  background: isSelected
-                    ? `linear-gradient(135deg, rgba(${bc.rgb}, 0.3), rgba(${bc.rgb}, 0.15))`
-                    : darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                  border: isSelected
-                    ? `1px solid rgba(${bc.rgb}, 0.5)`
-                    : darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
-                  color: isSelected ? (darkMode ? '#fff' : bc.base) : (darkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)'),
-                  boxShadow: isSelected ? `0 0 16px rgba(${bc.rgb}, 0.15)` : 'none',
-                }}>
-                {btn.label}
-              </button>
-            );
-          })}
-        </div>
+    <div className="flex flex-col gap-3 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      {question.options.map((opt) => (
+        <VerifyToggleSwitch key={opt} label={opt} color={color} darkMode={darkMode}
+          isOn={selected.includes(opt)} onToggle={() => toggle(opt)} />
+      ))}
+      {hasOther && selected.includes('Other') && (
+        <input type="text" value={otherText}
+          onChange={e => onAnswer({ items: selected, otherText: e.target.value })}
+          placeholder="Please specify..."
+          className={`w-full h-12 rounded-2xl px-5 text-sm font-medium outline-none ${TH('bg-input', darkMode)}`}
+          style={{ borderColor: `rgba(${c.rgb}, 0.3)` }} autoFocus />
       )}
-      {/* Sub-sequence progress dots */}
-      <div className="flex justify-center gap-1.5 mt-1">
-        {options.map((opt, i) => {
-          const resp = responses[opt];
-          const dotColor = resp === 'yes' ? emeraldC : resp === 'no' ? roseC : resp === 'not-sure' ? slateC : null;
-          return (
-            <div key={i} className="w-2 h-2 rounded-full transition-all duration-300"
-              style={{
-                background: i === subIdx
-                  ? (darkMode ? '#fff' : '#111')
-                  : dotColor
-                    ? `rgba(${dotColor.rgb}, ${darkMode ? 0.6 : 0.5})`
-                    : darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
-                transform: i === subIdx ? 'scale(1.3)' : 'scale(1)',
-              }} />
-          );
-        })}
-      </div>
     </div>
   );
 };
@@ -7524,6 +7478,7 @@ const VerifyTextInput = ({ question, color, darkMode, answer, onAnswer, onContin
     <div className="flex flex-col gap-4 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
       <input ref={inputRef} type="text" value={answer || ''} onChange={e => onAnswer(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' && (answer || '').trim()) onContinue(); }}
+        onDoubleClick={() => { if (IS_DEV) { onAnswer(answer || '(skipped)'); setTimeout(onContinue, 50); } }}
         placeholder={question.placeholder || ''}
         className={`w-full h-14 rounded-2xl px-5 text-sm font-medium outline-none transition-all duration-200 ${TH('bg-input', darkMode)}`}
         style={{ border: darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)' }}
@@ -7548,7 +7503,11 @@ const VerifyToggleSwitch = ({ label, subtitle, color, darkMode, isOn, onToggle }
           : darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
       }}>
       <div className="text-left pr-4 flex-1">
-        <span className={`text-sm font-medium block ${darkMode ? 'text-white/80' : 'text-gray-800'}`}>{label}</span>
+        {(() => { const dashRe = / [—\u2014] /; const p = dashRe.test(label) ? label.split(dashRe) : null;
+          return p ? (<><span className={`text-sm font-semibold block ${darkMode ? 'text-white/90' : 'text-gray-900'}`}>{p[0]}</span>
+            <span className={`text-xs block mt-0.5 ${darkMode ? 'text-white/45' : 'text-gray-500'}`}>{p[1]}</span></>)
+            : (<span className={`text-sm font-medium block ${darkMode ? 'text-white/80' : 'text-gray-800'}`}>{label}</span>);
+        })()}
         {subtitle && <span className={`text-xs block mt-0.5 ${darkMode ? 'text-white/35' : 'text-gray-400'}`}>{subtitle}</span>}
       </div>
       <div className="w-12 h-7 rounded-full relative transition-all duration-200 flex-shrink-0"
@@ -7674,7 +7633,7 @@ const VerifySubjectFlow = ({ darkMode, onComplete, onBack }) => {
               You may already know 14 Aura users!
             </div>
             <p className={`text-xs mb-4 ${TH('text-subtle', darkMode)}`}>
-              We found people from your {extractYesItems(answers['s2-social']).length ? extractYesItems(answers['s2-social']).join(' & ') : 'social'} network who are already in Aura.
+              We found people from your {Array.isArray(answers['s2-social']) ? answers['s2-social'].join(' & ') : 'social'} network who are already in Aura.
             </p>
             {[{ name: 'Ravi Kumar', mutual: 12 }, { name: 'Deepa Shah', mutual: 8 }, { name: 'Sarah Chen', mutual: 5 }].map((person, i) => (
               <div key={i} className={`flex items-center justify-between py-2.5 ${darkMode ? 'border-t border-white/[0.06]' : 'border-t border-black/[0.06]'}`}>
@@ -7738,9 +7697,8 @@ const VerifySubjectFlow = ({ darkMode, onComplete, onBack }) => {
   const isText = currentQ.type === 'text';
 
   const handleSingleAnswer = (val) => { handleAnswer(val); setTimeout(advance, 300); };
-  // Multi questions use sequential yes/no — no Continue button needed
-  const needsContinueButton = isText;
-  const continueDisabled = isText ? !(answers[currentScreenId] || '').trim() : false;
+  const needsContinueButton = isMulti || isText;
+  const continueDisabled = isText ? !(answers[currentScreenId] || '').trim() : isMulti ? !(Array.isArray(answers[currentScreenId]) ? answers[currentScreenId].length : (answers[currentScreenId]?.items?.length || 0)) : false;
 
   return (
     <VerifyScreenLayout darkMode={darkMode} color={color} sectionLabel={sectionLabel}
@@ -7752,7 +7710,7 @@ const VerifySubjectFlow = ({ darkMode, onComplete, onBack }) => {
         <h2 className={`question-text font-semibold px-2 text-center ${TH('text-primary', darkMode)}`}>{currentQ.text}</h2>
         {currentQ.subtitle && <p className={`text-xs text-center -mt-2 px-4 ${TH('text-muted', darkMode)}`}>{currentQ.subtitle}</p>}
         {isSingle && <VerifySingleSelect question={currentQ} color={color} darkMode={darkMode} answer={answers[currentScreenId]} onAnswer={handleSingleAnswer} answers={answers} />}
-        {isMulti && <VerifySequentialYesNo question={currentQ} color={color} darkMode={darkMode} answer={answers[currentScreenId]} onAnswer={handleAnswer} onComplete={advance} />}
+        {isMulti && <VerifyMultiToggle question={currentQ} color={color} darkMode={darkMode} answer={answers[currentScreenId]} onAnswer={handleAnswer} />}
         {isText && <VerifyTextInput question={currentQ} color={color} darkMode={darkMode} answer={answers[currentScreenId]} onAnswer={handleAnswer} onContinue={advance} />}
       </div>
     </VerifyScreenLayout>
@@ -7766,10 +7724,10 @@ const VerifySubjectCard = ({ darkMode, answers, onBack, onSubmit }) => {
     { label: 'Name', value: answers['s1-name'] },
     { label: 'Country', value: answers['s1-country'] },
     { label: 'City', value: answers['s1-city'] },
-    { label: 'Source', value: extractYesItems(answers['s1-source']).join(', ') || 'None selected' },
+    { label: 'Source', value: answers['s1-source'] || 'None selected' },
     answers['s1-referrer'] && { label: 'Referred by', value: answers['s1-referrer'] },
     { label: 'Account type', value: answers['s1-account-type'] },
-    { label: 'Social', value: extractYesItems(answers['s2-social']).length ? extractYesItems(answers['s2-social']).join(', ') : 'None connected' },
+    { label: 'Social', value: Array.isArray(answers['s2-social']) && answers['s2-social'].length ? answers['s2-social'].join(', ') : 'None connected' },
     answers['s2-know-anyone'] && { label: 'Knows someone', value: answers['s2-know-anyone'] },
     answers['s2-connection-name'] && { label: 'Connection', value: answers['s2-connection-name'] },
     { label: 'Account status', value: answers['s3-attest'] },
@@ -7876,6 +7834,23 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
 
   const gateColor = 'emerald';
 
+  // Dev toolbar — jump between paths and skip to verdict
+  const devBar = IS_DEV ? (
+    <div className="fixed top-1 right-1 z-[9999] flex gap-1 opacity-40 hover:opacity-100 transition-opacity" style={{fontSize:'10px'}}>
+      {['A','B','C'].map(p => (
+        <button key={p} onClick={() => { setPath(p); setPhase('path'); setQuestionIdx(0); setAnswers({}); setAnimKey(k=>k+1); }}
+          className={`px-2 py-1 rounded ${path === p ? 'bg-white/20 text-white' : 'bg-black/30 text-white/60'}`}>{p}</button>
+      ))}
+      <button onClick={() => {
+        if (!path) { setPath('B'); }
+        const p = path || 'B';
+        const qs = VERIFY_PATH_CONFIG[p].questions;
+        const verdictIdx = qs.findIndex(q => q.type === 'verdict');
+        if (verdictIdx >= 0) { setPhase('path'); setQuestionIdx(verdictIdx); setAnimKey(k=>k+1); }
+      }} className="px-2 py-1 rounded bg-black/30 text-amber-400/80">Verdict</button>
+    </div>
+  ) : null;
+
   const getActiveQuestions = (p, ans) => {
     if (!p || !VERIFY_PATH_CONFIG[p]) return [];
     return VERIFY_PATH_CONFIG[p].questions.filter(q => !q.conditional || q.conditional(ans));
@@ -7883,7 +7858,8 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
 
   // Gate screen
   if (phase === 'gate') {
-    return (
+    return (<>
+      {devBar}
       <VerifyScreenLayout darkMode={darkMode} color={gateColor} sectionLabel="Relationship Gate" onBack={onBack}>
         <div className="flex flex-col items-center gap-6 w-full mt-4" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
           <h2 className={`question-text font-semibold px-2 text-center ${TH('text-primary', darkMode)}`}>
@@ -7911,13 +7887,14 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
           </div>
         </div>
       </VerifyScreenLayout>
-    );
+    </>);
   }
 
   // Fit check
   if (phase === 'fit') {
     const fitColor = VERIFY_PATH_CONFIG[path].color;
-    return (
+    return (<>
+      {devBar}
       <VerifyScreenLayout darkMode={darkMode} color={fitColor} sectionLabel="Evaluator Fit" onBack={() => setPhase('gate')}>
         <div className="flex flex-col items-center gap-6 w-full mt-4" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
           <h2 className={`question-text font-semibold px-2 text-center ${TH('text-primary', darkMode)}`}>
@@ -7935,7 +7912,7 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
           </div>
         </div>
       </VerifyScreenLayout>
-    );
+    </>);
   }
 
   // Path questions
@@ -7953,6 +7930,7 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
   const advance = () => {
     setAnimKey(k => k + 1);
     if (question.type === 'star-confidence' && answers[question.id] === undefined) return;
+    if (question.type === 'verdict' && !(answers[question.id]?.verdict && answers[question.id]?.confidence)) return;
     const nextQuestions = getActiveQuestions(path, answers);
     const currentFilteredIdx = nextQuestions.findIndex(q => q.id === question.id);
     if (currentFilteredIdx + 1 < nextQuestions.length) setQuestionIdx(currentFilteredIdx + 1);
@@ -7968,26 +7946,36 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
   const isMulti = question.type === 'multi';
   const isText = question.type === 'text';
   const isStar = question.type === 'star-confidence';
-  // Multi questions use sequential yes/no — no Continue button needed
-  const needsContinueButton = isText || isStar;
+  const isVerdict = question.type === 'verdict';
+  const needsContinueButton = isMulti || isText || isStar || isVerdict;
   const continueDisabled = isText ? !(answers[question.id] || '').trim()
-    : isStar ? answers[question.id] === undefined : false;
+    : isMulti ? !(Array.isArray(answers[question.id]) ? answers[question.id].length : (answers[question.id]?.items?.length || 0))
+    : isStar ? answers[question.id] === undefined
+    : isVerdict ? !(answers[question.id]?.verdict && answers[question.id]?.confidence)
+    : false;
 
-  return (
+  return (<>
+    {devBar}
     <VerifyScreenLayout darkMode={darkMode} color={color}
-      sectionLabel={`Path ${path}: ${config.label}`}
+      sectionLabel={isVerdict ? 'Your Verdict' : `Path ${path}: ${config.label}`}
       progress={questionIdx} total={activePathQuestions.length} onBack={goBack}
       buttons={needsContinueButton ? <VerifyActionButton label="Continue" color={color} darkMode={darkMode} onClick={advance} disabled={continueDisabled} /> : null}>
       <div key={`eq-${question.id}-${animKey}`} className="flex flex-col items-center gap-5 w-full mt-4" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-        <h2 className={`question-text font-semibold px-2 text-center ${TH('text-primary', darkMode)}`}>{question.text}</h2>
+        {isVerdict && question.text.includes('\n') ? (<>
+          <p className={`text-sm font-medium tracking-wide uppercase ${TH('text-muted', darkMode)}`}>{question.text.split('\n')[0]}</p>
+          <h2 className={`question-text font-semibold px-2 text-center -mt-3 ${TH('text-primary', darkMode)}`}>{question.text.split('\n')[1]}</h2>
+        </>) : (
+          <h2 className={`question-text font-semibold px-2 text-center ${TH('text-primary', darkMode)}`}>{question.text}</h2>
+        )}
         {question.subtitle && <p className={`text-xs text-center -mt-2 px-4 ${TH('text-muted', darkMode)}`}>{question.subtitle}</p>}
         {isSingle && <VerifySingleSelect question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleSingleAnswer} answers={answers} />}
-        {isMulti && <VerifySequentialYesNo question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleAnswer} onComplete={advance} />}
+        {isMulti && <VerifyMultiToggle question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleAnswer} />}
         {isText && <VerifyTextInput question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleAnswer} onContinue={advance} />}
         {isStar && <VerifyStarConfidence color={color} darkMode={darkMode} value={answers[question.id]} onChange={handleAnswer} />}
+        {isVerdict && <VerifyVerdict question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleAnswer} />}
       </div>
     </VerifyScreenLayout>
-  );
+  </>);
 };
 
 // VerifyEvalSummary — evaluation summary after completing
@@ -7996,24 +7984,17 @@ const VerifyEvalSummary = ({ darkMode, data, subject, onSubmit, onBack }) => {
   const config = VERIFY_PATH_CONFIG[path];
   const color = config.color;
   const c = COLOR_HEX[color];
-  const confKey = path === 'A' ? 'a3-confidence' : path === 'B' ? 'b5-confidence' : 'c6-confidence';
-  const confidence = answers[confKey] || '--';
+  const verdictKey = path === 'A' ? 'a3-verdict' : path === 'B' ? 'b5-verdict' : 'c6-verdict';
+  const verdictData = answers[verdictKey] || {};
+  const verdict = verdictData.verdict;
+  const isPositive = verdict === 'Yes';
+  const confidence = verdictData.confidence || '--';
   const confLabels = { 1: 'Some confidence, notable gaps', 2: 'Fairly confident, minor uncertainty', 3: 'Very confident', 4: 'Certain' };
-  const rows = config.questions.filter(q => answers[q.id] !== undefined).map(q => {
-    const val = answers[q.id];
-    let display;
-    if (q.type === 'multi') {
-      const yesItems = extractYesItems(val);
-      const otherEntry = val && typeof val === 'object' && val['Other'];
-      const otherSuffix = otherEntry && otherEntry.text ? ` (${otherEntry.text})` : '';
-      display = yesItems.length ? yesItems.join(', ') + otherSuffix : 'None selected';
-    } else if (typeof val === 'number') {
-      display = String(val);
-    } else {
-      display = String(val);
-    }
-    return { label: q.text, value: display };
-  });
+  const rows = config.questions.filter(q => answers[q.id] !== undefined && q.type !== 'verdict').map(q => ({
+    label: q.text,
+    value: Array.isArray(answers[q.id]) ? answers[q.id].join(', ')
+      : (answers[q.id]?.items ? (answers[q.id].items.join(', ') + (answers[q.id].otherText ? ` (${answers[q.id].otherText})` : '')) : String(answers[q.id]))
+  }));
 
   return (
     <VerifyScreenLayout darkMode={darkMode} color={color} onBack={onBack}>
@@ -8030,6 +8011,11 @@ const VerifyEvalSummary = ({ darkMode, data, subject, onSubmit, onBack }) => {
         </div>
         <div className="rounded-2xl p-5 mb-4 text-center"
           style={{ background: `linear-gradient(135deg, rgba(${c.rgb}, 0.15), rgba(${c.rgb}, 0.05))`, border: `1px solid rgba(${c.rgb}, 0.25)` }}>
+          {verdict && (
+            <div className={`text-lg font-bold mb-3 ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {isPositive ? 'Yes' : 'No'}
+            </div>
+          )}
           <div className="flex justify-center gap-3 mb-3">
             {[1, 2, 3, 4].map(level => {
               const isSelected = typeof confidence === 'number' && level <= confidence;
@@ -8564,7 +8550,11 @@ const AssessPickerScreen = ({
         <button onClick={(e) => { e.stopPropagation(); onNavigate('categories'); }} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
         <span className="text-2xl cursor-pointer select-none" onDoubleClick={onClearDemo}>🪞</span>
         <span className={`font-semibold flex-1 ${TH('text-primary', darkMode)}`}>Reveal</span>
-        <button onClick={(e) => { e.stopPropagation(); if (assessCompleted['quick-profile']) onNavigate('assess-analysis'); }} className={`px-3 py-1.5 rounded-full text-sm font-medium ${assessCompleted['quick-profile'] ? 'bg-violet-600 text-white' : (darkMode ? 'bg-white/[0.04] text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')}`}>Analysis</button>
+        {(() => { const cc = getCompletedCategoryCount(assessCompleted, entityType); const ok = cc >= 2; return (
+            <button onClick={(e) => { e.stopPropagation(); if (ok) onNavigate('assess-analysis'); }}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium ${ok ? 'bg-violet-600 text-white' : (darkMode ? 'bg-white/[0.04] text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')}`}>
+              {ok ? 'Analysis' : `${cc}/2 to unlock`}
+            </button>); })()}
       </div>
       {/* Demo Profile Selector - only shown when demo controls enabled in settings */}
       {showDemoControls && (
@@ -8624,17 +8614,27 @@ const AssessPickerScreen = ({
 
         const categoriesWithStatus = visibleCategories.map(([catId, cat]) => {
           const catTests = cat.tests.map(id => [id, ASSESS_TESTS[id]]).filter(([_, t]) => t);
-          const allComplete = catTests.every(([id]) => assessCompleted[id]);
-          const hasProgress = catTests.some(([id]) => assessCompleted[id] || assessInProgress[id]);
-          return { catId, cat, catTests, allComplete, hasProgress };
+          const status = getCategoryStatus(catId, assessCompleted, assessInProgress, currentTier);
+          const allComplete = status === 'done';
+          const hasProgress = status === 'in-progress';
+          return { catId, cat, catTests, allComplete, hasProgress, status };
         });
         const heroPriority = entityType === 'ai'
           ? ['ai-identity', 'quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow']
           : ['quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow'];
         const allIncomplete = categoriesWithStatus.filter(c => !c.allComplete);
-        const heroItem = heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
+        // Layer 2: prefer in-progress categories for hero (bring user back to what they started)
+        const inProgressItems = allIncomplete.filter(c => c.hasProgress);
+        const heroItem = inProgressItems.length > 0
+          ? inProgressItems[0]  // in-progress gets priority
+          : heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
         const heroCategory = heroItem || null;
+        // Layer 2: sort in-progress to top, then by static order
         const incompleteCategories = allIncomplete.filter(c => c !== heroCategory).sort((a, b) => {
+          // In-progress floats above available
+          if (a.hasProgress && !b.hasProgress) return -1;
+          if (!a.hasProgress && b.hasProgress) return 1;
+          // Within same status, use static order
           const ai = heroPriority.indexOf(a.catId), bi = heroPriority.indexOf(b.catId);
           return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
         });
@@ -13033,7 +13033,7 @@ function App() {
                 if (s.id === 'verify-evaluator' && !verifyCurrentSubjectId) setVerifyCurrentSubjectId('mock-1');
                 if (s.id === 'verify-eval-summary' && !verifyEvaluatorData) {
                   setVerifyCurrentSubjectId('mock-1');
-                  setVerifyEvaluatorData({ path: 'A', pathLabel: 'Vouching', answers: { 'a3-confidence': 3 } });
+                  setVerifyEvaluatorData({ path: 'A', pathLabel: 'Vouching', answers: { 'a3-verdict': { verdict: 'Yes', confidence: 3 } } });
                 }
                 setScreen(s.id);
               }}

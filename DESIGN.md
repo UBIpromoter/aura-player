@@ -6,10 +6,6 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
 
 ## Open
 
-### Welcome
-- [ ] **Bloom: breathing, above tagline, ~20%** — aura viz replaces logo. Positioned above the tagline in the logo area. Medium-sized (~20% of screen). Continuously alive with subtle breathing — **calm resting pace, 2-3 sec cycle**. Animated bloom on load, then stays gently alive.
-  > "Mini bloom animation" · "Medium — fills ~20%" · "Breathing (alive)" · "Above tagline" · "Calm resting (2-3s)"
-
 ### Profile
 - [ ] **Stats lead, viz replaces guest image** — level bar + top trait up top. Viz takes over guest image slot at **current guest image size**, **contained circle with glow bleeding out** (not fully unbounded, but glow escapes the boundary). Trait label medium prominence — clear but not showy. Move level/XP elsewhere to simplify the whole top section
   > "Stats lead" · "Mix — level bar + top trait" · "Viz should take over the profile guest image, incorporate level and XP elsewhere so we can simplify the whole top"
@@ -42,6 +38,10 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
 - [x] **URGENT: Remove gold shimmer ring on multi-choice answers** — DONE: removed ring-2, ring-offset, ring-{color}-400 from assess answer buttons. Selected answers show filled bg + border only.
 - [x] **Undo toast: move from top-of-screen to answer row** — DONE: moved to overlay answer button area. Assess screen toast moved to bottom. Awaiting Philip review.
 
+### Verify
+- [ ] **Verdict question language refinement** — current: "One real person, one account here?" Works for now but revisit. Core concept: confirm this is a real human's one legitimate account in the system. Consider per-path variations (vouch vs investigate vs analyze). See brainstorm options 6, 7, 10, 11, 15 from session.
+  > "I want them to confirm that they think this is a human's one unique appropriate account to be using in the system"
+
 ### Settings
 - [ ] **UX audit later** — looks fine, but ensure right order, right items, easy to use. Revisit when more features land
   > "Fine for now" · "Make sure it's all in the right order and the right things are there and it's easy to use"
@@ -60,4 +60,4 @@ _Moved here on merge. Cleaned out periodically._
 - **Binary glow — center of question** — merged to production (removed marginTop: -5% offset)
 - **QotD — banner cleanup** — merged to production (removed day, slimmed timer to "Xh left", removed +25)
 - **Settings — collapsible keyboard shortcuts** — merged to production (click-to-expand)
-- **Welcome — bloom animation** — noodled (v2 noodle), iterating
+- **Welcome — bloom animation** — shipped: mature organism replaces emoji, bloom-in + breathing (`6487fce`)
