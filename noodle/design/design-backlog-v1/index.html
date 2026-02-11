@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Design Backlog — Batch 1</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  .phone-frame {
+    width: 375px;
+    height: 720px;
+    border-radius: 55px;
+    background: #030712;
+    border: 3px solid #1a1a1c;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .phone-inner {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  .label-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .label-before { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+  .label-after { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+  @keyframes aura-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+
+  @keyframes bloom-settle {
+    0% { transform: scale(0.3); opacity: 0; }
+    40% { transform: scale(1.15); opacity: 1; }
+    70% { transform: scale(0.95); opacity: 0.9; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes bloom-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+  }
+
+  .bloom-settle {
+    animation: bloom-settle 1.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .bloom-breathe {
+    animation: bloom-breathe 6s ease-in-out infinite;
+  }
+
+  .section-header {
+    padding: 40px 0 20px;
+    text-align: center;
+  }
+
+  .comparison-row {
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px 40px 60px;
+  }
+
+  .phone-label {
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  /* Starry background for predict category */
+  .starry-bg {
+    background-image: radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.3) 0%, transparent 100%),
+                       radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.2) 0%, transparent 100%),
+                       radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,0.25) 0%, transparent 100%),
+                       radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.15) 0%, transparent 100%);
+  }
+
+  /* Deep bloom canvas simulation */
+  .bloom-canvas {
+    width: 160px;
+    height: 160px;
+    position: relative;
+  }
+
+  .bloom-node {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(1px);
+  }
+
+  .bloom-glow {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  /* Question glow */
+  .question-glow-center {
+    position: absolute;
+    width: 300%;
+    height: 300%;
+    left: -100%;
+    top: -100%;
+    background: radial-gradient(ellipse at center, rgba(139, 92, 246, 0.18) 0%, rgba(139, 92, 246, 0.06) 35%, transparent 60%);
+    pointer-events: none;
+    animation: aura-breathe 8s ease-in-out infinite;
+  }
+
+  .question-glow-below {
+    position: absolute;
+    width: 300%;
+    height: 300%;
+    left: -100%;
+    top: 20%;
+    background: radial-gradient(ellipse at center, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 35%, transparent 60%);
+    pointer-events: none;
+    animation: aura-breathe 8s ease-in-out infinite;
+  }
+
+  .btn-cat {
+    transition: all 0.15s ease;
+  }
+  .btn-cat:active {
+    transform: scale(0.98);
+  }
+
+  /* Scroll styling */
+  ::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body>
+<div style="max-width: 1600px; margin: 0 auto; padding: 20px;">
+
+  <!-- Title -->
+  <div style="text-align: center; padding: 40px 20px 10px;">
+    <h1 style="font-size: 28px; font-weight: 700; color: #e2e8f0;">Aura Design Backlog — Batch 1</h1>
+    <p style="color: #64748b; margin-top: 8px; font-size: 14px;">Categories Grid &middot; Welcome Bloom &middot; Binary Glow &middot; QotD Cleanup</p>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- 1. CATEGORIES — 2-across square grid -->
+  <!-- ============================================ -->
+  <div class="section-header">
+    <h2 style="font-size: 20px; font-weight: 600; color: #c4b5fd;">1. Categories &mdash; 2-Across Square Grid</h2>
+    <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Current stacked list &rarr; square grid, name only, no progress</p>
+  </div>
+
+  <div class="comparison-row">
+    <!-- BEFORE -->
+    <div>
+      <div class="phone-label">
+        <span class="label-tag label-before">Before</span>
+      </div>
+      <div class="phone-frame">
+        <div class="phone-inner" style="padding: 16px 20px;">
+          <!-- Ambient wash -->
+          <div style="position: absolute; top: 0; left: 0; right: 0; height: 192px; pointer-events: none;
+            background: radial-gradient(ellipse 80% 100% at 50% -10%, rgba(139,92,246,0.08) 0%, transparent 70%);"></div>
+
+          <!-- Header -->
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0 12px; position: relative; z-index: 10;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 28px;">🌀</span>
+              <span style="font-size: 13px; font-weight: 700; color: #a78bfa;">Lv.3</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 13px; color: #fb923c; font-weight: 500;">🔥2</span>
+              <div style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+                box-shadow: 0 0 12px 3px rgba(255,255,255,0.3); border: 1.5px solid rgba(255,255,255,0.3);">
+                <span style="color: rgba(255,255,255,0.9); font-size: 13px;">👤</span>
+              </div>
+              <svg style="width: 24px; height: 24px; color: #6b7280;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- QotD card -->
+          <div style="width: 100%; padding: 16px; border-radius: 16px; text-align: center; margin-bottom: 16px;
+            background: linear-gradient(to bottom right, rgba(29,78,216,0.6), rgba(30,58,138,0.8));
+            border: 1px solid rgba(59,130,246,0.4);">
+            <div style="font-weight: 500; font-size: 13px; color: #60a5fa; margin-bottom: 8px;">🌀 Question of the Day</div>
+            <p style="font-size: 18px; font-weight: 600; color: #fff; line-height: 1.4;">Should AI be allowed to vote?</p>
+          </div>
+
+          <!-- Categories — stacked (current) -->
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Predict (featured) -->
+            <button class="btn-cat starry-bg" style="width: 100%; padding: 16px 20px; border-radius: 16px; text-align: left;
+              border: 1px solid rgba(245,158,11,0.4); overflow: hidden; background-color: rgba(120,53,15,0.15); cursor: pointer;">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <span style="font-size: 24px;">☀️</span>
+                <div style="font-size: 18px; font-weight: 600; color: #fff;">Predict</div>
+              </div>
+            </button>
+            <!-- Think -->
+            <button class="btn-cat" style="width: 100%; padding: 14px 20px; border-radius: 16px; text-align: left;
+              border: 1px solid rgba(139,92,246,0.4); background: linear-gradient(to right, rgba(76,29,149,0.3), rgba(46,16,101,0.5)); cursor: pointer;">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <span style="font-size: 20px;">🧠</span>
+                <div style="font-size: 16px; font-weight: 600; color: #fff;">Think</div>
+              </div>
+            </button>
+            <!-- Judge -->
+            <button class="btn-cat" style="width: 100%; padding: 14px 20px; border-radius: 16px; text-align: left;
+              border: 1px solid rgba(20,184,166,0.4); background: linear-gradient(to right, rgba(15,118,110,0.3), rgba(17,94,89,0.5)); cursor: pointer;">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <span style="font-size: 20px;">⚖️</span>
+                <div style="font-size: 16px; font-weight: 600; color: #fff;">Judge</div>
+              </div>
+            </button>
+            <!-- Surprise Me -->
+            <button class="btn-cat" style="width: 100%; padding: 16px 20px; border-radius: 16px; text-align: left;
+              border: 1px solid rgba(244,63,94,0.4); background: linear-gradient(to right, rgba(136,19,55,0.3), rgba(76,5,25,0.5)); cursor: pointer;">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <span style="font-size: 20px;">✨</span>
+                <div style="font-size: 16px; font-weight: 600; color: #fff;">Surprise me</div>
+              </div>
+            </button>
+
+            <!-- Self divider -->
+            <div style="display: flex; align-items: center; gap: 12px; margin: 8px 0;">
+              <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+              <span style="font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280;">Self</span>
+              <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+            </div>
+
+            <!-- Reveal -->
+            <button class="btn-cat" style="width: 100%; padding: 16px 20px; border-radius: 16px; text-align: left;
+              border: 1px solid rgba(59,130,246,0.4); background: linear-gradient(to right, rgba(30,64,175,0.3), rgba(30,58,138,0.5)); cursor: pointer;">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <span style="font-size: 20px;">🪞</span>
+                <div style="font-size: 16px; font-weight: 600; color: #fff;">Reveal</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AFTER -->
+    <div>
+      <div class="phone-label">
+        <span class="label-tag label-after">After</span>
+      </div>
+      <div class="phone-frame">
+        <div class="phone-inner" style="padding: 16px 20px;">
+          <!-- Ambient wash -->
+          <div style="position: absolute; top: 0; left: 0; right: 0; height: 192px; pointer-events: none;
+            background: radial-gradient(ellipse 80% 100% at 50% -10%, rgba(139,92,246,0.08) 0%, transparent 70%);"></div>
+
+          <!-- Header (same) -->
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0 12px; position: relative; z-index: 10;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 28px;">🌀</span>
+              <span style="font-size: 13px; font-weight: 700; color: #a78bfa;">Lv.3</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 13px; color: #fb923c; font-weight: 500;">🔥2</span>
+              <div style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+                box-shadow: 0 0 12px 3px rgba(255,255,255,0.3); border: 1.5px solid rgba(255,255,255,0.3);">
+                <span style="color: rgba(255,255,255,0.9); font-size: 13px;">👤</span>
+              </div>
+              <svg style="width: 24px; height: 24px; color: #6b7280;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- QotD card (same) -->
+          <div style="width: 100%; padding: 16px; border-radius: 16px; text-align: center; margin-bottom: 16px;
+            background: linear-gradient(to bottom right, rgba(29,78,216,0.6), rgba(30,58,138,0.8));
+            border: 1px solid rgba(59,130,246,0.4);">
+            <div style="font-weight: 500; font-size: 13px; color: #60a5fa; margin-bottom: 8px;">🌀 Question of the Day</div>
+            <p style="font-size: 18px; font-weight: 600; color: #fff; line-height: 1.4;">Should AI be allowed to vote?</p>
+          </div>
+
+          <!-- Categories — 2-across SQUARE grid, name only -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <!-- Predict -->
+            <button class="btn-cat starry-bg" style="aspect-ratio: 1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+              border: 1px solid rgba(245,158,11,0.4); overflow: hidden; background-color: rgba(120,53,15,0.15); cursor: pointer;">
+              <span style="font-size: 32px;">☀️</span>
+              <span style="font-size: 15px; font-weight: 600; color: #fff;">Predict</span>
+            </button>
+            <!-- Think -->
+            <button class="btn-cat" style="aspect-ratio: 1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+              border: 1px solid rgba(139,92,246,0.4); background: linear-gradient(135deg, rgba(76,29,149,0.25), rgba(46,16,101,0.4)); cursor: pointer;">
+              <span style="font-size: 32px;">🧠</span>
+              <span style="font-size: 15px; font-weight: 600; color: #fff;">Think</span>
+            </button>
+            <!-- Judge -->
+            <button class="btn-cat" style="aspect-ratio: 1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+              border: 1px solid rgba(20,184,166,0.4); background: linear-gradient(135deg, rgba(15,118,110,0.25), rgba(17,94,89,0.4)); cursor: pointer;">
+              <span style="font-size: 32px;">⚖️</span>
+              <span style="font-size: 15px; font-weight: 600; color: #fff;">Judge</span>
+            </button>
+            <!-- Surprise Me -->
+            <button class="btn-cat" style="aspect-ratio: 1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+              border: 1px solid rgba(244,63,94,0.4); background: linear-gradient(135deg, rgba(136,19,55,0.25), rgba(76,5,25,0.4)); cursor: pointer;">
+              <span style="font-size: 32px;">✨</span>
+              <span style="font-size: 15px; font-weight: 600; color: #fff;">Surprise me</span>
+            </button>
+          </div>
+
+          <!-- Self divider -->
+          <div style="display: flex; align-items: center; gap: 12px; margin: 20px 0;">
+            <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+            <span style="font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280;">Self</span>
+            <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+          </div>
+
+          <!-- Self section — 2-across grid too -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <!-- Reveal -->
+            <button class="btn-cat" style="aspect-ratio: 1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+              border: 1px solid rgba(59,130,246,0.4); background: linear-gradient(135deg, rgba(30,64,175,0.25), rgba(30,58,138,0.4)); cursor: pointer;">
+              <span style="font-size: 32px;">🪞</span>
+              <span style="font-size: 15px; font-weight: 600; color: #fff;">Reveal</span>
+            </button>
+            <!-- Surprise Me (self) -->
+            <button class="btn-cat" style="aspect-ratio: 1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+              border: 1px solid rgba(139,92,246,0.4); background: linear-gradient(135deg, rgba(76,29,149,0.25), rgba(46,16,101,0.4)); cursor: pointer;">
+              <span style="font-size: 32px;">🎲</span>
+              <span style="font-size: 15px; font-weight: 600; color: #fff;">Surprise me</span>
+            </button>
+          </div>
+
+          <!-- Work divider -->
+          <div style="display: flex; align-items: center; gap: 12px; margin: 20px 0;">
+            <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+            <span style="font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280;">Work</span>
+            <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+          </div>
+
+          <!-- Verify -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <button class="btn-cat" style="aspect-ratio: 1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+              border: 1px solid rgba(16,185,129,0.4); background: linear-gradient(135deg, rgba(6,78,59,0.25), rgba(6,78,59,0.4)); cursor: pointer;">
+              <span style="font-size: 32px;">🛡️</span>
+              <span style="font-size: 15px; font-weight: 600; color: #fff;">Verify</span>
+              <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: rgba(16,185,129,0.2); color: #34d399;">3</span>
+            </button>
+            <div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================ -->
+  <!-- 2. WELCOME — Mini Bloom Animation -->
+  <!-- ============================================ -->
+  <div class="section-header">
+    <h2 style="font-size: 20px; font-weight: 600; color: #c4b5fd;">2. Welcome &mdash; Mini Bloom Animation</h2>
+    <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Emoji logo &rarr; animated aura viz bloom, ~20% of screen, settles then breathes</p>
+  </div>
+
+  <div class="comparison-row">
+    <!-- BEFORE -->
+    <div>
+      <div class="phone-label">
+        <span class="label-tag label-before">Before</span>
+      </div>
+      <div class="phone-frame">
+        <div class="phone-inner" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px;">
+          <div style="font-size: 64px; margin-bottom: 24px;">🌀</div>
+          <h1 style="font-size: 30px; font-weight: 700; color: #fff; margin-bottom: 12px;">Aura</h1>
+          <p style="font-size: 16px; color: #9ca3af; text-align: center; margin-bottom: 48px;">Discover yourself, one question at a time</p>
+          <div style="width: 100%; max-width: 280px;">
+            <button style="width: 100%; padding: 16px 24px; border-radius: 12px; font-weight: 600; font-size: 18px; background: #7c3aed; color: #fff; border: none; cursor: pointer;">
+              Let's Go
+            </button>
+          </div>
+          <button style="margin-top: 32px; font-size: 13px; color: #6b7280; background: none; border: none; cursor: pointer;">Sign In</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AFTER -->
+    <div>
+      <div class="phone-label">
+        <span class="label-tag label-after">After</span>
+      </div>
+      <div class="phone-frame">
+        <div class="phone-inner" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px;">
+          <!-- Bloom viz replacing logo -->
+          <div style="width: 140px; height: 140px; position: relative; margin-bottom: 24px;" class="bloom-settle" id="bloom-container">
+            <!-- Outer glow -->
+            <div style="position: absolute; inset: -40px; border-radius: 50%;
+              background: radial-gradient(circle, rgba(139,92,246,0.25) 0%, rgba(139,92,246,0.08) 40%, transparent 70%);"
+              class="bloom-breathe"></div>
+            <!-- Secondary glow -->
+            <div style="position: absolute; inset: -25px; border-radius: 50%;
+              background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.05) 45%, transparent 70%);"
+              class="bloom-breathe" id="bloom-secondary"></div>
+            <!-- Canvas sim: nodes -->
+            <div style="position: absolute; inset: 0;">
+              <!-- Primary nodes (inner ring) -->
+              <div class="bloom-node" style="width: 14px; height: 14px; background: radial-gradient(circle, #8b5cf6 20%, rgba(139,92,246,0.4) 80%); top: 30%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 12px rgba(139,92,246,0.6);"></div>
+              <div class="bloom-node" style="width: 12px; height: 12px; background: radial-gradient(circle, #3b82f6 20%, rgba(59,130,246,0.4) 80%); top: 55%; left: 28%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(59,130,246,0.5);"></div>
+              <div class="bloom-node" style="width: 13px; height: 13px; background: radial-gradient(circle, #10b981 20%, rgba(16,185,129,0.4) 80%); top: 55%; left: 72%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(16,185,129,0.5);"></div>
+              <div class="bloom-node" style="width: 11px; height: 11px; background: radial-gradient(circle, #f43f5e 20%, rgba(244,63,94,0.4) 80%); top: 75%; left: 40%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(244,63,94,0.5);"></div>
+              <div class="bloom-node" style="width: 12px; height: 12px; background: radial-gradient(circle, #d946ef 20%, rgba(217,70,239,0.4) 80%); top: 75%; left: 62%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(217,70,239,0.5);"></div>
+              <!-- Connections (SVG) -->
+              <svg style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;">
+                <line x1="50%" y1="30%" x2="28%" y2="55%" stroke="rgba(139,92,246,0.15)" stroke-width="1"/>
+                <line x1="50%" y1="30%" x2="72%" y2="55%" stroke="rgba(139,92,246,0.12)" stroke-width="1"/>
+                <line x1="28%" y1="55%" x2="40%" y2="75%" stroke="rgba(59,130,246,0.12)" stroke-width="1"/>
+                <line x1="72%" y1="55%" x2="62%" y2="75%" stroke="rgba(16,185,129,0.12)" stroke-width="1"/>
+                <line x1="40%" y1="75%" x2="62%" y2="75%" stroke="rgba(244,63,94,0.10)" stroke-width="1"/>
+              </svg>
+            </div>
+          </div>
+          <h1 style="font-size: 30px; font-weight: 700; color: #fff; margin-bottom: 12px;">Aura</h1>
+          <p style="font-size: 16px; color: #9ca3af; text-align: center; margin-bottom: 48px;">Discover yourself, one question at a time</p>
+          <div style="width: 100%; max-width: 280px;">
+            <button style="width: 100%; padding: 16px 24px; border-radius: 12px; font-weight: 600; font-size: 18px; background: #7c3aed; color: #fff; border: none; cursor: pointer;">
+              Let's Go
+            </button>
+          </div>
+          <button style="margin-top: 32px; font-size: 13px; color: #6b7280; background: none; border: none; cursor: pointer;">Sign In</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================ -->
+  <!-- 3. BINARY GLOW — Center of question text -->
+  <!-- ============================================ -->
+  <div class="section-header">
+    <h2 style="font-size: 20px; font-weight: 600; color: #c4b5fd;">3. Binary Question Glow &mdash; Center of Question</h2>
+    <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Glow origin from below &rarr; centered on question text, increased intensity</p>
+  </div>
+
+  <div class="comparison-row">
+    <!-- BEFORE -->
+    <div>
+      <div class="phone-label">
+        <span class="label-tag label-before">Before (glow from below)</span>
+      </div>
+      <div class="phone-frame">
+        <div class="phone-inner" style="display: flex; flex-direction: column;">
+          <!-- Track selector bar -->
+          <div style="height: 68px; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: rgba(17,24,39,0.5);
+            border-bottom: 1px solid rgba(139,92,246,0.15);">
+            <span style="font-size: 20px; font-weight: 700; color: #d1d5db; width: 32px; text-align: center;">◀</span>
+            <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px;">
+              <div style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(139,92,246,0.5); display: flex; align-items: center; justify-content: center;">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: #030712; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff;">Y/N</div>
+              </div>
+              <div style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid rgba(139,92,246,0.25); display: flex; align-items: center; justify-content: center;">
+                <div style="width: 28px; height: 28px; border-radius: 50%; background: #030712; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #9ca3af;">MC</div>
+              </div>
+            </div>
+            <span style="font-size: 20px; font-weight: 700; color: #d1d5db; width: 32px; text-align: center;">▶</span>
+          </div>
+
+          <!-- Question area with glow FROM BELOW -->
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 16px; position: relative; overflow: hidden;">
+            <!-- Ambient breathing — offset low (the problem) -->
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; margin-top: 15%;">
+              <div style="position: absolute; width: 420px; height: 420px; border-radius: 50%;
+                background: radial-gradient(circle, rgba(139,92,246,0.14) 0%, rgba(139,92,246,0.06) 35%, transparent 65%);
+                animation: aura-breathe 8s ease-in-out infinite;"></div>
+            </div>
+
+            <!-- Category + question -->
+            <div style="position: relative; z-index: 10; text-align: center;">
+              <span style="font-size: 13px; font-weight: 500; color: #a78bfa;">🧠 Think</span>
+              <h2 style="font-size: clamp(20px, 6vw, 28px); font-weight: 500; color: #fff; margin-top: 8px; line-height: 1.35;">
+                Is consciousness required for intelligence?
+              </h2>
+            </div>
+          </div>
+
+          <!-- Binary buttons -->
+          <div style="flex-shrink: 0; padding: 12px 16px 16px; border-top: 1px solid rgba(139,92,246,0.12);
+            background: linear-gradient(180deg, rgba(3,7,18,1) 0%, rgba(139,92,246,0.04) 100%);">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <button style="padding: 16px; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer;
+                background: linear-gradient(135deg, #065f46, #059669); color: #fff; border: none;">YES</button>
+              <button style="padding: 16px; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer;
+                background: linear-gradient(135deg, #9f1239, #e11d48); color: #fff; border: none;">NO</button>
+            </div>
+            <!-- Action buttons -->
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button style="flex: 1; padding: 8px; border-radius: 12px; font-size: 11px; font-weight: 500; color: #6b7280; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">Can't</button>
+              <button style="flex: 1; padding: 8px; border-radius: 12px; font-size: 11px; font-weight: 500; color: #6b7280; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">Explain</button>
+              <button style="flex: 1; padding: 8px; border-radius: 12px; font-size: 11px; font-weight: 500; color: #6b7280; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">Skip</button>
+              <button style="flex: 1; padding: 8px; border-radius: 12px; font-size: 11px; font-weight: 500; color: #6b7280; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AFTER -->
+    <div>
+      <div class="phone-label">
+        <span class="label-tag label-after">After (glow from center)</span>
+      </div>
+      <div class="phone-frame">
+        <div class="phone-inner" style="display: flex; flex-direction: column;">
+          <!-- Track selector bar -->
+          <div style="height: 68px; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: rgba(17,24,39,0.5);
+            border-bottom: 1px solid rgba(139,92,246,0.15);">
+            <span style="font-size: 20px; font-weight: 700; color: #d1d5db; width: 32px; text-align: center;">◀</span>
+            <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px;">
+              <div style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(139,92,246,0.5); display: flex; align-items: center; justify-content: center;">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: #030712; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff;">Y/N</div>
+              </div>
+              <div style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid rgba(139,92,246,0.25); display: flex; align-items: center; justify-content: center;">
+                <div style="width: 28px; height: 28px; border-radius: 50%; background: #030712; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #9ca3af;">MC</div>
+              </div>
+            </div>
+            <span style="font-size: 20px; font-weight: 700; color: #d1d5db; width: 32px; text-align: center;">▶</span>
+          </div>
+
+          <!-- Question area with glow FROM CENTER -->
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 16px; position: relative; overflow: hidden;">
+            <!-- Ambient breathing — CENTERED on question (the fix) -->
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; margin-top: -5%;">
+              <div style="position: absolute; width: 420px; height: 420px; border-radius: 50%;
+                background: radial-gradient(circle, rgba(139,92,246,0.22) 0%, rgba(139,92,246,0.10) 30%, rgba(139,92,246,0.03) 55%, transparent 70%);
+                animation: aura-breathe 8s ease-in-out infinite;"></div>
+              <div style="position: absolute; width: 300px; height: 300px; border-radius: 50%;
+                background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 40%, transparent 65%);
+                animation: aura-breathe 6s ease-in-out infinite 1s;"></div>
+            </div>
+
+            <!-- Category + question -->
+            <div style="position: relative; z-index: 10; text-align: center;">
+              <span style="font-size: 13px; font-weight: 500; color: #a78bfa;">🧠 Think</span>
+              <h2 style="font-size: clamp(20px, 6vw, 28px); font-weight: 500; color: #fff; margin-top: 8px; line-height: 1.35;">
+                Is consciousness required for intelligence?
+              </h2>
+            </div>
+          </div>
+
+          <!-- Binary buttons -->
+          <div style="flex-shrink: 0; padding: 12px 16px 16px; border-top: 1px solid rgba(139,92,246,0.12);
+            background: linear-gradient(180deg, rgba(3,7,18,1) 0%, rgba(139,92,246,0.04) 100%);">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <button style="padding: 16px; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer;
+                background: linear-gradient(135deg, #065f46, #059669); color: #fff; border: none;">YES</button>
+              <button style="padding: 16px; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer;
+                background: linear-gradient(135deg, #9f1239, #e11d48); color: #fff; border: none;">NO</button>
+            </div>
+            <!-- Action buttons -->
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button style="flex: 1; padding: 8px; border-radius: 12px; font-size: 11px; font-weight: 500; color: #6b7280; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">Can't</button>
+              <button style="flex: 1; padding: 8px; border-radius: 12px; font-size: 11px; font-weight: 500; color: #6b7280; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">Explain</button>
+              <button style="flex: 1; padding: 8px; border-radius: 12px; font-size: 11px; font-weight: 500; color: #6b7280; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">Skip</button>
+              <button style="flex: 1; padding: 8px; border-radius: 12px; font-size: 11px; font-weight: 500; color: #6b7280; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================ -->
+  <!-- 4. QotD — Banner Text Cleanup -->
+  <!-- ============================================ -->
+  <div class="section-header">
+    <h2 style="font-size: 20px; font-weight: 600; color: #c4b5fd;">4. QotD Banner &mdash; Text Cleanup</h2>
+    <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Remove day indication, slim timer, remove +25, "Question of the Day" on one line</p>
+  </div>
+
+  <div class="comparison-row">
+    <!-- BEFORE -->
+    <div>
+      <div class="phone-label">
+        <span class="label-tag label-before">Before</span>
+      </div>
+      <div style="width: 375px; background: #030712; border-radius: 20px; border: 2px solid #1a1a1c; padding: 20px; overflow: hidden;">
+        <!-- Unanswered QotD card — current -->
+        <div style="width: 100%; padding: 16px; border-radius: 16px; text-align: center;
+          background: linear-gradient(to bottom right, rgba(29,78,216,0.6), rgba(30,58,138,0.8));
+          border: 1px solid rgba(59,130,246,0.4);">
+          <div style="font-weight: 500; font-size: 13px; color: #60a5fa; margin-bottom: 8px;">🌀 Question of the Day</div>
+          <p style="font-size: 18px; font-weight: 600; color: #fff; line-height: 1.4; margin-bottom: 12px;">Should AI be allowed to vote?</p>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span style="font-size: 12px; color: #93c5fd;">Wednesday</span>
+            <span style="font-size: 12px; color: #64748b;">&middot;</span>
+            <span style="font-size: 12px; color: #93c5fd;">14h 32m remaining</span>
+            <span style="font-size: 12px; color: #64748b;">&middot;</span>
+            <span style="font-size: 12px; color: #fbbf24; font-weight: 600;">+25 XP</span>
+          </div>
+        </div>
+
+        <div style="height: 16px;"></div>
+
+        <!-- Answered QotD — compact (current) -->
+        <div style="width: 100%; padding: 6px 12px; border-radius: 16px; display: flex; align-items: flex-start; gap: 6px;
+          background: linear-gradient(to bottom right, rgba(29,78,216,0.6), rgba(30,58,138,0.8));
+          border: 1px solid rgba(59,130,246,0.4);">
+          <span style="font-size: 12px; flex-shrink: 0;">🌀</span>
+          <span style="flex: 1; font-size: 12px; color: #fff; line-height: 1.4;">Should AI be allowed to vote?</span>
+          <span style="font-size: 12px; color: #34d399; flex-shrink: 0;">✓</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AFTER -->
+    <div>
+      <div class="phone-label">
+        <span class="label-tag label-after">After</span>
+      </div>
+      <div style="width: 375px; background: #030712; border-radius: 20px; border: 2px solid #1a1a1c; padding: 20px; overflow: hidden;">
+        <!-- Unanswered QotD card — cleaned up -->
+        <div style="width: 100%; padding: 16px; border-radius: 16px; text-align: center;
+          background: linear-gradient(to bottom right, rgba(29,78,216,0.6), rgba(30,58,138,0.8));
+          border: 1px solid rgba(59,130,246,0.4);">
+          <div style="font-weight: 500; font-size: 13px; color: #60a5fa; margin-bottom: 8px;">🌀 Question of the Day</div>
+          <p style="font-size: 18px; font-weight: 600; color: #fff; line-height: 1.4; margin-bottom: 8px;">Should AI be allowed to vote?</p>
+          <div style="font-size: 11px; color: #93c5fd; opacity: 0.7;">14h left</div>
+        </div>
+
+        <div style="height: 16px;"></div>
+
+        <!-- Answered QotD — compact (same, it's already clean) -->
+        <div style="width: 100%; padding: 6px 12px; border-radius: 16px; display: flex; align-items: flex-start; gap: 6px;
+          background: linear-gradient(to bottom right, rgba(29,78,216,0.6), rgba(30,58,138,0.8));
+          border: 1px solid rgba(59,130,246,0.4);">
+          <span style="font-size: 12px; flex-shrink: 0;">🌀</span>
+          <span style="flex: 1; font-size: 12px; color: #fff; line-height: 1.4;">Should AI be allowed to vote?</span>
+          <span style="font-size: 12px; color: #34d399; flex-shrink: 0;">✓</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Notes -->
+  <div style="max-width: 700px; margin: 0 auto; padding: 20px 40px 60px;">
+    <h3 style="font-size: 16px; font-weight: 600; color: #94a3b8; margin-bottom: 12px;">Implementation Notes</h3>
+    <ul style="list-style: none; padding: 0; font-size: 13px; color: #64748b; line-height: 1.8;">
+      <li><strong style="color: #94a3b8;">Categories:</strong> <code>grid-template-columns: 1fr 1fr</code> + <code>aspect-ratio: 1</code>. Icons centered, name only. All sections (World/Self/Work) get the same grid treatment.</li>
+      <li><strong style="color: #94a3b8;">Welcome Bloom:</strong> 140x140px container (~20% of 720h). Birth animation 1.8s settle, then 6s breathe loop. 5 primary nodes, connections rendered on top.</li>
+      <li><strong style="color: #94a3b8;">Binary Glow:</strong> Remove <code>marginTop: '15%'</code> offset from breathing aura container. Set to <code>-5%</code> to center on question text. Increase primary alpha from 0.14 to 0.22. Add second radial layer.</li>
+      <li><strong style="color: #94a3b8;">QotD:</strong> Remove day name, remove "+25 XP" badge, compress "14h 32m remaining" to "14h left", move to single line below question.</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  // Auto-replay bloom animation every 5s
+  const bloom = document.getElementById('bloom-container');
+  if (bloom) {
+    setInterval(() => {
+      bloom.classList.remove('bloom-settle');
+      void bloom.offsetWidth;
+      bloom.classList.add('bloom-settle');
+    }, 8000);
+  }
+</script>
+</body>
+</html>

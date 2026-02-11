@@ -11263,7 +11263,36 @@ function App() {
   const [showDevPanel, setShowDevPanel] = useState(IS_DEV);
   const [devMinimized, setDevMinimized] = useState(false);
   const [devPhoneSize, setDevPhoneSize] = useState('15');
-  const [devReviewIdx, setDevReviewIdx] = useState(0);
+  const [devQAAnswers, setDevQAAnswers] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('aura-dev-qa') || '{}');
+      // Backfill: patch old answers that lack question text
+      let patched = false;
+      const ALL_Q_TEXT = {
+        'dq-welcome-identity': 'Welcome screen — does the current layout (logo + tagline + begin) feel like the right first impression?',
+        'dq-path-choice-fork': 'After onboarding, the path choice screen offers two buttons. Is that the right fork, or should the app just flow into one default experience?',
+        'dq-verify-scope': 'Verification flow is functional but bare. Should we invest in polishing it now, or keep building core assessment features first?',
+        'dq-categories-density': 'Categories screen — too many items visible? Should we group, collapse, or paginate?',
+        'dq-assess-picker-light': 'Assessment picker in light mode — does it hold up or need a rework?',
+        'dq-profile-identity': 'Profile screen — should the aura viz be the hero (big, central, defining), or should stats/progress lead and the viz be supporting?',
+        'dq-binary-glow-intensity': 'Binary question glow behind the text — intensity right?',
+        'dq-qotd-whitespace': 'QotD screen — too much empty space around the question, or does it breathe well?',
+        'dq-settings-personality': 'Settings screen — generic utility dump or does it feel like Aura?',
+        'dq-mc-color-vs-gray': 'MC questions: colored options vs gray-until-tapped — which default?',
+        'dq-onboard-exit': 'After onboarding, the path choice screen offers two buttons. Is that the right fork, or should the app just flow into one default experience?',
+        'dq-action-bar-visibility': "Ghost buttons under answers (Can't / Explain / Skip / Save) — discoverable enough?",
+      };
+      for (const [qId, a] of Object.entries(raw)) {
+        if (!a.question && ALL_Q_TEXT[qId]) { a.question = ALL_Q_TEXT[qId]; patched = true; }
+        if (!a.tier) { a.tier = qId.match(/binary|action|qotd|settings|mc-color/) ? 'little' : 'big'; patched = true; }
+      }
+      if (patched) localStorage.setItem('aura-dev-qa', JSON.stringify(raw));
+      return raw;
+    } catch { return {}; }
+  });
+  const [devQAShowHistory, setDevQAShowHistory] = useState(false);
+  const [devQANotes, setDevQANotes] = useState({});
+  const [devQATier, setDevQATier] = useState('big'); // 'big' or 'little'
 
   // --- Questions & Responses ---
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -12306,6 +12335,61 @@ function App() {
     { id: 'verify-eval-summary', label: 'V:Sum', icon: '📊' },
   ];
 
+  // ── Dev Q&A Channel ──
+  // Claude maintains this array. Each question auto-navigates to the relevant screen.
+  // When Philip answers in-app, the answer is saved to localStorage and the question disappears.
+  // Claude removes answered questions and adds new ones each session.
+  // tier: 'big' = decisions that change what gets built. 'little' = polish details, opt-in.
+  const DEV_QUESTIONS = [
+    // ── Round 4: Execution-ready questions — answers here feed directly into builds ──
+    // No more questions pending. Builder window picks up from DESIGN.md.
+    // Load new questions when new design topics emerge.
+  ];
+
+  const [devQASkipped, setDevQASkipped] = useState([]);
+  const devPendingQs = (() => {
+    const unanswered = DEV_QUESTIONS.filter(q => !devQAAnswers[q.id] && (devQATier === 'little' || q.tier === 'big'));
+    const notSkipped = unanswered.filter(q => !devQASkipped.includes(q.id));
+    const skipped = unanswered.filter(q => devQASkipped.includes(q.id));
+    return [...notSkipped, ...skipped];
+  })();
+  const devQAHelpers = { setScreen, setEntityType, assessStartTest, assessGoToQuestion, setAssessCurrentTestId, setDarkMode, setCurrentIndex, setMcColorMode, setAssessCurrentIndex: (i) => assessGoToQuestion(i, 'fwd') };
+
+  // Auto-navigate to the first pending question's screen
+  const devFirstPendingId = devPendingQs.length > 0 ? devPendingQs[0].id : null;
+  useEffect(() => {
+    if (!devFirstPendingId || !showDevPanel || devMinimized) return;
+    const q = DEV_QUESTIONS.find(dq => dq.id === devFirstPendingId);
+    if (q && q.action) q.action(devQAHelpers);
+  }, [devFirstPendingId, showDevPanel, devMinimized]);
+
+  const devAnswerQuestion = (qId, answer) => {
+    const note = devQANotes[qId] || '';
+    const orig = DEV_QUESTIONS.find(q => q.id === qId);
+    const updated = { ...devQAAnswers, [qId]: { answer, note, ts: Date.now(), question: orig ? orig.question : qId, tier: orig ? orig.tier : '?' } };
+    setDevQAAnswers(updated);
+    localStorage.setItem('aura-dev-qa', JSON.stringify(updated));
+    setDevQANotes(prev => { const n = { ...prev }; delete n[qId]; return n; });
+  };
+
+  const devSkipQuestion = (qId) => {
+    setDevQASkipped(prev => [...prev.filter(id => id !== qId), qId]);
+  };
+
+  const devCopyAllAnswers = () => {
+    const lines = Object.entries(devQAAnswers).map(([qId, a]) => {
+      const orig = DEV_QUESTIONS.find(q => q.id === qId);
+      const qText = a.question || (orig ? orig.question : qId);
+      const tier = a.tier || (orig ? orig.tier : '?');
+      let line = `[${tier}] Q: ${qText}\nA: ${a.answer}`;
+      if (a.note) line += `\nNote: ${a.note}`;
+      return line;
+    });
+    const header = 'Dev Q&A answers from Aura.\n1. Update DESIGN.md — add new items, update existing ones with new detail.\n2. Replace answered DEV_QUESTIONS with fresh follow-ups.\n3. Remove questions I already answered from the array.';
+    const text = header + '\n\n' + lines.join('\n\n');
+    navigator.clipboard.writeText(text).catch(() => {});
+  };
+
   const devPanelEl = IS_DEV && showDevPanel ? (() => {
     if (devMinimized) {
       return (
@@ -12346,84 +12430,113 @@ function App() {
           </div>
         </div>
 
-        {/* ── Review Tour ── */}
+        {/* ── Design Q&A Channel ── */}
         {(() => {
-          const helpers = { setScreen, setEntityType, assessStartTest, assessGoToQuestion, setAssessCurrentTestId, setDarkMode, setCurrentIndex, setMcColorMode, setAssessCurrentIndex: (i) => assessGoToQuestion(i, 'fwd') };
-          const firstBinaryIdx = QUESTIONS.findIndex(q => q.type === 'binary');
-          const firstMcIdx = QUESTIONS.findIndex(q => q.type === 'multiple');
-          const DEV_REVIEW = [
-            {
-              label: '1. Binary — Dark, Neutral',
-              note: 'YES/NO question, dark mode, nothing tapped yet. Do the button borders read clearly? Is the glow behind the question visible but not overpowering? Are the green/red tints distinct?',
-              action: (h) => { h.setDarkMode(true); h.setScreen('question'); h.setCurrentIndex(firstBinaryIdx); },
-            },
-            {
-              label: '2. Binary — Light, Neutral',
-              note: 'Same question, light mode. Do the buttons have enough presence against white? Borders, fills, glow — all visible and distinct? Action bar readable?',
-              action: (h) => { h.setDarkMode(false); h.setScreen('question'); h.setCurrentIndex(firstBinaryIdx); },
-            },
-            {
-              label: '3. MC Colored — Dark',
-              note: 'Multiple-choice question, colored mode. Do the different colors per option look good? Too much? Too subtle?',
-              action: (h) => { h.setDarkMode(true); h.setScreen('question'); h.setCurrentIndex(firstMcIdx); h.setMcColorMode('color'); },
-            },
-            {
-              label: '4. MC Gray — Dark',
-              note: 'Same MC question, gray mode. All options neutral gray until tapped. Does this feel cleaner? Or too flat?',
-              action: (h) => { h.setDarkMode(true); h.setScreen('question'); h.setCurrentIndex(firstMcIdx); h.setMcColorMode('gray'); },
-            },
-            {
-              label: '5. MC — Light, Both Modes',
-              note: 'MC question in light mode. Toggle the color/gray switch (top-right) to compare. Do the MC options have enough contrast in light mode?',
-              action: (h) => { h.setDarkMode(false); h.setScreen('question'); h.setCurrentIndex(firstMcIdx); h.setMcColorMode('color'); },
-            },
-            {
-              label: '6. Tapped + Confidence',
-              note: 'Binary question, dark mode. Tap an answer once — does it light up clearly? Tap again 2-3 times — can you see the confidence ramp (brighter border, stronger glow)? Does the dimming of the other option feel right?',
-              action: (h) => { h.setDarkMode(true); h.setScreen('question'); h.setCurrentIndex(firstBinaryIdx); },
-            },
-            {
-              label: '7. Confirm/Cancel Overlay',
-              note: 'After tapping, look above the buttons in the question zone. The checkmark and X should float there without moving the buttons. Buttons stay locked in place?',
-              action: (h) => { h.setDarkMode(true); },
-            },
-            {
-              label: '8. Action Bar (Can\'t / Explain / Skip / Save)',
-              note: 'The four ghost buttons below the answer buttons. Visible enough? Tap Explain or Save — does the active state show with color? Does anything move?',
-              action: (h) => { h.setDarkMode(true); },
-            },
-            {
-              label: '9. QotD Screen',
-              note: 'Navigate to QotD. Question fills the space? No horizontal scrollbar? Glow behind question visible? Buttons at bottom?',
-              action: (h) => { h.setScreen('qotd'); h.setDarkMode(true); },
-            },
-            {
-              label: '10. Assessment Breath',
-              note: 'Start any assessment. Tap through 3-4 answers quickly. Do you see the gentle breath on each transition? Does it feel natural at your tapping speed? Too fast/slow?',
-              action: (h) => { h.setDarkMode(true); h.setScreen('assess-picker'); },
-            },
-          ];
-          if (DEV_REVIEW.length === 0) return null;
-          const stop = DEV_REVIEW[Math.min(devReviewIdx, DEV_REVIEW.length - 1)];
+          const answeredEntries = Object.entries(devQAAnswers).sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
+          const currentQ = devPendingQs.length > 0 ? devPendingQs[0] : null;
+          const remaining = devPendingQs.length;
+
+          if (!currentQ && answeredEntries.length === 0) return null;
+
           return (
-            <div className="px-4 py-3 border-b border-inherit" style={{ background: darkMode ? 'rgba(139,92,246,0.06)' : 'rgba(139,92,246,0.04)' }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`} style={{fontSize:'14px'}}>{stop.label}</span>
-                <span className="text-violet-400 font-medium" style={{fontSize:'12px'}}>Review {devReviewIdx + 1} of {DEV_REVIEW.length}</span>
+            <div className="border-b border-inherit">
+              {/* Tier toggle */}
+              <div className="px-4 py-1.5 flex items-center gap-2 border-b border-inherit">
+                <div className="flex items-center" style={{gap:'2px'}}>
+                  <button onClick={() => setDevQATier('big')}
+                    className={`px-3 py-1 rounded-l font-medium transition-all ${devQATier === 'big' ? btnAccent : btnBase}`}
+                    style={{fontSize:'11px'}}>Big</button>
+                  <button onClick={() => setDevQATier('little')}
+                    className={`px-3 py-1 rounded-r font-medium transition-all ${devQATier === 'little' ? btnAccent : btnBase}`}
+                    style={{fontSize:'11px'}}>Little</button>
+                </div>
+                <span className={`${darkMode ? 'text-gray-600' : 'text-gray-400'}`} style={{fontSize:'10px'}}>
+                  {devQATier === 'big' ? 'Decisions that change the build' : 'Polish & detail questions'}
+                </span>
               </div>
-              <div className={`leading-relaxed mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} style={{fontSize:'13px'}}>
-                {stop.note}
-              </div>
-              <div className="flex items-center justify-center gap-4">
-                <button onClick={() => { const ni = Math.max(0, devReviewIdx - 1); setDevReviewIdx(ni); DEV_REVIEW[ni].action(helpers); }}
-                  className={`rounded-lg font-bold ${devReviewIdx === 0 ? 'opacity-20 cursor-not-allowed' : ''} ${btnBase}`}
-                  style={{fontSize:'18px', width:'60px', height:'38px', display:'flex', alignItems:'center', justifyContent:'center'}}
-                  disabled={devReviewIdx === 0}>{'\u2190'}</button>
-                <button onClick={() => { const ni = Math.min(DEV_REVIEW.length - 1, devReviewIdx + 1); setDevReviewIdx(ni); DEV_REVIEW[ni].action(helpers); }}
-                  className={`rounded-lg font-bold ${devReviewIdx >= DEV_REVIEW.length - 1 ? 'opacity-20 cursor-not-allowed' : ''} ${btnBase}`}
-                  style={{fontSize:'18px', width:'60px', height:'38px', display:'flex', alignItems:'center', justifyContent:'center'}}
-                  disabled={devReviewIdx >= DEV_REVIEW.length - 1}>{'\u2192'}</button>
-              </div>
+              {/* Current question — one at a time */}
+              {currentQ ? (
+                <div className="px-4 py-3" style={{ background: darkMode ? 'rgba(139,92,246,0.06)' : 'rgba(139,92,246,0.04)' }}>
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                    <div className="flex items-start gap-2 flex-1">
+                      <span className="text-violet-400 font-bold" style={{fontSize:'11px', marginTop:'2px'}}>Q</span>
+                      <span className={`font-medium leading-snug ${darkMode ? 'text-white' : 'text-gray-900'}`} style={{fontSize:'13px'}}>{currentQ.question}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`${darkMode ? 'text-gray-600' : 'text-gray-400'}`} style={{fontSize:'11px'}}>{remaining} left</span>
+                      <button onClick={() => devSkipQuestion(currentQ.id)}
+                        className={`px-2 py-1 rounded text-xs transition-colors ${darkMode ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}>
+                        Skip
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Add a note (Enter to submit as 'Other')..."
+                    value={devQANotes[currentQ.id] || ''}
+                    onChange={(e) => setDevQANotes(prev => ({ ...prev, [currentQ.id]: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && devQANotes[currentQ.id]) devAnswerQuestion(currentQ.id, 'Other'); }}
+                    className={`w-full px-3 py-1.5 rounded-lg mb-2 text-sm transition-colors ${darkMode ? 'bg-gray-800/60 border border-gray-700 text-gray-200 placeholder-gray-600 focus:border-violet-500/50' : 'bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 focus:border-violet-400'}`}
+                    style={{fontSize:'12px', outline:'none'}}
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentQ.options.map(opt => (
+                      <button key={opt} onClick={() => devAnswerQuestion(currentQ.id, opt)}
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${darkMode ? 'bg-violet-600/20 hover:bg-violet-600/40 text-violet-300 ring-1 ring-violet-500/30 hover:ring-violet-400/50' : 'bg-violet-50 hover:bg-violet-100 text-violet-700 ring-1 ring-violet-300 hover:ring-violet-400'}`}
+                        style={{fontSize:'12px'}}>
+                        {opt}
+                      </button>
+                    ))}
+                    <button onClick={() => devAnswerQuestion(currentQ.id, 'Other')}
+                      className={`px-3 py-1.5 rounded-lg font-medium transition-all ${darkMode ? 'bg-gray-800/60 hover:bg-gray-700/80 text-gray-400 ring-1 ring-gray-600/30 hover:ring-gray-500/50' : 'bg-gray-100 hover:bg-gray-200 text-gray-500 ring-1 ring-gray-300 hover:ring-gray-400'}`}
+                      style={{fontSize:'12px'}}>
+                      Other
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="px-4 py-3" style={{ background: darkMode ? 'rgba(139,92,246,0.06)' : 'rgba(139,92,246,0.04)' }}>
+                  <span className={`${darkMode ? 'text-gray-500' : 'text-gray-400'}`} style={{fontSize:'12px'}}>All done — tell Claude to grab answers and load more.</span>
+                </div>
+              )}
+
+              {/* Footer: copy + history */}
+              {answeredEntries.length > 0 && (
+                <div className={`px-4 py-1.5 flex items-center gap-3 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
+                  <button onClick={devCopyAllAnswers}
+                    className={`font-medium transition-colors ${darkMode ? 'text-violet-400 hover:text-violet-300' : 'text-violet-500 hover:text-violet-600'}`}
+                    style={{fontSize:'11px'}}>
+                    Copy All
+                  </button>
+                  <button onClick={() => setDevQAShowHistory(h => !h)}
+                    className={`${darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-500'} transition-colors`}
+                    style={{fontSize:'11px'}}>
+                    {devQAShowHistory ? 'Hide' : 'Show'} answered ({answeredEntries.length})
+                  </button>
+                  {devQAShowHistory && (
+                    <button onClick={() => { setDevQAAnswers({}); localStorage.removeItem('aura-dev-qa'); setDevQASkipped([]); }}
+                      className={`${darkMode ? 'text-rose-700 hover:text-rose-500' : 'text-rose-400 hover:text-rose-500'} transition-colors`}
+                      style={{fontSize:'10px'}}>Clear</button>
+                  )}
+                </div>
+              )}
+              {devQAShowHistory && answeredEntries.length > 0 && (
+                <div className={`px-4 pb-2 space-y-1 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
+                  {answeredEntries.map(([qId, a]) => {
+                    const orig = DEV_QUESTIONS.find(q => q.id === qId);
+                    const qText = a.question || (orig ? orig.question : qId);
+                    return (
+                      <div key={qId} className={`${darkMode ? 'text-gray-600' : 'text-gray-400'}`} style={{fontSize:'11px'}}>
+                        <div className="flex items-baseline gap-2">
+                          <span className="shrink-0">{qText.slice(0, 50)}:</span>
+                          <span className={`font-medium ${darkMode ? 'text-violet-500' : 'text-violet-400'}`}>{a.answer}</span>
+                        </div>
+                        {a.note && <div className={`ml-4 mt-0.5 italic ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{a.note}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })()}
