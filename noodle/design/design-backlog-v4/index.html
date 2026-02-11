@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Design Backlog — Batch 3</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px 20px; }
+  .section-header { max-width: 900px; margin: 60px auto 24px; }
+  .section-header:first-of-type { margin-top: 0; }
+  .section-header h1 { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .section-header h2 { font-size: 20px; font-weight: 600; color: #c4b5fd; }
+  .section-header p { color: #64748b; font-size: 13px; margin-top: 4px; }
+  .comparison-row { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+  .phone-frame { width: 375px; height: 720px; border-radius: 32px; overflow: hidden; border: 2px solid rgba(255,255,255,0.08); position: relative; }
+  .phone-inner { width: 100%; height: 100%; overflow-y: auto; position: relative; }
+  .phone-label { text-align: center; margin-bottom: 8px; }
+  .label-tag { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .label-before { background: rgba(239,68,68,0.15); color: #f87171; }
+  .label-after { background: rgba(52,211,153,0.15); color: #34d399; }
+  @keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.08); opacity: 1; } }
+  .aura-breathe { animation: breathe 4s ease-in-out infinite; }
+  /* Toggle */
+  .toggle { position: relative; width: 48px; height: 24px; border-radius: 12px; cursor: pointer; flex-shrink: 0; }
+  .toggle-knob { position: absolute; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.2s; }
+  .toggle-on { background: #7c3aed; }
+  .toggle-on .toggle-knob { transform: translateX(24px); }
+  .toggle-off { background: #374151; }
+  .toggle-off .toggle-knob { transform: translateX(2px); }
+  /* Settings row */
+  .setting-row { border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .setting-dark { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); }
+  .setting-group-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin: 16px 0 8px; }
+</style>
+</head>
+<body>
+
+<div class="section-header">
+  <h1>Aura Design Backlog — Batch 3</h1>
+  <p>Path Choice · Verify · Settings</p>
+</div>
+
+
+<!-- ============================================ -->
+<!-- 1. PATH CHOICE — Fork visuals + glow scaling -->
+<!-- ============================================ -->
+<div class="section-header">
+  <h2>1. Path Choice — Glow Scaling + Button Polish</h2>
+  <p>Tiny aura shouldn't glow big. Fork buttons need more personality.</p>
+</div>
+
+<div class="comparison-row">
+  <!-- BEFORE -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-before">Before</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; padding: 16px 20px 8px;">
+          <span style="font-size: 28px;">🌀</span>
+          <span style="font-size: 20px; color: #6b7280;">☰</span>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 24px;">
+          <!-- Big glow, only 3 tiny nodes = mismatch -->
+          <div style="width: 240px; height: 240px; position: relative; margin-bottom: 16px;">
+            <div class="aura-breathe" style="position: absolute; inset: -30px; border-radius: 50%; background: radial-gradient(circle, rgba(139,92,246,0.30) 0%, rgba(96,165,250,0.18) 40%, transparent 70%);"></div>
+            <div style="position: absolute; top: 105px; left: 110px; width: 10px; height: 10px; border-radius: 50%; background: #a78bfa; box-shadow: 0 0 8px rgba(167,139,250,0.6);"></div>
+            <div style="position: absolute; top: 95px; left: 130px; width: 8px; height: 8px; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 6px rgba(96,165,250,0.5);"></div>
+            <div style="position: absolute; top: 120px; left: 115px; width: 7px; height: 7px; border-radius: 50%; background: #34d399; box-shadow: 0 0 5px rgba(52,211,153,0.4);"></div>
+          </div>
+          <h1 style="font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 8px;">Your aura has started</h1>
+          <p style="font-size: 14px; color: #9ca3af;">What do you want to explore?</p>
+        </div>
+        <div style="flex-shrink: 0; padding: 0 24px 32px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="width: 100%; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; color: #c4b5fd; border: 1px solid rgba(139,92,246,0.4); background: linear-gradient(135deg, rgba(76,29,149,0.3), rgba(76,29,149,0.5)); cursor: pointer;">
+              More about yourself
+            </button>
+            <button style="width: 100%; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; color: #5eead4; border: 1px solid rgba(20,184,166,0.3); background: linear-gradient(135deg, rgba(15,118,110,0.2), rgba(15,118,110,0.35)); cursor: pointer;">
+              More about the world
+            </button>
+          </div>
+          <button style="margin-top: 24px; font-size: 14px; color: #4b5563; background: none; border: none; cursor: pointer;">Just let me explore</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AFTER -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-after">After</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; padding: 16px 20px 8px;">
+          <span style="font-size: 28px;">🌀</span>
+          <span style="font-size: 20px; color: #6b7280;">☰</span>
+        </div>
+        <!-- Keep original top (before's viz+glow) with after's buttons -->
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 24px;">
+          <div style="width: 240px; height: 240px; position: relative; margin-bottom: 16px;">
+            <div class="aura-breathe" style="position: absolute; inset: -30px; border-radius: 50%; background: radial-gradient(circle, rgba(139,92,246,0.30) 0%, rgba(96,165,250,0.18) 40%, transparent 70%);"></div>
+            <div style="position: absolute; top: 105px; left: 110px; width: 10px; height: 10px; border-radius: 50%; background: #a78bfa; box-shadow: 0 0 8px rgba(167,139,250,0.6);"></div>
+            <div style="position: absolute; top: 95px; left: 130px; width: 8px; height: 8px; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 6px rgba(96,165,250,0.5);"></div>
+            <div style="position: absolute; top: 120px; left: 115px; width: 7px; height: 7px; border-radius: 50%; background: #34d399; box-shadow: 0 0 5px rgba(52,211,153,0.4);"></div>
+          </div>
+          <h1 style="font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 8px;">Your aura has started</h1>
+          <p style="font-size: 14px; color: #9ca3af;">What do you want to explore?</p>
+        </div>
+        <div style="flex-shrink: 0; padding: 0 24px 32px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="width: 100%; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; font-weight: 600; color: #c4b5fd; border: 1px solid rgba(139,92,246,0.5); background: linear-gradient(135deg, rgba(76,29,149,0.35), rgba(76,29,149,0.55)); cursor: pointer; box-shadow: 0 0 20px rgba(139,92,246,0.10);">
+              🪞 Reveal yourself
+            </button>
+            <button style="width: 100%; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; font-weight: 600; color: #5eead4; border: 1px solid rgba(20,184,166,0.4); background: linear-gradient(135deg, rgba(15,118,110,0.25), rgba(15,118,110,0.40)); cursor: pointer; box-shadow: 0 0 20px rgba(20,184,166,0.08);">
+              🌍 Explore the world
+            </button>
+          </div>
+          <button style="margin-top: 24px; font-size: 14px; color: #4b5563; background: none; border: none; cursor: pointer;">Just let me explore</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- 2. VERIFY — Polish pass -->
+<!-- ============================================ -->
+<div class="section-header">
+  <h2>2. Verify Hub — Polish</h2>
+  <p>Current is functional. Tightening visual hierarchy, description, and call-to-action clarity.</p>
+</div>
+
+<div class="comparison-row">
+  <!-- BEFORE -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-before">Before</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="display: flex; flex-direction: column; position: relative; overflow: hidden;">
+        <!-- Dual glow -->
+        <div style="position: absolute; top: 25%; left: 50%; transform: translate(-50%, -50%); width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, rgba(52,211,153,0.08) 40%, transparent 70%); pointer-events: none;" class="aura-breathe"></div>
+        <!-- Back button -->
+        <div style="position: absolute; top: 16px; left: 16px; z-index: 10;">
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); font-size: 14px;">←</div>
+        </div>
+        <!-- Center content -->
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 20px; position: relative; z-index: 1;">
+          <div style="width: 56px; height: 56px; border-radius: 50%; margin-bottom: 12px; background: linear-gradient(135deg, rgba(139,92,246,0.3), rgba(52,211,153,0.3)); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 0 40px rgba(139,92,246,0.15), 0 0 40px rgba(52,211,153,0.1);"></div>
+          <h1 style="font-size: 24px; font-weight: 700; color: #fff; letter-spacing: -0.02em;">Unique Humanity</h1>
+          <h2 style="font-size: 18px; font-weight: 500; color: #9ca3af; margin-top: 4px;">Verification</h2>
+          <p style="font-size: 12px; color: #6b7280; text-align: center; margin-top: 12px; max-width: 280px; line-height: 1.5;">
+            Prove you're a unique human, or help evaluate someone else's claim. Multiple evaluators, weighted confidence, no single point of failure.
+          </p>
+        </div>
+        <!-- Buttons -->
+        <div style="flex-shrink: 0; padding: 0 20px 32px; display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 1;">
+          <button style="width: 100%; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: #c4b5fd; border: 1px solid rgba(139,92,246,0.4); background: linear-gradient(135deg, rgba(76,29,149,0.25), rgba(76,29,149,0.45)); cursor: pointer; box-shadow: 0 0 20px rgba(139,92,246,0.12);">
+            I'm a new subject
+          </button>
+          <button style="width: 100%; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: #6ee7b7; border: 1px solid rgba(52,211,153,0.4); background: linear-gradient(135deg, rgba(6,78,59,0.25), rgba(6,78,59,0.45)); cursor: pointer; box-shadow: 0 0 20px rgba(52,211,153,0.08);">
+            I'm evaluating someone
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AFTER -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-after">After</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="display: flex; flex-direction: column; position: relative; overflow: hidden;">
+        <!-- Tighter dual glow -->
+        <div style="position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); width: 350px; height: 350px; border-radius: 50%; background: radial-gradient(circle, rgba(139,92,246,0.10) 0%, rgba(52,211,153,0.06) 45%, transparent 70%); pointer-events: none;" class="aura-breathe"></div>
+        <!-- Back -->
+        <div style="position: absolute; top: 16px; left: 16px; z-index: 10;">
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); font-size: 14px;">←</div>
+        </div>
+        <!-- Center — tighter hierarchy -->
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 20px; position: relative; z-index: 1;">
+          <!-- BrightID + Aura logos with glow -->
+          <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px; position: relative;">
+            <!-- Glow behind logos -->
+            <div style="position: absolute; inset: -30px; border-radius: 50%; background: radial-gradient(ellipse at 35% 50%, rgba(251,138,97,0.20) 0%, transparent 60%), radial-gradient(ellipse at 65% 50%, rgba(139,92,246,0.20) 0%, transparent 60%); pointer-events: none;" class="aura-breathe"></div>
+            <!-- BrightID logo -->
+            <svg width="44" height="44" viewBox="0 0 32 32" fill="none" style="position: relative; z-index: 1;">
+              <rect x="0.29" y="0.33" width="5.7" height="5.9" fill="#fb8a61"/>
+              <path d="m11.141,11.328 v 5.099 c 0,2.815 2.284,5.099 5.102,5.099 2.815,0 5.099-2.283 5.099-5.099 0-2.816-2.283-5.099-5.099-5.099-0.006,0-0.015,0-0.021,0 v 0 z" fill="#fb8a61"/>
+              <path d="M 17.047,0.327 H 14.991 11.14 v 5.899 h 5.081 v 0 c 0.006,0 0.015,0 0.021,0 5.633,0 10.199,4.568 10.199,10.2 0,5.632-4.566,10.2-10.199,10.2-5.635,0-10.198-4.568-10.198-10.2 V 11.327 H 0.291 v 4.666 h 0.037 c 0.009,8.66 7.029,15.679 15.691,15.679 8.666,0 15.689-7.024 15.689-15.693 C 31.709,7.661 25.233,0.855 17.047,0.327 Z" fill="#fb8a61"/>
+              <rect x="11.14" y="0.327" width="5.851" height="5.899" fill="#fb8a61"/>
+            </svg>
+            <!-- Aura vortex — matched height -->
+            <span style="font-size: 44px; line-height: 1; position: relative; z-index: 1;">🌀</span>
+          </div>
+          <h1 style="font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -0.02em;">Verify</h1>
+          <p style="font-size: 14px; color: #9ca3af; text-align: center; margin-top: 8px; max-width: 260px; line-height: 1.5;">
+            Prove you're uniquely human, or help verify someone who is.
+          </p>
+        </div>
+        <!-- Buttons — clearer roles -->
+        <div style="flex-shrink: 0; padding: 0 20px 32px; display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 1;">
+          <button style="width: 100%; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; font-weight: 600; color: #c4b5fd; border: 1px solid rgba(139,92,246,0.5); background: linear-gradient(135deg, rgba(76,29,149,0.30), rgba(76,29,149,0.50)); cursor: pointer; box-shadow: 0 0 20px rgba(139,92,246,0.12);">
+            🙋 Get verified
+          </button>
+          <button style="width: 100%; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; font-weight: 600; color: #6ee7b7; border: 1px solid rgba(52,211,153,0.4); background: linear-gradient(135deg, rgba(6,78,59,0.25), rgba(6,78,59,0.45)); cursor: pointer; box-shadow: 0 0 20px rgba(52,211,153,0.08);">
+            🔍 Evaluate someone
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- 3. SETTINGS — UX audit -->
+<!-- ============================================ -->
+<div class="section-header">
+  <h2>3. Settings — Collapse Keyboard Shortcuts</h2>
+  <p>Same flat list. Keyboard shortcuts section collapsed with caret to expand.</p>
+</div>
+
+<div class="comparison-row">
+  <!-- BEFORE -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-before">Before (flat list)</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="padding: 0;">
+        <div style="height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+          <span style="font-size: 14px; color: #a78bfa;">← Back</span>
+          <span style="font-weight: 600; color: #fff;">Settings</span>
+          <span style="width: 48px;"></span>
+        </div>
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <!-- All flat, no grouping -->
+          <div class="setting-row setting-dark">
+            <div><div style="font-size: 14px; font-weight: 500; color: #fff;">📋 Answer History</div></div>
+            <span style="font-size: 12px; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,0.06); color: #6b7280;">Coming Soon</span>
+          </div>
+          <div class="setting-row setting-dark">
+            <div><div style="font-size: 14px; font-weight: 500; color: #fff;">Theme</div></div>
+            <div class="toggle toggle-on"><div class="toggle-knob" style="display: flex; align-items: center; justify-content: center; font-size: 10px;">🌙</div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">Undo Delay</div>
+            </div>
+            <span style="font-size: 14px; font-weight: 700; color: #a78bfa;">1.5s</span>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">Require Submit Button</div>
+              <div style="font-size: 13px; color: #6b7280;">Off = auto-submit on tap</div>
+            </div>
+            <div class="toggle toggle-off"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">Show Tips</div>
+              <div style="font-size: 13px; color: #6b7280;">Gesture hints for new users</div>
+            </div>
+            <div class="toggle toggle-on"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">Streak Counter</div>
+              <div style="font-size: 13px; color: #6b7280;">Show 🔥 during play</div>
+            </div>
+            <div class="toggle toggle-on"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">I am a...</div>
+              <div style="font-size: 13px; color: #6b7280;">Human</div>
+            </div>
+            <div class="toggle toggle-off"><div class="toggle-knob" style="display: flex; align-items: center; justify-content: center; font-size: 10px;">🧬</div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">Demo Profiles</div>
+              <div style="font-size: 13px; color: #6b7280;">View sample assessment data</div>
+            </div>
+            <div class="toggle toggle-off"><div class="toggle-knob"></div></div>
+          </div>
+          <div style="border-radius: 12px; padding: 12px 14px; background: rgba(17,24,39,0.5); border: 1px solid rgba(31,41,55,1);">
+            <div style="font-size: 14px; font-weight: 500; color: #6b7280; margin-bottom: 8px;">Keyboard Shortcuts</div>
+            <div style="font-size: 13px; color: #4b5563; display: flex; flex-direction: column; gap: 4px;">
+              <div style="display: flex; justify-content: space-between;"><span>Yes / Option A</span><span style="font-family: monospace;">Y or 1</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>No / Option B-E</span><span style="font-family: monospace;">N or 2-5</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Next question</span><span style="font-family: monospace;">→ or Space</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Previous question</span><span style="font-family: monospace;">←</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Undo</span><span style="font-family: monospace;">Esc</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AFTER — same flat list, just keyboard shortcuts collapsed -->
+  <div>
+    <div class="phone-label"><span class="label-tag label-after">After (collapsed shortcuts)</span></div>
+    <div class="phone-frame" style="background: #030712;">
+      <div class="phone-inner" style="padding: 0;">
+        <div style="height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+          <span style="font-size: 14px; color: #a78bfa;">← Back</span>
+          <span style="font-weight: 600; color: #fff;">Settings</span>
+          <span style="width: 48px;"></span>
+        </div>
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <div class="setting-row setting-dark">
+            <div><div style="font-size: 14px; font-weight: 500; color: #fff;">📋 Answer History</div></div>
+            <span style="font-size: 12px; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,0.06); color: #6b7280;">Coming Soon</span>
+          </div>
+          <div class="setting-row setting-dark">
+            <div><div style="font-size: 14px; font-weight: 500; color: #fff;">Theme</div></div>
+            <div class="toggle toggle-on"><div class="toggle-knob" style="display: flex; align-items: center; justify-content: center; font-size: 10px;">🌙</div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div><div style="font-size: 14px; font-weight: 500; color: #fff;">Undo Delay</div></div>
+            <span style="font-size: 14px; font-weight: 700; color: #a78bfa;">1.5s</span>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">Require Submit Button</div>
+              <div style="font-size: 13px; color: #6b7280;">Off = auto-submit on tap</div>
+            </div>
+            <div class="toggle toggle-off"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">Show Tips</div>
+              <div style="font-size: 13px; color: #6b7280;">Gesture hints for new users</div>
+            </div>
+            <div class="toggle toggle-on"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">Streak Counter</div>
+              <div style="font-size: 13px; color: #6b7280;">Show 🔥 during play</div>
+            </div>
+            <div class="toggle toggle-on"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">I am a...</div>
+              <div style="font-size: 13px; color: #6b7280;">Human</div>
+            </div>
+            <div class="toggle toggle-off"><div class="toggle-knob" style="display: flex; align-items: center; justify-content: center; font-size: 10px;">🧬</div></div>
+          </div>
+          <div class="setting-row setting-dark">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: #fff;">Demo Profiles</div>
+              <div style="font-size: 13px; color: #6b7280;">View sample assessment data</div>
+            </div>
+            <div class="toggle toggle-off"><div class="toggle-knob"></div></div>
+          </div>
+          <!-- Keyboard shortcuts — collapsed -->
+          <div style="border-radius: 12px; padding: 12px 14px; background: rgba(17,24,39,0.5); border: 1px solid rgba(31,41,55,1); cursor: pointer;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-size: 14px; font-weight: 500; color: #6b7280;">⌨️ Keyboard Shortcuts</div>
+              <span style="font-size: 12px; color: #4b5563;">▾</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+</body>
+</html>
