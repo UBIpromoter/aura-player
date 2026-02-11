@@ -220,34 +220,40 @@
     .light-theme .shine-rose { --accent-color: rgba(244, 63, 94, 0.4); --accent-bright: rgba(251, 113, 133, 0.7); }
 
     /* Hover glow classes - subtle color-matched glow on hover/hold */
-    /* Uses inset box-shadow + background to work within overflow:hidden containers */
-    .hover-glow { transition: background-color 0.2s ease, box-shadow 0.2s ease; }
-    .hover-glow-amber:hover, .hover-glow-amber:active { background-color: rgba(251, 191, 36, 0.08); box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.3); }
-    .hover-glow-violet:hover, .hover-glow-violet:active { background-color: rgba(139, 92, 246, 0.08); box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.3); }
-    .hover-glow-teal:hover, .hover-glow-teal:active { background-color: rgba(45, 212, 191, 0.08); box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.3); }
-    .hover-glow-cyan:hover, .hover-glow-cyan:active { background-color: rgba(6, 182, 212, 0.08); box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.3); }
-    .hover-glow-blue:hover, .hover-glow-blue:active { background-color: rgba(59, 130, 246, 0.08); box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3); }
-    .hover-glow-gray:hover, .hover-glow-gray:active { background-color: rgba(156, 163, 175, 0.08); box-shadow: inset 0 0 0 1px rgba(156, 163, 175, 0.3); }
-    .hover-glow-emerald:hover, .hover-glow-emerald:active { background-color: rgba(16, 185, 129, 0.08); box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.3); }
-    .hover-glow-rose:hover, .hover-glow-rose:active { background-color: rgba(244, 63, 94, 0.08); box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.3); }
-    .hover-glow-pink:hover, .hover-glow-pink:active { background-color: rgba(236, 72, 153, 0.08); box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.3); }
-    .hover-glow-slate:hover, .hover-glow-slate:active { background-color: rgba(100, 116, 139, 0.08); box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.3); }
-    .hover-glow-sky:hover, .hover-glow-sky:active { background-color: rgba(14, 165, 233, 0.08); box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.3); }
-    .hover-glow-indigo:hover, .hover-glow-indigo:active { background-color: rgba(99, 102, 241, 0.08); box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.3); }
+    /* Uses ::before overlay so it works even on elements with inline styles */
+    /* :not(.shine-card) prevents conflict — shine-card has its own ::before/::after shimmer */
+    .hover-glow:not(.shine-card) { position: relative; isolation: isolate; }
+    .hover-glow:not(.shine-card)::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      opacity: 0; transition: opacity 0.2s ease; pointer-events: none; z-index: -1;
+    }
+    .hover-glow:not(.shine-card):hover::before, .hover-glow:not(.shine-card):active::before { opacity: 1; }
+    .hover-glow-amber:not(.shine-card)::before { background-color: rgba(251, 191, 36, 0.08); box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.3); }
+    .hover-glow-violet:not(.shine-card)::before { background-color: rgba(139, 92, 246, 0.08); box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.3); }
+    .hover-glow-teal:not(.shine-card)::before { background-color: rgba(45, 212, 191, 0.08); box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.3); }
+    .hover-glow-cyan:not(.shine-card)::before { background-color: rgba(6, 182, 212, 0.08); box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.3); }
+    .hover-glow-blue:not(.shine-card)::before { background-color: rgba(59, 130, 246, 0.08); box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3); }
+    .hover-glow-gray:not(.shine-card)::before { background-color: rgba(156, 163, 175, 0.08); box-shadow: inset 0 0 0 1px rgba(156, 163, 175, 0.3); }
+    .hover-glow-emerald:not(.shine-card)::before { background-color: rgba(16, 185, 129, 0.08); box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.3); }
+    .hover-glow-rose:not(.shine-card)::before { background-color: rgba(244, 63, 94, 0.08); box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.3); }
+    .hover-glow-pink:not(.shine-card)::before { background-color: rgba(236, 72, 153, 0.08); box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.3); }
+    .hover-glow-slate:not(.shine-card)::before { background-color: rgba(100, 116, 139, 0.08); box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.3); }
+    .hover-glow-sky:not(.shine-card)::before { background-color: rgba(14, 165, 233, 0.08); box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.3); }
+    .hover-glow-indigo:not(.shine-card)::before { background-color: rgba(99, 102, 241, 0.08); box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.3); }
 
     /* Light theme hover glow overrides — ~3x opacity, tighter inset shadow */
-    .light-theme .hover-glow-amber:hover, .light-theme .hover-glow-amber:active { background-color: rgba(251, 191, 36, 0.15); box-shadow: inset 0 0 0 1.5px rgba(251, 191, 36, 0.4); }
-    .light-theme .hover-glow-violet:hover, .light-theme .hover-glow-violet:active { background-color: rgba(139, 92, 246, 0.15); box-shadow: inset 0 0 0 1.5px rgba(139, 92, 246, 0.4); }
-    .light-theme .hover-glow-teal:hover, .light-theme .hover-glow-teal:active { background-color: rgba(45, 212, 191, 0.15); box-shadow: inset 0 0 0 1.5px rgba(45, 212, 191, 0.4); }
-    .light-theme .hover-glow-cyan:hover, .light-theme .hover-glow-cyan:active { background-color: rgba(6, 182, 212, 0.15); box-shadow: inset 0 0 0 1.5px rgba(6, 182, 212, 0.4); }
-    .light-theme .hover-glow-blue:hover, .light-theme .hover-glow-blue:active { background-color: rgba(59, 130, 246, 0.15); box-shadow: inset 0 0 0 1.5px rgba(59, 130, 246, 0.4); }
-    .light-theme .hover-glow-gray:hover, .light-theme .hover-glow-gray:active { background-color: rgba(156, 163, 175, 0.15); box-shadow: inset 0 0 0 1.5px rgba(156, 163, 175, 0.4); }
-    .light-theme .hover-glow-emerald:hover, .light-theme .hover-glow-emerald:active { background-color: rgba(16, 185, 129, 0.15); box-shadow: inset 0 0 0 1.5px rgba(16, 185, 129, 0.4); }
-    .light-theme .hover-glow-rose:hover, .light-theme .hover-glow-rose:active { background-color: rgba(244, 63, 94, 0.15); box-shadow: inset 0 0 0 1.5px rgba(244, 63, 94, 0.4); }
-    .light-theme .hover-glow-pink:hover, .light-theme .hover-glow-pink:active { background-color: rgba(236, 72, 153, 0.15); box-shadow: inset 0 0 0 1.5px rgba(236, 72, 153, 0.4); }
-    .light-theme .hover-glow-slate:hover, .light-theme .hover-glow-slate:active { background-color: rgba(100, 116, 139, 0.15); box-shadow: inset 0 0 0 1.5px rgba(100, 116, 139, 0.4); }
-    .light-theme .hover-glow-sky:hover, .light-theme .hover-glow-sky:active { background-color: rgba(14, 165, 233, 0.15); box-shadow: inset 0 0 0 1.5px rgba(14, 165, 233, 0.4); }
-    .light-theme .hover-glow-indigo:hover, .light-theme .hover-glow-indigo:active { background-color: rgba(99, 102, 241, 0.15); box-shadow: inset 0 0 0 1.5px rgba(99, 102, 241, 0.4); }
+    .light-theme .hover-glow-amber:not(.shine-card)::before { background-color: rgba(251, 191, 36, 0.15); box-shadow: inset 0 0 0 1.5px rgba(251, 191, 36, 0.4); }
+    .light-theme .hover-glow-violet:not(.shine-card)::before { background-color: rgba(139, 92, 246, 0.15); box-shadow: inset 0 0 0 1.5px rgba(139, 92, 246, 0.4); }
+    .light-theme .hover-glow-teal:not(.shine-card)::before { background-color: rgba(45, 212, 191, 0.15); box-shadow: inset 0 0 0 1.5px rgba(45, 212, 191, 0.4); }
+    .light-theme .hover-glow-cyan:not(.shine-card)::before { background-color: rgba(6, 182, 212, 0.15); box-shadow: inset 0 0 0 1.5px rgba(6, 182, 212, 0.4); }
+    .light-theme .hover-glow-blue:not(.shine-card)::before { background-color: rgba(59, 130, 246, 0.15); box-shadow: inset 0 0 0 1.5px rgba(59, 130, 246, 0.4); }
+    .light-theme .hover-glow-gray:not(.shine-card)::before { background-color: rgba(156, 163, 175, 0.15); box-shadow: inset 0 0 0 1.5px rgba(156, 163, 175, 0.4); }
+    .light-theme .hover-glow-emerald:not(.shine-card)::before { background-color: rgba(16, 185, 129, 0.15); box-shadow: inset 0 0 0 1.5px rgba(16, 185, 129, 0.4); }
+    .light-theme .hover-glow-rose:not(.shine-card)::before { background-color: rgba(244, 63, 94, 0.15); box-shadow: inset 0 0 0 1.5px rgba(244, 63, 94, 0.4); }
+    .light-theme .hover-glow-pink:not(.shine-card)::before { background-color: rgba(236, 72, 153, 0.15); box-shadow: inset 0 0 0 1.5px rgba(236, 72, 153, 0.4); }
+    .light-theme .hover-glow-slate:not(.shine-card)::before { background-color: rgba(100, 116, 139, 0.15); box-shadow: inset 0 0 0 1.5px rgba(100, 116, 139, 0.4); }
+    .light-theme .hover-glow-sky:not(.shine-card)::before { background-color: rgba(14, 165, 233, 0.15); box-shadow: inset 0 0 0 1.5px rgba(14, 165, 233, 0.4); }
+    .light-theme .hover-glow-indigo:not(.shine-card)::before { background-color: rgba(99, 102, 241, 0.15); box-shadow: inset 0 0 0 1.5px rgba(99, 102, 241, 0.4); }
 
     .starry-bg {
       background: linear-gradient(135deg, rgba(30, 20, 10, 0.9) 0%, rgba(50, 30, 15, 0.8) 100%);
@@ -1453,8 +1459,8 @@ const TH = (token, dark) => { const val = {
   'text-inverted': dark ? 'text-gray-900' : 'text-white',
   // Background colors
   'bg-main': dark ? 'bg-gray-950' : 'bg-gray-50',
-  'bg-card': dark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-white border border-black/[0.10] shadow-sm',
-  'bg-card-shine': dark ? 'bg-white/[0.04] shine-card shine-gray border border-white/[0.06]' : 'bg-white border border-black/[0.10] shadow-sm',
+  'bg-card': dark ? 'bg-white/[0.04] border border-white/[0.06] hover-glow' : 'bg-white border border-black/[0.10] shadow-sm hover-glow',
+  'bg-card-shine': dark ? 'bg-white/[0.04] shine-card shine-gray border border-white/[0.06] hover-glow' : 'bg-white border border-black/[0.10] shadow-sm hover-glow',
   'bg-elevated': dark ? 'bg-white/[0.06]' : 'bg-gray-200',
   'bg-input': dark ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400',
   'bg-surface': dark ? 'bg-white/[0.03]' : 'bg-white/90',
@@ -5405,7 +5411,7 @@ const PathChoiceScreen = ({ darkMode, entityType, onboardingAnswers, onReveal, o
         <div className="w-full max-w-sm resp-max-w space-y-3 resp-gap">
           <button
             onClick={onReveal}
-            className={`w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-violet glow-violet border btn-feedback ${
+            className={`w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-violet glow-violet hover-glow hover-glow-violet border btn-feedback ${
               darkMode
                 ? 'border-violet-500/60 hover:border-violet-400/80 bg-gradient-to-br from-violet-900/50 to-violet-950/70'
                 : 'border-violet-400 hover:border-violet-500 bg-gradient-to-br from-violet-100 to-violet-50'
@@ -5418,7 +5424,7 @@ const PathChoiceScreen = ({ darkMode, entityType, onboardingAnswers, onReveal, o
 
           <button
             onClick={onExplore}
-            className={`w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-teal glow-teal border btn-feedback ${
+            className={`w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-3 transition-all shine-card shine-teal glow-teal hover-glow hover-glow-teal border btn-feedback ${
               darkMode
                 ? 'border-teal-500/40 hover:border-teal-400/70 bg-gradient-to-br from-teal-900/30 to-teal-950/50'
                 : 'border-teal-300 hover:border-teal-400 bg-gradient-to-br from-teal-100 to-teal-50'
@@ -7133,7 +7139,7 @@ const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, seconda
   if (secondary) {
     return (
       <button onClick={onClick} disabled={disabled}
-        className="w-full h-14 resp-h-lg rounded-2xl font-medium text-sm transition-all duration-200 disabled:opacity-30"
+        className={`w-full h-14 resp-h-lg rounded-2xl font-medium text-sm transition-all duration-200 disabled:opacity-30 hover-glow hover-glow-${color}`}
         style={{
           background: darkMode ? `rgba(${c.rgb}, 0.08)` : `rgba(${c.rgb}, 0.06)`,
           border: `1px solid ${darkMode ? `rgba(${c.rgb}, 0.25)` : `rgba(${c.rgb}, 0.2)`}`,
@@ -7145,7 +7151,7 @@ const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, seconda
   }
   return (
     <button onClick={onClick} disabled={disabled}
-      className="w-full h-14 resp-h-lg rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-30"
+      className={`w-full h-14 resp-h-lg rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-30 hover-glow hover-glow-${color}`}
       style={{
         background: darkMode
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.15))`
@@ -7166,7 +7172,7 @@ const VerifyOptionButton = ({ label, selected, color, darkMode, onClick }) => {
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
   return (
     <button onClick={onClick}
-      className="w-full h-14 resp-h-lg rounded-2xl font-medium text-sm text-left px-5 transition-all duration-200"
+      className={`w-full h-14 resp-h-lg rounded-2xl font-medium text-sm text-left px-5 transition-all duration-200 hover-glow hover-glow-${color}`}
       style={{
         background: selected
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.25), rgba(${c.rgb}, 0.12))`
@@ -7297,7 +7303,7 @@ const VerifyToggleSwitch = ({ label, subtitle, color, darkMode, isOn, onToggle }
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
   return (
     <button onClick={onToggle}
-      className="w-full flex items-center justify-between rounded-2xl px-5 py-4 transition-all duration-200"
+      className={`w-full flex items-center justify-between rounded-2xl px-5 py-4 transition-all duration-200 hover-glow hover-glow-${color}`}
       style={{
         background: isOn
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.2), rgba(${c.rgb}, 0.08))`
@@ -7581,7 +7587,7 @@ const VerifyQueue = ({ darkMode, subjects, evaluations, onSelect, onBack }) => {
             const c = isCompleted ? COLOR_HEX.emerald : COLOR_HEX.violet;
             return (
               <button key={subject.id} onClick={() => !isCompleted && onSelect(subject.id)}
-                className={`w-full rounded-2xl p-4 text-left transition-all duration-200 ${isCompleted ? 'opacity-60' : ''}`}
+                className={`w-full rounded-2xl p-4 text-left transition-all duration-200 hover-glow hover-glow-${isCompleted ? 'emerald' : 'violet'} ${isCompleted ? 'opacity-60' : ''}`}
                 style={{
                   background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
                   border: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
@@ -7654,7 +7660,7 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
               const oc = COLOR_HEX[opt.color];
               return (
                 <button key={opt.key} onClick={() => { setPath(opt.key); setAnswers(prev => ({ ...prev, gate: opt.label })); setPhase('fit'); }}
-                  className="w-full rounded-2xl px-5 py-4 text-left transition-all duration-200"
+                  className={`w-full rounded-2xl px-5 py-4 text-left transition-all duration-200 hover-glow hover-glow-${opt.color}`}
                   style={{
                     background: `linear-gradient(135deg, rgba(${oc.rgb}, 0.12), rgba(${oc.rgb}, 0.04))`,
                     border: `1px solid rgba(${oc.rgb}, 0.2)`,
@@ -8415,7 +8421,7 @@ const AssessPickerScreen = ({
 
           return (
             <div className="mb-3">
-              <button onClick={handleHeroClick} className={`w-full relative rounded-2xl ${darkMode ? `border border-${t}-500/30` : `border border-${t}-300`} text-left`}>
+              <button onClick={handleHeroClick} className={`w-full relative rounded-2xl overflow-hidden text-left hover-glow hover-glow-${cat.color} ${darkMode ? 'border border-white/[0.06]' : 'border border-black/[0.10] shadow-sm'}`}>
                 <div className="absolute inset-0 overflow-hidden rounded-2xl flex items-center justify-center pointer-events-none">
                   <div className="aura-breathe rounded-full" style={{
                     width: 240, height: 240,
@@ -8454,7 +8460,8 @@ const AssessPickerScreen = ({
               if (!hasModules) {
                 const [testId, test] = catTests[0];
                 return (
-                  <button key={catId} onClick={() => onStartTest(testId)} className={`w-full p-3.5 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-3 hover-glow hover-glow-${cat.color}`}>
+                  <button key={catId} onClick={() => onStartTest(testId)} className={`w-full p-3.5 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-3 hover-glow hover-glow-${cat.color} relative overflow-hidden`}>
+                    {darkMode && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 200, height: 200, background: `radial-gradient(ellipse at center, rgba(${(COLOR_HEX[cat.color] || COLOR_HEX.violet).rgb}, 0.08) 0%, transparent 70%)` }} /></div>}
                     <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : totalQuestions} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-xs" orbit={assessProfileSwitching} />
                     <div className={`flex-1 text-left font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
                     <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${twColor(cat.color)}-500/25 text-${twColor(cat.color)}-300 border border-${twColor(cat.color)}-500/30` : `bg-${twColor(cat.color)}-100 text-${twColor(cat.color)}-600`}`}>{progressPct > 0 ? 'Continue →' : 'Start →'}</span>
@@ -8470,8 +8477,9 @@ const AssessPickerScreen = ({
               const tw = twColor(cat.color);
 
               return (
-                <div key={catId} className={`rounded-2xl ${TH('bg-card', darkMode)}`}>
-                  <div className={`p-3.5 hover-glow hover-glow-${cat.color} cursor-pointer`} onClick={() => onSetExpandedCategory(isExpanded ? null : catId)}>
+                <div key={catId} className={`rounded-2xl ${TH('bg-card', darkMode)} relative overflow-hidden`}>
+                  {darkMode && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 200, height: 200, background: `radial-gradient(ellipse at center, rgba(${(COLOR_HEX[cat.color] || COLOR_HEX.violet).rgb}, 0.08) 0%, transparent 70%)` }} /></div>}
+                  <div className={`p-3.5 hover-glow hover-glow-${cat.color} cursor-pointer relative`} onClick={() => onSetExpandedCategory(isExpanded ? null : catId)}>
                     <div className="flex items-center gap-3">
                       <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={incompleteModules} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-sm" orbit={assessProfileSwitching} />
                       <div className={`flex-1 min-w-0 font-semibold ${TH('text-primary', darkMode)} flex items-center gap-1.5`}>
@@ -8672,7 +8680,7 @@ const AssessPickerScreen = ({
           const isAIUser = entityType === 'ai';
           if (!isAIUser) {
             return (
-              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border-blue-500/30 shadow-blue-500/20 border flex items-center gap-4 shadow-lg`}>
+              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border-blue-500/30 shadow-blue-500/20 border flex items-center gap-4 shadow-lg hover-glow hover-glow-blue`}>
                 <ProgressCircle progress={0} size={72} strokeWidth={5} color="blue" text="10" gradientId={`cat-first`} darkMode={darkMode} textSize="text-base" />
                 <div className="flex-1 text-left">
                   <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
@@ -8684,7 +8692,7 @@ const AssessPickerScreen = ({
           }
           return (
             <>
-              <button onClick={() => onStartTest('ai-style')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br ${darkMode ? 'from-cyan-900/40 to-teal-900/40 border border-cyan-500/30 shadow-lg shadow-cyan-500/20' : 'from-cyan-50 to-teal-50 border border-cyan-300 shadow-lg shadow-cyan-200/40'} flex items-center gap-4`}>
+              <button onClick={() => onStartTest('ai-style')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br ${darkMode ? 'from-cyan-900/40 to-teal-900/40 border border-cyan-500/30 shadow-lg shadow-cyan-500/20' : 'from-cyan-50 to-teal-50 border border-cyan-300 shadow-lg shadow-cyan-200/40'} flex items-center gap-4 hover-glow hover-glow-cyan`}>
                 <ProgressCircle progress={0} size={72} strokeWidth={5} color="cyan" text="32" gradientId="cat-ai-first" darkMode={darkMode} textSize="text-base" />
                 <div className="flex-1 text-left">
                   <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>AI Identity</div>
@@ -8694,7 +8702,7 @@ const AssessPickerScreen = ({
                 <span className={`text-2xl ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>→</span>
               </button>
               <p className={`text-[11px] mt-3 max-w-sm text-center ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Designed for AI minds. Humans welcome.</p>
-              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm mt-3 p-3 rounded-xl ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'} flex items-center gap-3`}>
+              <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm mt-3 p-3 rounded-xl ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'} flex items-center gap-3 hover-glow hover-glow-blue`}>
                 <ProgressCircle progress={0} size={36} strokeWidth={3} color="blue" text="10" gradientId="cat-qp-alt" darkMode={darkMode} textSize="text-xs" />
                 <div className="flex-1 text-left">
                   <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Quick Profile</div>
@@ -8710,7 +8718,7 @@ const AssessPickerScreen = ({
           <div className="mt-3">
             <div className={`rounded-xl ${TH('bg-card', darkMode)}`}>
               {completedCategories.map(({ catId, cat, catTests }, idx) => (
-                <button key={catId} onClick={() => onNavigate('assess-results', { testId: catTests[0][0] })} className={`w-full px-3 py-2 flex items-center gap-3 opacity-70 ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
+                <button key={catId} onClick={() => onNavigate('assess-results', { testId: catTests[0][0] })} className={`w-full px-3 py-2 flex items-center gap-3 opacity-70 hover:opacity-90 hover-glow hover-glow-${cat.color} transition-opacity ${idx > 0 ? (darkMode ? 'border-t border-gray-800/50' : 'border-t border-gray-200') : ''}`}>
                   <ProgressCircle progress={100} size={28} strokeWidth={2} color={cat.color} icon={cat.icon} gradientId={`complete-${catId}`} darkMode={darkMode} iconSize="text-xs" />
                   <span className={`flex-1 text-left text-sm font-medium ${TH('text-dim', darkMode)}`}>{cat.name}</span>
                   <span className={`text-sm ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>›</span>

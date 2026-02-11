@@ -21,14 +21,16 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
 
 ### Assess Picker
 - [x] **Light mode low contrast** — MERGED: solid white cards, stronger borders (0.10 vs 0.06), hero card solid bg
+- [ ] **Smart category ordering** — hero card + full list should be ordered by what's best for the user, not hardcoded. Three factors: what they'd enjoy, what's ideal for their journey, what gives us the most useful data to provide good insights back. Everything stays visible and tappable — ordering is recommendation, not restriction. Gates stay for hard dependencies (tier system). Recommended static order as starting point: Quick Profile → Starter Pack → Personality → Relationships → Character → Behavior → Mind → Shadow Self. Arc: light → personal → deep → provocative. Shadow Self last because it lands better when we already know them well.
+  > "We should have that top card and the whole ordered list be based on what we think would be ideal for the user, what they would enjoy, and what we would find most useful to know from them to be able to provide good information back."
+  > "That person that wants to jump right down to Shadow Self is welcome to. It's just at the bottom of the list."
+  > Architecture note: categories may eventually have sub-assessments with intra-category dependencies (e.g. reasoning level 2 requires level 1). Not building now, but logic should accommodate it.
 
 ### Verify
 - [ ] **Polish now, balanced** — invest in polish alongside core features, not after
   > "Polish verify now" · "Keep balanced"
-- [ ] **URGENT: Remove gold shimmer ring on multi-choice answers** — one answer per screen has a shimmering gold ring highlight. This biases the user toward an answer. Trust/integrity issue — never suggest a "right" answer in verification context. Remove any such highlights
-  > "There is a weird shimmering ring that goes around one of the questions on each screen. This is terrible — it's like we're saying, 'Ooh, pick this one.' It's got a gold shining rim. We never want to be encouraging people to pick one answer over another."
-- [ ] **Undo toast: move from top-of-screen to answer row** — current position (top of screen) is not useful. Move to either inline on the answer the user just selected, or just above the check/X marks. Keep it contextual, where attention already is
-  > "I'm not liking the undo toast notification that comes across while you're waiting. It's coming up at the top of the screen. Previously, we had it come across the actual answer line itself. Or maybe just above the check and the X mark."
+- [x] **URGENT: Remove gold shimmer ring on multi-choice answers** — DONE: removed ring-2, ring-offset, ring-{color}-400 from assess answer buttons. Selected answers show filled bg + border only.
+- [x] **Undo toast: move from top-of-screen to answer row** — DONE: moved to overlay answer button area. Assess screen toast moved to bottom. Awaiting Philip review.
 - [ ] **Responsive: buttons dinky on large mobile, cramped on small** — assessment screens look good on desktop but buttons are undersized on large phones with too much whitespace. Small screens need to fit satisfyingly. Sizing/spacing/touch-target sweep needed
   > "When I looked on my mobile, suddenly all the buttons look dinky on the screen with tons of space. And on the flip side, if someone's got a small screen, we need to make sure it fits."
 - [ ] **DESIGN DECISION: Instant submit vs confirm on multi-select** — single-answer auto-progresses (good). Multi-select requires continue button (breaks flow). Proposal: "pick N" with auto-advance on Nth tap + "none of these" single-tap escape. Needs design decision before building

@@ -122,6 +122,17 @@ The `.light-theme` class on root containers activates light-specific overrides f
 | `.shine-*` | Low opacity accent vars | ~1.5x opacity for visibility on white |
 | `.hover-glow-*` | 0.08 bg, 1px inset border | 0.15 bg (~2x), 1.5px inset border |
 
+### Hover Glow — Standard Lego Block
+
+**Every interactive card and button gets `hover-glow hover-glow-{color}`.** This is mandatory, not optional.
+
+- `hover-glow` = base class (transition). Baked into `TH('bg-card')` — automatic for all cards.
+- `hover-glow-{color}` = color-specific hover/active effect. Must be added per-component with the relevant category/assessment color.
+- Component-level buttons (VerifyActionButton, VerifyOptionButton) include it in their definition — all instances get it automatically.
+- One CSS rule per color, defined once in `<style>`. Change the rule = change everywhere.
+- **Implementation:** Uses `::before` pseudo-element overlay with `isolation: isolate` + `z-index: -1`. This works even on elements with inline `style={{}}`.
+- **`shine-card` exclusion:** Elements with `shine-card` are excluded via `:not(.shine-card)` — shine-card has its own shimmer hover via `::before`/`::after`. No conflict.
+
 ---
 
 ## Ambient Gradient Sizes
