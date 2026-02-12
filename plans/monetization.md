@@ -1,6 +1,6 @@
 # Aura Monetization Strategy
 
-*Living document. Executive-owned. Last updated: 2026-02-08*
+*Living document. Executive-owned. Last updated: 2026-02-11*
 
 ---
 
@@ -19,7 +19,7 @@ The Aura app is the friendly top of a deep system:
 | **BrightID** | Unique identity verification | Adam's foundation |
 | **Aura protocol** | Decentralized peer evaluation (any domain) | Adam's focus — Weighted SybilRank, evaluations, confidence ratings, teams |
 | **Updraft** | Economic incentives + public ratification | Complement to Aura — prediction-market style |
-| **Aura app** | Consumer entry point — questions, personality, AI | Philip's focus (built with Claude, last 3 weeks) |
+| **Aura app** | Consumer entry point — questions, personality, AI | Philip's focus (built with Claude, ongoing since early 2026) |
 
 The app serves three simultaneous purposes:
 1. **Entertainment** — fun questions, personality tests, beautiful auras. People come for this.
@@ -39,7 +39,7 @@ The personality assessment adds evaluator-quality signals: independence of thoug
 ### Free (Viral Engine)
 
 - Full core assessment (all tracks)
-- Aura visualization (Deep Bloom — full constellation)
+- Aura visualization (living organism — full constellation)
 - Shareable result card (screenshot-ready, embeddable)
 - Basic personality summary
 
@@ -245,5 +245,5 @@ Weights are inaccessible (proprietary) or illegible (no clean mapping from param
 ## Notes
 
 - Assessment question format for AI consumption being developed in parallel session (2026-02-08)
-- Deep Bloom tier system (New/Regular/Power) could map naturally to free/paid visualization tiers
+- Organism visualization complexity could map naturally to free/paid visualization tiers (richer organisms as more assessments are completed)
 - The visualization is the moat — it's what makes Aura shareable where other tests aren't

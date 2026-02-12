@@ -1,6 +1,6 @@
 # Aura Ship Spec
 
-*What "shippable" means. Not MVP — the real thing, end-to-end. Last updated: 2026-02-08*
+*What "shippable" means. Not MVP — the real thing, end-to-end. Last updated: 2026-02-11*
 
 ---
 
@@ -20,7 +20,7 @@ Four years of work. Ship the vision, not the minimum.
 | 2. **Entity gate** — human or AI? | In design | Simple routing question (in AI questions spec) |
 | 3. **Take the assessment** — human track | Working | Polish, i18n framework |
 | 4. **Take the assessment** — AI track | In progress | AI-native questions integration, API endpoint |
-| 5. **See my aura** — Deep Bloom visualization | Working | Solid |
+| 5. **See my aura** — organism visualization | Working | Solid |
 | 6. **Read my profile** — personality breakdown | Partial | Detailed analysis layer, type labels |
 | 7. **Save my result** — persistence | Missing | Backend: accounts, database |
 | 8. **Share my result** — viral loop | Missing | Permalink, OG card/image, embed |
@@ -32,10 +32,15 @@ Four years of work. Ship the vision, not the minimum.
 ## Frontend (Philip's domain)
 
 ### Already built:
-- Deep Bloom visualization (shipped, polished)
-- Human assessment flow (working)
-- Design system — atmospheric glows, light/dark mode
-- Single-file app architecture
+- Organism visualization (shipped, integrated)
+- Human assessment flow with smart ordering and Intelligence Layer 2 (dynamic reordering, insight gating, profile depth)
+- Verify flow overhauled (toggles, radio buttons, verdict screen)
+- Responsive across all phone sizes
+- Light/dark mode
+- Welcome bloom animation
+- Dev panel with Q&A channel
+- Design system — atmospheric glows, radial gradient void glows
+- Single-file app architecture (~13K lines)
 
 ### Needs building:
 - [ ] **AI track integration** — AI-native questions in the app, entity gate routing
@@ -49,6 +54,17 @@ Four years of work. Ship the vision, not the minimum.
 ---
 
 ## Backend (Adam's domain)
+
+### Bridge Persistence Layer (Current)
+
+**Supabase** is confirmed as the bridge persistence layer until Adam builds the real backend. This provides:
+- Auth (email/password, OAuth providers)
+- PostgreSQL database for assessment storage, user profiles, history
+- Real-time subscriptions (optional, for future features)
+- Row-level security policies
+- Auto-generated REST API
+
+Philip confirmed this approach — ship with Supabase for auth + persistence, then migrate to Adam's architecture when the real backend is ready. This unblocks shipping without waiting for Adam's full stack.
 
 ### Adam's Stack (from BrightID + Updraft repos)
 
@@ -175,7 +191,7 @@ The key insight: Adam builds **minimal backends**. Serverless functions, managed
 
 ### Migration Path
 
-Current state: single `index.html` (~10K lines).
+Current state: single `index.html` (~13K lines).
 
 The migration doesn't have to be all-at-once:
 1. Wrap `index.html` in a Vite shell (existing code as a component)
@@ -229,6 +245,8 @@ Personality assessment is linguistically sensitive. "Directness" doesn't carry t
 7. Result card design
 8. Landing page
 
+**Note on privacy model:** Aura uses a privacy-first verification approach with three layers: claims (what you say about yourself), visibility controls (who can see what), and verification (proof without exposure). See `plans/user-flow-vision.md` for full details. This affects how profiles are shared and what's visible by default — verification status is separate from public/private toggle.
+
 ### Phase C: AI Track (Philip, informed by AI questions window)
 9. AI-native questions integrated into app
 10. Entity gate routing
@@ -249,7 +267,7 @@ Personality assessment is linguistically sensitive. "Directness" doesn't carry t
 - **Data store?** Firestore, Supabase, or something else? Supabase is lighter touch (his Updraft pattern). Firestore is more integrated if using Firebase Auth.
 - **Auth approach?** Firebase Auth (email/password/Google), BrightID identity, wallet-based, or multiple options? BrightID integration is natural but may limit audience. Could offer both.
 - **OG image generation?** Vercel serverless function (his Updraft pattern for social meta) — render aura card server-side for link previews.
-- **Monolith-wrap-and-extend vs full componentization?** Current index.html is ~10K lines. Could wrap in React/Lit shell and extend, or he may prefer to componentize first.
+- **Monolith-wrap-and-extend vs full componentization?** Current index.html is ~13K lines. Could wrap in React/Lit shell and extend, or he may prefer to componentize first.
 - **Lit or React?** His newest project (Updraft) uses Lit, not React. His Aura projects use React. Which does he prefer going forward?
 - **Where does AI assessment API live?** Vercel serverless function? Separate service?
 - **Neon Postgres vs Firestore vs Supabase?** His latest (aura-verified) uses Neon + Drizzle. Worth confirming this is still preferred.

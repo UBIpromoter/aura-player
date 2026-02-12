@@ -2,7 +2,7 @@
 
 *The complete picture. How BrightID, Aura protocol, Updraft, and the Aura app fit together. Read this first before any other plan doc.*
 
-*Last updated: 2026-02-08*
+*Last updated: 2026-02-11*
 
 ---
 
@@ -137,13 +137,13 @@ BrightID is one **domain** that can be evaluated using the Aura protocol. "Is th
 
 **What:** Consumer app for personality assessment, world questions, and AI evaluation.
 **Created by:** Philip Silva (with Claude), built on 4 years of BrightID/Aura work
-**Status:** Active development. Deep Bloom visualization shipped. AI track in progress.
+**Status:** Active development. Organism visualization shipped. Intelligence Layer 2 (smart ordering, insight gating, profile depth). Verify flow overhauled. AI track in progress.
 **Core idea:** Make evaluation fun. People come for personality tests and trivia. Some of them turn out to be excellent evaluators. Feed them into the protocol.
 
 **The app serves three simultaneous purposes:**
 
 #### A. Entertainment (why people show up)
-- Beautiful personality assessment with Deep Bloom aura visualization
+- Beautiful personality assessment with living organism aura visualization
 - 411 world questions — fun, opinionated, shareable
 - AI personality assessment — novel, press-worthy
 - Shareable results — "here's my aura"
@@ -160,7 +160,7 @@ BrightID is one **domain** that can be evaluated using the Aura protocol. "Is th
 - Graduates can be invited to harder domains: identity verification, grant review, insurance claims
 - The app is the recruitment engine; the protocol is where the real work happens
 
-**Tech:** Single-file HTML app (index.html, ~10K lines), Deep Bloom canvas visualization, no backend yet
+**Tech:** Single-file HTML app (index.html, ~13K lines), organism canvas visualization, no backend yet
 **GitHub:** github.com/AuraProtocol (Philip's repo)
 **Local:** ~/Code/Aura/
 
@@ -278,7 +278,9 @@ BrightID is one **domain** that can be evaluated using the Aura protocol. "Is th
 | Aura protocol (scoring) | Operational | BrightID infrastructure |
 | Updraft | Live | updraft.fund, github.com/UpdraftFund |
 | Aura app — human assessment | Working | ~/Code/Aura/index.html |
-| Deep Bloom visualization | Shipped | index.html:1421-2200 |
+| Organism visualization | Shipped | Integrated throughout app |
+| Intelligence Layer 2 | Shipped | Smart ordering, insight gating, dynamic reorder, profile depth |
+| Verify flow | Overhauled | Toggles, radio buttons, verdict screen, responsive |
 | Design system | Polished | Atmospheric glows, light/dark mode |
 
 ### In Progress
