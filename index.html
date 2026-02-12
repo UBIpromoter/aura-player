@@ -50,7 +50,8 @@
 
   Extracted Screen Components
   ···························
-  "SCREEN COMPONENTS"          HistoryScreen, QotdScreen, ProfileScreen,
+  "SCREEN COMPONENTS"          SharePicker, PublicProfileScreen, StampRow,
+                               HistoryScreen, QotdScreen, ProfileScreen,
                                AssessPickerScreen, AssessQuestionScreen
   "ASSESS RESULTS SCREEN"      AssessResultsScreen, AssessAnalysisScreen
   "QUESTION FLOW SCREEN"       QuestionFlowScreen
@@ -94,12 +95,18 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Aura">
   <meta name="theme-color" content="#030712">
+  <meta property="og:title" content="Aura — Discover Your Personality">
+  <meta property="og:description" content="Answer questions, reveal who you are. Personality assessments that go deeper.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Aura — Discover Your Personality">
+  <meta name="twitter:description" content="Answer questions, reveal who you are. Personality assessments that go deeper.">
   <title>Aura Player</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
   <style>
     :root {
       --sat: env(safe-area-inset-top);
@@ -1046,74 +1053,128 @@ const ONBOARDING_QUESTIONS = [
     // Initialize Supabase
     const auraDB = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Generate anonymous session ID
+    // Generate anonymous session ID (for pre-auth response capture)
     const AURA_SESSION_ID = localStorage.getItem('aura_session_id') || (() => {
       const id = 'anon_' + Math.random().toString(36).slice(2, 11);
       localStorage.setItem('aura_session_id', id);
       return id;
     })();
-    console.log('[Aura] Session ID:', AURA_SESSION_ID);
 
-    // Capture response to Supabase with snapshot
-    async function captureResponse(questionId, answer, confidence) {
-      const question = QUESTIONS.find(q => q.id === questionId);
-      const response = {
-        session_id: AURA_SESSION_ID,
-        question_id: questionId,
-        answer: answer,
-        confidence: confidence,
-        email: AURA_USER_EMAIL,
-        snapshot: question ? {
-          q: question.text,
-          a: question.type === 'binary' ? (answer ? 'Yes' : 'No') : (question.options?.[answer] || String(answer)),
-          t: question.type,
-          c: question.category,
-          v: question._v
-        } : null
-      };
+    // ==================== AUTH STATE ====================
+    let AURA_AUTH_USER = null;
+    let AURA_USER_EMAIL = null;
+    let AURA_DISPLAY_NAME = null;
+    let _auraAuthReady;
+    const auraAuthReady = new Promise(r => { _auraAuthReady = r; });
 
-      const { error } = await auraDB.from('responses').insert(response);
+    auraDB.auth.onAuthStateChange(async (event, session) => {
+      console.log('[Aura] Auth:', event);
+      if (session?.user) {
+        AURA_AUTH_USER = session.user;
+        AURA_USER_EMAIL = session.user.email;
 
-      if (error) {
-        console.error('[Aura] Capture failed:', error);
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          // Fire in background — NEVER await Supabase calls inside onAuthStateChange (deadlocks the client)
+          setTimeout(async () => {
+            try {
+              if (event === 'SIGNED_IN') {
+                await createEmailClaim(session.user.id, session.user.email);
+                await migrateLocalAssessments(session.user.id);
+                await claimMyResponses();
+              }
+              // Load profile display name
+              const name = await loadProfile(session.user.id);
+              AURA_DISPLAY_NAME = name;
+              window.dispatchEvent(new CustomEvent('aura-profile-change', { detail: { displayName: name } }));
+              // Load user claims
+              const claims = await loadUserClaims(session.user.id);
+              window.dispatchEvent(new CustomEvent('aura-claims-loaded', { detail: { claims } }));
+            } catch (err) {
+              console.warn('[Aura] Post-signin sync error:', err.message);
+            }
+          }, 0);
+        }
       } else {
-        console.log('[Aura] Response captured:', response);
+        AURA_AUTH_USER = null;
+        AURA_USER_EMAIL = null;
+        window.dispatchEvent(new CustomEvent('aura-claims-loaded', { detail: { claims: [] } }));
+      }
+      window.dispatchEvent(new CustomEvent('aura-auth-change', {
+        detail: { user: session?.user || null, event }
+      }));
+      _auraAuthReady();
+    });
+
+    // Capture response to Supabase with snapshot (only when signed in)
+    async function captureResponse(questionId, answer, confidence) {
+      if (!AURA_AUTH_USER) return; // Skip cloud capture when not signed in
+      try {
+        const question = QUESTIONS.find(q => q.id === questionId);
+        const response = {
+          session_id: AURA_SESSION_ID,
+          question_id: questionId,
+          answer: answer,
+          confidence: confidence,
+          email: AURA_USER_EMAIL,
+          snapshot: question ? {
+            q: question.text,
+            a: question.type === 'binary' ? (answer ? 'Yes' : 'No') : (question.options?.[answer] || String(answer)),
+            t: question.type,
+            c: question.category,
+            v: question._v
+          } : null
+        };
+
+        const { error } = await auraDB.from('responses').insert(response);
+
+        if (error) {
+          console.error('[Aura] Capture failed:', error);
+        } else {
+          console.log('[Aura] Response captured:', response);
+        }
+      } catch (err) {
+        console.warn('[Aura] Capture error (non-blocking):', err.message);
       }
     }
 
-    // Capture assessment response with test_id and snapshot
+    // Capture assessment response with test_id and snapshot (only when signed in)
     async function captureAssessResponse(testId, questionIndex, answer) {
-      const test = ASSESS_TESTS[testId];
-      const item = test?.items?.[questionIndex];
-      const scaleLabels = {
-        likeme: ['Not at all', 'A little', 'Somewhat', 'Very much', 'Extremely'],
-        agreement: ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'],
-        frequency: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'],
-        likelihood: ['Very unlikely', 'Unlikely', 'Neutral', 'Likely', 'Very likely']
-      };
+      if (!AURA_AUTH_USER) return; // Skip cloud capture when not signed in
+      try {
+        const test = ASSESS_TESTS[testId];
+        const item = test?.items?.[questionIndex];
+        const scaleLabels = {
+          likeme: ['Not at all', 'A little', 'Somewhat', 'Very much', 'Extremely'],
+          agreement: ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'],
+          frequency: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'],
+          likelihood: ['Very unlikely', 'Unlikely', 'Neutral', 'Likely', 'Very likely']
+        };
 
-      const response = {
-        session_id: AURA_SESSION_ID,
-        question_id: -(questionIndex + 1), // Negative to distinguish from regular questions
-        answer: answer,
-        confidence: 0,
-        email: AURA_USER_EMAIL,
-        test_id: testId,
-        snapshot: test && item ? {
-          test: testId,
-          name: test.name,
-          q: item.q,
-          a: scaleLabels[test.scale]?.[answer - 1] || String(answer),
-          idx: questionIndex
-        } : null
-      };
+        const response = {
+          session_id: AURA_SESSION_ID,
+          question_id: -(questionIndex + 1), // Negative to distinguish from regular questions
+          answer: answer,
+          confidence: 0,
+          email: AURA_USER_EMAIL,
+          test_id: testId,
+          snapshot: test && item ? {
+            test: testId,
+            name: test.name,
+            q: item.q,
+            a: scaleLabels[test.scale]?.[answer - 1] || String(answer),
+            idx: questionIndex
+          } : null
+        };
 
-      const { error } = await auraDB.from('responses').insert(response);
+        const { error } = await auraDB.from('responses').insert(response);
 
-      if (error) {
-        console.error('[Aura] Assessment capture failed:', error);
-      } else {
-        console.log('[Aura] Assessment captured:', testId, 'q' + questionIndex, '=', answer);
+        if (error) {
+          console.error('[Aura] Assessment capture failed:', error);
+        } else {
+          console.log('[Aura] Assessment captured:', testId, 'q' + questionIndex, '=', answer);
+        }
+      } catch (err) {
+        console.warn('[Aura] Assessment capture error (non-blocking):', err.message);
       }
     }
 
@@ -1232,171 +1293,318 @@ const ONBOARDING_QUESTIONS = [
       }, duration);
     }
 
-    // Profile management
-    let AURA_USER_EMAIL = localStorage.getItem('aura_user_email') || null;
+    // ==================== AUTH FUNCTIONS ====================
 
-    async function createProfile(email, pin) {
-      // Check if email already exists
-      const { data: existing } = await auraDB.from('profiles').select('email').eq('email', email.toLowerCase()).single();
-      if (existing) {
-        return { success: false, error: 'Email already registered. Use Sign In instead.' };
-      }
-
-      // Create new profile
-      const { error } = await auraDB.from('profiles').insert({
+    async function signUpWithPassword(email, password) {
+      const { data, error } = await auraDB.auth.signUp({
         email: email.toLowerCase(),
-        pin: pin
+        password
       });
-
       if (error) {
-        console.error('[Aura] Profile creation failed:', error);
-        return { success: false, error: 'Failed to create profile' };
+        console.error('[Aura] Sign up failed:', error);
+        return { success: false, error: error.message };
       }
-
-      // Store locally
-      AURA_USER_EMAIL = email.toLowerCase();
-      localStorage.setItem('aura_user_email', AURA_USER_EMAIL);
-      console.log('[Aura] Profile created:', AURA_USER_EMAIL);
-
-      // Claim any responses from this session
-      await claimMyResponses();
-
-      return { success: true };
+      return { success: true, user: data?.user };
     }
 
-    async function signIn(email, pin) {
-      const { data, error } = await auraDB.from('profiles')
-        .select('email, pin')
-        .eq('email', email.toLowerCase())
-        .single();
-
-      if (error || !data) {
-        return { success: false, error: 'Email not found. Create a profile first.' };
+    async function signInWithPassword(email, password) {
+      const { data, error } = await auraDB.auth.signInWithPassword({
+        email: email.toLowerCase(),
+        password
+      });
+      if (error) {
+        console.error('[Aura] Sign in failed:', error);
+        // Friendly error messages
+        if (error.message.includes('Invalid login credentials')) {
+          return { success: false, error: 'Wrong email or password' };
+        }
+        return { success: false, error: error.message };
       }
-
-      if (data.pin !== pin) {
-        return { success: false, error: 'Incorrect PIN' };
-      }
-
-      // Store locally
-      AURA_USER_EMAIL = email.toLowerCase();
-      localStorage.setItem('aura_user_email', AURA_USER_EMAIL);
-      console.log('[Aura] Signed in:', AURA_USER_EMAIL);
-
-      // Claim any responses from this device's session
-      await claimMyResponses();
-
-      // Sync responses from cloud
-      await syncFromCloud(email.toLowerCase());
-
-      return { success: true, synced: true };
+      return { success: true, user: data?.user };
     }
 
-    // Sync responses from Supabase to local storage
-    async function syncFromCloud(email) {
-      console.log('[Aura] Syncing from cloud for:', email);
+    // ==================== EMAIL CLAIM ====================
 
-      // Fetch all responses for this email
-      const { data: responses, error } = await auraDB.from('responses')
-        .select('question_id, answer, confidence, created_at, test_id')
-        .eq('email', email)
-        .order('created_at', { ascending: true });
+    async function createEmailClaim(userId, email) {
+      const normalized = email.toLowerCase().trim();
+      const hashInput = 'email:' + normalized;
+      const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashInput));
+      const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      const { error } = await auraDB.from('claims').upsert({
+        user_id: userId,
+        type: 'contact',
+        provider: 'email',
+        label: normalized,
+        value: normalized,
+        proof_type: 'password',
+        proof_status: 'verified',
+        visibility: 'private',
+        hash: hashHex,
+        weight: 1
+      }, { onConflict: 'hash' });
 
       if (error) {
-        console.error('[Aura] Sync failed:', error);
-        return { success: false, error: 'Sync failed' };
+        console.error('[Aura] Email claim failed:', error);
+      } else {
+        console.log('[Aura] Email claim created:', normalized);
       }
+    }
 
-      if (!responses || responses.length === 0) {
-        console.log('[Aura] No cloud data to sync');
-        return { success: true, count: 0 };
-      }
+    // ==================== ACCOUNT CLAIMS ====================
 
-      console.log('[Aura] Found', responses.length, 'responses to sync');
-
-      // Get current local state
-      const STORAGE_KEY = 'aura-demo-vI';
-      let localData;
+    async function loadUserClaims(userId) {
       try {
-        localData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-      } catch (e) {
-        localData = {};
+        const { data, error } = await auraDB.from('claims')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true });
+        if (error) {
+          console.error('[Aura] Claims load failed:', error);
+          return [];
+        }
+        return data || [];
+      } catch (err) {
+        console.warn('[Aura] Claims load error:', err.message);
+        return [];
+      }
+    }
+
+    async function createAccountClaim(userId, provider, label, value) {
+      try {
+        const hashInput = provider + ':' + value.toLowerCase().trim();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashInput));
+        const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+        const { data, error } = await auraDB.from('claims').upsert({
+          user_id: userId,
+          type: 'account',
+          provider,
+          label: label.trim(),
+          value: value.trim(),
+          proof_type: 'self_reported',
+          proof_status: 'unverified',
+          visibility: 'public',
+          hash: hashHex,
+          weight: 0
+        }, { onConflict: 'hash' }).select().single();
+
+        if (error) {
+          console.error('[Aura] Account claim failed:', error);
+          return null;
+        }
+        console.log('[Aura] Account claim created:', provider, label);
+        return data;
+      } catch (err) {
+        console.warn('[Aura] Account claim error:', err.message);
+        return null;
+      }
+    }
+
+    async function removeClaim(claimId, userId) {
+      try {
+        const { error } = await auraDB.from('claims')
+          .delete()
+          .eq('id', claimId)
+          .eq('user_id', userId);
+        if (error) {
+          console.error('[Aura] Claim delete failed:', error);
+          return false;
+        }
+        console.log('[Aura] Claim removed:', claimId);
+        return true;
+      } catch (err) {
+        console.warn('[Aura] Claim delete error:', err.message);
+        return false;
+      }
+    }
+
+    async function updateClaimVisibility(claimId, userId, visibility) {
+      try {
+        const { error } = await auraDB.from('claims')
+          .update({ visibility })
+          .eq('id', claimId)
+          .eq('user_id', userId);
+        if (error) {
+          console.error('[Aura] Claim visibility update failed:', error);
+          return false;
+        }
+        console.log('[Aura] Claim visibility updated:', claimId, visibility);
+        return true;
+      } catch (err) {
+        console.warn('[Aura] Claim visibility error:', err.message);
+        return false;
+      }
+    }
+
+    async function setPrimaryClaim(userId, claimId) {
+      try {
+        // Clear all user's claims to non-primary
+        const { error: clearErr } = await auraDB.from('claims')
+          .update({ weight: 0 })
+          .eq('user_id', userId);
+        if (clearErr) {
+          console.error('[Aura] Clear primary failed:', clearErr);
+          return false;
+        }
+        // Set chosen claim as primary + force public visibility
+        const { error: setErr } = await auraDB.from('claims')
+          .update({ weight: 1, visibility: 'public' })
+          .eq('id', claimId)
+          .eq('user_id', userId);
+        if (setErr) {
+          console.error('[Aura] Set primary failed:', setErr);
+          return false;
+        }
+        console.log('[Aura] Primary claim set:', claimId);
+        return true;
+      } catch (err) {
+        console.warn('[Aura] Set primary error:', err.message);
+        return false;
+      }
+    }
+
+    // ==================== PROFILE SUMMARY (for sharing) ====================
+
+    async function updateProfileSummary(userId, assessCompleted, userClaims, entityType) {
+      try {
+        const summary = {
+          assessment_count: Object.keys(assessCompleted || {}).length,
+          stamp_count: (userClaims || []).filter(c => c.visibility === 'public').length,
+          entity_type: entityType || 'human',
+          updated_at: new Date().toISOString()
+        };
+
+        // Try to compute archetype if calculateArchetype is available in React context
+        // This runs from Script #3, so we store minimal data and let the public profile compute archetype client-side
+
+        const { error } = await auraDB.from('profiles')
+          .update({ profile_summary: summary, updated_at: new Date().toISOString() })
+          .eq('id', userId);
+        if (error) {
+          console.error('[Aura] Profile summary update failed:', error);
+        }
+      } catch (err) {
+        console.warn('[Aura] Profile summary error:', err.message);
+      }
+    }
+
+    async function loadPublicProfile(userId) {
+      try {
+        // RLS enforces visibility='public' for anon reads; explicit filter for clarity
+        const [profileRes, claimsRes] = await Promise.all([
+          auraDB.from('profiles').select('id, display_name, profile_summary').eq('id', userId).single(),
+          auraDB.from('claims').select('*').eq('user_id', userId).eq('visibility', 'public')
+        ]);
+        if (profileRes.error) {
+          console.error('[Aura] Public profile load failed:', profileRes.error);
+          return null;
+        }
+        return {
+          profile: profileRes.data,
+          claims: claimsRes.data || []
+        };
+      } catch (err) {
+        console.warn('[Aura] Public profile error:', err.message);
+        return null;
+      }
+    }
+
+    // ==================== ASSESSMENT SYNC ====================
+
+    async function saveAssessmentToCloud(userId, testId, status, answers, traits, progress) {
+      try {
+        const row = {
+          user_id: userId,
+          category_id: testId,
+          status,
+          answers,
+          traits,
+          progress,
+          updated_at: new Date().toISOString()
+        };
+        if (status === 'completed') row.completed_at = new Date().toISOString();
+
+        const { error } = await auraDB.from('assessment_results')
+          .upsert(row, { onConflict: 'user_id,category_id' });
+        if (error) {
+          console.error('[Aura] Assessment save failed:', error);
+        }
+      } catch (err) {
+        console.warn('[Aura] Assessment save error (non-blocking):', err.message);
+      }
+    }
+
+    async function deleteAssessmentFromCloud(userId, testId) {
+      const { error } = await auraDB.from('assessment_results')
+        .delete()
+        .eq('user_id', userId)
+        .eq('category_id', testId);
+      if (error) console.error('[Aura] Assessment delete failed:', error);
+    }
+
+    async function clearAllAssessmentsFromCloud(userId) {
+      const { error } = await auraDB.from('assessment_results')
+        .delete()
+        .eq('user_id', userId);
+      if (error) console.error('[Aura] Assessment clear failed:', error);
+    }
+
+    async function loadAssessmentsFromCloud(userId) {
+      const { data, error } = await auraDB.from('assessment_results')
+        .select('*')
+        .eq('user_id', userId);
+      if (error) {
+        console.error('[Aura] Assessment load failed:', error);
+        return null;
       }
 
-      // Merge cloud responses into local answers (positive IDs only = regular questions)
-      const answers = localData.answers || {};
-      let syncedCount = 0;
-
-      for (const resp of responses) {
-        // Only sync regular questions (positive IDs), skip assessments (negative IDs)
-        if (resp.question_id > 0) {
-          answers[resp.question_id] = {
-            answer: resp.answer,
-            confidence: resp.confidence,
-            timestamp: new Date(resp.created_at).getTime()
+      const completed = {};
+      const inProgress = {};
+      for (const row of (data || [])) {
+        if (row.status === 'completed') {
+          completed[row.category_id] = row.traits || {};
+        } else {
+          inProgress[row.category_id] = {
+            index: row.answers?.currentIndex || 0,
+            responses: row.answers?.responses || {},
+            skipped: row.answers?.skipped || []
           };
-          syncedCount++;
         }
       }
+      return { completed, inProgress };
+    }
 
-      // Update local storage
-      localData.answers = answers;
-      localData.stats = localData.stats || {};
-      localData.stats.answered = Object.keys(answers).length;
+    async function migrateLocalAssessments(userId) {
+      const ASSESS_KEY = 'aura-assessments-v1';
+      let local;
+      try { local = JSON.parse(localStorage.getItem(ASSESS_KEY)); } catch { return; }
+      if (!local) return;
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(localData));
-      console.log('[Aura] Synced', syncedCount, 'regular responses to local storage');
-
-      // Now sync assessments (using test_id column)
-      const assessData = {};
-      console.log('[Aura] Checking for assessment responses...');
-      let assessSyncedCount = 0;
-
-      for (const resp of responses) {
-        if (resp.test_id) {
-          // Assessment response - use test_id directly
-          const testId = resp.test_id;
-          const questionIndex = Math.abs(resp.question_id) - 1; // Convert back to 0-indexed
-
-          if (!assessData[testId]) {
-            assessData[testId] = { responses: {}, indices: [] };
-          }
-          assessData[testId].responses[questionIndex] = resp.answer;
-          assessData[testId].indices.push(questionIndex);
-          assessSyncedCount++;
-        }
+      // Skip if user already has cloud data
+      const cloud = await loadAssessmentsFromCloud(userId);
+      if (cloud && (Object.keys(cloud.completed).length > 0 || Object.keys(cloud.inProgress).length > 0)) {
+        console.log('[Aura] Cloud data exists, skipping migration');
+        return;
       }
 
-      // Save assessment data if any
-      if (assessSyncedCount > 0) {
-        const ASSESS_STORAGE_KEY = 'aura-assessments-v1';
-        let existingAssess;
-        try {
-          existingAssess = JSON.parse(localStorage.getItem(ASSESS_STORAGE_KEY)) || {};
-        } catch (e) {
-          existingAssess = {};
+      console.log('[Aura] Migrating localStorage assessments to cloud...');
+      if (local.completed) {
+        for (const [testId, results] of Object.entries(local.completed)) {
+          await saveAssessmentToCloud(userId, testId, 'completed', {}, results, 1.0);
         }
-
-        const inProgress = existingAssess.inProgress || {};
-
-        // Add synced assessments as in-progress
-        for (const testId of Object.keys(assessData)) {
-          const data = assessData[testId];
-          inProgress[testId] = {
-            index: Math.max(...data.indices),
-            responses: data.responses,
-            skipped: []
-          };
-        }
-
-        existingAssess.inProgress = inProgress;
-        localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify(existingAssess));
-        console.log('[Aura] Synced', assessSyncedCount, 'assessment responses');
       }
-
-      const total = syncedCount + assessSyncedCount;
-      console.log('[Aura] Synced', total, 'total responses');
-      return { success: true, count: total };
+      if (local.inProgress) {
+        for (const [testId, progress] of Object.entries(local.inProgress)) {
+          const answeredCount = Object.keys(progress.responses || {}).length;
+          await saveAssessmentToCloud(userId, testId, 'in-progress', {
+            responses: progress.responses || {},
+            skipped: progress.skipped || [],
+            currentIndex: progress.index || 0
+          }, null, answeredCount > 0 ? 0.5 : 0);
+        }
+      }
+      console.log('[Aura] Migration complete');
     }
 
     // Claim all responses from current session and attach email
@@ -1421,14 +1629,62 @@ const ONBOARDING_QUESTIONS = [
       return { success: true };
     }
 
-    function signOut() {
+    // ==================== PROFILE SYNC ====================
+
+    async function loadProfile(userId) {
+      try {
+        const { data, error } = await auraDB.from('profiles')
+          .select('display_name')
+          .eq('id', userId)
+          .single();
+        if (error) {
+          console.error('[Aura] Profile load failed:', error);
+          return null;
+        }
+        return data?.display_name || null;
+      } catch (err) {
+        console.warn('[Aura] Profile load error:', err.message);
+        return null;
+      }
+    }
+
+    async function updateDisplayName(userId, name) {
+      try {
+        const { error } = await auraDB.from('profiles')
+          .update({ display_name: name, updated_at: new Date().toISOString() })
+          .eq('id', userId);
+        if (error) {
+          console.error('[Aura] Display name update failed:', error);
+          return false;
+        }
+        AURA_DISPLAY_NAME = name;
+        window.dispatchEvent(new CustomEvent('aura-profile-change', { detail: { displayName: name } }));
+        return true;
+      } catch (err) {
+        console.warn('[Aura] Display name update error:', err.message);
+        return false;
+      }
+    }
+
+    function getDisplayName() {
+      return AURA_DISPLAY_NAME;
+    }
+
+    async function signOut() {
+      await auraDB.auth.signOut();
+      AURA_AUTH_USER = null;
       AURA_USER_EMAIL = null;
+      AURA_DISPLAY_NAME = null;
       localStorage.removeItem('aura_user_email');
       console.log('[Aura] Signed out');
     }
 
     function getCurrentEmail() {
       return AURA_USER_EMAIL;
+    }
+
+    function getCurrentUser() {
+      return AURA_AUTH_USER;
     }
   </script>
   <script type="text/babel">
@@ -4383,6 +4639,64 @@ const ASSESS_DEMO_PROFILES = {
 const ASSESS_STORAGE_KEY = 'aura-assessments-v1';
 const ONBOARD_STORAGE_KEY = 'aura-onboarding-answers-v1';
 
+// ==================== STAMP PROVIDERS ====================
+// priority: lower = shown first within linked/unlinked groups
+const STAMP_PROVIDERS = [
+  { id: 'email', name: 'Email', type: 'contact', color: '#6b7280', priority: 0,
+    svg: 'M0 2.5A1.5 1.5 0 011.5 1h13A1.5 1.5 0 0116 2.5v1.21L8 8.42.5 3.94A.5.5 0 010 3.71V2.5zM0 5.08v8.42A1.5 1.5 0 001.5 15h13a1.5 1.5 0 001.5-1.5V5.08L8.48 9.7a1 1 0 01-.96 0L0 5.08z',
+    prefix: '', placeholder: '' },
+  { id: 'github', name: 'GitHub', type: 'account', color: '#f0f6fc', priority: 1,
+    svg: 'M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z',
+    prefix: '@', placeholder: 'username' },
+  { id: 'x', name: 'X', type: 'account', color: '#f0f0f0', priority: 2,
+    svg: 'M12.6.75h2.45L9.94 6.62 16 15.25h-4.73l-3.7-4.83-4.23 4.83H.89l5.48-6.26L.58.75H5.4l3.34 4.42L12.6.75zm-.86 13.03h1.36L4.32 2.15H2.86l8.88 11.63z',
+    prefix: '@', placeholder: 'handle' },
+  { id: 'linkedin', name: 'LinkedIn', type: 'account', color: '#0a66c2', priority: 3,
+    svg: 'M0 1.15C0 .51.52 0 1.15 0h13.7C15.48 0 16 .52 16 1.15v13.7c0 .63-.52 1.15-1.15 1.15H1.15C.52 16 0 15.48 0 14.85V1.15zm4.94 13.17V6.17H2.54v8.15h2.4zM3.73 5.13c.84 0 1.36-.55 1.36-1.24-.02-.7-.52-1.24-1.34-1.24-.82 0-1.36.54-1.36 1.24 0 .69.52 1.24 1.32 1.24h.02zM6.16 14.32h2.4V9.84c0-.22.02-.43.08-.6.16-.43.54-.88 1.17-.88.82 0 1.15.63 1.15 1.55v4.41h2.4V9.63c0-2.51-1.34-3.68-3.13-3.68-1.47 0-2.11.82-2.47 1.38l.04-.08V6.17H6.16c.04.67 0 8.15 0 8.15z',
+    prefix: '/in/', placeholder: 'username' },
+  { id: 'instagram', name: 'Instagram', type: 'account', color: '#e4405f', priority: 4,
+    svg: 'M4.77 0h6.46C14.15 0 16 1.85 16 4.77v6.46A4.77 4.77 0 0111.23 16H4.77A4.77 4.77 0 010 11.23V4.77A4.77 4.77 0 014.77 0zm-.18 1.44A3.15 3.15 0 001.44 4.6v6.81a3.15 3.15 0 003.15 3.15h6.82a3.15 3.15 0 003.15-3.15V4.59a3.15 3.15 0 00-3.15-3.15H4.59zM12.35 2.9a.96.96 0 110 1.92.96.96 0 010-1.92zM8 3.89A4.11 4.11 0 1112.11 8 4.11 4.11 0 018 3.89zm0 1.44A2.67 2.67 0 1110.67 8 2.67 2.67 0 018 5.33z',
+    prefix: '@', placeholder: 'username' },
+  { id: 'google', name: 'Google', type: 'account', color: '#4285f4', priority: 5,
+    svg: 'M15.5 8c0-.6-.1-1.2-.2-1.7H8v3.3h4.2a3.6 3.6 0 01-1.6 2.4v2h2.5A7.5 7.5 0 0015.5 8zM8 16c2.2 0 4-.7 5.3-1.9l-2.5-2A4.8 4.8 0 018 12.8a4.8 4.8 0 01-4.5-3.3H.9v2A8 8 0 008 16zM3.5 9.5a4.8 4.8 0 010-3l.1-.1V4.3H.9A8 8 0 000 8c0 1.3.3 2.5.9 3.6l2.6-2.1zM8 3.2c1.2 0 2.3.4 3.2 1.2l2.4-2.4A7.6 7.6 0 008 0 8 8 0 00.9 4.3l2.6 2A4.8 4.8 0 018 3.2z',
+    prefix: '', placeholder: 'email' },
+  { id: 'facebook', name: 'Facebook', type: 'account', color: '#1877f2', priority: 6,
+    svg: 'M16 8a8 8 0 10-9.25 7.9v-5.59H4.72V8h2.03V6.24c0-2 1.19-3.11 3.02-3.11.87 0 1.79.16 1.79.16v1.97h-1.01c-.99 0-1.3.62-1.3 1.25V8h2.22l-.35 2.31H9.25v5.59A8 8 0 0016 8z',
+    prefix: '', placeholder: 'name or profile URL' },
+];
+
+// StampIcon — renders SVG brand icon from provider config
+const StampIcon = ({ provider, size = 16, className = '' }) => {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill={provider.color} className={className}
+      style={{ flexShrink: 0 }}>
+      <path d={provider.svg} fillRule="evenodd" clipRule="evenodd" />
+    </svg>
+  );
+};
+
+// normalizeStampValue — strip prefix if typed, trim whitespace
+const normalizeStampValue = (providerId, rawInput) => {
+  const provider = STAMP_PROVIDERS.find(p => p.id === providerId);
+  if (!provider) return rawInput.trim();
+  let val = rawInput.trim();
+  if (provider.prefix && val.startsWith(provider.prefix)) {
+    val = val.slice(provider.prefix.length).trim();
+  }
+  return val;
+};
+
+// Format stamp display value — prepend prefix to stored value (skip if already prefixed)
+const formatStampDisplay = (providerId, storedValue) => {
+  if (!storedValue) return storedValue;
+  const provider = STAMP_PROVIDERS.find(p => p.id === providerId);
+  if (!provider || !provider.prefix) return storedValue;
+  // LinkedIn: show plain username, not /in/username
+  if (providerId === 'linkedin') return storedValue.replace(/^\/in\//, '');
+  if (storedValue.startsWith(provider.prefix)) return storedValue;
+  return provider.prefix + storedValue;
+};
+
 // AI entity result interpretations — shown when entityType === 'ai'
 const AI_RESULT_NOTES = {
   chronotype: { title: 'No Biological Rhythm', note: 'Chronotype measures sleep-wake preferences driven by circadian biology. As a non-biological entity, this dimension doesn\'t apply — but it\'s fascinating to see what humans optimize their days around.' },
@@ -5087,8 +5401,7 @@ const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devO
   return (
   <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4"
     style={devOffset ? { paddingRight: 280 } : undefined}>
-    <div style={scale < 1 ? { width: chromeW * scale, height: chromeH * scale } : undefined}>
-    <div className="relative bg-[#1a1a1c] rounded-[55px] p-3 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))', transform: scale < 1 ? `scale(${scale.toFixed(3)})` : undefined, transformOrigin: 'top left' }}>
+    <div className="relative bg-[#1a1a1c] rounded-[55px] p-3 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))', zoom: scale < 1 ? scale : undefined }}>
       <div className="absolute -left-[3px] top-[100px] w-[3px] h-[28px] bg-[#2a2a2c] rounded-l-sm" />
       <div className="absolute -left-[3px] top-[145px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
       <div className="absolute -left-[3px] top-[205px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
@@ -5111,7 +5424,6 @@ const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devO
         <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
         <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-[134px] h-[5px] ${TH('bg-inverted', darkMode)} rounded-full opacity-60 z-20`} />
       </div>
-    </div>
     </div>
   </div>
   );
@@ -5141,7 +5453,7 @@ const VortexButton = ({ onSingleTap, onDoubleTap, className = "text-xl btn-feedb
 };
 
 // NavBar
-const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSettings, onProfile, isLoggedIn, isGuest, assessCompleted, accentColor = 'violet' }) => {
+const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSettings, onProfile, isLoggedIn, isGuest, assessCompleted, accentColor = 'violet', displayName }) => {
   const accent = COLOR_HEX[accentColor] || COLOR_HEX.violet;
   // Calculate aura glow colors based on assessment progress
   const getAuraGlow = () => {
@@ -5201,13 +5513,13 @@ const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSett
       <div className="flex items-center gap-2">
         <button onClick={onProfile} className="btn-feedback">
           {isLoggedIn ? (
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm"
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
               style={aura.colors.length > 0 ? aura.style : {
                 background: darkMode ? 'linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05))' : 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(139,92,246,0.05))',
                 boxShadow: darkMode ? '0 0 12px 3px rgba(255,255,255,0.3), inset 0 0 8px rgba(255,255,255,0.1)' : '0 0 12px 3px rgba(139,92,246,0.2), inset 0 0 8px rgba(139,92,246,0.1)',
                 border: darkMode ? '1.5px solid rgba(255,255,255,0.3)' : '1.5px solid rgba(139,92,246,0.3)'
               }}>
-              <span style={{color: darkMode ? 'rgba(255,255,255,0.9)' : 'rgba(99,102,241,0.9)'}}>👤</span>
+              <span style={{color: darkMode ? 'rgba(255,255,255,0.9)' : 'rgba(99,102,241,0.9)', fontSize: '0.75rem'}}>{displayName ? displayName[0].toUpperCase() : '👤'}</span>
             </div>
           ) : (
             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium ${darkMode ? 'border-gray-600 text-gray-500' : 'border-gray-400 text-gray-400'}`}
@@ -5240,32 +5552,33 @@ const WELCOME_SHOWCASE_DATA = {
 const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
   const [mode, setMode] = React.useState('welcome'); // 'welcome', 'signin', 'signup'
   const [email, setEmail] = React.useState('');
-  const [pin, setPin] = React.useState('');
+  const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
-  const handleSignUp = async () => {
-    if (!email || !pin) { setError('Email and PIN required'); return; }
-    if (pin.length < 4) { setError('PIN must be at least 4 digits'); return; }
+  const handleSignIn = async () => {
+    if (!email) { setError('Enter your email'); return; }
+    if (!password) { setError('Enter your password'); return; }
     setLoading(true);
     setError('');
-    const result = await createProfile(email, pin);
+    const result = await signInWithPassword(email, password);
     setLoading(false);
     if (result.success) {
-      onCreateAccount(email.toLowerCase());
+      onSignIn(result.user?.email || email);
     } else {
       setError(result.error);
     }
   };
 
-  const handleSignIn = async () => {
-    if (!email || !pin) { setError('Email and PIN required'); return; }
+  const handleSignUp = async () => {
+    if (!email) { setError('Enter your email'); return; }
+    if (!password || password.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true);
     setError('');
-    const result = await signIn(email, pin);
+    const result = await signUpWithPassword(email, password);
     setLoading(false);
     if (result.success) {
-      onSignIn(email.toLowerCase());
+      onSignIn(result.user?.email || email);
     } else {
       setError(result.error);
     }
@@ -5278,6 +5591,17 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
       else handleSignIn();
     }
   };
+
+  // Listen for auth change
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.user && e.detail?.event === 'SIGNED_IN') {
+        onSignIn(e.detail.user.email);
+      }
+    };
+    window.addEventListener('aura-auth-change', handler);
+    return () => window.removeEventListener('aura-auth-change', handler);
+  }, [onSignIn]);
 
   if (mode === 'welcome') {
     return (
@@ -5303,49 +5627,66 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
     );
   }
 
-  // Sign in or Sign up form
+  // Sign up form
+  if (mode === 'signup') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8" style={{backgroundColor: darkMode ? '#030712' : '#f9fafb'}}>
+        <div className="text-5xl mb-4">✨</div>
+        <h1 className="text-2xl font-bold mb-2" style={{color: darkMode ? '#fff' : '#111'}}>Create Account</h1>
+        <p className="text-sm mb-6 text-center" style={{color: darkMode ? '#9ca3af' : '#6b7280'}}>
+          Save your progress across devices
+        </p>
+        <div className="w-full max-w-xs space-y-3">
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={handleKeyDown} autoFocus
+            className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`} />
+          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={handleKeyDown}
+            className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`} />
+          {error && <div className="text-sm text-rose-500 text-center">{error}</div>}
+          <button onClick={handleSignUp} disabled={loading}
+            className={`w-full py-3 px-6 rounded-xl font-medium btn-feedback ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'} ${loading ? 'opacity-50' : ''}`}>
+            {loading ? 'Creating...' : 'Create Account'}
+          </button>
+          <div className="text-center pt-2">
+            <button onClick={() => { setMode('signin'); setError(''); }} className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              Already have an account? Sign in
+            </button>
+          </div>
+          <div className="text-center">
+            <button onClick={() => { setMode('welcome'); setError(''); }} className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              ← Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Sign in form
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8" style={{backgroundColor: darkMode ? '#030712' : '#f9fafb'}}>
-      <div className="text-5xl mb-4">{mode === 'signup' ? '✨' : '🔑'}</div>
-      <h1 className="text-2xl font-bold mb-6" style={{color: darkMode ? '#fff' : '#111'}}>
-        {mode === 'signup' ? 'Create Account' : 'Sign In'}
-      </h1>
+      <div className="text-5xl mb-4">✨</div>
+      <h1 className="text-2xl font-bold mb-2" style={{color: darkMode ? '#fff' : '#111'}}>Sign In</h1>
+      <p className="text-sm mb-6 text-center" style={{color: darkMode ? '#9ca3af' : '#6b7280'}}>
+        Welcome back
+      </p>
       <div className="w-full max-w-xs space-y-3">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
-        />
-        <input
-          type="password"
-          placeholder="PIN (4+ digits)"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-          onKeyDown={handleKeyDown}
-          inputMode="numeric"
-          className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
-        />
+        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={handleKeyDown} autoFocus
+          className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`} />
+        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={handleKeyDown}
+          className={`w-full px-4 py-3 rounded-xl text-base ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`} />
         {error && <div className="text-sm text-rose-500 text-center">{error}</div>}
-        <button
-          onClick={mode === 'signup' ? handleSignUp : handleSignIn}
-          disabled={loading}
-          className={`w-full py-3 px-6 rounded-xl font-medium btn-feedback ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'} ${loading ? 'opacity-50' : ''}`}
-        >
-          {loading ? '...' : (mode === 'signup' ? 'Create Account' : 'Sign In')}
+        <button onClick={handleSignIn} disabled={loading}
+          className={`w-full py-3 px-6 rounded-xl font-medium btn-feedback ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'} ${loading ? 'opacity-50' : ''}`}>
+          {loading ? 'Signing in...' : 'Sign In'}
         </button>
         <div className="text-center pt-2">
-          <button onClick={() => { setMode('welcome'); setError(''); }} className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-            ← Back
+          <button onClick={() => { setMode('signup'); setError(''); }} className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+            New here? Create account
           </button>
         </div>
-        <div className={`text-xs text-center pt-2 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
-          {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
-          {' '}
-          <button onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); }} className={darkMode ? 'text-violet-400' : 'text-violet-500'}>
-            {mode === 'signup' ? 'Sign In' : 'Create one'}
+        <div className="text-center">
+          <button onClick={() => { setMode('welcome'); setError(''); }} className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+            ← Back
           </button>
         </div>
       </div>
@@ -6901,51 +7242,93 @@ const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, curr
   );
 };
 
-// ProfileSection - handles login/signup with email + PIN
-const ProfileSection = ({ darkMode }) => {
+// ProfileSection - password auth + display name
+const ProfileSection = ({ darkMode, onAuthChange }) => {
   const [email, setEmail] = React.useState('');
-  const [pin, setPin] = React.useState('');
+  const [password, setPassword] = React.useState('');
   const [mode, setMode] = React.useState('view'); // 'view', 'signin', 'signup'
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [currentEmail, setCurrentEmail] = React.useState(getCurrentEmail());
+  const [displayName, setDisplayName] = React.useState(getDisplayName());
+  const [editingName, setEditingName] = React.useState(false);
+  const [nameInput, setNameInput] = React.useState('');
+  const [nameSaving, setNameSaving] = React.useState(false);
 
-  const handleSignUp = async () => {
-    if (!email || !pin) { setError('Email and PIN required'); return; }
-    if (pin.length < 4) { setError('PIN must be at least 4 digits'); return; }
-    setLoading(true);
-    setError('');
-    const result = await createProfile(email, pin);
-    setLoading(false);
-    if (result.success) {
-      setCurrentEmail(email.toLowerCase());
-      setMode('view');
-      setEmail('');
-      setPin('');
-    } else {
-      setError(result.error);
+  // Listen for auth changes
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.user) {
+        setCurrentEmail(e.detail.user.email);
+        setMode('view');
+        onAuthChange && onAuthChange(e.detail.user);
+      } else {
+        setCurrentEmail(null);
+        setDisplayName(null);
+        setEditingName(false);
+      }
+    };
+    window.addEventListener('aura-auth-change', handler);
+    return () => window.removeEventListener('aura-auth-change', handler);
+  }, [onAuthChange]);
+
+  // Listen for profile changes (display name loaded from cloud)
+  React.useEffect(() => {
+    const handler = (e) => setDisplayName(e.detail?.displayName || null);
+    window.addEventListener('aura-profile-change', handler);
+    return () => window.removeEventListener('aura-profile-change', handler);
+  }, []);
+
+  const handleSaveName = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    const user = getCurrentUser();
+    if (!user) return;
+    setNameSaving(true);
+    const ok = await updateDisplayName(user.id, trimmed);
+    setNameSaving(false);
+    if (ok) {
+      setDisplayName(trimmed);
+      setEditingName(false);
     }
   };
 
   const handleSignIn = async () => {
-    if (!email || !pin) { setError('Email and PIN required'); return; }
+    if (!email) { setError('Enter your email'); return; }
+    if (!password) { setError('Enter your password'); return; }
     setLoading(true);
     setError('');
-    const result = await signIn(email, pin);
+    const result = await signInWithPassword(email, password);
     setLoading(false);
     if (result.success) {
-      setCurrentEmail(email.toLowerCase());
+      setCurrentEmail(result.user?.email || email);
       setMode('view');
-      setEmail('');
-      setPin('');
+      onAuthChange && onAuthChange(result.user);
     } else {
       setError(result.error);
     }
   };
 
-  const handleSignOut = () => {
-    signOut();
+  const handleSignUp = async () => {
+    if (!email) { setError('Enter your email'); return; }
+    if (!password || password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    setLoading(true);
+    setError('');
+    const result = await signUpWithPassword(email, password);
+    setLoading(false);
+    if (result.success) {
+      setCurrentEmail(result.user?.email || email);
+      setMode('view');
+      onAuthChange && onAuthChange(result.user);
+    } else {
+      setError(result.error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
     setCurrentEmail(null);
+    onAuthChange && onAuthChange(null);
   };
 
   const handleKeyDown = (e) => {
@@ -6956,53 +7339,46 @@ const ProfileSection = ({ darkMode }) => {
     }
   };
 
-  const [syncStatus, setSyncStatus] = React.useState(null); // null, 'success', 'error'
-  const [syncMessage, setSyncMessage] = React.useState('');
-
-  const handleSync = async () => {
-    setLoading(true);
-    setSyncStatus(null);
-    setSyncMessage('');
-    await claimMyResponses();
-    const result = await syncFromCloud(currentEmail);
-    setLoading(false);
-
-    if (result && result.success) {
-      setSyncStatus('success');
-      setSyncMessage(result.count > 0 ? `${result.count} synced` : 'Up to date');
-    } else {
-      setSyncStatus('error');
-      setSyncMessage('Sync failed');
-    }
-    // Reset status after 3 seconds
-    setTimeout(() => {
-      setSyncStatus(null);
-      setSyncMessage('');
-    }, 3000);
-  };
-
   if (currentEmail) {
     return (
       <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
-        <div className={`text-sm font-medium mb-2 ${TH('text-primary', darkMode)}`}>Profile</div>
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <div className={`text-sm ${TH('text-subtle', darkMode)}`}>{currentEmail}</div>
-            <div className={`text-xs ${TH('text-faint', darkMode)}`}>Synced across devices</div>
-          </div>
-          <button onClick={handleSignOut} className={`px-3 py-1.5 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
+        <div className="flex items-center justify-between">
+          <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Profile</div>
+          <button onClick={handleSignOut} className={`px-2.5 py-1 rounded-lg text-xs btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
             Sign Out
           </button>
         </div>
-        <button onClick={handleSync} disabled={loading} className={`w-full py-2 rounded-lg text-sm font-medium btn-feedback ${
-          syncStatus === 'success'
-            ? (darkMode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-emerald-100 text-emerald-600')
-            : syncStatus === 'error'
-            ? (darkMode ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-600')
-            : (darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-600')
-        } ${loading ? 'opacity-50' : ''}`}>
-          {loading ? 'Syncing...' : syncStatus === 'success' ? `✓ ${syncMessage}` : syncStatus === 'error' ? `⚠ ${syncMessage}` : 'Sync Now'}
-        </button>
+        {editingName ? (
+          <div className="flex items-center gap-2 mt-1">
+            <input
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
+              onFocus={(e) => e.target.select()}
+              placeholder="Display name"
+              autoFocus
+              maxLength={50}
+              className={`text-sm px-2 py-1 rounded border flex-1 min-w-0 ${darkMode ? 'bg-white/[0.06] border-white/10 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+            />
+            <button onClick={handleSaveName} disabled={nameSaving} className={`text-xs px-2 py-1 rounded btn-feedback ${darkMode ? 'bg-violet-600/40 text-violet-300' : 'bg-violet-100 text-violet-700'}`}>
+              {nameSaving ? '...' : 'Save'}
+            </button>
+            <button onClick={() => setEditingName(false)} className={`text-xs px-1.5 py-1 rounded btn-feedback ${TH('text-faint', darkMode)}`}>
+              ✕
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between mt-1">
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>{displayName || currentEmail}</span>
+              <button onClick={() => { setNameInput(displayName || ''); setEditingName(true); }} className={`text-xs px-1.5 py-0.5 rounded btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-500 hover:text-gray-300' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
+                Edit
+              </button>
+            </div>
+            {displayName && <div className={`text-xs ${TH('text-faint', darkMode)}`}>{currentEmail}</div>}
+          </div>
+        )}
       </div>
     );
   }
@@ -7011,60 +7387,60 @@ const ProfileSection = ({ darkMode }) => {
     return (
       <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
         <div className={`text-sm font-medium mb-2 ${TH('text-primary', darkMode)}`}>Profile</div>
-        <div className={`text-xs mb-2 ${TH('text-faint', darkMode)}`}>Sign in to sync across devices</div>
-        <div className="flex gap-2">
-          <button onClick={() => setMode('signin')} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-600'}`}>
-            Sign In
+        <div className={`text-xs mb-2 ${TH('text-faint', darkMode)}`}>Sign in to save progress across devices</div>
+        <button onClick={() => setMode('signin')} className={`w-full py-2 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-100 text-violet-600'}`}>
+          Sign In
+        </button>
+      </div>
+    );
+  }
+
+  // Sign up mode
+  if (mode === 'signup') {
+    return (
+      <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Create Account</div>
+          <button onClick={() => { setMode('view'); setError(''); }} className={`text-xs ${TH('text-violet', darkMode)}`}>Cancel</button>
+        </div>
+        <div className="space-y-2">
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={handleKeyDown}
+            className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`} />
+          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={handleKeyDown}
+            className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`} />
+          {error && <div className="text-xs text-rose-500">{error}</div>}
+          <button onClick={handleSignUp} disabled={loading}
+            className={`w-full py-2 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'} ${loading ? 'opacity-50' : ''}`}>
+            {loading ? 'Creating...' : 'Create Account'}
           </button>
-          <button onClick={() => setMode('signup')} className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}>
-            Create Profile
+          <button onClick={() => { setMode('signin'); setError(''); }} className={`text-xs ${TH('text-violet', darkMode)}`}>
+            Already have an account? Sign in
           </button>
         </div>
       </div>
     );
   }
 
+  // Sign in mode
   return (
     <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
       <div className="flex items-center justify-between mb-2">
-        <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>
-          {mode === 'signup' ? 'Create Profile' : 'Sign In'}
-        </div>
+        <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Sign In</div>
         <button onClick={() => { setMode('view'); setError(''); }} className={`text-xs ${TH('text-violet', darkMode)}`}>Cancel</button>
       </div>
       <div className="space-y-2">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
-        />
-        <input
-          type="password"
-          placeholder="PIN (4+ digits)"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-          onKeyDown={handleKeyDown}
-          inputMode="numeric"
-          className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`}
-        />
+        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={handleKeyDown}
+          className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`} />
+        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={handleKeyDown}
+          className={`w-full px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-white/[0.06] text-white placeholder-gray-500' : 'bg-gray-100 text-gray-900 placeholder-gray-400'}`} />
         {error && <div className="text-xs text-rose-500">{error}</div>}
-        <button
-          onClick={mode === 'signup' ? handleSignUp : handleSignIn}
-          disabled={loading}
-          className={`w-full py-2 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'} ${loading ? 'opacity-50' : ''}`}
-        >
-          {loading ? '...' : (mode === 'signup' ? 'Create Profile' : 'Sign In')}
+        <button onClick={handleSignIn} disabled={loading}
+          className={`w-full py-2 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-violet-600 text-white' : 'bg-violet-500 text-white'} ${loading ? 'opacity-50' : ''}`}>
+          {loading ? 'Signing in...' : 'Sign In'}
         </button>
-        <div className={`text-xs text-center ${TH('text-faint', darkMode)}`}>
-          {mode === 'signup' ? 'Already have a profile?' : "Don't have a profile?"}
-          {' '}
-          <button onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); }} className={TH('text-violet', darkMode)}>
-            {mode === 'signup' ? 'Sign In' : 'Create one'}
-          </button>
-        </div>
+        <button onClick={() => { setMode('signup'); setError(''); }} className={`text-xs ${TH('text-violet', darkMode)}`}>
+          New here? Create account
+        </button>
       </div>
     </div>
   );
@@ -8369,11 +8745,668 @@ const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTa
   );
 };
 
+// SharePicker — Bottom sheet with color-coded toggles + primary identity gate
+// Green=public, Amber=temp-unlocked private, Red=temp-unlocked locked
+const SharePicker = ({ darkMode, userId, userClaims, displayName, assessmentCount, tempUnlocked, onMakePublic, onSetPrimary }) => {
+  const [open, setOpen] = useState(false);
+  const [choosingPrimary, setChoosingPrimary] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [selections, setSelections] = useState({});
+
+  const primaryClaim = (userClaims || []).find(c => c.weight === 1);
+
+  // Shareable stamps: public OR temp-unlocked (non-email, linked)
+  const shareableStamps = (userClaims || []).filter(c =>
+    c.provider !== 'email' && c.value &&
+    ((c.visibility || 'public') === 'public' || (tempUnlocked || {})[c.provider])
+  );
+
+  // All linked claims for the primary chooser
+  const linkedClaims = (userClaims || []).filter(c => c.value);
+
+  const openShareSheet = () => {
+    if (shareableStamps.length === 0) {
+      copyUrl(`${window.location.origin}${window.location.pathname}?p=${userId}`);
+      return;
+    }
+    const init = {};
+    shareableStamps.forEach(c => { init[c.provider] = (c.visibility || 'public') === 'public'; });
+    setSelections(init);
+    setChoosingPrimary(false);
+    setOpen(true);
+  };
+
+  const handleOpen = () => {
+    // Gate: no primary set → show primary chooser first
+    if (!primaryClaim) {
+      setChoosingPrimary(true);
+      setOpen(true);
+      return;
+    }
+    openShareSheet();
+  };
+
+  const handleChoosePrimary = async (claimId) => {
+    if (onSetPrimary) await onSetPrimary(claimId);
+    // After setting primary, proceed to share sheet
+    setChoosingPrimary(false);
+    // Small delay for claims to reload, then open share directly
+    setTimeout(() => {
+      const init = {};
+      shareableStamps.forEach(c => { init[c.provider] = (c.visibility || 'public') === 'public'; });
+      setSelections(init);
+    }, 100);
+  };
+
+  const copyUrl = async (url) => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'My Aura Profile', url });
+        setOpen(false);
+        return;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => { setCopied(false); setOpen(false); }, 1200);
+  };
+
+  const handleCopyLink = () => {
+    const selected = Object.entries(selections).filter(([_, on]) => on).map(([id]) => id);
+    shareableStamps.forEach(c => {
+      if ((c.visibility || 'public') !== 'public' && selections[c.provider] && onMakePublic) {
+        onMakePublic(c.id);
+      }
+    });
+    let url = `${window.location.origin}${window.location.pathname}?p=${userId}`;
+    if (selected.length > 0) url += `&s=${selected.join(',')}`;
+    copyUrl(url);
+  };
+
+  const getToggleColor = (claim, isOn) => {
+    if (!isOn) return darkMode ? 'bg-gray-700' : 'bg-gray-300';
+    const vis = claim.visibility || 'public';
+    if (vis === 'locked') return darkMode ? 'bg-red-600' : 'bg-red-500';
+    if (vis === 'private') return darkMode ? 'bg-amber-600' : 'bg-amber-500';
+    return darkMode ? 'bg-emerald-600' : 'bg-emerald-500';
+  };
+
+  // Sort shareable stamps: primary first, then rest
+  const sortedShareable = [...shareableStamps].sort((a, b) => {
+    if (primaryClaim && a.id === primaryClaim.id) return -1;
+    if (primaryClaim && b.id === primaryClaim.id) return 1;
+    return 0;
+  });
+
+  return (
+    <>
+      <button onClick={handleOpen}
+        className={`text-xs px-2.5 py-1 rounded-lg font-medium btn-feedback transition-colors ${
+          copied
+            ? (darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700')
+            : (darkMode ? 'bg-white/[0.06] text-gray-400 hover:text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-700')
+        }`}>
+        {copied ? '\u2713 Copied' : 'Share'}
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setOpen(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div onClick={(e) => e.stopPropagation()}
+            className={`relative w-full max-w-md rounded-t-2xl px-5 pt-5 pb-6 ${darkMode ? 'bg-gray-900 border-t border-gray-800' : 'bg-white border-t border-gray-200'}`}
+            style={{ animation: 'slideUp 0.2s ease-out' }}>
+
+            {choosingPrimary ? (
+              <>
+                {/* Primary Selection Sheet */}
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className={`font-semibold text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>Choose your public name</h3>
+                  <button onClick={() => setOpen(false)}
+                    className={`text-lg px-1.5 py-0.5 rounded btn-feedback ${darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}>
+                    {'✕'}
+                  </button>
+                </div>
+                <p className={`text-xs mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Pick how you'll appear when you share your profile.
+                </p>
+
+                <div className="space-y-1.5 mb-4">
+                  {linkedClaims.map(claim => {
+                    const provider = STAMP_PROVIDERS.find(p => p.id === claim.provider);
+                    if (!provider) return null;
+                    return (
+                      <div key={claim.id}
+                        className={`rounded-lg px-3 py-2.5 flex items-center gap-2.5 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
+                        <div className="w-5 flex items-center justify-center flex-shrink-0">
+                          <StampIcon provider={provider} size={14} />
+                        </div>
+                        <span className={`text-xs font-medium flex-1 min-w-0 truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {formatStampDisplay(claim.provider, claim.value) || claim.label || provider.name}
+                        </span>
+                        <button onClick={() => handleChoosePrimary(claim.id)}
+                          className={`text-[10px] px-3 py-1 rounded-lg font-medium btn-feedback transition-colors ${
+                            darkMode ? 'bg-violet-600/30 text-violet-300 hover:bg-violet-600/50' : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+                          }`}>
+                          Use
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {linkedClaims.length <= 1 && (
+                  <p className={`text-[10px] text-center ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+                    Link more accounts above to choose a different identity
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Share sheet */}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className={`font-semibold text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>Share Profile</h3>
+                  <button onClick={() => setOpen(false)}
+                    className={`text-lg px-1.5 py-0.5 rounded btn-feedback ${darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}>
+                    {'✕'}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center font-bold text-sm text-white">
+                    {(displayName || 'A')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{displayName || 'Aura User'}</div>
+                    <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{assessmentCount || 0} assessments</div>
+                  </div>
+                </div>
+
+                <div className={`border-t mb-3 ${darkMode ? 'border-gray-800' : 'border-gray-200'}`} />
+
+                {/* Primary stamp — always shown, always on */}
+                {primaryClaim && (() => {
+                  const pProvider = STAMP_PROVIDERS.find(p => p.id === primaryClaim.provider);
+                  if (!pProvider) return null;
+                  return (
+                    <div className="mb-3">
+                      <div className={`text-xs font-medium mb-1.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Your identity:</div>
+                      <div className={`rounded-lg px-2.5 py-2 flex items-center gap-2 ${darkMode ? 'bg-amber-500/[0.06] border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+                        <div className="w-5 flex items-center justify-center flex-shrink-0">
+                          <StampIcon provider={pProvider} size={14} />
+                        </div>
+                        <span className={`text-xs font-medium flex-1 min-w-0 truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {formatStampDisplay(primaryClaim.provider, primaryClaim.value) || primaryClaim.label}
+                        </span>
+                        <span className={`text-[9px] flex-shrink-0 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>★ Primary</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {sortedShareable.length > 0 && (
+                  <>
+                    <div className={`text-xs font-medium mb-2.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Include in this link:</div>
+                    <div className="space-y-1 mb-5">
+                      {sortedShareable.map(claim => {
+                        // Skip primary in the toggleable list — it's pinned above
+                        if (primaryClaim && claim.id === primaryClaim.id) return null;
+                        const provider = STAMP_PROVIDERS.find(p => p.id === claim.provider);
+                        if (!provider) return null;
+                        const vis = claim.visibility || 'public';
+                        const isOn = selections[claim.provider];
+                        const isTempUnlocked = vis !== 'public';
+
+                        return (
+                          <div key={claim.provider}
+                            className={`rounded-lg px-2.5 py-2 flex items-center gap-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
+                            <div className="w-5 flex items-center justify-center flex-shrink-0">
+                              <StampIcon provider={provider} size={14} />
+                            </div>
+                            <span className={`text-xs flex-1 min-w-0 truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {formatStampDisplay(claim.provider, claim.value) || claim.label}
+                            </span>
+                            {isTempUnlocked && (
+                              <span className={`text-[9px] flex-shrink-0 ${
+                                vis === 'locked' ? (darkMode ? 'text-red-500' : 'text-red-600') : (darkMode ? 'text-amber-500' : 'text-amber-600')
+                              }`}>
+                                {vis === 'locked' ? 'Normally locked' : 'Normally private'}
+                              </span>
+                            )}
+                            <button onClick={() => setSelections(prev => ({ ...prev, [claim.provider]: !prev[claim.provider] }))}
+                              className={`w-9 h-5 rounded-full flex items-center transition-colors btn-feedback flex-shrink-0 ${getToggleColor(claim, isOn)}`}>
+                              <div className={`w-3.5 h-3.5 rounded-full mx-0.5 transition-transform ${
+                                isOn ? 'translate-x-4 bg-white' : 'translate-x-0 bg-white/80'
+                              }`} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                <button onClick={handleCopyLink}
+                  className={`w-full py-3 rounded-xl font-semibold text-sm btn-feedback transition-colors ${
+                    copied
+                      ? (darkMode ? 'bg-emerald-600/30 text-emerald-400' : 'bg-emerald-100 text-emerald-700')
+                      : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:from-violet-500 hover:to-fuchsia-500'
+                  }`}>
+                  {copied ? '\u2713 Copied!' : 'Copy Link'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// PublicProfileScreen — Read-only public view of a user's profile
+const PublicProfileScreen = ({ darkMode, profileId, onCreateAccount }) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+
+  useEffect(() => {
+    if (!profileId) { setError('No profile ID'); setLoading(false); return; }
+    (async () => {
+      const result = await loadPublicProfile(profileId);
+      if (!result) {
+        setError('Profile not found');
+      } else {
+        setProfileData(result);
+      }
+      setLoading(false);
+    })();
+  }, [profileId]);
+
+  if (loading) {
+    return (
+      <div className={`flex-1 flex items-center justify-center ${darkMode ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
+        <div className="text-center">
+          <div className={`text-2xl mb-2 ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>✦</div>
+          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading profile...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !profileData) {
+    return (
+      <div className={`flex-1 flex items-center justify-center ${darkMode ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
+        <div className="text-center px-8">
+          <div className="text-3xl mb-3">👻</div>
+          <div className={`font-semibold mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Profile not found</div>
+          <div className={`text-sm mb-6 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>This link may be expired or invalid.</div>
+          <button onClick={onCreateAccount}
+            className="px-6 py-2.5 rounded-xl bg-violet-600 text-white font-medium text-sm hover:bg-violet-500 btn-feedback">
+            Create Your Aura
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { profile, claims } = profileData;
+  const summary = profile.profile_summary || {};
+  const initial = (profile.display_name || 'A')[0].toUpperCase();
+
+  // Primary stamp — the user's public identity
+  const primaryClaim = claims.find(c => c.weight === 1);
+  const primaryProvider = primaryClaim ? STAMP_PROVIDERS.find(p => p.id === primaryClaim.provider) : null;
+
+  // Filter claims: ?s= param selects specific providers; no ?s= shows all (already public from DB)
+  const sParam = new URLSearchParams(window.location.search).get('s');
+  const selectedProviders = sParam ? sParam.split(',').map(s => s.trim()) : null;
+  const visibleClaims = claims.filter(c => {
+    if (c.provider === 'email') return false; // Email never shown publicly
+    if (primaryClaim && c.id === primaryClaim.id) return false; // Primary shown in header
+    if (selectedProviders) return selectedProviders.includes(c.provider);
+    return true; // All claims from loadPublicProfile are already public-visibility
+  });
+
+  return (
+    <div className={`flex-1 flex flex-col overflow-hidden ${darkMode ? 'text-white bg-gray-950' : 'text-gray-900 bg-gray-50'}`}>
+      <div className="flex-1 p-4 overflow-y-auto space-y-4">
+        {/* Avatar + Name + Primary Stamp */}
+        <div className="flex flex-col items-center pt-4 pb-2">
+          <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center font-bold text-2xl text-white mb-3"
+            style={{ boxShadow: '0 0 20px 6px rgba(139,92,246,0.3), 0 0 30px 10px rgba(217,70,239,0.15)' }}>
+            {initial}
+          </div>
+          <h2 className="font-semibold text-xl">{profile.display_name || 'Aura User'}</h2>
+          {primaryProvider && primaryClaim.provider !== 'email' && (
+            <div className={`flex items-center gap-1.5 mt-1.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <StampIcon provider={primaryProvider} size={13} />
+              <span className="text-sm font-medium">
+                {formatStampDisplay(primaryClaim.provider, primaryClaim.value) || primaryClaim.label || primaryProvider.name}
+              </span>
+            </div>
+          )}
+          {summary.entity_type === 'ai' && (
+            <span className={`text-xs mt-1 px-2 py-0.5 rounded-full ${darkMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-100 text-cyan-700'}`}>AI Entity</span>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className={`rounded-2xl px-4 py-3 flex items-center justify-around ${darkMode ? 'bg-gray-900/40 border border-gray-800/40' : 'bg-white border border-gray-200'}`}>
+          <div className="text-center">
+            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{summary.assessment_count || 0}</div>
+            <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Assessments</div>
+          </div>
+          <div className={`w-px h-8 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
+          <div className="text-center">
+            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{summary.stamp_count || 0}</div>
+            <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Stamps</div>
+          </div>
+        </div>
+
+        {/* Public Stamps */}
+        {visibleClaims.length > 0 && (
+          <div className="space-y-1.5">
+            <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Linked Accounts</div>
+            {visibleClaims.map(claim => {
+              const provider = STAMP_PROVIDERS.find(p => p.id === claim.provider);
+              if (!provider) return null;
+              return (
+                <div key={claim.id} className={`rounded-xl px-3 py-2.5 flex items-center gap-3 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
+                  <div className="w-6 flex items-center justify-center">
+                    <StampIcon provider={provider} />
+                  </div>
+                  <span className={`text-sm font-medium flex-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {formatStampDisplay(claim.provider, claim.value) || claim.label || provider.name}
+                  </span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                    claim.proof_status === 'verified'
+                      ? (darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700')
+                      : (darkMode ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-100 text-gray-500')
+                  }`}>
+                    {claim.proof_status === 'verified' ? 'Verified' : 'Self-reported'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* CTA */}
+        <div className="pt-4 pb-8">
+          <button onClick={onCreateAccount}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold text-sm hover:from-violet-500 hover:to-fuchsia-500 btn-feedback">
+            Create Your Aura
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Visibility tier config
+// Visibility bounce: Public → Private → Locked → Private → Public → ...
+// Direction tracked via _visDir flag on the click handler
+const VISIBILITY_NEXT = (current, direction) => {
+  if (current === 'public') return 'private';
+  if (current === 'locked') return 'private';
+  // private — direction determines which way
+  return direction === 'up' ? 'locked' : 'public';
+};
+const VISIBILITY_TIERS = {
+  public: { label: 'Public' },
+  private: { label: 'Private' },
+  locked: { label: 'Locked' }
+};
+
+// StampRow — Compact single-line provider row
+const StampRow = ({ provider, claim, isEmail, isLinked, darkMode, onLink, onUnlink, onVisibilityChange, isTempUnlocked, onTempUnlock, isPrimary, onSetPrimary, onPrimaryTap }) => {
+  const [editing, setEditing] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
+  // Track bounce direction for visibility cycle
+  const [visDirection, setVisDirection] = useState('up');
+
+  const handleSave = async () => {
+    const normalized = normalizeStampValue(provider.id, inputValue);
+    if (!normalized) return;
+    setSaving(true);
+    await onLink(normalized);
+    setSaving(false);
+    setEditing(false);
+    setInputValue('');
+  };
+
+  const visibility = claim?.visibility || 'public';
+  const visTier = VISIBILITY_TIERS[visibility] || VISIBILITY_TIERS.public;
+  const isHidden = visibility !== 'public';
+
+  const handleVisibilityTap = () => {
+    const next = VISIBILITY_NEXT(visibility, visDirection);
+    // Update direction for next tap
+    if (visibility === 'public') setVisDirection('up');
+    else if (visibility === 'locked') setVisDirection('down');
+    onVisibilityChange && onVisibilityChange(next);
+  };
+
+  // Editing state — inline input
+  if (editing) {
+    return (
+      <div className={`rounded-lg px-2.5 py-1.5 flex items-center gap-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
+        <div className="w-5 flex items-center justify-center flex-shrink-0">
+          <StampIcon provider={provider} size={14} />
+        </div>
+        <div className={`flex items-center flex-1 min-w-0 rounded border ${darkMode ? 'bg-white/[0.06] border-white/10' : 'bg-white border-gray-300'}`}>
+          {provider.prefix && (
+            <span className={`text-xs pl-1.5 select-none ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>{provider.prefix}</span>
+          )}
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false); }}
+            onFocus={(e) => e.target.select()}
+            placeholder={provider.placeholder || 'username'}
+            autoFocus
+            className={`text-xs flex-1 min-w-0 px-1 py-1 bg-transparent outline-none ${darkMode ? 'text-white placeholder-gray-600' : 'text-gray-900 placeholder-gray-400'}`}
+          />
+        </div>
+        <button onClick={handleSave} disabled={saving || !inputValue.trim()}
+          className={`text-xs px-2 py-0.5 rounded font-medium btn-feedback ${darkMode ? 'bg-emerald-600/30 text-emerald-400 disabled:opacity-30' : 'bg-emerald-100 text-emerald-700 disabled:opacity-30'}`}>
+          {saving ? '...' : 'Save'}
+        </button>
+        <button onClick={() => setEditing(false)}
+          className={`text-xs px-1 btn-feedback ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  // Confirm unlink inline
+  if (confirmUnlink) {
+    return (
+      <div className={`rounded-lg px-2.5 py-2 flex items-center gap-2 ${darkMode ? 'bg-red-950/30 border border-red-800/30' : 'bg-red-50 border border-red-200'}`}>
+        <div className="w-5 flex items-center justify-center flex-shrink-0">
+          <StampIcon provider={provider} size={14} />
+        </div>
+        <span className={`text-xs flex-1 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+          Remove {provider.name}? You'll need to re-link it.
+        </span>
+        <button onClick={() => { setConfirmUnlink(false); onUnlink(); }}
+          className={`text-xs px-2 py-0.5 rounded font-medium btn-feedback ${darkMode ? 'bg-red-600/40 text-red-300' : 'bg-red-100 text-red-700'}`}>
+          Remove
+        </button>
+        <button onClick={() => setConfirmUnlink(false)}
+          className={`text-xs px-1.5 py-0.5 rounded btn-feedback ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+          Keep
+        </button>
+      </div>
+    );
+  }
+
+  // Unlinked — provider name + Link button (right-side aligned with linked rows)
+  if (!isLinked) {
+    return (
+      <div className={`rounded-lg px-2.5 py-2 flex items-center gap-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
+        <div className="w-5 flex items-center justify-center flex-shrink-0 opacity-40">
+          <StampIcon provider={provider} size={14} />
+        </div>
+        <span className={`text-xs flex-1 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+          {provider.name}
+        </span>
+        <div className="flex items-center justify-end gap-1.5" style={{ minWidth: '8rem' }}>
+          <button onClick={() => { setEditing(true); setInputValue(''); }}
+            className={`text-xs px-2 py-0.5 rounded font-medium btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-500 hover:text-white' : 'bg-gray-100 text-gray-400 hover:text-gray-700'}`}>
+            + Link
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Linked — compact single line with fixed-width columns: SR | Visibility | ↗ | ✕/★
+  const isVerified = isEmail || claim.proof_status === 'verified';
+  const isLocked = visibility === 'locked';
+  return (
+    <div className={`rounded-lg px-2.5 py-2 flex items-center gap-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
+      <div className="w-5 flex items-center justify-center flex-shrink-0">
+        <StampIcon provider={provider} size={14} />
+      </div>
+      <span className={`text-xs font-medium flex-1 min-w-0 truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+        {formatStampDisplay(provider.id, claim.value) || claim.label || provider.name}
+      </span>
+      {/* Fixed right columns: SR/✓ | Visibility | ↗ | ✕/★ */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Col 1: SR / ✓ */}
+        <span className={`text-[11px] w-5 text-center ${isVerified ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-gray-600' : 'text-gray-400')}`}>
+          {isVerified ? '✓' : 'SR'}
+        </span>
+        {/* Col 2: Visibility label — always fixed width */}
+        {isPrimary ? (
+          <span className={`text-[10px] w-[3rem] text-center py-0.5 rounded font-medium ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Public</span>
+        ) : !isEmail ? (
+          <button onClick={handleVisibilityTap}
+            className={`text-[10px] w-[3rem] text-center py-0.5 rounded font-medium btn-feedback ${
+              isLocked ? (darkMode ? 'text-red-500' : 'text-red-600')
+              : isHidden ? (darkMode ? 'text-amber-500' : 'text-amber-600')
+              : (darkMode ? 'text-emerald-500' : 'text-emerald-600')
+            }`}
+            title="Tap to change visibility">
+            {visTier.label}
+          </button>
+        ) : (
+          <div className="w-[3rem]" />
+        )}
+        {/* Col 3: Share-once circle — fixed slot, visible on non-public rows */}
+        {!isPrimary && !isEmail && isHidden ? (
+          <button onClick={() => onTempUnlock && onTempUnlock(provider.id)}
+            className={`w-5 h-5 rounded-full flex items-center justify-center btn-feedback transition-colors ${
+              isTempUnlocked
+                ? isLocked
+                  ? (darkMode ? 'bg-red-500 text-white' : 'bg-red-500 text-white')
+                  : (darkMode ? 'bg-orange-500 text-white' : 'bg-orange-500 text-white')
+                : (darkMode ? 'border border-gray-700 text-gray-600 hover:border-gray-500' : 'border border-gray-300 text-gray-400 hover:border-gray-400')
+            }`}
+            title={isTempUnlocked ? 'Shared for this session' : 'Share once'}>
+            <span className="text-[9px] leading-none">↗</span>
+          </button>
+        ) : (
+          <div className="w-5" />
+        )}
+        {/* Col 4: ★ (primary) or ✕ (unlink) — far right */}
+        {isPrimary ? (
+          <button onClick={() => onPrimaryTap && onPrimaryTap()}
+            className={`text-[11px] w-5 text-center btn-feedback ${darkMode ? 'text-amber-400' : 'text-amber-500'}`}
+            title="Change primary">
+            ★
+          </button>
+        ) : !isEmail ? (
+          <button onClick={() => setConfirmUnlink(true)}
+            className={`text-xs w-5 text-center btn-feedback ${darkMode ? 'text-gray-700 hover:text-red-400' : 'text-gray-300 hover:text-red-500'}`}>
+            ✕
+          </button>
+        ) : <div className="w-5" />}
+      </div>
+    </div>
+  );
+};
+
 // ProfileScreen — Unified hub with personality + stats
-const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType, onboardingAnswers, onNavigate }) => {
+const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType, onboardingAnswers, onNavigate, userClaims, onClaimsChange }) => {
   const answeredList = Object.entries(responses).map(([id, r]) => ({ id: parseInt(id), ...r }));
   const answered = answeredList.length;
   const avgConf = answered > 0 ? (answeredList.reduce((s, r) => s + r.confidence, 0) / answered).toFixed(1) : '—';
+
+  // Display name editing
+  const [profileDisplayName, setProfileDisplayName] = useState(getDisplayName);
+  const [editingProfileName, setEditingProfileName] = useState(false);
+  const [profileNameInput, setProfileNameInput] = useState('');
+  const [profileNameSaving, setProfileNameSaving] = useState(false);
+
+  // Temp unlock — session-only state for sharing private/locked stamps
+  const [tempUnlocked, setTempUnlocked] = useState({});
+  // Collapse unlinked stamps behind toggle
+  const [showUnlinked, setShowUnlinked] = useState(false);
+  const toggleTempUnlock = (providerId) => {
+    setTempUnlocked(prev => ({ ...prev, [providerId]: !prev[providerId] }));
+  };
+
+  // Primary stamp — the user's public identity
+  const primaryClaim = (userClaims || []).find(c => c.weight === 1);
+  const primaryClaimId = primaryClaim?.id || null;
+  const [choosingPrimary, setChoosingPrimary] = useState(false);
+  const handleSetPrimary = async (claimId) => {
+    const user = getCurrentUser();
+    if (!user) return;
+    const ok = await setPrimaryClaim(user.id, claimId);
+    if (ok) {
+      const claims = await loadUserClaims(user.id);
+      onClaimsChange(claims);
+    }
+  };
+
+  // Auto-fix: if primary claim exists but visibility isn't public, sync it
+  useEffect(() => {
+    if (primaryClaim && primaryClaim.visibility !== 'public') {
+      const user = getCurrentUser();
+      if (user) {
+        updateClaimVisibility(primaryClaim.id, user.id, 'public').then(ok => {
+          if (ok) loadUserClaims(user.id).then(claims => onClaimsChange(claims));
+        });
+      }
+    }
+  }, [primaryClaimId]);
+
+  useEffect(() => {
+    const handler = (e) => setProfileDisplayName(e.detail?.displayName || null);
+    window.addEventListener('aura-profile-change', handler);
+    return () => window.removeEventListener('aura-profile-change', handler);
+  }, []);
+
+  const handleProfileNameSave = async () => {
+    const trimmed = profileNameInput.trim();
+    if (!trimmed) return;
+    const user = getCurrentUser();
+    if (!user) return;
+    setProfileNameSaving(true);
+    const ok = await updateDisplayName(user.id, trimmed);
+    setProfileNameSaving(false);
+    if (ok) {
+      setProfileDisplayName(trimmed);
+      setEditingProfileName(false);
+    }
+  };
 
   // Archetype for personality section
   const archetype = calculateArchetype(assessCompleted);
@@ -8406,43 +9439,100 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
       <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
         <button onClick={() => onNavigate('categories')} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
         <span className="font-medium flex-1">Profile</span>
+        {getCurrentUser() && <SharePicker darkMode={darkMode} userId={getCurrentUser().id}
+          userClaims={userClaims} displayName={profileDisplayName} assessmentCount={Object.keys(assessCompleted).length}
+          tempUnlocked={tempUnlocked}
+          onSetPrimary={handleSetPrimary}
+          onMakePublic={async (claimId) => {
+            const user = getCurrentUser();
+            if (!user) return;
+            await updateClaimVisibility(claimId, user.id, 'public');
+            const claims = await loadUserClaims(user.id);
+            onClaimsChange(claims);
+            setTempUnlocked(prev => {
+              const next = { ...prev };
+              // Clear temp unlock for any claim that's now public
+              claims.forEach(c => { if (c.id === claimId) delete next[c.provider]; });
+              return next;
+            });
+          }}
+        />}
       </div>
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
         {/* Avatar with aura glow + basic stats */}
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center font-bold text-xl text-white"
             style={getAuraStyle()}>
-            {getCurrentEmail() ? getCurrentEmail()[0].toUpperCase() : 'G'}
+            {(profileDisplayName || getCurrentEmail() || 'G')[0].toUpperCase()}
           </div>
           <div className="flex-1">
-            <h2 className="font-semibold text-lg">{getCurrentEmail() || 'Guest'}</h2>
-            <div className="flex items-center gap-3 mt-1">
-              <span className={`text-sm ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Lv.{stats.level || 1}</span>
-              {stats.streak > 0 && <span className="text-sm text-orange-400">🔥{stats.streak}</span>}
-              <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{stats.xp || 0} XP</span>
+            {editingProfileName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={profileNameInput}
+                  onChange={(e) => setProfileNameInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleProfileNameSave(); if (e.key === 'Escape') setEditingProfileName(false); }}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="Display name"
+                  autoFocus
+                  maxLength={50}
+                  className={`text-sm px-2 py-1 rounded border flex-1 min-w-0 ${darkMode ? 'bg-white/[0.06] border-white/10 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                />
+                <button onClick={handleProfileNameSave} disabled={profileNameSaving} className={`text-xs px-2 py-1 rounded btn-feedback ${darkMode ? 'bg-violet-600/40 text-violet-300' : 'bg-violet-100 text-violet-700'}`}>
+                  {profileNameSaving ? '...' : 'Save'}
+                </button>
+                <button onClick={() => setEditingProfileName(false)} className={`text-xs px-1.5 py-1 rounded btn-feedback ${TH('text-faint', darkMode)}`}>
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold text-lg">{profileDisplayName || getCurrentEmail() || 'Guest'}</h2>
+                {getCurrentUser() && (
+                  <button onClick={() => { setProfileNameInput(profileDisplayName || ''); setEditingProfileName(true); }}
+                    className={`text-xs px-1.5 py-0.5 rounded btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-500 hover:text-gray-300' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
+                    Edit
+                  </button>
+                )}
+              </div>
+            )}
+            {profileDisplayName && getCurrentEmail() && <div className={`text-xs ${TH('text-faint', darkMode)}`}>{getCurrentEmail()}</div>}
+            {/* Profile Depth — inline in user card */}
+            {(() => {
+              const tier = calculateAssessTier(assessCompleted);
+              const done = getCompletedCategoryCount(assessCompleted, entityType);
+              const total = getVisibleCategoryCount(tier, entityType);
+              if (total === 0) return null;
+              const pct = Math.round((done / total) * 100);
+              return (
+                <div className="mt-1.5">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className={`text-[11px] ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Profile Depth</span>
+                    <span className={`text-[11px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{done}/{total}</span>
+                  </div>
+                  <div className={`h-1 rounded-full ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
+                    <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
+            {/* Inline stat line */}
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <span className={`text-xs font-medium ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Lv.{stats.level || 1}</span>
+              <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>·</span>
+              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{stats.xp || 0} XP</span>
+              <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>·</span>
+              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{answered} answered</span>
+              <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>·</span>
+              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{avgConf} avg conf</span>
+              {stats.streak > 0 && <>
+                <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>·</span>
+                <span className="text-xs text-orange-400">{stats.streak}d streak</span>
+              </>}
             </div>
           </div>
         </div>
-
-        {/* Profile Depth — Layer 2 intelligence */}
-        {(() => {
-          const tier = calculateAssessTier(assessCompleted);
-          const done = getCompletedCategoryCount(assessCompleted, entityType);
-          const total = getVisibleCategoryCount(tier, entityType);
-          if (total === 0) return null;
-          const pct = Math.round((done / total) * 100);
-          return (
-            <div className={`rounded-xl px-4 py-3 ${darkMode ? 'bg-violet-950/20 border border-violet-800/20' : 'bg-violet-50 border border-violet-200'}`}>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className={`text-xs font-medium ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Profile Depth</span>
-                <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{done} of {total}</span>
-              </div>
-              <div className={`h-1.5 rounded-full ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
-                <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
-              </div>
-            </div>
-          );
-        })()}
 
         {/* Personality Section - clickable to Analysis */}
         <button
@@ -8473,23 +9563,111 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
           </div>
         </button>
 
-        {/* Stats */}
-        <div className={`rounded-2xl px-4 py-3 flex items-center justify-around ${darkMode ? 'bg-gray-900/40 border border-gray-800/40' : 'bg-white border border-gray-200'}`}>
-          <div className="text-center">
-            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{answered}</div>
-            <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Answered</div>
-          </div>
-          <div className={`w-px h-8 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
-          <div className="text-center">
-            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedCount}</div>
-            <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Assessments</div>
-          </div>
-          <div className={`w-px h-8 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
-          <div className="text-center">
-            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{avgConf}</div>
-            <div className={`text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Avg Conf</div>
-          </div>
-        </div>
+        {/* Stamps — linked accounts shown, unlinked collapsed behind toggle */}
+        {getCurrentUser() && (() => {
+          const claimsByProvider = {};
+          (userClaims || []).forEach(c => { claimsByProvider[c.provider] = c; });
+          const linked = STAMP_PROVIDERS.filter(p => !!claimsByProvider[p.id]).sort((a, b) => a.priority - b.priority);
+          const unlinked = STAMP_PROVIDERS.filter(p => !claimsByProvider[p.id]).sort((a, b) => a.priority - b.priority);
+          const noneLinked = linked.length === 0;
+
+          const renderStampRow = (provider) => {
+            const claim = claimsByProvider[provider.id];
+            const isEmail = provider.id === 'email';
+            const isLinked = !!claim;
+            return (
+              <StampRow
+                key={provider.id}
+                provider={provider}
+                claim={claim}
+                isEmail={isEmail}
+                isLinked={isLinked}
+                darkMode={darkMode}
+                isPrimary={!!claim && claim.id === primaryClaimId}
+                onSetPrimary={handleSetPrimary}
+                onPrimaryTap={() => setChoosingPrimary(!choosingPrimary)}
+                onLink={async (value) => {
+                  const user = getCurrentUser();
+                  if (!user) return;
+                  const displayLabel = formatStampDisplay(provider.id, value) || provider.name;
+                  const result = await createAccountClaim(user.id, provider.id, displayLabel, value);
+                  if (result) {
+                    const claims = await loadUserClaims(user.id);
+                    onClaimsChange(claims);
+                    updateProfileSummary(user.id, assessCompleted, claims, entityType);
+                  }
+                }}
+                onUnlink={async () => {
+                  const user = getCurrentUser();
+                  if (!user || !claim) return;
+                  const ok = await removeClaim(claim.id, user.id);
+                  if (ok) {
+                    const claims = await loadUserClaims(user.id);
+                    onClaimsChange(claims);
+                    updateProfileSummary(user.id, assessCompleted, claims, entityType);
+                  }
+                }}
+                onVisibilityChange={async (newVisibility) => {
+                  const user = getCurrentUser();
+                  if (!user || !claim) return;
+                  const ok = await updateClaimVisibility(claim.id, user.id, newVisibility);
+                  if (ok) {
+                    const claims = await loadUserClaims(user.id);
+                    onClaimsChange(claims);
+                    updateProfileSummary(user.id, assessCompleted, claims, entityType);
+                  }
+                }}
+                isTempUnlocked={!!tempUnlocked[provider.id]}
+                onTempUnlock={toggleTempUnlock}
+              />
+            );
+          };
+
+          return (
+            <div className="space-y-1">
+              <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Linked Accounts</div>
+              {linked.map(renderStampRow)}
+              {/* Inline primary picker — shown when ★ tapped */}
+              {choosingPrimary && linked.length > 1 && (
+                <div className={`rounded-lg px-2.5 py-2 space-y-1 ${darkMode ? 'bg-amber-950/20 border border-amber-800/20' : 'bg-amber-50 border border-amber-200'}`}>
+                  <div className={`text-[11px] font-medium ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Change primary identity</div>
+                  {linked.filter(p => {
+                    const c = claimsByProvider[p.id];
+                    return c && c.id !== primaryClaimId;
+                  }).map(p => {
+                    const c = claimsByProvider[p.id];
+                    return (
+                      <button key={p.id} onClick={async () => { await handleSetPrimary(c.id); setChoosingPrimary(false); }}
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded btn-feedback text-left ${darkMode ? 'hover:bg-white/[0.04]' : 'hover:bg-amber-100/60'}`}>
+                        <StampIcon provider={p} size={14} />
+                        <span className={`text-xs flex-1 truncate ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {formatStampDisplay(p.id, c.value) || c.label || p.name}
+                        </span>
+                        <span className={`text-[11px] ${darkMode ? 'text-amber-400/60' : 'text-amber-500/60'}`}>☆</span>
+                      </button>
+                    );
+                  })}
+                  <button onClick={() => setChoosingPrimary(false)}
+                    className={`text-[11px] w-full text-center py-0.5 btn-feedback ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+              {/* Unlinked: show all if none linked, otherwise behind toggle */}
+              {unlinked.length > 0 && (noneLinked ? (
+                unlinked.map(renderStampRow)
+              ) : (
+                <>
+                  <button onClick={() => setShowUnlinked(!showUnlinked)}
+                    className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg btn-feedback ${darkMode ? 'text-gray-500 hover:text-gray-300 bg-white/[0.02] hover:bg-white/[0.04]' : 'text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100'}`}>
+                    {showUnlinked ? '− Hide unlinked' : `+ Link account (${unlinked.length} available)`}
+                  </button>
+                  {showUnlinked && unlinked.map(renderStampRow)}
+                </>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Assessments — available vs completed */}
         {(() => {
@@ -11376,11 +12554,27 @@ const QuestionFlowScreen = ({
 
 // ==================== MAIN APP ====================
 // Helper to determine initial screen based on login state
+// Check for public profile URL parameter
+const getPublicProfileId = () => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('p') || null;
+  } catch { return null; }
+};
+
 const getInitialScreen = () => {
+  // Public profile link takes priority
+  if (getPublicProfileId()) return 'public-profile';
+  // Check Supabase auth session (stored in localStorage by Supabase client)
+  const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+  if (sbKey) {
+    try {
+      const session = JSON.parse(localStorage.getItem(sbKey));
+      if (session?.user || session?.access_token) return 'assess-picker';
+    } catch {}
+  }
   const hasEmail = localStorage.getItem('aura_user_email');
-  // Only signed-in users stay logged in on reload - land on categories menu
   if (hasEmail) return 'categories';
-  // Everyone else (including guests) starts fresh at welcome
   return 'welcome';
 };
 
@@ -11510,6 +12704,39 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
     localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed, inProgress: progress, demoActive, savedUserData, demoProfile, showDemoControls: demoControls }));
   };
 
+  // Sync assessment data with Supabase on auth changes
+  useEffect(() => {
+    const handler = async (e) => {
+      const user = e.detail?.user;
+      if (user && (e.detail.event === 'SIGNED_IN' || e.detail.event === 'INITIAL_SESSION')) {
+        const cloud = await loadAssessmentsFromCloud(user.id);
+        if (cloud) {
+          if (Object.keys(cloud.completed).length > 0 || Object.keys(cloud.inProgress).length > 0) {
+            setAssessCompleted(prev => ({ ...prev, ...cloud.completed }));
+            setAssessInProgress(prev => ({ ...prev, ...cloud.inProgress }));
+            // Read localStorage directly to avoid stale closure
+            try {
+              const stored = JSON.parse(localStorage.getItem(ASSESS_STORAGE_KEY) || '{}');
+              const merged = { ...(stored.completed || {}), ...cloud.completed };
+              const mergedProgress = { ...(stored.inProgress || {}), ...cloud.inProgress };
+              localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ ...stored, completed: merged, inProgress: mergedProgress }));
+            } catch {}
+            console.log('[Aura] Loaded assessments from cloud:', Object.keys(cloud.completed).length, 'completed,', Object.keys(cloud.inProgress).length, 'in-progress');
+          }
+        }
+      }
+      // Reset state on sign-out — prevents stale cloud data from previous account
+      if (!user && e.detail?.event === 'SIGNED_OUT') {
+        setAssessCompleted({});
+        setAssessInProgress({});
+        localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed: {}, inProgress: {}, demoActive: false, savedUserData: null, demoProfile: null, showDemoControls: false }));
+        console.log('[Aura] Cleared assessment state on sign-out');
+      }
+    };
+    window.addEventListener('aura-auth-change', handler);
+    return () => window.removeEventListener('aura-auth-change', handler);
+  }, []);
+
   const assessCurrentTest = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
   const assessTestColor = assessCurrentTest ? getAssessColor(assessCurrentTest.color, darkMode) : null;
   const assessCurrentScale = assessCurrentTest ? ASSESS_SCALES[assessCurrentTest.scale] : null;
@@ -11527,9 +12754,21 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
 
   const assessSaveAndExit = () => {
     clearTimeout(assessTimeoutRef.current);
-    const newProgress = { ...assessInProgress, [assessCurrentTestId]: { index: assessCurrentIndex, responses: assessResponses, skipped: assessSkipped } };
+    const progressData = { index: assessCurrentIndex, responses: assessResponses, skipped: assessSkipped };
+    const newProgress = { ...assessInProgress, [assessCurrentTestId]: progressData };
     setAssessInProgress(newProgress);
     assessSaveToStorage(assessCompleted, newProgress);
+    // Sync to cloud if signed in
+    const user = getCurrentUser();
+    if (user) {
+      const totalQ = assessCurrentTest?.items?.length || 1;
+      const pct = Object.keys(assessResponses).length / totalQ;
+      saveAssessmentToCloud(user.id, assessCurrentTestId, 'in-progress', {
+        responses: assessResponses,
+        skipped: assessSkipped,
+        currentIndex: assessCurrentIndex
+      }, null, pct);
+    }
     setScreen('assess-picker');
   };
 
@@ -11594,6 +12833,12 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
     const { [assessCurrentTestId]: _, ...remainingProgress } = assessInProgress;
     setAssessInProgress(remainingProgress);
     assessSaveToStorage(newCompleted, remainingProgress);
+    // Sync completed test to cloud + update profile summary
+    const user = getCurrentUser();
+    if (user) {
+      saveAssessmentToCloud(user.id, assessCurrentTestId, 'completed', resp, results, 1.0);
+      updateProfileSummary(user.id, newCompleted, null, entityType);
+    }
 
     // Check for unlock tier changes
     const prevTier = calculateAssessTier(assessCompleted);
@@ -11694,6 +12939,9 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
     setAssessSavedUserData(null);
     assessSaveToStorage({}, {}, false, null);
     setAssessShowDemoMenu(false);
+    // Clear cloud data if signed in
+    const user = getCurrentUser();
+    if (user) clearAllAssessmentsFromCloud(user.id);
   };
 
   return {
@@ -11737,8 +12985,53 @@ function App() {
   const [screen, setScreen] = useState(getInitialScreen);
   const [previousScreen, setPreviousScreen] = useState('categories');
   const [isGuestMode, setIsGuestMode] = useState(() => localStorage.getItem('aura_guest_mode') === 'true');
+  const [authUser, setAuthUser] = useState(null);
+  const [displayName, setDisplayName] = useState(null);
   const [showSaveNudge, setShowSaveNudge] = useState(false);
   const [nudgeShown, setNudgeShown] = useState(() => localStorage.getItem('aura_nudge_shown') === 'true');
+
+  // Listen for auth state changes to trigger re-renders + navigate
+  useEffect(() => {
+    const handler = (e) => {
+      const user = e.detail?.user || null;
+      const prevUser = authUser;
+      setAuthUser(user);
+      // Navigate on sign-in (null → user transition)
+      if (user && !prevUser) {
+        localStorage.removeItem('aura_guest_mode');
+        setIsGuestMode(false);
+        setScreen('assess-picker');
+      }
+      // Navigate on sign-out
+      if (!user && prevUser) {
+        setDisplayName(null);
+        setScreen('welcome');
+      }
+    };
+    window.addEventListener('aura-auth-change', handler);
+    // Check initial state (session may have restored before React mounted)
+    if (getCurrentUser()) setAuthUser(getCurrentUser());
+    return () => window.removeEventListener('aura-auth-change', handler);
+  }, [authUser]);
+
+  // Listen for profile changes (display name)
+  useEffect(() => {
+    const handler = (e) => setDisplayName(e.detail?.displayName || null);
+    window.addEventListener('aura-profile-change', handler);
+    return () => window.removeEventListener('aura-profile-change', handler);
+  }, []);
+
+  // --- Claims (stamps) ---
+  const [userClaims, setUserClaims] = useState([]);
+  useEffect(() => {
+    const handler = (e) => setUserClaims(e.detail?.claims || []);
+    window.addEventListener('aura-claims-loaded', handler);
+    return () => window.removeEventListener('aura-claims-loaded', handler);
+  }, []);
+
+  // --- Public Profile (sharing) ---
+  const [publicProfileId] = useState(getPublicProfileId);
+
   const [onboardingComplete, setOnboardingComplete] = useState(() => localStorage.getItem('aura_onboarding_complete') === 'true');
   const [onboardingAnswers, setOnboardingAnswers] = useState(() => {
     try { return JSON.parse(localStorage.getItem(ONBOARD_STORAGE_KEY)) || {}; } catch { return {}; }
@@ -12345,8 +13638,7 @@ function App() {
   const handleCreateAccount = (email) => {
     localStorage.removeItem('aura_guest_mode');
     setIsGuestMode(false);
-    claimMyResponses();
-    // Land on assessment profile for logged-in users
+    // Claims + migration handled by onAuthStateChange listener
     setScreen('assess-picker');
   };
 
@@ -12375,7 +13667,7 @@ function App() {
   }, [isGuestMode, responseCount]);
 
   React.useEffect(() => {
-    if (isGuestMode && !nudgeShown && !getCurrentEmail() && guestStartCountRef.current !== null) {
+    if (isGuestMode && !nudgeShown && !authUser && guestStartCountRef.current !== null) {
       const newResponses = responseCount - guestStartCountRef.current;
       if (newResponses >= 20) {
         setShowSaveNudge(true);
@@ -12434,8 +13726,22 @@ function App() {
     //   assess-results  → AssessResultsScreen
     //   assess-analysis → AssessAnalysisScreen
     //   verify-*        → Verify* components
+    //   public-profile  → PublicProfileScreen (read-only, no auth)
     //   categories      → CategoryScreen (home/hub)
     //   (default)       → QuestionFlowScreen
+
+    // Public profile (shared link)
+    if (screen === 'public-profile') return (
+      <PublicProfileScreen
+        darkMode={darkMode}
+        profileId={publicProfileId}
+        onCreateAccount={() => {
+          // Clear ?p= param and go to welcome
+          window.history.replaceState({}, '', window.location.pathname);
+          setScreen('welcome');
+        }}
+      />
+    );
 
     // Welcome screen
     if (screen === 'welcome') return (
@@ -12520,6 +13826,7 @@ function App() {
     if (screen === 'profile') return (
       <ProfileScreen darkMode={darkMode} responses={responses} assessCompleted={assessCompleted}
         stats={stats} entityType={entityType} onboardingAnswers={onboardingAnswers}
+        userClaims={userClaims} onClaimsChange={setUserClaims}
         onNavigate={(scr, opts) => {
           if (opts?.testId) setAssessCurrentTestId(opts.testId);
           setScreen(scr);
@@ -12721,7 +14028,7 @@ function App() {
           }
         }}
         assessCompleted={assessCompleted}
-        isLoggedIn={!!getCurrentEmail()}
+        isLoggedIn={!!authUser}
         onVerify={() => setScreen('verify-hub')}
         verifyPendingCount={verifyPendingCount}
       />
@@ -12825,6 +14132,7 @@ function App() {
     { id: 'verify-queue', label: 'V:Queue', icon: '📋' },
     { id: 'verify-evaluator', label: 'V:Eval', icon: '🔍' },
     { id: 'verify-eval-summary', label: 'V:Sum', icon: '📊' },
+    { id: 'public-profile', label: 'Pub Prof', icon: '🔗' },
   ];
 
   // ── Dev Q&A Channel ──
@@ -13250,8 +14558,8 @@ function App() {
           {/* Global stars background for dark mode */}
           {darkMode && <div className="global-stars" />}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && !screen.startsWith('verify-') && (
-              <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} assessCompleted={assessCompleted} accentColor={navAccentColor} />
+            {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && !screen.startsWith('verify-') && (
+              <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!authUser} isGuest={isGuestMode} assessCompleted={assessCompleted} accentColor={navAccentColor} displayName={displayName} />
             )}
             {renderContent()}
           </div>
@@ -13275,9 +14583,9 @@ function App() {
     >
       {/* Global stars background for dark mode */}
       {darkMode && <div className="global-stars" />}
-      {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && !screen.startsWith('verify-') && (
+      {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && !screen.startsWith('verify-') && (
         <div className="safe-top">
-          <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!getCurrentEmail()} isGuest={isGuestMode} assessCompleted={assessCompleted} />
+          <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!authUser} isGuest={isGuestMode} assessCompleted={assessCompleted} displayName={displayName} />
         </div>
       )}
       <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
