@@ -324,31 +324,39 @@ const PhoneFrame = ({ children, darkMode, device, expanded = false, onClick, cla
   const [isHovered, setIsHovered] = useState(false);
 
   // Calculate dimensions
-  const thumbScale = 280 / device.width;
+  // Physical-size frames: match real phone dimensions on this monitor
+  // Phones average ~141 CSS px per inch of device width
+  // Monitor: estimate CSS px/inch from screen width (assumes ~27" viewable)
+  const cssPerInch = Math.round(window.screen.width / 23.5);
+  const phoneInches = device.width / 141;
+  const physicalPx = Math.round(phoneInches * cssPerInch);
+  const expandedScale = physicalPx / device.width;
+  const thumbScale = (physicalPx * 0.6) / device.width;
   const isThumb = !expanded;
+  const frameScale = isThumb ? thumbScale : expandedScale;
 
-  const displayW = isThumb ? Math.round(device.width * thumbScale) : device.width;
-  const displayH = isThumb ? Math.round(device.height * thumbScale) : device.height;
+  const displayW = Math.round(device.width * frameScale);
+  const displayH = Math.round(device.height * frameScale);
 
-  const bezel = expanded ? 12 : 8;
-  const outerRadius = expanded ? 55 : 40;
-  const innerRadius = expanded ? 44 : 33;
+  const bezel = expanded ? 8 : 5;
+  const outerRadius = Math.round(55 * frameScale) + bezel;
+  const innerRadius = Math.round(44 * frameScale);
 
   // Status bar dimensions based on device type and scale
-  const statusH = device.dynamicIsland ? (expanded ? 54 : Math.round(54 * thumbScale)) : (expanded ? 44 : Math.round(44 * thumbScale));
+  const statusH = Math.round((device.dynamicIsland ? 54 : 44) * frameScale);
   const statusHDevice = device.dynamicIsland ? 54 : 44; // device-actual size for content
 
   // Dynamic Island / Notch dimensions
-  const diW = expanded ? 126 : Math.round(126 * thumbScale);
-  const diH = expanded ? 37 : Math.round(37 * thumbScale);
-  const diTop = expanded ? 12 : Math.round(12 * thumbScale);
+  const diW = Math.round(126 * frameScale);
+  const diH = Math.round(37 * frameScale);
+  const diTop = Math.round(12 * frameScale);
 
   // Simple notch for non-Dynamic-Island phones
-  const notchW = expanded ? 140 : Math.round(140 * thumbScale);
-  const notchH = expanded ? 26 : Math.round(26 * thumbScale);
+  const notchW = Math.round(140 * frameScale);
+  const notchH = Math.round(26 * frameScale);
   const notchTop = 0;
 
-  const homeW = expanded ? 134 : Math.round(134 * thumbScale);
+  const homeW = Math.round(134 * frameScale);
 
   const bezelBg = darkMode
     ? 'linear-gradient(145deg, #2a2a2e, #1a1a1c)'
@@ -362,9 +370,9 @@ const PhoneFrame = ({ children, darkMode, device, expanded = false, onClick, cla
     ? { boxShadow: `0 0 20px ${sectionColor}40, 0 0 40px ${sectionColor}20` }
     : {};
 
-  const iconScale = expanded ? 1 : 0.75;
-  const timeSize = expanded ? 14 : 10;
-  const sidePad = expanded ? 32 : Math.round(32 * thumbScale);
+  const iconScale = expanded ? 0.7 : 0.5;
+  const timeSize = Math.round(14 * frameScale);
+  const sidePad = Math.round(32 * frameScale);
 
   return (
     <div
@@ -400,25 +408,25 @@ const PhoneFrame = ({ children, darkMode, device, expanded = false, onClick, cla
             position: 'absolute', top: notchTop, left: '50%', transform: 'translateX(-50%)',
             width: notchW, height: notchH,
             background: darkMode ? '#000' : '#fff',
-            borderBottomLeftRadius: expanded ? 18 : Math.round(18 * thumbScale),
-            borderBottomRightRadius: expanded ? 18 : Math.round(18 * thumbScale),
+            borderBottomLeftRadius: Math.round(18 * frameScale),
+            borderBottomRightRadius: Math.round(18 * frameScale),
             zIndex: 30,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: expanded ? 8 : Math.round(8 * thumbScale),
+            gap: Math.round(8 * frameScale),
           }}>
             {/* Speaker slit */}
             <div style={{
-              width: expanded ? 40 : Math.round(40 * thumbScale),
-              height: expanded ? 4 : Math.round(4 * thumbScale),
+              width: Math.round(40 * frameScale),
+              height: Math.round(4 * frameScale),
               background: darkMode ? '#1a1a1a' : '#e5e5e5',
               borderRadius: 999,
             }} />
             {/* Camera dot */}
             <div style={{
-              width: expanded ? 8 : Math.round(8 * thumbScale),
-              height: expanded ? 8 : Math.round(8 * thumbScale),
+              width: Math.round(8 * frameScale),
+              height: Math.round(8 * frameScale),
               background: darkMode ? '#1a1a1a' : '#d0d0d0',
               borderRadius: '50%',
             }} />
@@ -429,7 +437,7 @@ const PhoneFrame = ({ children, darkMode, device, expanded = false, onClick, cla
         <div style={{
           height: statusH, position: 'relative', zIndex: 20,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
-          padding: `0 ${sidePad}px ${expanded ? 8 : Math.round(8 * thumbScale)}px`,
+          padding: `0 ${sidePad}px ${Math.round(8 * frameScale)}px`,
           fontSize: timeSize, fontWeight: 600,
           color: darkMode ? '#fff' : '#000',
         }}>
@@ -437,37 +445,28 @@ const PhoneFrame = ({ children, darkMode, device, expanded = false, onClick, cla
           <StatusBarIcons dark={darkMode} scale={iconScale} />
         </div>
 
-        {/* Content wrapper with scaling — --ts drives responsive text sizing */}
-        {isThumb ? (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: displayW, height: displayH, overflow: 'hidden' }}>
-            <div className="phone-content" style={{
-              '--ts': device.width / 393,
-              width: device.width,
-              height: device.height,
-              transform: `scale(${thumbScale})`,
-              transformOrigin: 'top left',
-              display: 'flex',
-              flexDirection: 'column',
-            }}>
-              <div style={{ height: statusHDevice, flexShrink: 0 }} />
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                {children}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="phone-content" style={{ '--ts': device.width / 393, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Content wrapper — always render at device width then scale to frame */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: displayW, height: displayH, overflow: 'hidden' }}>
+          <div className="phone-content" style={{
+            '--ts': device.width / 393,
+            width: device.width,
+            height: device.height,
+            transform: `scale(${frameScale})`,
+            transformOrigin: 'top left',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
             <div style={{ height: statusHDevice, flexShrink: 0 }} />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {children}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Home indicator */}
         <div style={{
-          position: 'absolute', bottom: expanded ? 8 : Math.round(8 * thumbScale), left: '50%', transform: 'translateX(-50%)',
-          width: homeW, height: expanded ? 5 : Math.round(5 * thumbScale), borderRadius: 9999, zIndex: 20, opacity: 0.3,
+          position: 'absolute', bottom: Math.round(8 * frameScale), left: '50%', transform: 'translateX(-50%)',
+          width: homeW, height: Math.round(5 * frameScale), borderRadius: 9999, zIndex: 20, opacity: 0.3,
           background: darkMode ? '#fff' : '#000',
         }} />
       </div>
