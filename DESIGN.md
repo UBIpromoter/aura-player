@@ -7,15 +7,12 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
 ## Open
 
 ### Profile
-- [ ] **Stats lead, viz replaces guest image** — level bar + top trait up top. Viz takes over guest image slot at **current guest image size**, **contained circle with glow bleeding out** (not fully unbounded, but glow escapes the boundary). Trait label medium prominence — clear but not showy. Move level/XP elsewhere to simplify the whole top section
-  > "Stats lead" · "Mix — level bar + top trait" · "Viz should take over the profile guest image, incorporate level and XP elsewhere so we can simplify the whole top"
-  > "Contained but with glow bleeding out" · "Medium — clear but not showy" · "Current guest image size"
+- [x] **Stats lead, viz replaces guest image** — SHIPPED: AuraVisualization replaces letter initial (64px, overflow:visible for glow bleed). Top trait label below name (archetype name or "High Openness" etc). Level/XP already inline from prior cleanup.
 
 ### Path Choice
 - [ ] **Fork is right, better copy/framing** — two-button fork is correct but looks bland. Direction: better copy and framing, not visual drama or effects. Try different metaphors in the text. **Deprioritized** — leave for now
   > "Fork is good but not interesting looking" · "Better copy/framing" · "Leave for now"
-- [ ] **Aura glow scales to node count** — tiny starting aura glows way too much. Glow proportional to node count. Few nodes = dim. Big constellation = big glow. Brand new user gets a **tiny seed glow** (promise of growth) — not completely dark, not bright
-  > "A little aura doesn't glow a lot. Only a big aura glows a lot." · "Scale to node count" · "Tiny seed glow (promise of growth)"
+- [x] **Aura glow scales to node count** — SHIPPED: `depthGlow` factor in AuraVisualization. 0 nodes = 0.08 (seed), 1-2 = dim, 3-5 = moderate, 6+ = full. Affects glowRadius and glowIntensity.
 
 ### Assess Picker
 - [x] **Light mode low contrast** — MERGED: solid white cards, stronger borders (0.10 vs 0.06), hero card solid bg
@@ -25,8 +22,7 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
 ### Assessment Flow
 - [x] **Continue to next test after completion** — SHIPPED: 2 recommended next assessments after completing a category. Primary = full gradient CTA button, secondary = soft color-wash card. "What's next" header. ResultCard header dimmed so CTAs win visual hierarchy. Shadow Self slate color boosted to purple-slate for visibility.
   > "We should probably offer them the chance to continue right on to the next test." · "Offer 2"
-- [ ] **Celebration glow clipping** — completion animation glow has hard vertical clip lines on both sides. `blur-3xl` output clipped by ancestor `overflow-hidden` chain. Needs restructuring — possibly render celebration outside the overflow chain, or replace blur with a different glow technique. Dev panel "Celeb" button toggles it for testing.
-  > "The glow is being cut off on the two sides. It has like straight vertical cutoff lines."
+- [x] **Celebration glow clipping** — FIXED: replaced `blur-3xl` div (584px visual footprint on 393px screen) with 320px radial gradient. Same `celebrate-glow` entrance animation, no pixels outside the box to clip. Root cause documented in Constraints below.
 - [x] **Multi-select resolution** — SHIPPED: Sequential yes/no tested and rejected (tedious, broke flow — "are they a family member? are they a neighbor?" felt annoying). Solution: eliminated multi-select where possible, remaining multi-answer questions use radio buttons for distinct visual difference. Radio buttons make it obvious this is a different interaction type. Sticking with this.
   > "Sequential yes/no really didn't work. It was annoying. Radio buttons have a distinct visual difference in the flow. It's more obvious to the user."
 - [x] **Responsive: fix now — buttons dinky on phones** — SHIPPED: responsive pass across assessment screens (`bce0c59`). Touch targets, spacing, scrollbar cleanup.
@@ -44,8 +40,33 @@ Living backlog from Dev Q&A. Items added when Philip answers. Removed when merge
 - [ ] **UX audit later** — looks fine, but ensure right order, right items, easy to use. Revisit when more features land
   > "Fine for now" · "Make sure it's all in the right order and the right things are there and it's easy to use"
 
+### Assess Picker
+- [x] **Profile icon glow clipping** — FIXED: tightened boxShadow from 26px to 18px extent. Fits within header padding now. See Constraints below for root cause.
+
 ### Closed (no action needed)
 - ~~Ghost buttons~~ — discoverable enough as-is
+
+---
+
+## Constraints
+
+Hard-won rules. Check these before designing visual effects.
+
+### No CSS effects that paint outside the box near overflow-hidden
+Every screen root has `overflow-hidden` (for scroll containment and phone-frame corner rounding). CSS `filter: blur()`, large `box-shadow`, and `transform: scale()` all render pixels beyond the element's layout box. Those pixels get hard-clipped — straight vertical/horizontal cut lines.
+
+**Safe alternatives:**
+- `radial-gradient` or `linear-gradient` backgrounds — painted within the box, can't clip
+- SVG `<radialGradient>` fills — contained within the SVG viewport
+- Small `box-shadow` that fits within parent padding (keep spread+blur < available margin)
+- `background-image` with gradient — same as above, stays in-box
+
+**Unsafe (will clip near edges):**
+- `filter: blur()` on any element — visual footprint = element size + ~3x blur radius per side
+- Large `box-shadow` spread near container edges
+- `transform: scale() > 1` on elements near edges
+
+**Rule of thumb:** if the effect needs to extend past the element's box to look right, it will clip. Redesign the effect to stay within bounds.
 
 ---
 
