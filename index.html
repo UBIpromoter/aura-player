@@ -5388,11 +5388,11 @@ const PHONE_SIZES = [
 
 const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devOffset = false }) => {
   const [scale, setScale] = React.useState(1);
+  const [zoom, setZoom] = React.useState(1);
+  const [maxZoom, setMaxZoom] = React.useState(1);
+  const ZOOM_LEVELS = [1, 1.25, 1.5, 'max'];
   React.useEffect(() => {
     const calc = () => {
-      // Physical size approximation: scale frame to match real phone on this monitor
-      // Phones average ~141 CSS px per inch of physical width
-      // Monitor: estimate CSS px/inch from screen width (assumes ~27" viewable)
       const cssPerInch = Math.round(window.screen.width / 23.5);
       const phoneWidthInches = width / 141;
       const physicalScale = (phoneWidthInches * cssPerInch) / width;
@@ -5401,17 +5401,30 @@ const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devO
       const avail = window.innerHeight - outerPad;
       const heightScale = avail < scaledH ? avail / scaledH : 1;
       setScale(physicalScale * heightScale);
+      setMaxZoom(avail / (chromeH * physicalScale));
     };
     calc();
     window.addEventListener('resize', calc);
     return () => window.removeEventListener('resize', calc);
   }, [width, height]);
-  const chromeW = width + 24; // p-3 each side
+  const chromeW = width + 24;
   const chromeH = height + 24;
+  const resolvedZoom = zoom === 'max' ? maxZoom : zoom;
+  const effectiveZoom = scale * resolvedZoom;
   return (
-  <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4"
+  <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-start justify-center pt-3 pb-4 px-4"
     style={devOffset ? { paddingRight: 280 } : undefined}>
-    <div className="relative bg-[#1a1a1c] rounded-[55px] p-3 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))', zoom: scale < 1 ? scale : undefined }}>
+    <div className="fixed top-3 left-3 z-50 flex flex-col gap-1">
+      {ZOOM_LEVELS.map(level => {
+        const active = zoom === level;
+        const label = level === 'max' ? 'Fill' : `${Math.round(level * 100)}%`;
+        return React.createElement('button', { key: String(level), onClick: () => setZoom(level),
+          className: 'px-2.5 py-1 rounded-full text-xs font-medium transition-all',
+          style: { background: active ? 'rgba(96,165,250,0.25)' : 'rgba(255,255,255,0.08)', color: active ? '#60a5fa' : 'rgba(255,255,255,0.45)', border: active ? '1px solid rgba(96,165,250,0.4)' : '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(12px)' }
+        }, label);
+      })}
+    </div>
+    <div className="relative bg-[#1a1a1c] rounded-[55px] p-3 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))', zoom: effectiveZoom < 1 ? effectiveZoom : effectiveZoom > 1 ? effectiveZoom : undefined, transformOrigin: 'top center' }}>
       <div className="absolute -left-[3px] top-[100px] w-[3px] h-[28px] bg-[#2a2a2c] rounded-l-sm" />
       <div className="absolute -left-[3px] top-[145px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
       <div className="absolute -left-[3px] top-[205px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
