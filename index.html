@@ -5390,15 +5390,22 @@ const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devO
   const [scale, setScale] = React.useState(1);
   React.useEffect(() => {
     const calc = () => {
-      const chromeH = height + 24; // p-3 (12 top + 12 bottom)
-      const outerPad = 32;         // p-4 (16 top + 16 bottom) — not scaled
+      // Physical size approximation: scale frame to match real phone on this monitor
+      // Phones average ~141 CSS px per inch of physical width
+      // Monitor: estimate CSS px/inch from screen width (assumes ~27" viewable)
+      const cssPerInch = Math.round(window.screen.width / 23.5);
+      const phoneWidthInches = width / 141;
+      const physicalScale = (phoneWidthInches * cssPerInch) / width;
+      const scaledH = (height + 24) * physicalScale;
+      const outerPad = 32;
       const avail = window.innerHeight - outerPad;
-      setScale(avail < chromeH ? avail / chromeH : 1);
+      const heightScale = avail < scaledH ? avail / scaledH : 1;
+      setScale(physicalScale * heightScale);
     };
     calc();
     window.addEventListener('resize', calc);
     return () => window.removeEventListener('resize', calc);
-  }, [height]);
+  }, [width, height]);
   const chromeW = width + 24; // p-3 each side
   const chromeH = height + 24;
   return (
