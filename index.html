@@ -9171,13 +9171,12 @@ const VISIBILITY_TIERS = {
   locked: { label: 'Locked' }
 };
 
-// StampRow — Compact single-line provider row
+// StampRow — Mobile-friendly two-line card per linked account
 const StampRow = ({ provider, claim, isEmail, isLinked, darkMode, onLink, onUnlink, onVisibilityChange, isTempUnlocked, onTempUnlock, isPrimary, onSetPrimary, onPrimaryTap }) => {
   const [editing, setEditing] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
-  // Track bounce direction for visibility cycle
   const [visDirection, setVisDirection] = useState('up');
 
   const handleSave = async () => {
@@ -9196,7 +9195,6 @@ const StampRow = ({ provider, claim, isEmail, isLinked, darkMode, onLink, onUnli
 
   const handleVisibilityTap = () => {
     const next = VISIBILITY_NEXT(visibility, visDirection);
-    // Update direction for next tap
     if (visibility === 'public') setVisDirection('up');
     else if (visibility === 'locked') setVisDirection('down');
     onVisibilityChange && onVisibilityChange(next);
@@ -9205,13 +9203,14 @@ const StampRow = ({ provider, claim, isEmail, isLinked, darkMode, onLink, onUnli
   // Editing state — inline input
   if (editing) {
     return (
-      <div className={`rounded-lg px-2.5 py-1.5 flex items-center gap-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
-        <div className="w-5 flex items-center justify-center flex-shrink-0">
-          <StampIcon provider={provider} size={14} />
+      <div className={`rounded-xl px-3 py-3 space-y-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
+        <div className="flex items-center gap-2.5">
+          <StampIcon provider={provider} size={18} />
+          <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{provider.name}</span>
         </div>
-        <div className={`flex items-center flex-1 min-w-0 rounded border ${darkMode ? 'bg-white/[0.06] border-white/10' : 'bg-white border-gray-300'}`}>
+        <div className={`flex items-center rounded-lg border ${darkMode ? 'bg-white/[0.06] border-white/10' : 'bg-white border-gray-300'}`}>
           {provider.prefix && (
-            <span className={`text-xs pl-1.5 select-none ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>{provider.prefix}</span>
+            <span className={`text-sm pl-2.5 select-none ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>{provider.prefix}</span>
           )}
           <input
             type="text"
@@ -9221,175 +9220,300 @@ const StampRow = ({ provider, claim, isEmail, isLinked, darkMode, onLink, onUnli
             onFocus={(e) => e.target.select()}
             placeholder={provider.placeholder || 'username'}
             autoFocus
-            className={`text-xs flex-1 min-w-0 px-1 py-1 bg-transparent outline-none ${darkMode ? 'text-white placeholder-gray-600' : 'text-gray-900 placeholder-gray-400'}`}
+            className={`text-sm flex-1 min-w-0 px-2 py-2 bg-transparent outline-none ${darkMode ? 'text-white placeholder-gray-600' : 'text-gray-900 placeholder-gray-400'}`}
           />
         </div>
-        <button onClick={handleSave} disabled={saving || !inputValue.trim()}
-          className={`text-xs px-2 py-0.5 rounded font-medium btn-feedback ${darkMode ? 'bg-emerald-600/30 text-emerald-400 disabled:opacity-30' : 'bg-emerald-100 text-emerald-700 disabled:opacity-30'}`}>
-          {saving ? '...' : 'Save'}
-        </button>
-        <button onClick={() => setEditing(false)}
-          className={`text-xs px-1 btn-feedback ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-          ✕
-        </button>
-      </div>
-    );
-  }
-
-  // Confirm unlink inline
-  if (confirmUnlink) {
-    return (
-      <div className={`rounded-lg px-2.5 py-2 flex items-center gap-2 ${darkMode ? 'bg-red-950/30 border border-red-800/30' : 'bg-red-50 border border-red-200'}`}>
-        <div className="w-5 flex items-center justify-center flex-shrink-0">
-          <StampIcon provider={provider} size={14} />
-        </div>
-        <span className={`text-xs flex-1 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
-          Remove {provider.name}? You'll need to re-link it.
-        </span>
-        <button onClick={() => { setConfirmUnlink(false); onUnlink(); }}
-          className={`text-xs px-2 py-0.5 rounded font-medium btn-feedback ${darkMode ? 'bg-red-600/40 text-red-300' : 'bg-red-100 text-red-700'}`}>
-          Remove
-        </button>
-        <button onClick={() => setConfirmUnlink(false)}
-          className={`text-xs px-1.5 py-0.5 rounded btn-feedback ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-          Keep
-        </button>
-      </div>
-    );
-  }
-
-  // Unlinked — provider name + Link button (right-side aligned with linked rows)
-  if (!isLinked) {
-    return (
-      <div className={`rounded-lg px-2.5 py-2 flex items-center gap-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
-        <div className="w-5 flex items-center justify-center flex-shrink-0 opacity-40">
-          <StampIcon provider={provider} size={14} />
-        </div>
-        <span className={`text-xs flex-1 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
-          {provider.name}
-        </span>
-        <div className="flex items-center justify-end gap-1.5" style={{ minWidth: '8rem' }}>
-          <button onClick={() => { setEditing(true); setInputValue(''); }}
-            className={`text-xs px-2 py-0.5 rounded font-medium btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-500 hover:text-white' : 'bg-gray-100 text-gray-400 hover:text-gray-700'}`}>
-            + Link
+        <div className="flex gap-2">
+          <button onClick={handleSave} disabled={saving || !inputValue.trim()}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-emerald-600/30 text-emerald-400 disabled:opacity-30' : 'bg-emerald-100 text-emerald-700 disabled:opacity-30'}`}>
+            {saving ? '...' : 'Save'}
+          </button>
+          <button onClick={() => setEditing(false)}
+            className={`px-4 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+            Cancel
           </button>
         </div>
       </div>
     );
   }
 
-  // Linked — compact single line with fixed-width columns: SR | Visibility | ↗ | ✕/★
+  // Confirm unlink
+  if (confirmUnlink) {
+    return (
+      <div className={`rounded-xl px-3 py-3 space-y-2.5 ${darkMode ? 'bg-red-950/30 border border-red-800/30' : 'bg-red-50 border border-red-200'}`}>
+        <div className="flex items-center gap-2.5">
+          <StampIcon provider={provider} size={18} />
+          <span className={`text-sm flex-1 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+            Remove {provider.name}?
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => { setConfirmUnlink(false); onUnlink(); }}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-red-600/40 text-red-300' : 'bg-red-100 text-red-700'}`}>
+            Remove
+          </button>
+          <button onClick={() => setConfirmUnlink(false)}
+            className={`flex-1 py-2 rounded-lg text-sm btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+            Keep
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Unlinked — provider name + Link button
+  if (!isLinked) {
+    return (
+      <button onClick={() => { setEditing(true); setInputValue(''); }}
+        className={`w-full rounded-xl px-3 py-3 flex items-center gap-3 btn-feedback ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'}`}>
+        <div className="opacity-40"><StampIcon provider={provider} size={18} /></div>
+        <span className={`text-sm flex-1 text-left ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>{provider.name}</span>
+        <span className={`text-xs font-medium ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>+ Link</span>
+      </button>
+    );
+  }
+
+  // Linked — two-line card: name row + action row
   const isVerified = isEmail || claim.proof_status === 'verified';
   const isLocked = visibility === 'locked';
   return (
-    <div className={`rounded-lg px-2.5 py-2 flex items-center gap-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
-      <div className="w-5 flex items-center justify-center flex-shrink-0">
-        <StampIcon provider={provider} size={14} />
-      </div>
-      <span className={`text-xs font-medium flex-1 min-w-0 truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-        {formatStampDisplay(provider.id, claim.value) || claim.label || provider.name}
-      </span>
-      {/* Fixed right columns: SR/✓ | Visibility | ↗ | ✕/★ */}
-      <div className="flex items-center gap-1 flex-shrink-0">
-        {/* Col 1: SR / ✓ */}
-        <span className={`text-[11px] w-5 text-center ${isVerified ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-gray-600' : 'text-gray-400')}`}>
-          {isVerified ? '✓' : 'SR'}
+    <div className={`rounded-xl px-3 py-3 space-y-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-white border border-gray-200'}`}>
+      {/* Row 1: Icon + value + primary badge */}
+      <div className="flex items-center gap-2.5">
+        <StampIcon provider={provider} size={18} />
+        <span className={`text-sm font-medium flex-1 min-w-0 truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+          {formatStampDisplay(provider.id, claim.value) || claim.label || provider.name}
         </span>
-        {/* Col 2: Visibility label — always fixed width */}
-        {isPrimary ? (
-          <span className={`text-[10px] w-[3rem] text-center py-0.5 rounded font-medium ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Public</span>
-        ) : !isEmail ? (
+        {isVerified && <span className={`text-xs ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>✓</span>}
+        {isPrimary && (
+          <span
+            className={`text-xs font-medium select-none ${darkMode ? 'text-amber-400' : 'text-amber-500'}`}
+            onContextMenu={(e) => { e.preventDefault(); onPrimaryTap && onPrimaryTap(); }}
+            onTouchStart={(e) => {
+              const timer = setTimeout(() => { onPrimaryTap && onPrimaryTap(); }, 600);
+              e.target._lpTimer = timer;
+            }}
+            onTouchEnd={(e) => { clearTimeout(e.target._lpTimer); }}
+            onTouchMove={(e) => { clearTimeout(e.target._lpTimer); }}
+          >★ Primary</span>
+        )}
+      </div>
+      {/* Row 2: Actions — only for non-primary, non-email */}
+      {isPrimary ? null : !isEmail ? (
+        <div className="flex items-center gap-2">
           <button onClick={handleVisibilityTap}
-            className={`text-[10px] w-[3rem] text-center py-0.5 rounded font-medium btn-feedback ${
-              isLocked ? (darkMode ? 'text-red-500' : 'text-red-600')
-              : isHidden ? (darkMode ? 'text-amber-500' : 'text-amber-600')
-              : (darkMode ? 'text-emerald-500' : 'text-emerald-600')
-            }`}
-            title="Tap to change visibility">
+            className={`text-xs px-2.5 py-1 rounded-lg font-medium btn-feedback ${
+              isLocked ? (darkMode ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600')
+              : isHidden ? (darkMode ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-600')
+              : (darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600')
+            }`}>
             {visTier.label}
           </button>
-        ) : (
-          <div className="w-[3rem]" />
-        )}
-        {/* Col 3: Share-once circle — fixed slot, visible on non-public rows */}
-        {!isPrimary && !isEmail && isHidden ? (
-          <button onClick={() => onTempUnlock && onTempUnlock(provider.id)}
-            className={`w-5 h-5 rounded-full flex items-center justify-center btn-feedback transition-colors ${
-              isTempUnlocked
-                ? isLocked
-                  ? (darkMode ? 'bg-red-500 text-white' : 'bg-red-500 text-white')
-                  : (darkMode ? 'bg-orange-500 text-white' : 'bg-orange-500 text-white')
-                : (darkMode ? 'border border-gray-700 text-gray-600 hover:border-gray-500' : 'border border-gray-300 text-gray-400 hover:border-gray-400')
-            }`}
-            title={isTempUnlocked ? 'Shared for this session' : 'Share once'}>
-            <span className="text-[9px] leading-none">↗</span>
-          </button>
-        ) : (
-          <div className="w-5" />
-        )}
-        {/* Col 4: ★ (primary) or ✕ (unlink) — far right */}
-        {isPrimary ? (
-          <button onClick={() => onPrimaryTap && onPrimaryTap()}
-            className={`text-[11px] w-5 text-center btn-feedback ${darkMode ? 'text-amber-400' : 'text-amber-500'}`}
-            title="Change primary">
-            ★
-          </button>
-        ) : !isEmail ? (
+          {isHidden && (
+            <button onClick={() => onTempUnlock && onTempUnlock(provider.id)}
+              className={`text-xs px-2.5 py-1 rounded-lg font-medium btn-feedback ${
+                isTempUnlocked
+                  ? (darkMode ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-100 text-violet-700')
+                  : (darkMode ? 'bg-white/[0.06] text-gray-500' : 'bg-gray-100 text-gray-400')
+              }`}>
+              {isTempUnlocked ? '✓ Shared' : 'Share once'}
+            </button>
+          )}
+          <div className="flex-1" />
           <button onClick={() => setConfirmUnlink(true)}
-            className={`text-xs w-5 text-center btn-feedback ${darkMode ? 'text-gray-700 hover:text-red-400' : 'text-gray-300 hover:text-red-500'}`}>
-            ✕
+            className={`text-xs px-2.5 py-1 rounded-lg btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-600 hover:text-red-400' : 'bg-gray-100 text-gray-300 hover:text-red-500'}`}>
+            Remove
           </button>
-        ) : <div className="w-5" />}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+// IdentityScreen — Full stamp management with sharing
+const IdentityScreen = ({ darkMode, userClaims, onClaimsChange, assessCompleted, entityType, displayName, onBack }) => {
+  const [tempUnlocked, setTempUnlocked] = useState({});
+  const [showUnlinked, setShowUnlinked] = useState(false);
+  const [choosingPrimary, setChoosingPrimary] = useState(false);
+  const toggleTempUnlock = (providerId) => {
+    setTempUnlocked(prev => ({ ...prev, [providerId]: !prev[providerId] }));
+  };
+
+  const primaryClaim = (userClaims || []).find(c => c.weight === 1);
+  const primaryClaimId = primaryClaim?.id || null;
+
+  const handleSetPrimary = (claimId) => {
+    const user = getCurrentUser();
+    if (!user) return;
+    const prev = userClaims || [];
+    const optimistic = prev.map(c => ({
+      ...c,
+      weight: c.id === claimId ? 1 : 0,
+      visibility: c.id === claimId ? 'public' : c.visibility
+    }));
+    onClaimsChange(optimistic);
+    setPrimaryClaim(user.id, claimId).then(ok => {
+      if (!ok) onClaimsChange(prev);
+    });
+  };
+
+  const claimsByProvider = {};
+  (userClaims || []).forEach(c => { claimsByProvider[c.provider] = c; });
+  const linked = STAMP_PROVIDERS.filter(p => !!claimsByProvider[p.id]).sort((a, b) => a.priority - b.priority);
+  const unlinked = STAMP_PROVIDERS.filter(p => !claimsByProvider[p.id]).sort((a, b) => a.priority - b.priority);
+  const noneLinked = linked.length === 0;
+
+  const renderStampRow = (provider) => {
+    const claim = claimsByProvider[provider.id];
+    const isEmail = provider.id === 'email';
+    const isLinked = !!claim;
+    return (
+      <StampRow
+        key={provider.id}
+        provider={provider}
+        claim={claim}
+        isEmail={isEmail}
+        isLinked={isLinked}
+        darkMode={darkMode}
+        isPrimary={!!claim && claim.id === primaryClaimId}
+        onSetPrimary={handleSetPrimary}
+        onPrimaryTap={() => setChoosingPrimary(!choosingPrimary)}
+        onLink={async (value) => {
+          const user = getCurrentUser();
+          if (!user) return;
+          const displayLabel = formatStampDisplay(provider.id, value) || provider.name;
+          const result = await createAccountClaim(user.id, provider.id, displayLabel, value);
+          if (result) {
+            const optimistic = [...(userClaims || []), result];
+            onClaimsChange(optimistic);
+            updateProfileSummary(user.id, assessCompleted, optimistic, entityType);
+          }
+        }}
+        onUnlink={() => {
+          const user = getCurrentUser();
+          if (!user || !claim) return;
+          const prev = userClaims || [];
+          const optimistic = prev.filter(c => c.id !== claim.id);
+          onClaimsChange(optimistic);
+          removeClaim(claim.id, user.id).then(ok => {
+            if (ok) {
+              updateProfileSummary(user.id, assessCompleted, optimistic, entityType);
+            } else {
+              onClaimsChange(prev);
+            }
+          });
+        }}
+        onVisibilityChange={(newVisibility) => {
+          const user = getCurrentUser();
+          if (!user || !claim) return;
+          const prev = userClaims || [];
+          const optimistic = prev.map(c => c.id === claim.id ? { ...c, visibility: newVisibility } : c);
+          onClaimsChange(optimistic);
+          updateClaimVisibility(claim.id, user.id, newVisibility).then(ok => {
+            if (ok) {
+              updateProfileSummary(user.id, assessCompleted, optimistic, entityType);
+            } else {
+              onClaimsChange(prev);
+            }
+          });
+        }}
+        isTempUnlocked={!!tempUnlocked[provider.id]}
+        onTempUnlock={toggleTempUnlock}
+      />
+    );
+  };
+
+  return (
+    <div className={`flex-1 flex flex-col overflow-hidden ${darkMode ? 'text-white bg-gray-950' : 'text-gray-900 bg-gray-50'}`}>
+      <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
+        <button onClick={onBack} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
+        <span className="font-medium flex-1">Identity</span>
+        {getCurrentUser() && <SharePicker darkMode={darkMode} userId={getCurrentUser().id}
+          userClaims={userClaims} displayName={displayName} assessmentCount={Object.keys(assessCompleted).length}
+          tempUnlocked={tempUnlocked}
+          onSetPrimary={handleSetPrimary}
+          onMakePublic={(claimId) => {
+            const user = getCurrentUser();
+            if (!user) return;
+            const prev = userClaims || [];
+            const optimistic = prev.map(c => c.id === claimId ? { ...c, visibility: 'public' } : c);
+            onClaimsChange(optimistic);
+            setTempUnlocked(p => {
+              const next = { ...p };
+              const claim = prev.find(c => c.id === claimId);
+              if (claim) delete next[claim.provider];
+              return next;
+            });
+            updateClaimVisibility(claimId, user.id, 'public').then(ok => {
+              if (!ok) onClaimsChange(prev);
+            });
+          }}
+        />}
+      </div>
+      <div className="flex-1 p-4 overflow-y-auto space-y-3">
+        {/* Email display */}
+        {getCurrentEmail() && (
+          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{getCurrentEmail()}</div>
+        )}
+
+        {/* Linked accounts */}
+        <div className="space-y-2">
+          <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Linked Accounts</div>
+          {linked.map(renderStampRow)}
+          {/* Inline primary picker */}
+          {choosingPrimary && linked.length > 1 && (
+            <div className={`rounded-xl px-3 py-3 space-y-2 ${darkMode ? 'bg-amber-950/20 border border-amber-800/20' : 'bg-amber-50 border border-amber-200'}`}>
+              <div className={`text-xs font-medium ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Choose primary identity</div>
+              {linked.filter(p => {
+                const c = claimsByProvider[p.id];
+                return c && c.id !== primaryClaimId;
+              }).map(p => {
+                const c = claimsByProvider[p.id];
+                return (
+                  <button key={p.id} onClick={() => { handleSetPrimary(c.id); setChoosingPrimary(false); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg btn-feedback text-left ${darkMode ? 'bg-white/[0.04] hover:bg-white/[0.08]' : 'bg-white hover:bg-amber-50'}`}>
+                    <StampIcon provider={p} size={18} />
+                    <span className={`text-sm flex-1 truncate ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {formatStampDisplay(p.id, c.value) || c.label || p.name}
+                    </span>
+                    <span className={`text-xs ${darkMode ? 'text-amber-400/60' : 'text-amber-500/60'}`}>☆</span>
+                  </button>
+                );
+              })}
+              <button onClick={() => setChoosingPrimary(false)}
+                className={`text-xs w-full text-center py-1.5 rounded-lg btn-feedback ${darkMode ? 'text-gray-500 bg-white/[0.04]' : 'text-gray-400 bg-gray-100'}`}>
+                Cancel
+              </button>
+            </div>
+          )}
+          {/* Unlinked stamps */}
+          {unlinked.length > 0 && (noneLinked ? (
+            unlinked.map(renderStampRow)
+          ) : (
+            <>
+              <button onClick={() => setShowUnlinked(!showUnlinked)}
+                className={`w-full text-left text-sm px-3 py-2.5 rounded-xl btn-feedback ${darkMode ? 'text-gray-500 hover:text-gray-300 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06]' : 'text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200'}`}>
+                {showUnlinked ? '− Hide unlinked' : `+ Link account (${unlinked.length} available)`}
+              </button>
+              {showUnlinked && unlinked.map(renderStampRow)}
+            </>
+          ))}
+        </div>
       </div>
     </div>
   );
 };
 
-// ProfileScreen — Unified hub with personality + stats
+// ProfileScreen — Clean hub with personality + assessments
 const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType, onboardingAnswers, onNavigate, userClaims, onClaimsChange }) => {
-  const answeredList = Object.entries(responses).map(([id, r]) => ({ id: parseInt(id), ...r }));
-  const answered = answeredList.length;
-  const avgConf = answered > 0 ? (answeredList.reduce((s, r) => s + r.confidence, 0) / answered).toFixed(1) : '—';
-
   // Display name editing
   const [profileDisplayName, setProfileDisplayName] = useState(getDisplayName);
   const [editingProfileName, setEditingProfileName] = useState(false);
   const [profileNameInput, setProfileNameInput] = useState('');
   const [profileNameSaving, setProfileNameSaving] = useState(false);
 
-  // Temp unlock — session-only state for sharing private/locked stamps
-  const [tempUnlocked, setTempUnlocked] = useState({});
-  // Collapse unlinked stamps behind toggle
-  const [showUnlinked, setShowUnlinked] = useState(false);
-  const toggleTempUnlock = (providerId) => {
-    setTempUnlocked(prev => ({ ...prev, [providerId]: !prev[providerId] }));
-  };
-
-  // Primary stamp — the user's public identity
+  // Primary stamp — for identity card display
   const primaryClaim = (userClaims || []).find(c => c.weight === 1);
-  const primaryClaimId = primaryClaim?.id || null;
-  const [choosingPrimary, setChoosingPrimary] = useState(false);
-  const handleSetPrimary = async (claimId) => {
-    const user = getCurrentUser();
-    if (!user) return;
-    const ok = await setPrimaryClaim(user.id, claimId);
-    if (ok) {
-      const claims = await loadUserClaims(user.id);
-      onClaimsChange(claims);
-    }
-  };
-
-  // Auto-fix: if primary claim exists but visibility isn't public, sync it
-  useEffect(() => {
-    if (primaryClaim && primaryClaim.visibility !== 'public') {
-      const user = getCurrentUser();
-      if (user) {
-        updateClaimVisibility(primaryClaim.id, user.id, 'public').then(ok => {
-          if (ok) loadUserClaims(user.id).then(claims => onClaimsChange(claims));
-        });
-      }
-    }
-  }, [primaryClaimId]);
 
   useEffect(() => {
     const handler = (e) => setProfileDisplayName(e.detail?.displayName || null);
@@ -9442,24 +9566,6 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
       <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
         <button onClick={() => onNavigate('categories')} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
         <span className="font-medium flex-1">Profile</span>
-        {getCurrentUser() && <SharePicker darkMode={darkMode} userId={getCurrentUser().id}
-          userClaims={userClaims} displayName={profileDisplayName} assessmentCount={Object.keys(assessCompleted).length}
-          tempUnlocked={tempUnlocked}
-          onSetPrimary={handleSetPrimary}
-          onMakePublic={async (claimId) => {
-            const user = getCurrentUser();
-            if (!user) return;
-            await updateClaimVisibility(claimId, user.id, 'public');
-            const claims = await loadUserClaims(user.id);
-            onClaimsChange(claims);
-            setTempUnlocked(prev => {
-              const next = { ...prev };
-              // Clear temp unlock for any claim that's now public
-              claims.forEach(c => { if (c.id === claimId) delete next[c.provider]; });
-              return next;
-            });
-          }}
-        />}
       </div>
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
         {/* Avatar with aura glow + basic stats */}
@@ -9521,40 +9627,6 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
               }
               return null;
             })()}
-            {profileDisplayName && getCurrentEmail() && <div className={`text-xs ${TH('text-faint', darkMode)}`}>{getCurrentEmail()}</div>}
-            {/* Profile Depth — inline in user card */}
-            {(() => {
-              const tier = calculateAssessTier(assessCompleted);
-              const done = getCompletedCategoryCount(assessCompleted, entityType);
-              const total = getVisibleCategoryCount(tier, entityType);
-              if (total === 0) return null;
-              const pct = Math.round((done / total) * 100);
-              return (
-                <div className="mt-1.5">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className={`text-[11px] ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Profile Depth</span>
-                    <span className={`text-[11px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{done}/{total}</span>
-                  </div>
-                  <div className={`h-1 rounded-full ${darkMode ? 'bg-white/[0.06]' : 'bg-gray-200'}`}>
-                    <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })()}
-            {/* Inline stat line */}
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <span className={`text-xs font-medium ${darkMode ? 'text-violet-400' : 'text-violet-600'}`}>Lv.{stats.level || 1}</span>
-              <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>·</span>
-              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{stats.xp || 0} XP</span>
-              <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>·</span>
-              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{answered} answered</span>
-              <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>·</span>
-              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{avgConf} avg conf</span>
-              {stats.streak > 0 && <>
-                <span className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>·</span>
-                <span className="text-xs text-orange-400">{stats.streak}d streak</span>
-              </>}
-            </div>
           </div>
         </div>
 
@@ -9587,109 +9659,27 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
           </div>
         </button>
 
-        {/* Stamps — linked accounts shown, unlinked collapsed behind toggle */}
+        {/* Primary Identity — compact card with Manage link */}
         {getCurrentUser() && (() => {
-          const claimsByProvider = {};
-          (userClaims || []).forEach(c => { claimsByProvider[c.provider] = c; });
-          const linked = STAMP_PROVIDERS.filter(p => !!claimsByProvider[p.id]).sort((a, b) => a.priority - b.priority);
-          const unlinked = STAMP_PROVIDERS.filter(p => !claimsByProvider[p.id]).sort((a, b) => a.priority - b.priority);
-          const noneLinked = linked.length === 0;
-
-          const renderStampRow = (provider) => {
-            const claim = claimsByProvider[provider.id];
-            const isEmail = provider.id === 'email';
-            const isLinked = !!claim;
-            return (
-              <StampRow
-                key={provider.id}
-                provider={provider}
-                claim={claim}
-                isEmail={isEmail}
-                isLinked={isLinked}
-                darkMode={darkMode}
-                isPrimary={!!claim && claim.id === primaryClaimId}
-                onSetPrimary={handleSetPrimary}
-                onPrimaryTap={() => setChoosingPrimary(!choosingPrimary)}
-                onLink={async (value) => {
-                  const user = getCurrentUser();
-                  if (!user) return;
-                  const displayLabel = formatStampDisplay(provider.id, value) || provider.name;
-                  const result = await createAccountClaim(user.id, provider.id, displayLabel, value);
-                  if (result) {
-                    const claims = await loadUserClaims(user.id);
-                    onClaimsChange(claims);
-                    updateProfileSummary(user.id, assessCompleted, claims, entityType);
-                  }
-                }}
-                onUnlink={async () => {
-                  const user = getCurrentUser();
-                  if (!user || !claim) return;
-                  const ok = await removeClaim(claim.id, user.id);
-                  if (ok) {
-                    const claims = await loadUserClaims(user.id);
-                    onClaimsChange(claims);
-                    updateProfileSummary(user.id, assessCompleted, claims, entityType);
-                  }
-                }}
-                onVisibilityChange={async (newVisibility) => {
-                  const user = getCurrentUser();
-                  if (!user || !claim) return;
-                  const ok = await updateClaimVisibility(claim.id, user.id, newVisibility);
-                  if (ok) {
-                    const claims = await loadUserClaims(user.id);
-                    onClaimsChange(claims);
-                    updateProfileSummary(user.id, assessCompleted, claims, entityType);
-                  }
-                }}
-                isTempUnlocked={!!tempUnlocked[provider.id]}
-                onTempUnlock={toggleTempUnlock}
-              />
-            );
-          };
-
+          const primaryDisplay = primaryClaim
+            ? (formatStampDisplay(primaryClaim.provider, primaryClaim.value) || primaryClaim.label || primaryClaim.provider)
+            : getCurrentEmail();
+          const primaryProvider = primaryClaim
+            ? STAMP_PROVIDERS.find(p => p.id === primaryClaim.provider)
+            : STAMP_PROVIDERS.find(p => p.id === 'email');
+          const linkedCount = (userClaims || []).length;
           return (
-            <div className="space-y-1">
-              <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Linked Accounts</div>
-              {linked.map(renderStampRow)}
-              {/* Inline primary picker — shown when ★ tapped */}
-              {choosingPrimary && linked.length > 1 && (
-                <div className={`rounded-lg px-2.5 py-2 space-y-1 ${darkMode ? 'bg-amber-950/20 border border-amber-800/20' : 'bg-amber-50 border border-amber-200'}`}>
-                  <div className={`text-[11px] font-medium ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Change primary identity</div>
-                  {linked.filter(p => {
-                    const c = claimsByProvider[p.id];
-                    return c && c.id !== primaryClaimId;
-                  }).map(p => {
-                    const c = claimsByProvider[p.id];
-                    return (
-                      <button key={p.id} onClick={async () => { await handleSetPrimary(c.id); setChoosingPrimary(false); }}
-                        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded btn-feedback text-left ${darkMode ? 'hover:bg-white/[0.04]' : 'hover:bg-amber-100/60'}`}>
-                        <StampIcon provider={p} size={14} />
-                        <span className={`text-xs flex-1 truncate ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          {formatStampDisplay(p.id, c.value) || c.label || p.name}
-                        </span>
-                        <span className={`text-[11px] ${darkMode ? 'text-amber-400/60' : 'text-amber-500/60'}`}>☆</span>
-                      </button>
-                    );
-                  })}
-                  <button onClick={() => setChoosingPrimary(false)}
-                    className={`text-[11px] w-full text-center py-0.5 btn-feedback ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
-                    Cancel
-                  </button>
-                </div>
-              )}
-              {/* Unlinked: show all if none linked, otherwise behind toggle */}
-              {unlinked.length > 0 && (noneLinked ? (
-                unlinked.map(renderStampRow)
-              ) : (
-                <>
-                  <button onClick={() => setShowUnlinked(!showUnlinked)}
-                    className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg btn-feedback ${darkMode ? 'text-gray-500 hover:text-gray-300 bg-white/[0.02] hover:bg-white/[0.04]' : 'text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100'}`}>
-                    {showUnlinked ? '− Hide unlinked' : `+ Link account (${unlinked.length} available)`}
-                  </button>
-                  {showUnlinked && unlinked.map(renderStampRow)}
-                </>
-              ))}
-            </div>
+            <button
+              onClick={() => onNavigate('identity')}
+              className={`w-full rounded-xl px-3 py-2.5 flex items-center gap-3 text-left ${darkMode ? 'bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.15]' : 'bg-white border border-gray-200 hover:border-gray-300'}`}
+            >
+              {primaryProvider && <StampIcon provider={primaryProvider} size={16} />}
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{primaryDisplay}</div>
+                {linkedCount > 1 && <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{linkedCount} linked accounts</div>}
+              </div>
+              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Manage →</span>
+            </button>
           );
         })()}
 
@@ -12197,55 +12187,6 @@ const QuestionFlowScreen = ({
                   );
                 })()}
               </div>
-              {/* Undo toast — inline below answer buttons */}
-              {pendingSubmit && (() => {
-                const undoColor = isBinary
-                  ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
-                  : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
-                const answerLabel = isBinary
-                  ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
-                  : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
-                return (
-                  <div className="px-4 mt-2">
-                    <div
-                      onClick={handleUndo}
-                      className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3"
-                      style={{
-                        background: darkMode
-                          ? `rgba(${undoColor.rgb}, 0.15)`
-                          : `rgba(${undoColor.rgb}, 0.12)`,
-                        border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
-                      }}
-                    >
-                      <div className="flex-shrink-0 w-7 h-7 relative">
-                        <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
-                          <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
-                          <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
-                            strokeDasharray="75.4"
-                            strokeDashoffset="0"
-                            style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
-                          />
-                        </svg>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {answerLabel}
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleUndo(); }}
-                        className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
-                        style={{
-                          background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
-                          color: undoColor.hex,
-                        }}
-                      >
-                        Undo
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
 
               {/* Action buttons row — always rendered, invisible during pending to preserve layout */}
               <div className={`relative px-4 mt-3 mb-2 flex items-center justify-center resp-max-w mx-auto ${(isAnswered || pendingSubmit) ? 'invisible' : ''}`}>
@@ -13859,6 +13800,12 @@ function App() {
           if (opts?.testId) setAssessCurrentTestId(opts.testId);
           setScreen(scr);
         }} />
+    );
+
+    if (screen === 'identity') return (
+      <IdentityScreen darkMode={darkMode} userClaims={userClaims} onClaimsChange={setUserClaims}
+        assessCompleted={assessCompleted} entityType={entityType} displayName={displayName}
+        onBack={() => setScreen('profile')} />
     );
 
     if (screen === 'history') return (
