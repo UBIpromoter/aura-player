@@ -46,7 +46,7 @@
   Verification
   ············
   "VERIFICATION DATA LAYER"    Mock subjects, storage, helpers
-  "VERIFICATION COMPONENTS"    VerifySubjectCard, VerifyCompare, full flow
+  "VERIFICATION COMPONENTS"    VerifyHub, VerifyEvaluatorFlow, VerifyExpertForm (Express), VerifyEvalSummary
 
   Extracted Screen Components
   ···························
@@ -2978,6 +2978,7 @@ const ASSESS_SCALES = {
     { v: 4, l: 'Likely' }, { v: 5, l: 'Definitely' },
   ],
   iq: null, // Custom options per question - handled in UI
+  gateway: null, // Custom branching options per question - handled in UI
 };
 
 // ==================== ASSESSMENTS ====================
@@ -3347,25 +3348,74 @@ const ASSESS_TESTS = {
     ]
   },
 
-  // Quick Profile - Gateway assessment (10 questions, ~90 seconds)
+  // Quick Profile - Gateway assessment (3→5 branching, ~60 seconds)
+  // Scale: gateway — custom 3-option answers with trait scoring + verify signals
+  // Q1-Q3: everyone sees. Q4-Q5: branch based on Q1 answer.
+  // Branching logic: Q1 option 0 = introverted, 1 = ambivalent, 2 = extroverted
   'quick-profile': {
     name: 'Quick Profile',
     icon: '✨',
     color: 'blue',
-    scale: 'likeme',
+    scale: 'gateway',
     tier: 0,
-    description: 'Who are you in 2 minutes?',
+    questionCount: 5, // 3 core + 2 branched (user always sees 5)
+    description: 'Who are you in 60 seconds?',
     items: [
-      { q: "At a party, I'm usually one of the last to leave", c: 'E', k: '+' },
-      { q: "Too much socializing drains me", c: 'E', k: '-' },
-      { q: "I keep my commitments even when I don't feel like it", c: 'C', k: '+' },
-      { q: "I start more projects than I finish", c: 'C', k: '-' },
-      { q: "When someone near me is anxious, I feel it too", c: 'A', k: '+' },
-      { q: "I say uncomfortable truths others avoid", c: 'A', k: '-' },
-      { q: "I overthink things that haven't happened yet", c: 'N', k: '+' },
-      { q: "The unconventional appeals to me more than the traditional", c: 'O', k: '+' },
-      { q: "I trust my gut more than analysis", c: 'intuition', k: '+' },
-      { q: "I'd rather have three close friends than thirty acquaintances", c: 'depth', k: '+' },
+      // --- Core 3 (everyone) ---
+      // Q0: Energy source → E dimension + branching key
+      { q: "After a long week, what sounds best?",
+        o: ["Quiet time to recharge", "Depends on my mood", "Going out with people"],
+        traits: { E: [20, 50, 85] },
+        branch: 'energy' },
+      // Q1: Social depth → A dimension + verify social graph signal
+      { q: "The people closest to me really know me",
+        o: ["Definitely — they get me", "A few do", "I keep most people at a distance"],
+        traits: { A: [80, 55, 25] },
+        verify: 'socialDepth' },
+      // Q2: Consistency → C dimension + verify uniqueness signal
+      { q: "I'm a creature of habit — same routines, same accounts, same spots",
+        o: ["That's me", "Somewhat", "I like to mix it up"],
+        traits: { C: [80, 50, 25] },
+        verify: 'consistency' },
+
+      // --- Branch: introverted (Q0 = 0) ---
+      // Q3a: Inner world → N dimension
+      { q: "My mind tends to replay things — conversations, decisions, what-ifs",
+        o: ["All the time", "Sometimes", "Rarely — I move on quick"],
+        traits: { N: [80, 50, 20] },
+        branchIf: { energy: 0 } },
+      // Q4a: Curiosity → O dimension + verify availability signal
+      { q: "I'd rather go deep on one thing than skim across many",
+        o: ["Absolutely", "Depends on the topic", "I like variety"],
+        traits: { O: [30, 55, 80] },
+        branchIf: { energy: 0 },
+        verify: 'depth' },
+
+      // --- Branch: ambivalent (Q0 = 1) ---
+      // Q3b: Adaptability → O + N dimensions
+      { q: "I adjust how I act depending on who I'm with",
+        o: ["A lot — I'm a chameleon", "A little", "Not really — I'm the same with everyone"],
+        traits: { O: [70, 50, 35], N: [55, 40, 25] },
+        branchIf: { energy: 1 } },
+      // Q4b: Inner compass → C dimension
+      { q: "When plans fall apart, I usually...",
+        o: ["Roll with it — could be better this way", "Get a little stressed, then adapt", "Need a minute — I like knowing what's next"],
+        traits: { C: [30, 55, 80], N: [20, 50, 75] },
+        branchIf: { energy: 1 },
+        verify: 'adaptability' },
+
+      // --- Branch: extroverted (Q0 = 2) ---
+      // Q3c: Social confidence → E + A dimensions
+      { q: "In a group, I'm usually the one who...",
+        o: ["Gets things started", "Goes with the flow", "Listens and observes"],
+        traits: { E: [90, 60, 35], A: [50, 70, 60] },
+        branchIf: { energy: 2 } },
+      // Q4c: Risk + openness → O dimension + verify availability signal
+      { q: "A stranger invites you to something that sounds fun but unfamiliar",
+        o: ["I'm in — life's short", "Maybe — tell me more first", "Probably not — I stick with what I know"],
+        traits: { O: [85, 55, 20] },
+        branchIf: { energy: 2 },
+        verify: 'openToContact' },
     ]
   },
   // ==================== AI-NATIVE ASSESSMENT ====================
@@ -4594,7 +4644,12 @@ const getAssessNudge = (completedTestId, newCompleted, entityType) => {
 const ASSESS_DEMO_PROFILES = {
   1: {
     name: 'Alex', desc: 'Confident exterior, sensitive soul', color: 'violet',
-    'quick-profile': [4, 2, 4, 3, 4, 3, 4, 3, 3, 4],
+    claims: [
+      { provider: 'email', value: 'alex@aura.example', weight: 1, proof: 'verified' },
+      { provider: 'linkedin', value: 'alexdemo', weight: 0, proof: 'self-reported' },
+      { provider: 'github', value: 'alex-dev', weight: 0, proof: 'self-reported' },
+    ],
+    'quick-profile': { 0: 1, 1: 1, 2: 1, 3: 2, 4: 1 },  // introverted branch
     'starter-personality': [4, 4, 3, 4, 2, 2, 2, 4, 4],
     'starter-motivation': [4, 3, 4, 4, 2, 3, 2, 4],
     'starter-thinking': [4, 4, 3, 4, 2, 4, 2, 3],
@@ -4609,7 +4664,11 @@ const ASSESS_DEMO_PROFILES = {
   },
   2: {
     name: 'Bob', desc: 'Laid back genius', color: 'teal',
-    'quick-profile': [2, 4, 3, 4, 5, 2, 2, 5, 4, 5],
+    claims: [
+      { provider: 'email', value: 'bob@aura.example', weight: 1, proof: 'verified' },
+      { provider: 'x', value: '@bobchill', weight: 0, proof: 'self-reported' },
+    ],
+    'quick-profile': { 0: 3, 1: 2, 2: 3, 8: 1, 9: 1 },  // extroverted branch
     'starter-personality': [2, 3, 4, 2, 4, 4, 2, 5, 2],
     'starter-motivation': [2, 2, 4, 2, 4, 2, 4, 3],
     'starter-thinking': [3, 5, 4, 5, 2, 3, 3, 2],
@@ -4624,7 +4683,13 @@ const ASSESS_DEMO_PROFILES = {
   },
   3: {
     name: 'Cindy', desc: 'Lucky optimist, loving life', color: 'pink',
-    'quick-profile': [5, 1, 2, 4, 5, 2, 1, 3, 4, 3],
+    claims: [
+      { provider: 'email', value: 'cindy@aura.example', weight: 1, proof: 'verified' },
+      { provider: 'instagram', value: '@cindysunshine', weight: 0, proof: 'self-reported' },
+      { provider: 'facebook', value: 'cindydemo', weight: 0, proof: 'self-reported' },
+      { provider: 'linkedin', value: 'cindypro', weight: 0, proof: 'self-reported' },
+    ],
+    'quick-profile': { 0: 2, 1: 1, 2: 2, 5: 1, 6: 2 },  // ambivalent branch
     'starter-personality': [5, 2, 5, 1, 4, 1, 1, 3, 1],
     'starter-motivation': [3, 2, 3, 3, 4, 2, 3, 5],
     'starter-thinking': [2, 3, 4, 3, 3, 4, 4, 4],
@@ -4828,24 +4893,41 @@ const calculateAssessResults = (testId, resp) => {
     // Map to percentile-style labels
     results.level = results.score >= 92 ? 'Exceptional' : results.score >= 75 ? 'Above Average' : results.score >= 50 ? 'Average' : 'Developing';
   } else if (testId === 'quick-profile') {
-    // Quick Profile: simple trait scoring for personality snapshot
-    const traitScores = {};
+    // Gateway assessment: 3→5 branching with per-option trait scores
+    // Determine which items the user actually saw (core 3 + 2 branched)
+    const branchKey = resp[0] !== undefined ? resp[0] - 1 : null; // 0-indexed branch from Q0
+    const traitSums = {};
     const traitCounts = {};
+    const verifySignals = {};
     test.items.forEach((item, i) => {
-      if (resp[i] && resp[i] !== null && item.c) {
-        let value = resp[i];
-        if (item.k === '-') value = 6 - value;
-        traitScores[item.c] = (traitScores[item.c] || 0) + value;
-        traitCounts[item.c] = (traitCounts[item.c] || 0) + 1;
+      const answer = resp[i];
+      if (answer === undefined || answer === null) return;
+      // Skip items from other branches
+      if (item.branchIf) {
+        const [bKey, bVal] = Object.entries(item.branchIf)[0];
+        if (bKey === 'energy' && branchKey !== bVal) return;
+      }
+      const optIdx = answer - 1; // resp is 1-indexed
+      if (item.traits) {
+        for (const [trait, scores] of Object.entries(item.traits)) {
+          if (scores[optIdx] !== undefined) {
+            traitSums[trait] = (traitSums[trait] || 0) + scores[optIdx];
+            traitCounts[trait] = (traitCounts[trait] || 0) + 1;
+          }
+        }
+      }
+      if (item.verify) {
+        verifySignals[item.verify] = optIdx; // 0=first option, 1=middle, 2=last
       }
     });
     results.traits = {};
-    for (const c in traitScores) {
-      results.traits[c] = Math.round((traitScores[c] / (traitCounts[c] * 5)) * 100);
+    for (const t in traitSums) {
+      results.traits[t] = Math.round(traitSums[t] / traitCounts[t]);
     }
     // Overall score (average of Big Five traits only)
-    const bigFiveTraits = ['E', 'A', 'C', 'N', 'O'].filter(t => results.traits[t]);
+    const bigFiveTraits = ['E', 'A', 'C', 'N', 'O'].filter(t => results.traits[t] != null);
     results.score = bigFiveTraits.length > 0 ? Math.round(bigFiveTraits.reduce((a, t) => a + results.traits[t], 0) / bigFiveTraits.length) : 50;
+    results.verifySignals = verifySignals;
     results.responses = resp;
   } else if (test.parent === 'starter') {
     // Starter Pack v4.3: score by construct
@@ -5288,8 +5370,9 @@ const TraitSpectrum = ({ name, score, lowLabel, highLabel, color = 'violet', com
 const AssessProgressCircle = ({ testId, test, assessCompleted, assessInProgress, darkMode, size = 48, strokeWidth = 3, iconSize, textSize }) => {
   const isCompleted = assessCompleted[testId];
   const progress = assessInProgress[testId];
-  const answered = isCompleted ? test.items.length : progress ? Object.keys(progress.responses || {}).length : 0;
-  const progressPct = (answered / test.items.length) * 100;
+  const qCount = test.questionCount || test.items.length;
+  const answered = isCompleted ? qCount : progress ? Object.keys(progress.responses || {}).length : 0;
+  const progressPct = (answered / qCount) * 100;
   return (
     <ProgressCircle
       progress={progressPct}
@@ -5386,15 +5469,15 @@ const PHONE_SIZES = [
   { id: 'galaxy', label: 'Galaxy S24', w: 360, h: 780 },
 ];
 
-const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devOffset = false }) => {
+const PhoneFrame = ({ children, darkMode = true, width = 440, height = 956, devOffset = false }) => {
   const [scale, setScale] = React.useState(1);
-  const [zoom, setZoom] = React.useState(1);
+  const [zoom, setZoom] = React.useState(1.2);
   const [maxZoom, setMaxZoom] = React.useState(1);
-  const ZOOM_LEVELS = [1, 1.25, 1.5, 'max'];
+  const ZOOM_LEVELS = [1, 1.2, 1.5, 'max'];
   React.useEffect(() => {
     const calc = () => {
-      const cssPerInch = Math.round(window.screen.width / 23.5);
-      const phoneWidthInches = width / 141;
+      const cssPerInch = Math.round(window.screen.width / 23.49); // LG 27UN850-W: 23.49" active width
+      const phoneWidthInches = width / 153; // iPhone 15 Pro: 460ppi / 3x retina = 153 logical PPI
       const physicalScale = (phoneWidthInches * cssPerInch) / width;
       const scaledH = (height + 24) * physicalScale;
       const outerPad = 32;
@@ -5407,8 +5490,8 @@ const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devO
     window.addEventListener('resize', calc);
     return () => window.removeEventListener('resize', calc);
   }, [width, height]);
-  const chromeW = width + 24;
-  const chromeH = height + 24;
+  const chromeW = width + 28; // 14px bezel per side — matches iPhone 16 Pro Max
+  const chromeH = height + 28;
   const resolvedZoom = zoom === 'max' ? maxZoom : zoom;
   const effectiveZoom = scale * resolvedZoom;
   return (
@@ -5424,7 +5507,7 @@ const PhoneFrame = ({ children, darkMode = true, width = 393, height = 852, devO
         }, label);
       })}
     </div>
-    <div className="relative bg-[#1a1a1c] rounded-[55px] p-3 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))', zoom: effectiveZoom < 1 ? effectiveZoom : effectiveZoom > 1 ? effectiveZoom : undefined, transformOrigin: 'top center' }}>
+    <div className="relative bg-[#1a1a1c] rounded-[58px] p-3.5 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))', zoom: effectiveZoom < 1 ? effectiveZoom : effectiveZoom > 1 ? effectiveZoom : undefined, transformOrigin: 'top center' }}>
       <div className="absolute -left-[3px] top-[100px] w-[3px] h-[28px] bg-[#2a2a2c] rounded-l-sm" />
       <div className="absolute -left-[3px] top-[145px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
       <div className="absolute -left-[3px] top-[205px] w-[3px] h-[50px] bg-[#2a2a2c] rounded-l-sm" />
@@ -7479,62 +7562,18 @@ const verifyLoadFromStorage = () => {
   try { const s = localStorage.getItem(VERIFY_STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; }
 };
 
-const VERIFY_SUBJECT_QUESTIONS = [
-  /* S1: Basics */
-  { id: 's1-name', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What name do you go by?', type: 'text', placeholder: 'Your name' },
-  { id: 's1-country', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What country or region?', type: 'single',
-    options: ['United States', 'Europe', 'South America', 'Southeast Asia', 'India', 'Africa', 'Middle East', 'Other'] },
-  { id: 's1-city', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What city or area?', type: 'text', placeholder: 'City or area' },
-  { id: 's1-source', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'How did you find Aura?', type: 'single',
-    options: ['A friend told me about it', 'Just checking it out', 'I want to prove my identity', 'I want to become an Aura player'] },
-  { id: 's1-referrer', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'Who told you about Aura?', type: 'text', placeholder: 'Their name or username',
-    conditional: (a) => a['s1-source'] === 'A friend told me about it' },
-  { id: 's1-account-type', section: 'S1', sectionLabel: 'Basics', color: 'violet', text: 'What brings you here?', type: 'single',
-    options: ['Setting up a new account', 'Recovering an account I lost access to', 'Replacing an old account with a new one'] },
-  /* S2: Connections */
-  { id: 's2-social', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Connect your social accounts to find people you already know', type: 'multi',
-    subtitle: 'Not for auto-verification — gives evaluators a map.',
-    options: ['LinkedIn', 'Facebook'] },
-  { id: 's2-delight', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: '__DELIGHT__', type: 'delight',
-    conditional: (a) => Array.isArray(a['s2-social']) && a['s2-social'].length > 0 },
-  { id: 's2-contacts', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Want us to check your contacts too?', type: 'single',
-    subtitle: 'We only check for matches with Aura users. Nothing is stored or shared.',
-    options: ['Sure, check my contacts', 'No thanks'],
-    conditional: (a) => Array.isArray(a['s2-social']) && a['s2-social'].length > 0 },
-  { id: 's2-know-anyone', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Do you know anyone already using Aura?', type: 'single',
-    options: ["I'm sure they're here", "I think they might be", "No, I don't know anyone"],
-    conditional: (a) => !Array.isArray(a['s2-social']) || a['s2-social'].length === 0 },
-  { id: 's2-connection-name', section: 'S2', sectionLabel: 'Connections', color: 'blue', text: 'Who?', type: 'text', placeholder: 'Their name or username',
-    conditional: (a) => a['s2-know-anyone'] === "I'm sure they're here" || a['s2-know-anyone'] === "I think they might be" },
-  /* S3: Attestation */
-  { id: 's3-attest', section: 'S3', sectionLabel: 'Account', color: 'emerald', text: 'Do you have any other accounts in Aura or BrightID?', type: 'single',
-    subtitle: "One person, one account — that's how Aura stays fair. If you have an old account, an Aura player can help you sort it out.",
-    options: ['Nope, this is my only one', "Yes, I have an old one I don't use", "I'm not sure"] },
-  /* S4: Availability */
-  { id: 's4-availability', section: 'S4', sectionLabel: 'Availability', color: 'teal', text: '__AVAILABILITY__', type: 'availability' },
-];
+// VerifyProfileFields removed — data collected through dual-purpose gateway questions + verify onboarding flow
 
-/* Evaluator shared question fragments */
-const VERIFY_Q_REAL_HUMAN = {
-  text: 'Is this a real, biological person?', type: 'single',
-  subtitle: 'Not AI, not virtual, not a deepfake.',
-  options: ['Definitely', 'I believe so', 'I have some doubt']
-};
-const VERIFY_Q_ONLY_ACCOUNT = {
-  text: 'Think this is their only account?', type: 'single',
-  options: ["Almost certainly", "Probably", 'Not totally sure', 'I suspect they have another']
-};
-const VERIFY_Q_SYBIL = {
-  text: 'Could they pull off a double life?',
-  subtitle: 'None of these are bad things. They just make it easier in theory.',
-  type: 'single',
-  options: ['Nah — one community, deeply rooted', 'Maybe — they move in different worlds', 'Probably — savvy, mobile, and well-connected']
-};
-const VERIFY_Q_RED_FLAGS = {
-  text: 'Anything feel off?',
-  subtitle: 'Trust your gut here.',
-  type: 'single',
-  options: ['All good — nothing weird', 'A little — minor stuff', 'Yeah — something felt off']
+/* Evaluator shared: identity check — 3 questions on one screen */
+const VERIFY_IDENTITY_CHECK = {
+  type: 'identity-check',
+  text: 'Identity check',
+  fields: [
+    { id: 'double-life', label: 'Could they game the system?', subtitle: 'Ability to pass off a sybil',
+      options: ['Unlikely', 'Maybe', 'Likely'] },
+    { id: 'only-account', label: 'Do you believe they only have one account?',
+      options: ['Yes', 'Unsure', 'Doubt it'] },
+  ],
 };
 
 const VERIFY_CONFIDENCE_LABELS = [
@@ -7545,52 +7584,44 @@ const VERIFY_CONFIDENCE_LABELS = [
 ];
 
 const VERIFY_PATH_A_QUESTIONS = [
-  { id: 'a1-relationship', text: 'How do you know them?', type: 'single',
-    options: ['Family', 'Friend', 'Colleague', 'Neighbor', 'Community member', 'Other'] },
-  { id: 'a1-duration', text: 'How long have you known them?', type: 'single', options: ['Less than 1 year', '1-5 years', '5+ years'] },
-  { id: 'a1-last-interact', text: 'When did you last interact?', type: 'single', options: ['This week', 'This month', 'This year', 'Longer'] },
-  { id: 'a2a', ...VERIFY_Q_REAL_HUMAN },
-  { id: 'a2b', ...VERIFY_Q_ONLY_ACCOUNT },
-  { id: 'a2c', ...VERIFY_Q_SYBIL },
-  { id: 'a3-verdict', text: "What's the verdict?\nOne real person, one account here?", type: 'verdict',
-    verdictOptions: ['Yes', 'No'] },
-  { id: 'a4-doubt', text: "What makes you hesitate?", type: 'multi', subtitle: 'Toggle all that apply.',
-    options: ["Time — haven't seen them in a while", 'Limited — only know them in one context', "Gut feeling — something feels off", 'Other'],
-    conditional: (a) => { const v = a['a3-verdict'] || {}; return v.verdict === 'No' || (v.confidence !== undefined && v.confidence <= 2); } },
+  { id: 'a1-connection', text: 'Tell us about your connection', type: 'compact-connection',
+    fields: [
+      { id: 'a1-relationship', label: 'Relationship', options: ['Family', 'Friend', 'Colleague', 'Neighbor', 'Community', 'Other'] },
+      { id: 'a1-duration', label: 'How long', options: ['< 1 year', '1–5 years', '5+ years'] },
+      { id: 'a1-last-interact', label: 'Last contact', options: ['Recently', 'This year', 'Longer'] },
+    ]},
+  { id: 'a2-identity', ...VERIFY_IDENTITY_CHECK },
+  { id: 'a3-verdict', text: "Do you endorse this as this person's\none unique account?", type: 'verdict',
+    verdictOptions: ['Yes', 'No'],
+    flags: ["Haven't seen them in a while", 'Only know one context', 'Something feels off', 'Other'] },
 ];
 
 const VERIFY_PATH_B_QUESTIONS = [
   { id: 'b1-how-meet', text: 'How did you meet?', type: 'single', options: ['In person', 'Video call', 'Text-chat only'] },
   { id: 'b1-who-init', text: 'Who initiated?', type: 'single', options: ['They came to me', 'I reached out', 'Mutual'] },
   { id: 'b1-context', text: 'Brief context — where and when?', type: 'text', placeholder: 'e.g. Coffee shop downtown, last Tuesday' },
-  { id: 'b2-evidence-direct', text: 'What did you directly observe?', type: 'multi', subtitle: 'Toggle all that apply (max 5).', maxSelect: 5,
-    options: ['Physically present — clearly a real person', 'Specific details — talked about their life naturally', 'Recognized — others at the scene knew them', 'Hard to fake — showed something convincing', 'Nothing — I couldn\'t directly verify'] },
-  { id: 'b2-evidence-support', text: 'Any supporting evidence?', type: 'multi', subtitle: 'Toggle all that apply (max 5).', maxSelect: 5,
-    options: ['Social graph — looks authentic', 'Connections — already in Aura', 'Referral — from someone I trust', 'Profile — matches what I observed', 'Nothing — no supporting evidence'] },
-  { id: 'b3-red-flags', ...VERIFY_Q_RED_FLAGS },
-  { id: 'b4a', text: 'Is this a real, biological person?', type: 'single', subtitle: 'Not AI, not virtual, not a deepfake.',
-    options: ['Definitely', 'I believe so', 'I have some doubt'],
-    dynamicOptions: (a) => a['b1-how-meet'] === 'In person' ? ['Definitely', 'I believe so'] : ['Definitely', 'I believe so', 'I have some doubt'] },
-  { id: 'b4b', ...VERIFY_Q_ONLY_ACCOUNT },
-  { id: 'b4c', ...VERIFY_Q_SYBIL },
-  { id: 'b5-verdict', text: "What's the verdict?\nOne real person, one account here?", type: 'verdict',
-    verdictOptions: ['Yes', 'No'] },
-  { id: 'b6-doubt', text: "What makes you hesitate?", type: 'multi', subtitle: 'Toggle all that apply.',
-    options: ["Only met once — not much to go on", "One context — don't know the full picture", "Guarded — kept things close to the vest", "Capable — smart enough to game things", "Gut feeling — something feels off", 'Other'],
-    conditional: (a) => { const v = a['b5-verdict'] || {}; return v.verdict === 'No' || (v.confidence !== undefined && v.confidence <= 2); } },
+  { id: 'b2-evidence', text: 'What evidence do you have?', type: 'evidence-combined',
+    sections: [
+      { label: 'Directly observed', options: ['Physically present — clearly a real person', 'Specific details — talked about their life naturally', 'Recognized — others at the scene knew them', 'Hard to fake — showed something convincing', 'Nothing direct'] },
+      { label: 'Supporting evidence', options: ['Social graph — looks authentic', 'Connections — already in Aura', 'Referral — from someone I trust', 'Profile — matches what I observed', 'Nothing supporting'] },
+    ]},
+  { id: 'b3-identity', ...VERIFY_IDENTITY_CHECK },
+  { id: 'b4-verdict', text: "Do you endorse this as this person's\none unique account?", type: 'verdict',
+    verdictOptions: ['Yes', 'No'],
+    flags: ['Only met once', 'One context only', 'Kept things guarded', 'Could game the system', 'Something feels off', 'Other'] },
 ];
 
 const VERIFY_PATH_C_QUESTIONS = [
   { id: 'c1-sources', text: 'What are you working from?', type: 'multi', subtitle: 'Toggle all that apply.',
     options: ['Self-attestation', 'Connections — social graph imports', "Evaluators — other people's assessments", 'Referral chain', 'Activity history', 'Other'] },
   { id: 'c2-looks-real', text: 'Does this profile look like a real, unique person?', type: 'star-confidence' },
-  { id: 'c3-strongest', text: "Strongest signal?", type: 'single',
+  { id: 'c3-strongest', text: "Strongest signals?", type: 'multi', subtitle: 'Pick up to two.', maxSelect: 2,
     options: ['Connections — rich, verified network', 'Self-attestation — believable story', 'Evaluators — multiple already confident', 'Referral chain — strong and traceable', 'Other'] },
-  { id: 'c3-weakest', text: "Biggest gap?", type: 'single',
+  { id: 'c3-weakest', text: "Biggest gaps?", type: 'multi', subtitle: 'Pick up to two.', maxSelect: 2,
     options: ['Connections — thin network', 'Verification — no in-person check', 'History — new profile, little activity', 'Attestation — generic, nothing specific', 'Other'] },
-  { id: 'c4-red-flags', ...VERIFY_Q_RED_FLAGS },
-  { id: 'c6-verdict', text: "What's the verdict?\nOne real person, one account here?", type: 'verdict',
-    verdictOptions: ['Yes', 'No'] },
+  { id: 'c4-verdict', text: "Do you endorse this as this person's\none unique account?", type: 'verdict',
+    verdictOptions: ['Yes', 'No'],
+    flags: ['Thin profile', 'Looks like other fakes', 'Something feels off', 'Other'] },
 ];
 
 const VERIFY_PATH_CONFIG = {
@@ -7604,15 +7635,63 @@ const VERIFY_MOCK_SUBJECTS = [
     availability: { video: true, meet: true, vouch: true } },
   { id: 'mock-2', name: 'Priya Sharma', city: 'Bangalore', country: 'India', connections: 8,
     availability: { video: true, meet: false, vouch: true } },
-  { id: 'mock-3', name: 'Marcus Chen', city: 'Toronto', country: 'Other', connections: 0, availability: null },
-  { id: 'mock-4', name: 'Sofia Andersson', city: 'Stockholm', country: 'Europe', connections: 22,
+  { id: 'mock-3', name: 'Marcus Chen', city: 'Toronto', country: 'Canada', connections: 0, availability: null },
+  { id: 'mock-4', name: 'Sofia Andersson', city: 'Stockholm', country: 'Sweden', connections: 22,
     availability: { video: true, meet: true, vouch: true } },
+  { id: 'mock-5', name: 'Jordan Lee', city: 'Austin, TX', country: 'United States', connections: 5,
+    availability: { video: true, meet: false, vouch: false } },
+  { id: 'mock-6', name: 'Aisha Okafor', city: 'Lagos', country: 'Nigeria', connections: 31,
+    availability: { video: true, meet: true, vouch: true } },
+  { id: 'mock-7', name: 'David Kowalski', city: 'Berlin', country: 'Germany', connections: 11,
+    availability: { video: true, meet: true, vouch: false } },
+  { id: 'mock-8', name: 'Luna Martinez', city: 'Mexico City', country: 'Mexico', connections: 3,
+    availability: { video: false, meet: false, vouch: true } },
 ];
 
 // ==================== VERIFICATION COMPONENTS ====================
 
+// Shared: VerifySubjectBanner — who you're evaluating
+const VerifySubjectBanner = ({ subject, color, darkMode }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!subject) return null;
+  const c = COLOR_HEX[color] || COLOR_HEX.emerald;
+  return (
+    <div className="w-full mb-3">
+      <button onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-200"
+        style={{
+          background: darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+          border: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+        }}>
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+          style={{ background: `rgba(${c.rgb}, 0.2)`, color: darkMode ? c.light : c.base }}>
+          {subject.name[0]}
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{subject.name}</div>
+          <div className={`text-xs truncate ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>
+            {subject.city}{subject.connections > 0 ? ` · ${subject.connections} connections` : ''}
+          </div>
+        </div>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+          className={`flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          style={{ color: darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)' }}>
+          <path d="M3 4.5L6 7.5L9 4.5" />
+        </svg>
+      </button>
+      {expanded && subject.availability && (
+        <div className="flex gap-2 mt-1.5 px-1" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
+          {subject.availability.video && <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? 'bg-white/[0.06] text-white/40' : 'bg-gray-100 text-gray-500'}`}>Video</span>}
+          {subject.availability.meet && <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? 'bg-white/[0.06] text-white/40' : 'bg-gray-100 text-gray-500'}`}>In-person</span>}
+          {subject.availability.vouch && <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? 'bg-white/[0.06] text-white/40' : 'bg-gray-100 text-gray-500'}`}>Has voucher</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Shared: VerifyScreenLayout — split layout with ambient glow, content top, buttons bottom
-const VerifyScreenLayout = ({ darkMode, color, sectionLabel, progress, total, onBack, children, buttons }) => {
+const VerifyScreenLayout = ({ darkMode, color, sectionLabel, progress, total, onBack, children, buttons, subject }) => {
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
   return (
     <div className={`flex-1 flex flex-col relative overflow-hidden ${TH('bg-main', darkMode)}`}>
@@ -7646,35 +7725,33 @@ const VerifyScreenLayout = ({ darkMode, color, sectionLabel, progress, total, on
       )}
       <div className="relative z-10 flex flex-col h-full w-full">
         <div className="flex-1 overflow-y-auto flex flex-col items-center w-full">
-          <div className="w-full max-w-sm mx-auto px-5 pt-14 pb-4 flex flex-col items-center">
-            {sectionLabel && (() => {
+          <div className="w-full max-w-sm mx-auto px-5 pt-12 pb-4 flex flex-col items-center">
+            {(sectionLabel || (progress !== undefined && total !== undefined)) && (() => {
               const sc = COLOR_HEX[color] || COLOR_HEX.violet;
-              return (
-                <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium mb-3"
-                  style={{
-                    background: darkMode ? `rgba(${sc.rgb}, 0.12)` : `rgba(${sc.rgb}, 0.08)`,
-                    color: darkMode ? sc.light : sc.base,
-                    border: `1px solid ${darkMode ? `rgba(${sc.rgb}, 0.2)` : `rgba(${sc.rgb}, 0.15)`}`
-                  }}>
-                  {sectionLabel}
-                </div>
-              );
-            })()}
-            {(progress !== undefined && total !== undefined) && (() => {
-              const pc = COLOR_HEX[color] || COLOR_HEX.violet;
               const pct = total > 0 ? ((progress + 1) / total) * 100 : 0;
               return (
-                <div className="w-full max-w-sm mx-auto mb-4">
-                  <div className={`flex justify-between text-xs mb-1.5 ${TH('text-subtle', darkMode)}`}>
-                    <span>{progress + 1} of {total}</span>
-                  </div>
-                  <div className={`h-1 rounded-full overflow-hidden ${darkMode ? 'bg-white/[0.06]' : 'bg-black/[0.06]'}`}>
-                    <div className="h-full rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${pc.base}, ${pc.light})` }} />
-                  </div>
+                <div className="flex items-center gap-3 w-full mb-3">
+                  {sectionLabel && (
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0 whitespace-nowrap"
+                      style={{
+                        background: darkMode ? `rgba(${sc.rgb}, 0.12)` : `rgba(${sc.rgb}, 0.08)`,
+                        color: darkMode ? sc.light : sc.base,
+                        border: `1px solid ${darkMode ? `rgba(${sc.rgb}, 0.2)` : `rgba(${sc.rgb}, 0.15)`}`
+                      }}>
+                      {sectionLabel}
+                    </div>
+                  )}
+                  {(progress !== undefined && total !== undefined) && (<>
+                    <div className={`flex-1 h-1 rounded-full overflow-hidden ${darkMode ? 'bg-white/[0.06]' : 'bg-black/[0.06]'}`}>
+                      <div className="h-full rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${sc.base}, ${sc.light})` }} />
+                    </div>
+                    <span className={`text-xs font-medium flex-shrink-0 tabular-nums ${TH('text-subtle', darkMode)}`}>{progress + 1}/{total}</span>
+                  </>)}
                 </div>
               );
             })()}
+            {subject && <VerifySubjectBanner subject={subject} color={color} darkMode={darkMode} />}
             {children}
           </div>
         </div>
@@ -7729,7 +7806,7 @@ const VerifyOptionButton = ({ label, selected, color, darkMode, onClick }) => {
   const parts = dashRe.test(label) ? label.split(dashRe) : null;
   return (
     <button onClick={onClick}
-      className={`w-full rounded-2xl text-left px-5 transition-all duration-200 hover-glow hover-glow-${color} ${parts ? 'py-3' : 'h-14 resp-h-lg font-medium resp-text-md'}`}
+      className={`w-full rounded-2xl text-left px-4 transition-all duration-200 hover-glow hover-glow-${color} ${parts ? 'py-3' : 'h-14 resp-h-lg font-medium resp-text-md'}`}
       style={{
         background: selected
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.25), rgba(${c.rgb}, 0.12))`
@@ -7759,25 +7836,28 @@ const VerifyStarConfidence = ({ color, darkMode, value, onChange }) => {
       <div className="flex items-start justify-center gap-5">
         {[1, 2, 3, 4].map(level => {
           const isSelected = value !== undefined && level <= value;
-          const intensity = [0.2, 0.35, 0.5, 0.7][level - 1];
-          const glowSize = [8, 12, 16, 24][level - 1];
-          const borderAlpha = [0.3, 0.4, 0.55, 0.7][level - 1];
+          const isCurrent = value === level;
+          const intensity = [0.25, 0.4, 0.55, 0.75][level - 1];
+          const glowSize = [12, 18, 24, 32][level - 1];
+          const borderAlpha = [0.35, 0.45, 0.6, 0.75][level - 1];
           return (
             <button key={level} onClick={() => onChange(level)} className="flex flex-col items-center gap-2 transition-all duration-200">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300"
+              <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300"
                 style={{
                   background: isSelected
                     ? `linear-gradient(135deg, rgba(${c.rgb}, ${intensity}), rgba(${c.rgb}, ${intensity * 0.5}))`
                     : darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                   border: isSelected
-                    ? `1px solid rgba(${c.rgb}, ${borderAlpha})`
+                    ? `1.5px solid rgba(${c.rgb}, ${borderAlpha})`
                     : darkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
                   color: isSelected ? '#fff' : (darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'),
-                  boxShadow: isSelected ? `0 0 ${glowSize}px rgba(${c.rgb}, ${intensity * 0.6})` : 'none',
+                  boxShadow: isSelected
+                    ? `0 0 ${glowSize}px rgba(${c.rgb}, ${intensity * 0.5}), 0 0 ${glowSize * 2}px rgba(${c.rgb}, ${intensity * 0.15})${isCurrent ? `, inset 0 0 8px rgba(255,255,255,0.15)` : ''}`
+                    : 'none',
                 }}>
                 {level}
               </div>
-              <span className="text-[10px] font-medium transition-colors duration-200"
+              <span className="text-xs font-medium transition-colors duration-200"
                 style={{ color: isSelected ? (darkMode ? c.light : c.base) : (darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)') }}>
                 {labels[level - 1]}
               </span>
@@ -7799,15 +7879,21 @@ const VerifyStarConfidence = ({ color, darkMode, value, onChange }) => {
   );
 };
 
-// Shared: VerifyVerdict — combined yes/no + confidence on one screen
+// Shared: VerifyVerdict — yes/no + confidence + expandable flags
 const VerifyVerdict = ({ question, color, darkMode, answer, onAnswer }) => {
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
   const val = answer || {};
   const verdict = val.verdict;
   const confidence = val.confidence;
+  const flags = val.flags || [];
+  const [showFlags, setShowFlags] = useState(false);
   const setField = (field, v) => onAnswer({ ...val, [field]: v });
+  const toggleFlag = (flag) => {
+    const next = flags.includes(flag) ? flags.filter(f => f !== flag) : [...flags, flag];
+    onAnswer({ ...val, flags: next });
+  };
   return (
-    <div className="flex flex-col items-center gap-6 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+    <div className="flex flex-col items-center gap-5 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
       <div className="flex gap-3 w-full">
         {(question.verdictOptions || ['Yes', 'No']).map((opt, i) => {
           const isYes = i === 0;
@@ -7837,6 +7923,48 @@ const VerifyVerdict = ({ question, color, darkMode, answer, onAnswer }) => {
           <VerifyStarConfidence color={color} darkMode={darkMode} value={confidence} onChange={v => setField('confidence', v)} />
         </div>
       )}
+      {verdict && question.flags && (
+        <div className="w-full" style={{ animation: 'fadeSlideIn 0.3s ease-out both 0.1s' }}>
+          <button onClick={() => setShowFlags(!showFlags)}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-200`}
+            style={{
+              background: (showFlags || flags.length > 0)
+                ? (darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)')
+                : (darkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)'),
+              border: flags.length > 0
+                ? `1px solid rgba(${(COLOR_HEX.amber || c).rgb}, 0.3)`
+                : (darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'),
+            }}>
+            <span className={`text-sm font-medium ${flags.length > 0 ? (darkMode ? 'text-amber-400' : 'text-amber-600') : TH('text-muted', darkMode)}`}>
+              {flags.length > 0 ? `${flags.length} concern${flags.length > 1 ? 's' : ''} flagged` : 'Anything feel off?'}
+            </span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+              className={`transition-transform duration-200 ${showFlags ? 'rotate-180' : ''}`}
+              style={{ color: darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>
+              <path d="M3 4.5L6 7.5L9 4.5" />
+            </svg>
+          </button>
+          {showFlags && (
+            <div className="mt-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', animation: 'fadeSlideIn 0.2s ease-out both' }}>
+              {question.flags.map(flag => {
+                const isOn = flags.includes(flag);
+                const ac = COLOR_HEX.amber || c;
+                return (
+                  <button key={flag} onClick={() => toggleFlag(flag)}
+                    className="px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-center"
+                    style={{
+                      background: isOn ? `rgba(${ac.rgb}, 0.2)` : (darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.025)'),
+                      border: isOn ? `1px solid rgba(${ac.rgb}, 0.4)` : (darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)'),
+                      color: isOn ? (darkMode ? '#fbbf24' : '#d97706') : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)'),
+                    }}>
+                    {flag}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -7845,7 +7973,7 @@ const VerifyVerdict = ({ question, color, darkMode, answer, onAnswer }) => {
 const VerifySingleSelect = ({ question, color, darkMode, answer, onAnswer, answers }) => {
   const opts = question.dynamicOptions ? question.dynamicOptions(answers || {}) : question.options;
   return (
-    <div className="flex flex-col gap-3 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+    <div className="flex flex-col gap-2 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
       {opts.map((opt) => (
         <VerifyOptionButton key={opt} label={opt} selected={answer === opt} color={color} darkMode={darkMode} onClick={() => onAnswer(opt)} />
       ))}
@@ -7868,7 +7996,7 @@ const VerifyMultiToggle = ({ question, color, darkMode, answer, onAnswer }) => {
     else { onAnswer(next); }
   };
   return (
-    <div className="flex flex-col gap-3 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+    <div className="flex flex-col gap-2 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
       {question.options.map((opt) => (
         <VerifyToggleSwitch key={opt} label={opt} color={color} darkMode={darkMode}
           isOn={selected.includes(opt)} onToggle={() => toggle(opt)} />
@@ -7877,7 +8005,7 @@ const VerifyMultiToggle = ({ question, color, darkMode, answer, onAnswer }) => {
         <input type="text" value={otherText}
           onChange={e => onAnswer({ items: selected, otherText: e.target.value })}
           placeholder="Please specify..."
-          className={`w-full h-12 rounded-2xl px-5 text-sm font-medium outline-none ${TH('bg-input', darkMode)}`}
+          className={`w-full h-12 rounded-2xl px-4 text-sm font-medium outline-none ${TH('bg-input', darkMode)}`}
           style={{ borderColor: `rgba(${c.rgb}, 0.3)` }} autoFocus />
       )}
     </div>
@@ -7907,7 +8035,7 @@ const VerifyToggleSwitch = ({ label, subtitle, color, darkMode, isOn, onToggle }
   const c = COLOR_HEX[color] || COLOR_HEX.violet;
   return (
     <button onClick={onToggle}
-      className={`w-full flex items-center justify-between rounded-2xl px-5 py-4 transition-all duration-200 hover-glow hover-glow-${color}`}
+      className={`w-full flex items-center justify-between rounded-2xl px-4 py-3.5 transition-all duration-200 hover-glow hover-glow-${color}`}
       style={{
         background: isOn
           ? `linear-gradient(135deg, rgba(${c.rgb}, 0.2), rgba(${c.rgb}, 0.08))`
@@ -7916,7 +8044,7 @@ const VerifyToggleSwitch = ({ label, subtitle, color, darkMode, isOn, onToggle }
           ? `1px solid rgba(${c.rgb}, 0.35)`
           : darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
       }}>
-      <div className="text-left pr-4 flex-1">
+      <div className="text-left pr-3 flex-1">
         {(() => { const dashRe = / [—\u2014] /; const p = dashRe.test(label) ? label.split(dashRe) : null;
           return p ? (<><span className={`text-sm font-semibold block ${darkMode ? 'text-white/90' : 'text-gray-900'}`}>{p[0]}</span>
             <span className={`text-xs block mt-0.5 ${darkMode ? 'text-white/45' : 'text-gray-500'}`}>{p[1]}</span></>)
@@ -7924,331 +8052,381 @@ const VerifyToggleSwitch = ({ label, subtitle, color, darkMode, isOn, onToggle }
         })()}
         {subtitle && <span className={`text-xs block mt-0.5 ${darkMode ? 'text-white/35' : 'text-gray-400'}`}>{subtitle}</span>}
       </div>
-      <div className="w-12 h-7 rounded-full relative transition-all duration-200 flex-shrink-0"
+      <div className="w-11 h-6 rounded-full relative transition-all duration-200 flex-shrink-0"
         style={{ background: isOn ? `rgba(${c.rgb}, 0.5)` : darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
-        <div className="absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all duration-200 shadow-sm"
-          style={{ left: isOn ? '22px' : '2px' }} />
+        <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 shadow-sm"
+          style={{ left: isOn ? '21px' : '2px' }} />
       </div>
     </button>
   );
 };
 
-// VerifyHub — landing: choose Subject or Evaluator path
-const VerifyHub = ({ darkMode, onSubject, onEvaluator, onBack, subjectProfile }) => {
-  const vc = COLOR_HEX.violet;
-  const ec = COLOR_HEX.emerald;
+// VerifyHub — evaluation queue with search, expert toggle, and history
+const VerifyHub = ({ darkMode, onBack, subjects, evaluations, onSelect, onViewCompleted, expertMode, setExpertMode, completedCount }) => {
+  const c = COLOR_HEX.emerald;
+  const [search, setSearch] = useState('');
+  const [showAllCompleted, setShowAllCompleted] = useState(false);
+  const [showAllPending, setShowAllPending] = useState(false);
+  const PENDING_COLLAPSE = 3;
+  const pending = subjects.filter(s => !evaluations[s.id])
+    .sort((a, b) => {
+      // Priority: more connections + more availability = higher priority
+      const avail = s => (s.availability ? [s.availability.video, s.availability.meet, s.availability.vouch].filter(Boolean).length : 0);
+      const scoreA = (a.connections || 0) + avail(a) * 10;
+      const scoreB = (b.connections || 0) + avail(b) * 10;
+      return scoreB - scoreA;
+    });
+  const completed = subjects.filter(s => !!evaluations[s.id]);
+  const filtered = search.trim()
+    ? subjects.filter(s => s.name.toLowerCase().includes(search.toLowerCase()) || s.city.toLowerCase().includes(search.toLowerCase()))
+    : null;
+  const showList = filtered || (showAllPending ? pending : pending.slice(0, PENDING_COLLAPSE));
+
+  const SubjectCard = ({ subject, isDone }) => {
+    const sc = isDone ? COLOR_HEX.emerald : COLOR_HEX.violet;
+    return (
+      <button onClick={() => isDone ? (onViewCompleted && onViewCompleted(subject.id)) : onSelect(subject.id)}
+        className={`w-full rounded-2xl p-3.5 text-left transition-all duration-200 hover-glow hover-glow-${isDone ? 'emerald' : 'violet'}`}
+        style={{
+          background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+          border: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+        }}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+            style={{ background: `rgba(${sc.rgb}, 0.2)`, color: darkMode ? sc.light : sc.base }}>
+            {subject.name[0]}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className={`text-sm font-semibold ${TH('text-primary', darkMode)}`}>{subject.name}</div>
+            <div className={`text-xs ${TH('text-subtle', darkMode)}`}>
+              {subject.city}{subject.connections > 0 ? ` · ${subject.connections} connections` : ''}
+            </div>
+          </div>
+          {isDone ? (
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>Done</span>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+              className="flex-shrink-0" style={{ color: darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)' }}>
+              <path d="M5 2L10 7L5 12" />
+            </svg>
+          )}
+        </div>
+      </button>
+    );
+  };
+
   return (
     <div className={`flex-1 flex flex-col relative overflow-hidden ${TH('bg-main', darkMode)}`}>
+      {/* Ambient glow */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-12%' }}>
         <div style={{
           position: 'absolute', width: 420, height: 420, borderRadius: '50%',
           background: darkMode
-            ? `radial-gradient(circle, rgba(${COLOR_HEX.blue.rgb}, 0.14) 0%, rgba(${COLOR_HEX.blue.rgb}, 0.06) 35%, transparent 65%)`
-            : `radial-gradient(circle, rgba(${COLOR_HEX.blue.rgb}, 0.10) 0%, rgba(${COLOR_HEX.blue.rgb}, 0.04) 35%, transparent 65%)`,
+            ? `radial-gradient(circle, rgba(${c.rgb}, 0.14) 0%, rgba(${c.rgb}, 0.06) 35%, transparent 65%)`
+            : `radial-gradient(circle, rgba(${c.rgb}, 0.10) 0%, rgba(${c.rgb}, 0.04) 35%, transparent 65%)`,
           animation: 'aura-breathe 8s ease-in-out infinite',
         }} />
-        <div style={{
-          position: 'absolute', width: 350, height: 350, borderRadius: '50%',
-          background: darkMode
-            ? `radial-gradient(circle, rgba(${COLOR_HEX.violet.rgb}, 0.10) 0%, rgba(${COLOR_HEX.violet.rgb}, 0.04) 40%, transparent 65%)`
-            : `radial-gradient(circle, rgba(${COLOR_HEX.violet.rgb}, 0.08) 0%, rgba(${COLOR_HEX.violet.rgb}, 0.03) 40%, transparent 65%)`,
-          animation: 'aura-breathe 6s ease-in-out infinite 1s',
-        }} />
       </div>
+      {/* Back button */}
       {onBack && (
         <button onClick={onBack}
           className={`absolute top-4 left-4 z-50 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 ${
             darkMode ? 'bg-white/[0.06] border border-white/[0.08] text-white/40 hover:text-white/70 hover:bg-white/[0.1]'
-                     : 'bg-black/[0.04] border border-black/[0.08] text-gray-400 hover:text-gray-600 hover:bg-black/[0.06]'
-          }`}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 2L4 7L9 12" />
-          </svg>
+                     : 'bg-black/[0.04] border border-black/[0.08] text-gray-400 hover:text-gray-600 hover:bg-black/[0.06]'}`}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 2L4 7L9 12" /></svg>
         </button>
       )}
+      {/* Refresh button */}
+      <button onClick={() => location.reload()}
+        className="absolute top-4 right-4 z-50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
+        style={{
+          background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+          color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+          border: darkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.1)',
+          backdropFilter: 'blur(12px)',
+        }}
+        onMouseOver={e => { e.currentTarget.style.background = darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'; e.currentTarget.style.color = darkMode ? '#fff' : '#000'; }}
+        onMouseOut={e => { e.currentTarget.style.background = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'; e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'; }}>
+        ↻ Refresh
+      </button>
       <div className="relative z-10 flex flex-col h-full w-full">
-        <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm mx-auto px-5">
-          <div className="flex flex-col items-center gap-2" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-            <div className="flex items-center gap-5 mb-5">
-              <svg width="44" height="44" viewBox="0 0 32 32" fill="none" style={{ position: 'relative', zIndex: 1 }}>
-                <rect x="0.29" y="0.33" width="5.7" height="5.9" fill="#fb8a61"/>
-                <path d="m11.141,11.328 v 5.099 c 0,2.815 2.284,5.099 5.102,5.099 2.815,0 5.099-2.283 5.099-5.099 0-2.816-2.283-5.099-5.099-5.099-0.006,0-0.015,0-0.021,0 v 0 z" fill="#fb8a61"/>
-                <path d="M 17.047,0.327 H 14.991 11.14 v 5.899 h 5.081 v 0 c 0.006,0 0.015,0 0.021,0 5.633,0 10.199,4.568 10.199,10.2 0,5.632-4.566,10.2-10.199,10.2-5.635,0-10.198-4.568-10.198-10.2 V 11.327 H 0.291 v 4.666 h 0.037 c 0.009,8.66 7.029,15.679 15.691,15.679 8.666,0 15.689-7.024 15.689-15.693 C 31.709,7.661 25.233,0.855 17.047,0.327 Z" fill="#fb8a61"/>
-                <rect x="11.14" y="0.327" width="5.851" height="5.899" fill="#fb8a61"/>
-              </svg>
-              <span style={{ fontSize: 44, lineHeight: 1, position: 'relative', zIndex: 1 }}>🌀</span>
-            </div>
-            <h1 className={`text-2xl font-bold tracking-tight ${TH('text-primary', darkMode)}`}>Verify</h1>
-            <p className={`text-sm text-center mt-2 leading-relaxed max-w-[260px] ${TH('text-muted', darkMode)}`}>
-              Prove you're uniquely human, or help verify someone who is.
-            </p>
+        {/* Header */}
+        <div className="w-full max-w-sm mx-auto px-5 pt-14 pb-2 flex flex-col items-center">
+          <h1 className={`text-xl font-bold tracking-tight mb-3 ${TH('text-primary', darkMode)}`}>Verify</h1>
+          {/* Search box */}
+          <div className="w-full relative mb-3">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>
+              <circle cx="7" cy="7" r="5" /><path d="M11 11L14 14" />
+            </svg>
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name or city..."
+              className={`w-full h-11 rounded-xl pl-10 pr-4 text-sm font-medium outline-none transition-all duration-200 ${TH('bg-input', darkMode)}`}
+              style={{
+                border: search ? `1px solid rgba(${c.rgb}, 0.3)` : (darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)'),
+                boxShadow: search ? `0 0 12px rgba(${c.rgb}, 0.08)` : 'none',
+              }} />
+          </div>
+          {/* Mode toggle + count */}
+          <div className="w-full flex items-center justify-between mb-2">
+            <span className={`text-xs font-medium ${TH('text-subtle', darkMode)}`}>
+              {filtered ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''}` : `${pending.length} pending`}
+            </span>
+            {(completedCount || 0) >= 3 && (
+              <button onClick={() => setExpertMode && setExpertMode(!expertMode)}
+                className="flex items-center rounded-full overflow-hidden transition-all duration-200"
+                style={{
+                  background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  border: darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+                }}>
+                <span className={`px-3 py-1 text-xs font-medium transition-all duration-200`}
+                  style={{
+                    background: !expertMode
+                      ? (darkMode ? `rgba(${c.rgb}, 0.2)` : `rgba(${c.rgb}, 0.12)`)
+                      : 'transparent',
+                    color: !expertMode
+                      ? (darkMode ? c.light : c.base)
+                      : (darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'),
+                  }}>Guided</span>
+                <span className={`px-3 py-1 text-xs font-medium transition-all duration-200`}
+                  style={{
+                    background: expertMode
+                      ? 'rgba(251,191,36,0.25)'
+                      : 'transparent',
+                    color: expertMode
+                      ? (darkMode ? '#fbbf24' : '#d97706')
+                      : (darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'),
+                  }}>Express</span>
+              </button>
+            )}
           </div>
         </div>
-        <div className="flex-shrink-0 w-full max-w-sm mx-auto px-5 pb-8">
-          <div className="flex flex-col gap-3 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both', animationDelay: '0.15s' }}>
-            <VerifyActionButton label={subjectProfile ? 'View my profile' : "🙋 Get verified"} color="violet" darkMode={darkMode} onClick={onSubject} />
-            <VerifyActionButton label="🔍 Evaluate someone" color="emerald" darkMode={darkMode} onClick={onEvaluator} />
+        {/* Scrollable queue + history */}
+        <div className="flex-1 overflow-y-auto w-full max-w-sm mx-auto px-5 pb-6">
+          {/* Pending / search results */}
+          <div className="w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+            {!filtered && pending.length > 0 && (
+              <button onClick={() => pending.length > PENDING_COLLAPSE && setShowAllPending(!showAllPending)}
+                className="w-full flex items-center justify-between mb-2"
+                style={{ cursor: pending.length > PENDING_COLLAPSE ? 'pointer' : 'default' }}>
+                <span className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Up next
+                </span>
+                {pending.length > PENDING_COLLAPSE && (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                    className={`transition-transform duration-200 ${showAllPending ? 'rotate-180' : ''}`}
+                    style={{ color: darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>
+                    <path d="M3 5L7 9L11 5" />
+                  </svg>
+                )}
+              </button>
+            )}
+            <div className="flex flex-col gap-2">
+              {showList.length === 0 && (
+                <div className={`text-center py-8 ${TH('text-subtle', darkMode)}`}>
+                  <p className="text-sm">{search ? 'No matches found' : 'All caught up!'}</p>
+                  <p className="text-xs mt-1">
+                    {search ? 'Try a different name or city' : 'Check back for new evaluations'}
+                  </p>
+                </div>
+              )}
+              {showList.map(subject => (
+                <SubjectCard key={subject.id} subject={subject} isDone={!!evaluations[subject.id]} />
+              ))}
+            </div>
           </div>
+          {/* Completed history */}
+          {!filtered && completed.length > 0 && (
+            <div className="mt-6">
+              <button onClick={() => setShowAllCompleted(!showAllCompleted)}
+                className="w-full flex items-center justify-between mb-2 cursor-pointer">
+                <span className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Recently evaluated ({completed.length})
+                </span>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                  className={`transition-transform duration-200 ${showAllCompleted ? 'rotate-180' : ''}`}
+                  style={{ color: darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>
+                  <path d="M3 5L7 9L11 5" />
+                </svg>
+              </button>
+              {showAllCompleted && (
+                <div className="flex flex-col gap-2" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
+                  {completed.map(subject => (
+                    <SubjectCard key={subject.id} subject={subject} isDone={true} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-// VerifySubjectFlow — subject question flow (all subject questions)
-const VerifySubjectFlow = ({ darkMode, onComplete, onBack }) => {
-  const [answers, setAnswers] = useState({});
-  const [currentScreenId, setCurrentScreenId] = useState('s1-name');
-  const [animKey, setAnimKey] = useState(0);
+// VerifyProfileFields removed — data collected through dual-purpose gateway questions + verify onboarding flow
 
-  const allScreenIds = useMemo(() => {
-    return VERIFY_SUBJECT_QUESTIONS.filter(q => !q.conditional || q.conditional(answers)).map(q => q.id);
-  }, [answers]);
+// VerifyQueue removed — functionality merged into VerifyHub
 
-  const currentIdx = allScreenIds.indexOf(currentScreenId);
-  const currentQ = VERIFY_SUBJECT_QUESTIONS.find(q => q.id === currentScreenId);
+// Shared: VerifyChipButton — reusable chip for compact selectors
+const VerifyChipButton = ({ label, selected, color, darkMode, onClick, stretch }) => {
+  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  return (
+    <button onClick={onClick}
+      className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-center hover-glow hover-glow-${color}`}
+      style={{
+        width: stretch ? '100%' : undefined,
+        background: selected
+          ? `linear-gradient(135deg, rgba(${c.rgb}, 0.25), rgba(${c.rgb}, 0.12))`
+          : (darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'),
+        border: selected
+          ? `1px solid rgba(${c.rgb}, 0.45)`
+          : (darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)'),
+        color: selected ? (darkMode ? '#fff' : c.base) : (darkMode ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)'),
+        boxShadow: selected ? `0 0 12px rgba(${c.rgb}, 0.1)` : 'none',
+      }}>
+      {label}
+    </button>
+  );
+};
 
-  const goToScreen = (id) => { setAnimKey(k => k + 1); setCurrentScreenId(id); };
-  const advance = () => {
-    const nextIdx = currentIdx + 1;
-    if (nextIdx < allScreenIds.length) goToScreen(allScreenIds[nextIdx]);
-    else onComplete(answers);
-  };
-  const goBack = () => {
-    if (currentIdx > 0) goToScreen(allScreenIds[currentIdx - 1]);
-    else onBack();
-  };
-  const handleAnswer = (val) => setAnswers(prev => ({ ...prev, [currentScreenId]: val }));
-
-  if (!currentQ) return null;
-
-  const color = currentQ.color;
-  const sectionLabel = currentQ.sectionLabel;
-  const questionOnlyScreens = allScreenIds.filter(id => {
-    const q = VERIFY_SUBJECT_QUESTIONS.find(sq => sq.id === id);
-    return q && q.type !== 'delight' && q.type !== 'availability';
-  });
-  const progressIdx = questionOnlyScreens.indexOf(currentScreenId);
-
-  // Delight screen
-  if (currentQ.type === 'delight') {
-    const c = COLOR_HEX[color];
-    return (
-      <VerifyScreenLayout darkMode={darkMode} color={color} sectionLabel={sectionLabel} onBack={goBack}
-        buttons={<VerifyActionButton label="Continue" color={color} darkMode={darkMode} onClick={advance} />}>
-        <div key={`delight-${animKey}`} className="flex flex-col items-center gap-5 mt-4 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-          <div className="w-full rounded-2xl p-5 text-center"
+// VerifyCompactConnection — 3 inline chip selectors on one screen
+const VerifyCompactConnection = ({ question, color, darkMode, answer, onAnswer }) => {
+  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const val = answer || {};
+  const setField = (fieldId, v) => onAnswer({ ...val, [fieldId]: v });
+  return (
+    <div className="flex flex-col gap-3 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      {question.fields.map(field => {
+        const cols = field.options.length <= 4 ? field.options.length : 3;
+        return (
+          <div key={field.id} className="rounded-2xl px-4 py-3"
             style={{
-              background: `linear-gradient(135deg, rgba(${c.rgb}, 0.15), rgba(${c.rgb}, 0.05))`,
-              border: `1px solid rgba(${c.rgb}, 0.25)`,
-              boxShadow: `0 0 40px rgba(${c.rgb}, 0.1)`,
+              background: val[field.id]
+                ? (darkMode ? `rgba(${c.rgb}, 0.04)` : `rgba(${c.rgb}, 0.02)`)
+                : (darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
+              border: val[field.id]
+                ? `1px solid rgba(${c.rgb}, 0.15)`
+                : (darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'),
+              transition: 'all 0.2s',
             }}>
-            <div className={`text-lg font-bold mb-1 ${TH('text-primary', darkMode)}`}>
-              You may already know 14 Aura users!
+            <div className={`text-sm font-semibold mb-2 ${TH('text-primary', darkMode)}`}>{field.label}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '8px' }}>
+              {field.options.map(opt => (
+                <VerifyChipButton key={opt} label={opt} selected={val[field.id] === opt} color={color} darkMode={darkMode}
+                  onClick={() => setField(field.id, opt)} stretch />
+              ))}
             </div>
-            <p className={`text-xs mb-4 ${TH('text-subtle', darkMode)}`}>
-              We found people from your {Array.isArray(answers['s2-social']) ? answers['s2-social'].join(' & ') : 'social'} network who are already in Aura.
-            </p>
-            {[{ name: 'Ravi Kumar', mutual: 12 }, { name: 'Deepa Shah', mutual: 8 }, { name: 'Sarah Chen', mutual: 5 }].map((person, i) => (
-              <div key={i} className={`flex items-center justify-between py-2.5 ${darkMode ? 'border-t border-white/[0.06]' : 'border-t border-black/[0.06]'}`}>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
-                    style={{ background: `rgba(${c.rgb}, 0.2)`, color: darkMode ? c.light : c.base }}>
-                    {person.name[0]}
-                  </div>
-                  <div className="text-left">
-                    <div className={`text-sm font-medium ${darkMode ? 'text-white/80' : 'text-gray-800'}`}>{person.name}</div>
-                    <div className={`text-[10px] ${TH('text-subtle', darkMode)}`}>{person.mutual} mutual connections</div>
-                  </div>
-                </div>
-                <button className="text-[10px] font-semibold px-3 py-1.5 rounded-full transition-colors"
-                  style={{ background: `rgba(${c.rgb}, 0.15)`, color: darkMode ? c.light : c.base, border: `1px solid rgba(${c.rgb}, 0.25)` }}>
-                  Contact
-                </button>
-              </div>
-            ))}
-            <div className={`text-xs mt-2 ${TH('text-subtle', darkMode)}`}>+ 11 more</div>
           </div>
-          <p className={`text-xs text-center px-4 ${TH('text-subtle', darkMode)}`}>
-            Any of these people could verify you through Path A — the fastest route.
-          </p>
-        </div>
-      </VerifyScreenLayout>
-    );
-  }
+        );
+      })}
+    </div>
+  );
+};
 
-  // Availability screen
-  if (currentQ.type === 'availability') {
-    return (
-      <VerifyScreenLayout darkMode={darkMode} color={color} sectionLabel={sectionLabel} onBack={goBack}
-        buttons={
+// VerifyIdentityCheck — 3 identity questions on one screen
+const VerifyIdentityCheck = ({ question, color, darkMode, answer, onAnswer }) => {
+  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const val = answer || {};
+  const setField = (fieldId, v) => onAnswer({ ...val, [fieldId]: v });
+  return (
+    <div className="flex flex-col gap-3 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      {question.fields.map(field => {
+        const cols = field.options.length <= 4 ? field.options.length : 3;
+        return (
+          <div key={field.id} className="rounded-2xl px-4 py-3"
+            style={{
+              background: val[field.id]
+                ? (darkMode ? `rgba(${c.rgb}, 0.04)` : `rgba(${c.rgb}, 0.02)`)
+                : (darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
+              border: val[field.id]
+                ? `1px solid rgba(${c.rgb}, 0.15)`
+                : (darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'),
+              transition: 'all 0.2s',
+            }}>
+            <div className={`text-sm font-semibold mb-0.5 ${TH('text-primary', darkMode)}`}>{field.label}</div>
+            {field.subtitle && <div className={`text-xs mb-2 ${TH('text-subtle', darkMode)}`}>{field.subtitle}</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '8px' }}>
+              {field.options.map(opt => (
+                <VerifyChipButton key={opt} label={opt} selected={val[field.id] === opt} color={color} darkMode={darkMode}
+                  onClick={() => setField(field.id, opt)} stretch />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// VerifyEvidenceCombined — merged evidence checklist with section headers
+const VerifyEvidenceCombined = ({ question, color, darkMode, answer, onAnswer }) => {
+  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const val = answer || {};
+  const toggleItem = (sectionIdx, opt) => {
+    const key = `s${sectionIdx}`;
+    const current = val[key] || [];
+    const next = current.includes(opt) ? current.filter(x => x !== opt) : [...current, opt];
+    onAnswer({ ...val, [key]: next });
+  };
+  return (
+    <div className="flex flex-col gap-4 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      {question.sections.map((section, si) => (
+        <div key={si}>
+          <div className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{section.label}</div>
           <div className="flex flex-col gap-2">
-            <VerifyActionButton label="Continue" color={color} darkMode={darkMode} onClick={() => onComplete(answers)} />
-            <button onClick={() => onComplete(answers)}
-              className={`text-xs py-2 transition-colors ${TH('text-subtle', darkMode)}`}>
-              Skip — these are optional
-            </button>
+            {section.options.map(opt => {
+              const isOn = (val[`s${si}`] || []).includes(opt);
+              return (
+                <VerifyToggleSwitch key={opt} label={opt} color={color} darkMode={darkMode}
+                  isOn={isOn} onToggle={() => toggleItem(si, opt)} />
+              );
+            })}
           </div>
-        }>
-        <div key={`avail-${animKey}`} className="flex flex-col gap-4 w-full mt-4" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-          <p className={`text-sm text-center mb-2 italic ${TH('text-muted', darkMode)}`}>
-            These are optional — they help evaluators feel confident about you.
-          </p>
-          <VerifyToggleSwitch label="Open to a quick video chat" color={color} darkMode={darkMode}
-            isOn={!!answers['s4-video']} onToggle={() => setAnswers(prev => ({ ...prev, 's4-video': !prev['s4-video'] }))} />
-          <VerifyToggleSwitch label="Could meet someone nearby" subtitle="Coffee shop, community event, etc." color={color} darkMode={darkMode}
-            isOn={!!answers['s4-meet']} onToggle={() => setAnswers(prev => ({ ...prev, 's4-meet': !prev['s4-meet'] }))} />
-          <VerifyToggleSwitch label="Someone I know can confirm I'm real" color={color} darkMode={darkMode}
-            isOn={!!answers['s4-vouch']} onToggle={() => setAnswers(prev => ({ ...prev, 's4-vouch': !prev['s4-vouch'] }))} />
         </div>
-      </VerifyScreenLayout>
-    );
-  }
-
-  // Regular question screens
-  const isSingle = currentQ.type === 'single';
-  const isMulti = currentQ.type === 'multi';
-  const isText = currentQ.type === 'text';
-
-  const handleSingleAnswer = (val) => { handleAnswer(val); setTimeout(advance, 300); };
-  const needsContinueButton = isMulti || isText;
-  const continueDisabled = isText ? !(answers[currentScreenId] || '').trim() : isMulti ? !(Array.isArray(answers[currentScreenId]) ? answers[currentScreenId].length : (answers[currentScreenId]?.items?.length || 0)) : false;
-
-  return (
-    <VerifyScreenLayout darkMode={darkMode} color={color} sectionLabel={sectionLabel}
-      progress={progressIdx >= 0 ? progressIdx : undefined}
-      total={progressIdx >= 0 ? questionOnlyScreens.length : undefined}
-      onBack={goBack}
-      buttons={needsContinueButton ? <VerifyActionButton label="Continue" color={color} darkMode={darkMode} onClick={advance} disabled={continueDisabled} /> : null}>
-      <div key={`q-${currentScreenId}-${animKey}`} className="flex flex-col items-center gap-5 w-full mt-4" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-        <h2 className={`question-text font-semibold px-2 text-center ${TH('text-primary', darkMode)}`}>{currentQ.text}</h2>
-        {currentQ.subtitle && <p className={`text-xs text-center -mt-2 px-4 ${TH('text-muted', darkMode)}`}>{currentQ.subtitle}</p>}
-        {isSingle && <VerifySingleSelect question={currentQ} color={color} darkMode={darkMode} answer={answers[currentScreenId]} onAnswer={handleSingleAnswer} answers={answers} />}
-        {isMulti && <VerifyMultiToggle question={currentQ} color={color} darkMode={darkMode} answer={answers[currentScreenId]} onAnswer={handleAnswer} />}
-        {isText && <VerifyTextInput question={currentQ} color={color} darkMode={darkMode} answer={answers[currentScreenId]} onAnswer={handleAnswer} onContinue={advance} />}
-      </div>
-    </VerifyScreenLayout>
+      ))}
+    </div>
   );
 };
 
-// VerifySubjectCard — profile summary after subject flow
-const VerifySubjectCard = ({ darkMode, answers, onBack, onSubmit }) => {
-  const c = COLOR_HEX.violet;
-  const rows = [
-    { label: 'Name', value: answers['s1-name'] },
-    { label: 'Country', value: answers['s1-country'] },
-    { label: 'City', value: answers['s1-city'] },
-    { label: 'Source', value: answers['s1-source'] || 'None selected' },
-    answers['s1-referrer'] && { label: 'Referred by', value: answers['s1-referrer'] },
-    { label: 'Account type', value: answers['s1-account-type'] },
-    { label: 'Social', value: Array.isArray(answers['s2-social']) && answers['s2-social'].length ? answers['s2-social'].join(', ') : 'None connected' },
-    answers['s2-know-anyone'] && { label: 'Knows someone', value: answers['s2-know-anyone'] },
-    answers['s2-connection-name'] && { label: 'Connection', value: answers['s2-connection-name'] },
-    { label: 'Account status', value: answers['s3-attest'] },
-    { label: 'Open to video chat', value: answers['s4-video'] ? 'Yes' : 'No' },
-    { label: 'Open to in-person', value: answers['s4-meet'] ? 'Yes' : 'No' },
-    { label: 'Has a voucher', value: answers['s4-vouch'] ? 'Yes' : 'No' },
-  ].filter(Boolean);
-
+// VerifyModeToggle — inline Guided/Express switch for in-flow mode switching
+const VerifyModeToggle = ({ darkMode, expertMode, setExpertMode, completedCount }) => {
+  if ((completedCount || 0) < 3) return null;
+  const c = COLOR_HEX.emerald;
   return (
-    <VerifyScreenLayout darkMode={darkMode} color="violet" onBack={onBack}>
-      <div className="w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4"
-            style={{ background: `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.1))`, border: `1px solid rgba(${c.rgb}, 0.3)` }}>
-            <span className="text-2xl">{(answers['s1-name'] || '?')[0]?.toUpperCase()}</span>
-          </div>
-          <h2 className={`text-xl font-bold ${TH('text-primary', darkMode)}`}>{answers['s1-name'] || 'Anonymous'}</h2>
-          <p className={`text-sm mt-1 ${TH('text-muted', darkMode)}`}>{answers['s1-city'] || answers['s1-country'] || 'Unknown location'}</p>
-        </div>
-        <div className={`rounded-2xl p-5 mb-4 ${TH('bg-card', darkMode)}`}>
-          <h3 className={`text-xs font-semibold uppercase tracking-wider mb-4 ${TH('text-muted', darkMode)}`}>Profile Card</h3>
-          <div className="flex flex-col gap-3">
-            {rows.map(row => (
-              <div key={row.label} className="flex justify-between items-start gap-3">
-                <span className={`text-xs flex-shrink-0 ${TH('text-muted', darkMode)}`}>{row.label}</span>
-                <span className={`text-sm text-right ${darkMode ? 'text-white/80' : 'text-gray-800'}`}>{String(row.value)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <p className={`text-xs text-center mb-6 px-4 ${TH('text-subtle', darkMode)}`}>
-          This is what evaluators will see. Multiple evaluators will assess your profile to determine your verification level.
-        </p>
-        <VerifyActionButton label="Submit Profile" color="violet" darkMode={darkMode} onClick={onSubmit} />
-        <div className="mt-3">
-          <VerifyActionButton label="Start Over" color="gray" darkMode={darkMode} onClick={onBack} secondary />
-        </div>
-      </div>
-    </VerifyScreenLayout>
+    <div className="flex justify-center mb-3">
+      <button onClick={() => setExpertMode(!expertMode)}
+        className="flex items-center rounded-full overflow-hidden transition-all duration-200"
+        style={{
+          background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+          border: darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+        }}>
+        <span className="px-3 py-1 text-xs font-medium transition-all duration-200"
+          style={{
+            background: !expertMode ? (darkMode ? `rgba(${c.rgb}, 0.2)` : `rgba(${c.rgb}, 0.12)`) : 'transparent',
+            color: !expertMode ? (darkMode ? c.light : c.base) : (darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'),
+          }}>Guided</span>
+        <span className="px-3 py-1 text-xs font-medium transition-all duration-200"
+          style={{
+            background: expertMode ? 'rgba(251,191,36,0.25)' : 'transparent',
+            color: expertMode ? (darkMode ? '#fbbf24' : '#d97706') : (darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'),
+          }}>Express</span>
+      </button>
+    </div>
   );
 };
 
-// VerifyQueue — list of mock subjects awaiting evaluation
-const VerifyQueue = ({ darkMode, subjects, evaluations, onSelect, onBack }) => {
-  return (
-    <VerifyScreenLayout darkMode={darkMode} color="emerald" onBack={onBack}>
-      <div className="w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-        <h2 className={`text-xl font-bold text-center mb-1 ${TH('text-primary', darkMode)}`}>Evaluation Queue</h2>
-        <p className={`text-xs text-center mb-6 ${TH('text-subtle', darkMode)}`}>Select someone to evaluate</p>
-        <div className="flex flex-col gap-3 w-full">
-          {subjects.map(subject => {
-            const isCompleted = !!evaluations[subject.id];
-            const c = isCompleted ? COLOR_HEX.emerald : COLOR_HEX.violet;
-            return (
-              <button key={subject.id} onClick={() => !isCompleted && onSelect(subject.id)}
-                className={`w-full rounded-2xl p-4 text-left transition-all duration-200 hover-glow hover-glow-${isCompleted ? 'emerald' : 'violet'} ${isCompleted ? 'opacity-60' : ''}`}
-                style={{
-                  background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-                  border: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
-                }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
-                    style={{ background: `rgba(${c.rgb}, 0.2)`, color: darkMode ? c.light : c.base }}>
-                    {subject.name[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-semibold ${TH('text-primary', darkMode)}`}>{subject.name}</div>
-                    <div className={`text-xs ${TH('text-subtle', darkMode)}`}>{subject.city}, {subject.country}</div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    {isCompleted ? (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>Done</span>
-                    ) : (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${darkMode ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-700'}`}>Pending</span>
-                    )}
-                    {subject.connections > 0 && (
-                      <span className={`text-[10px] ${TH('text-subtle', darkMode)}`}>{subject.connections} connections</span>
-                    )}
-                  </div>
-                </div>
-                {subject.availability && (
-                  <div className="flex gap-2 mt-2 ml-13">
-                    {subject.availability.video && <span className={`text-[10px] px-2 py-0.5 rounded-full ${darkMode ? 'bg-white/[0.06] text-white/40' : 'bg-gray-100 text-gray-500'}`}>Video</span>}
-                    {subject.availability.meet && <span className={`text-[10px] px-2 py-0.5 rounded-full ${darkMode ? 'bg-white/[0.06] text-white/40' : 'bg-gray-100 text-gray-500'}`}>In-person</span>}
-                    {subject.availability.vouch && <span className={`text-[10px] px-2 py-0.5 rounded-full ${darkMode ? 'bg-white/[0.06] text-white/40' : 'bg-gray-100 text-gray-500'}`}>Has voucher</span>}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </VerifyScreenLayout>
-  );
-};
-
-// VerifyEvaluatorFlow — gate → fit → path questions
-const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
-  const [phase, setPhase] = useState('gate');
-  const [path, setPath] = useState(null);
-  const [answers, setAnswers] = useState({});
+// VerifyEvaluatorFlow — merged gate+fit → path questions
+const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack, sharedPath, setSharedPath, sharedAnswers, setSharedAnswers, expertMode, setExpertMode, completedCount }) => {
+  const path = sharedPath;
+  const setPath = setSharedPath;
+  const answers = sharedAnswers;
+  const setAnswers = setSharedAnswers;
+  const [phase, setPhase] = useState(path ? 'path' : 'route');
   const [questionIdx, setQuestionIdx] = useState(0);
   const [animKey, setAnimKey] = useState(0);
 
-  const gateColor = 'emerald';
-
-  // Dev toolbar — jump between paths and skip to verdict
+  // Dev toolbar
   const devBar = IS_DEV ? (
     <div className="fixed top-1 right-1 z-[9999] flex gap-1 opacity-40 hover:opacity-100 transition-opacity" style={{fontSize:'10px'}}>
       {['A','B','C'].map(p => (
@@ -8256,8 +8434,8 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
           className={`px-2 py-1 rounded ${path === p ? 'bg-white/20 text-white' : 'bg-black/30 text-white/60'}`}>{p}</button>
       ))}
       <button onClick={() => {
-        if (!path) { setPath('B'); }
         const p = path || 'B';
+        if (!path) setPath('B');
         const qs = VERIFY_PATH_CONFIG[p].questions;
         const verdictIdx = qs.findIndex(q => q.type === 'verdict');
         if (verdictIdx >= 0) { setPhase('path'); setQuestionIdx(verdictIdx); setAnimKey(k=>k+1); }
@@ -8270,59 +8448,46 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
     return VERIFY_PATH_CONFIG[p].questions.filter(q => !q.conditional || q.conditional(ans));
   };
 
-  // Gate screen
-  if (phase === 'gate') {
+  // Combined route screen (gate + fit merged)
+  if (phase === 'route') {
     return (<>
       {devBar}
-      <VerifyScreenLayout darkMode={darkMode} color={gateColor} sectionLabel="Relationship Gate" onBack={onBack}>
-        <div className="flex flex-col items-center gap-6 w-full mt-4" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      <VerifyScreenLayout darkMode={darkMode} color="emerald" onBack={onBack} subject={subject}>
+        <div className="flex flex-col items-center gap-4 w-full mt-1" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+          <VerifyModeToggle darkMode={darkMode} expertMode={expertMode} setExpertMode={setExpertMode} completedCount={completedCount} />
           <h2 className={`question-text font-semibold px-2 text-center ${TH('text-primary', darkMode)}`}>
-            How do you know {subject?.name || 'this person'}?
+            How do you know them?
           </h2>
           <div className="flex flex-col gap-3 w-full">
             {[
-              { key: 'A', label: 'I know them personally', sub: 'Highest weight \u2014 vouching', color: 'cyan' },
-              { key: 'B', label: 'I met/interviewed them for verification', sub: 'Medium weight \u2014 investigation', color: 'amber' },
-              { key: 'C', label: "I'm reviewing their profile only", sub: 'Lowest weight \u2014 analysis', color: 'slate' },
+              { key: 'A', label: 'I know them personally', sub: 'I can vouch for their identity', color: 'cyan', icon: '🤝' },
+              { key: 'B', label: 'I met them for verification', sub: 'I investigated and have evidence', color: 'amber', icon: '🔍' },
+              { key: 'C', label: "I'm reviewing their profile", sub: "I'm analyzing what's available", color: 'slate', icon: '📋' },
             ].map(opt => {
               const oc = COLOR_HEX[opt.color];
               return (
-                <button key={opt.key} onClick={() => { setPath(opt.key); setAnswers(prev => ({ ...prev, gate: opt.label })); setPhase('fit'); }}
-                  className={`w-full rounded-2xl px-5 py-4 text-left transition-all duration-200 hover-glow hover-glow-${opt.color}`}
+                <button key={opt.key} onClick={() => {
+                  setPath(opt.key);
+                  setAnswers(prev => ({ ...prev, gate: opt.label }));
+                  setPhase('path');
+                  setQuestionIdx(0);
+                  setAnimKey(k => k + 1);
+                }}
+                  className={`w-full rounded-2xl px-4 py-3.5 text-left transition-all duration-200 hover-glow hover-glow-${opt.color}`}
                   style={{
                     background: `linear-gradient(135deg, rgba(${oc.rgb}, 0.12), rgba(${oc.rgb}, 0.04))`,
                     border: `1px solid rgba(${oc.rgb}, 0.2)`,
                   }}>
-                  <div className={`text-sm font-semibold ${TH('text-primary', darkMode)}`}>{opt.label}</div>
-                  <div className="text-xs mt-0.5" style={{ color: `rgba(${oc.rgb}, 0.7)` }}>{opt.sub}</div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{opt.icon}</span>
+                    <div>
+                      <div className={`text-sm font-semibold ${TH('text-primary', darkMode)}`}>{opt.label}</div>
+                      <div className="text-xs mt-0.5" style={{ color: darkMode ? `rgba(${oc.rgb}, 0.7)` : oc.base + '99' }}>{opt.sub}</div>
+                    </div>
+                  </div>
                 </button>
               );
             })}
-          </div>
-        </div>
-      </VerifyScreenLayout>
-    </>);
-  }
-
-  // Fit check
-  if (phase === 'fit') {
-    const fitColor = VERIFY_PATH_CONFIG[path].color;
-    return (<>
-      {devBar}
-      <VerifyScreenLayout darkMode={darkMode} color={fitColor} sectionLabel="Evaluator Fit" onBack={() => setPhase('gate')}>
-        <div className="flex flex-col items-center gap-6 w-full mt-4" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
-          <h2 className={`question-text font-semibold px-2 text-center ${TH('text-primary', darkMode)}`}>
-            How well do you know this person's situation?
-          </h2>
-          <div className="flex flex-col gap-3 w-full">
-            {[
-              "Very well \u2014 I'm a good judge here",
-              "Somewhat \u2014 I can contribute but have gaps",
-              "Not very well \u2014 I'll do my best with what I have",
-            ].map(opt => (
-              <VerifyOptionButton key={opt} label={opt} color={fitColor} darkMode={darkMode} selected={answers['fit'] === opt}
-                onClick={() => { setAnswers(prev => ({ ...prev, fit: opt })); setTimeout(() => setPhase('path'), 300); }} />
-            ))}
           </div>
         </div>
       </VerifyScreenLayout>
@@ -8345,6 +8510,21 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
     setAnimKey(k => k + 1);
     if (question.type === 'star-confidence' && answers[question.id] === undefined) return;
     if (question.type === 'verdict' && !(answers[question.id]?.verdict && answers[question.id]?.confidence)) return;
+    if (question.type === 'compact-connection') {
+      const val = answers[question.id] || {};
+      const allFilled = question.fields.every(f => val[f.id]);
+      if (!allFilled) return;
+    }
+    if (question.type === 'evidence-combined') {
+      const val = answers[question.id] || {};
+      const anySelected = question.sections.some((_, si) => (val[`s${si}`] || []).length > 0);
+      if (!anySelected) return;
+    }
+    if (question.type === 'identity-check') {
+      const val = answers[question.id] || {};
+      const allFilled = question.fields.every(f => val[f.id]);
+      if (!allFilled) return;
+    }
     const nextQuestions = getActiveQuestions(path, answers);
     const currentFilteredIdx = nextQuestions.findIndex(q => q.id === question.id);
     if (currentFilteredIdx + 1 < nextQuestions.length) setQuestionIdx(currentFilteredIdx + 1);
@@ -8352,7 +8532,7 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
   };
   const goBack = () => {
     if (questionIdx > 0) { setAnimKey(k => k + 1); setQuestionIdx(questionIdx - 1); }
-    else setPhase('fit');
+    else { setPhase('route'); setPath(null); setAnswers({}); }
   };
   const handleSingleAnswer = (val) => { handleAnswer(val); setTimeout(advance, 300); };
 
@@ -8361,20 +8541,52 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
   const isText = question.type === 'text';
   const isStar = question.type === 'star-confidence';
   const isVerdict = question.type === 'verdict';
-  const needsContinueButton = isMulti || isText || isStar || isVerdict;
+  const isCompactConnection = question.type === 'compact-connection';
+  const isEvidenceCombined = question.type === 'evidence-combined';
+  const isIdentityCheck = question.type === 'identity-check';
+  const needsContinueButton = isMulti || isText || isStar || isVerdict || isCompactConnection || isEvidenceCombined || isIdentityCheck;
+
   const continueDisabled = isText ? !(answers[question.id] || '').trim()
     : isMulti ? !(Array.isArray(answers[question.id]) ? answers[question.id].length : (answers[question.id]?.items?.length || 0))
     : isStar ? answers[question.id] === undefined
     : isVerdict ? !(answers[question.id]?.verdict && answers[question.id]?.confidence)
+    : isCompactConnection ? !question.fields.every(f => (answers[question.id] || {})[f.id])
+    : isEvidenceCombined ? !question.sections.some((_, si) => ((answers[question.id] || {})[`s${si}`] || []).length > 0)
+    : isIdentityCheck ? !question.fields.every(f => (answers[question.id] || {})[f.id])
     : false;
 
   return (<>
     {devBar}
-    <VerifyScreenLayout darkMode={darkMode} color={color}
-      sectionLabel={isVerdict ? 'Your Verdict' : `Path ${path}: ${config.label}`}
+    <VerifyScreenLayout darkMode={darkMode} color={color} subject={subject}
+      sectionLabel={isVerdict ? 'Your Verdict' : config.label}
       progress={questionIdx} total={activePathQuestions.length} onBack={goBack}
-      buttons={needsContinueButton ? <VerifyActionButton label="Continue" color={color} darkMode={darkMode} onClick={advance} disabled={continueDisabled} /> : null}>
-      <div key={`eq-${question.id}-${animKey}`} className="flex flex-col items-center gap-5 w-full mt-4" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      buttons={needsContinueButton ? (() => {
+        if (isCompactConnection || isIdentityCheck) {
+          const val = answers[question.id] || {};
+          const total = question.fields.length;
+          const filled = question.fields.filter(f => val[f.id]).length;
+          if (filled < total) {
+            const cc = COLOR_HEX[color] || COLOR_HEX.violet;
+            return (
+              <div className="w-full h-14 resp-h-lg rounded-2xl font-medium text-sm flex items-center justify-center transition-all duration-300"
+                style={{
+                  background: darkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  border: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+                  color: darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
+                }}>
+                <span>Select one from each</span>
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold" style={{
+                  background: `rgba(${cc.rgb}, 0.15)`,
+                  color: darkMode ? cc.light : cc.base,
+                }}>{filled} of {total}</span>
+              </div>
+            );
+          }
+        }
+        return <VerifyActionButton label="Continue" color={color} darkMode={darkMode} onClick={advance} disabled={continueDisabled} />;
+      })() : null}>
+      <div key={`eq-${question.id}-${animKey}`} className="flex flex-col items-center gap-4 w-full mt-2" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+        <VerifyModeToggle darkMode={darkMode} expertMode={expertMode} setExpertMode={setExpertMode} completedCount={completedCount} />
         {isVerdict && question.text.includes('\n') ? (<>
           <p className={`text-sm font-medium tracking-wide uppercase ${TH('text-muted', darkMode)}`}>{question.text.split('\n')[0]}</p>
           <h2 className={`question-text font-semibold px-2 text-center -mt-3 ${TH('text-primary', darkMode)}`}>{question.text.split('\n')[1]}</h2>
@@ -8387,28 +8599,381 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack }) => {
         {isText && <VerifyTextInput question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleAnswer} onContinue={advance} />}
         {isStar && <VerifyStarConfidence color={color} darkMode={darkMode} value={answers[question.id]} onChange={handleAnswer} />}
         {isVerdict && <VerifyVerdict question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleAnswer} />}
+        {isCompactConnection && <VerifyCompactConnection question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleAnswer} />}
+        {isEvidenceCombined && <VerifyEvidenceCombined question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleAnswer} />}
+        {isIdentityCheck && <VerifyIdentityCheck question={question} color={color} darkMode={darkMode} answer={answers[question.id]} onAnswer={handleAnswer} />}
       </div>
     </VerifyScreenLayout>
   </>);
 };
 
+// VerifyExpertForm — single scrollable express evaluation form
+const VerifyExpertForm = ({ darkMode, subject, onComplete, onBack, sharedPath, setSharedPath, sharedAnswers, setSharedAnswers, expertMode, setExpertMode, completedCount }) => {
+  const path = sharedPath;
+  const setPath = setSharedPath;
+  const answers = sharedAnswers;
+  const setAnswers = setSharedAnswers;
+  const [phase, setPhase] = useState(path ? 'form' : 'select-path');
+
+  const config = path ? VERIFY_PATH_CONFIG[path] : null;
+  const color = config ? config.color : 'emerald';
+  const c = COLOR_HEX[color] || COLOR_HEX.emerald;
+  const verdictKey = path === 'A' ? 'a3-verdict' : path === 'B' ? 'b4-verdict' : 'c4-verdict';
+  const verdict = answers[verdictKey];
+  const canSubmit = verdict?.verdict && verdict?.confidence;
+
+  const setAnswer = (id, val) => setAnswers(prev => ({ ...prev, [id]: val }));
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    onComplete({ path, pathLabel: config.label, answers });
+  };
+
+  // Inline chip selector — scaled up for expert mode
+  const ExpertChip = ({ options, value, onChange, chipColor }) => {
+    const fc = COLOR_HEX[chipColor] || c;
+    return (
+      <div className="flex flex-wrap gap-2">
+        {options.map(opt => {
+          const sel = value === opt;
+          return (
+            <button key={opt} onClick={() => onChange(opt)}
+              className="px-3.5 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{
+                background: sel ? `rgba(${fc.rgb}, 0.25)` : (darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'),
+                border: sel ? `1px solid rgba(${fc.rgb}, 0.45)` : (darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)'),
+                color: sel ? (darkMode ? '#fff' : fc.base) : (darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)'),
+              }}>
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Toggle pill — scaled up
+  const ExpertPill = ({ label, isOn, onToggle, pillColor }) => {
+    const pc = pillColor ? (COLOR_HEX[pillColor] || c) : c;
+    return (
+      <button onClick={onToggle}
+        className="px-3.5 py-2 rounded-xl text-sm font-medium transition-all"
+        style={{
+          background: isOn ? `rgba(${pc.rgb}, 0.2)` : (darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'),
+          border: isOn ? `1px solid rgba(${pc.rgb}, 0.35)` : (darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)'),
+          color: isOn ? (darkMode ? '#fff' : pc.base) : (darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)'),
+        }}>
+        {label}
+      </button>
+    );
+  };
+
+  // Path selection phase
+  if (phase === 'select-path') {
+    const ec = COLOR_HEX.emerald;
+    return (
+      <div className={`flex-1 flex flex-col relative overflow-hidden ${TH('bg-main', darkMode)}`}>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-8%' }}>
+          <div style={{ position: 'absolute', width: 420, height: 420, borderRadius: '50%',
+            background: darkMode ? `radial-gradient(circle, rgba(${ec.rgb},0.14) 0%, rgba(${ec.rgb},0.05) 35%, transparent 65%)` : `radial-gradient(circle, rgba(${ec.rgb},0.10) 0%, rgba(${ec.rgb},0.04) 35%, transparent 65%)`,
+            animation: 'aura-breathe 8s ease-in-out infinite' }} />
+        </div>
+        <button onClick={onBack}
+          className={`absolute top-4 left-4 z-50 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 ${
+            darkMode ? 'bg-white/[0.06] border border-white/[0.08] text-white/40 hover:text-white/70' : 'bg-black/[0.04] border border-black/[0.08] text-gray-400 hover:text-gray-600'}`}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 2L4 7L9 12" /></svg>
+        </button>
+        <div className="relative z-10 flex flex-col h-full w-full">
+          <div className="flex-1 overflow-y-auto flex flex-col items-center w-full">
+            <div className="w-full max-w-sm mx-auto px-5 pt-12 pb-4 flex flex-col items-center">
+              <VerifyModeToggle darkMode={darkMode} expertMode={expertMode} setExpertMode={setExpertMode} completedCount={completedCount} />
+              <VerifySubjectBanner subject={subject} color="emerald" darkMode={darkMode} />
+              <h2 className={`question-text font-semibold px-2 text-center mb-4 ${TH('text-primary', darkMode)}`}>
+                How do you know them?
+              </h2>
+              <div className="flex flex-col gap-3 w-full">
+                {[
+                  { key: 'A', label: 'I know them personally', sub: 'Vouch for their identity', color: 'cyan', icon: '🤝' },
+                  { key: 'B', label: 'I met them for verification', sub: 'Investigated with evidence', color: 'amber', icon: '🔍' },
+                  { key: 'C', label: "I'm reviewing their profile", sub: "Analyzing what's available", color: 'slate', icon: '📋' },
+                ].map(opt => {
+                  const oc = COLOR_HEX[opt.color];
+                  return (
+                    <button key={opt.key} onClick={() => { setPath(opt.key); setAnswers({ gate: opt.label }); setPhase('form'); }}
+                      className={`w-full rounded-2xl px-4 py-3.5 text-left transition-all duration-200 hover-glow hover-glow-${opt.color}`}
+                      style={{
+                        background: `linear-gradient(135deg, rgba(${oc.rgb}, 0.12), rgba(${oc.rgb}, 0.04))`,
+                        border: `1px solid rgba(${oc.rgb}, 0.2)`,
+                      }}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">{opt.icon}</span>
+                        <div>
+                          <div className={`text-sm font-semibold ${TH('text-primary', darkMode)}`}>{opt.label}</div>
+                          <div className="text-xs mt-0.5" style={{ color: darkMode ? `rgba(${oc.rgb}, 0.7)` : oc.base + '99' }}>{opt.sub}</div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Form phase
+  const questions = config.questions;
+
+  return (
+    <div className={`flex-1 flex flex-col relative overflow-hidden ${TH('bg-main', darkMode)}`}>
+      {/* Header with subject + path indicator */}
+      <div className={`flex-shrink-0 px-4 py-3 border-b ${TH('border-base', darkMode)}`}>
+        <div className="flex items-center gap-3">
+          <button onClick={onBack}
+            className={`w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 ${
+              darkMode ? 'bg-white/[0.06] border border-white/[0.08] text-white/40' : 'bg-black/[0.04] border border-black/[0.08] text-gray-400'}`}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 2L4 7L9 12" /></svg>
+          </button>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+            style={{ background: `rgba(${c.rgb}, 0.2)`, color: darkMode ? c.light : c.base }}>
+            {subject?.name?.[0] || '?'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className={`text-sm font-semibold truncate ${TH('text-primary', darkMode)}`}>{subject?.name}</div>
+            <div className={`text-xs truncate ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>{subject?.city}</div>
+          </div>
+          <button onClick={() => { setPhase('select-path'); setAnswers({}); setPath(null); }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all"
+            style={{
+              background: `rgba(${c.rgb}, 0.15)`,
+              border: `1px solid rgba(${c.rgb}, 0.25)`,
+              color: darkMode ? c.light : c.base,
+            }}>
+            <span className="text-xs font-medium">{config.label}</span>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M2.5 2.5L7.5 7.5M7.5 2.5L2.5 7.5" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      {/* Mode toggle */}
+      <div className="flex-shrink-0 pt-3">
+        <VerifyModeToggle darkMode={darkMode} expertMode={expertMode} setExpertMode={setExpertMode} completedCount={completedCount} />
+      </div>
+      {/* Scrollable form — scaled up */}
+      <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-6">
+        {questions.map(q => {
+          if (q.conditional && !q.conditional(answers)) return null;
+          const a = answers[q.id];
+          return (
+            <div key={q.id}>
+              <div className={`text-sm font-semibold mb-2 ${TH('text-primary', darkMode)}`}>{q.text}</div>
+              {q.subtitle && <div className={`text-xs mb-2 -mt-1 ${TH('text-subtle', darkMode)}`}>{q.subtitle}</div>}
+
+              {q.type === 'single' && (
+                <ExpertChip options={q.dynamicOptions ? q.dynamicOptions(answers) : q.options}
+                  value={a} onChange={v => setAnswer(q.id, v)} chipColor={color} />
+              )}
+
+              {q.type === 'multi' && (() => {
+                const selected = Array.isArray(a) ? a : [];
+                const toggle = (opt) => {
+                  const next = selected.includes(opt) ? selected.filter(x => x !== opt) : [...selected, opt];
+                  setAnswer(q.id, next);
+                };
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    {q.options.map(opt => (
+                      <ExpertPill key={opt} label={opt} isOn={selected.includes(opt)} onToggle={() => toggle(opt)} />
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {q.type === 'text' && (
+                <input type="text" value={a || ''} onChange={e => setAnswer(q.id, e.target.value)}
+                  placeholder={q.placeholder || ''}
+                  className={`w-full text-sm px-4 py-3 rounded-xl bg-transparent outline-none ${darkMode ? 'border border-white/10 text-white placeholder-gray-600' : 'border border-gray-200 text-gray-900 placeholder-gray-300'}`} />
+              )}
+
+              {q.type === 'star-confidence' && (
+                <div className="flex gap-3">
+                  {[1,2,3,4].map(level => {
+                    const sel = a !== undefined && level <= a;
+                    return (
+                      <button key={level} onClick={() => setAnswer(q.id, level)}
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all"
+                        style={{
+                          background: sel ? `rgba(${c.rgb}, ${0.15 + level * 0.1})` : (darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                          border: sel ? `1px solid rgba(${c.rgb}, 0.5)` : (darkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)'),
+                          color: sel ? '#fff' : (darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'),
+                        }}>
+                        {level}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {q.type === 'compact-connection' && (
+                <div className="space-y-4">
+                  {q.fields.map(f => (
+                    <div key={f.id}>
+                      <div className={`text-xs font-semibold uppercase tracking-wide mb-1.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{f.label}</div>
+                      <ExpertChip options={f.options} value={(a || {})[f.id]}
+                        onChange={v => setAnswer(q.id, { ...(a || {}), [f.id]: v })} chipColor={color} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {q.type === 'evidence-combined' && (
+                <div className="space-y-4">
+                  {q.sections.map((s, si) => {
+                    const selected = (a || {})[`s${si}`] || [];
+                    const toggle = (opt) => {
+                      const next = selected.includes(opt) ? selected.filter(x => x !== opt) : [...selected, opt];
+                      setAnswer(q.id, { ...(a || {}), [`s${si}`]: next });
+                    };
+                    return (
+                      <div key={si}>
+                        <div className={`text-xs font-semibold uppercase tracking-wide mb-1.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{s.label}</div>
+                        <div className="flex flex-wrap gap-2">
+                          {s.options.map(opt => (
+                            <ExpertPill key={opt} label={opt} isOn={selected.includes(opt)} onToggle={() => toggle(opt)} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {q.type === 'identity-check' && (
+                <div className="space-y-4">
+                  {q.fields.map(f => (
+                    <div key={f.id}>
+                      <div className={`text-xs font-semibold uppercase tracking-wide mb-1.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{f.label}</div>
+                      {f.subtitle && <div className={`text-xs -mt-0.5 mb-1.5 ${TH('text-subtle', darkMode)}`}>{f.subtitle}</div>}
+                      <ExpertChip options={f.options} value={(a || {})[f.id]}
+                        onChange={v => setAnswer(q.id, { ...(a || {}), [f.id]: v })} chipColor={color} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {q.type === 'verdict' && (() => {
+                const val = a || {};
+                const vFlags = val.flags || [];
+                const toggleFlag = (flag) => {
+                  const next = vFlags.includes(flag) ? vFlags.filter(f => f !== flag) : [...vFlags, flag];
+                  setAnswer(q.id, { ...val, flags: next });
+                };
+                return (
+                  <div className="space-y-4">
+                    <div className="flex gap-3">
+                      {(q.verdictOptions || ['Yes', 'No']).map((opt, i) => {
+                        const isYes = i === 0;
+                        const sel = val.verdict === opt;
+                        const vc = isYes ? COLOR_HEX.emerald : COLOR_HEX.rose;
+                        return (
+                          <button key={opt} onClick={() => setAnswer(q.id, { ...val, verdict: opt })}
+                            className="flex-1 py-3.5 rounded-2xl text-base font-semibold transition-all"
+                            style={{
+                              background: sel ? `rgba(${vc.rgb}, 0.2)` : (darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+                              border: sel ? `1.5px solid rgba(${vc.rgb}, 0.5)` : (darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'),
+                              color: sel ? (darkMode ? '#fff' : vc.base) : (darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)'),
+                            }}>
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {val.verdict && (
+                      <div className="flex gap-3 items-center">
+                        {[1,2,3,4].map(level => {
+                          const sel = val.confidence !== undefined && level <= val.confidence;
+                          return (
+                            <button key={level} onClick={() => setAnswer(q.id, { ...val, confidence: level })}
+                              className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all"
+                              style={{
+                                background: sel ? `rgba(${c.rgb}, ${0.15 + level * 0.1})` : (darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                                border: sel ? `1px solid rgba(${c.rgb}, 0.5)` : (darkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)'),
+                                color: sel ? '#fff' : (darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'),
+                              }}>
+                              {level}
+                            </button>
+                          );
+                        })}
+                        {val.confidence && (
+                          <span className={`text-xs ml-1 ${TH('text-subtle', darkMode)}`}>
+                            {VERIFY_CONFIDENCE_LABELS[(val.confidence || 1) - 1]}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {val.verdict && q.flags && (
+                      <div>
+                        <div className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Concerns</div>
+                        <div className="flex flex-wrap gap-2">
+                          {q.flags.map(flag => (
+                            <ExpertPill key={flag} label={flag} isOn={vFlags.includes(flag)} onToggle={() => toggleFlag(flag)} pillColor="amber" />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          );
+        })}
+      </div>
+      {/* Fixed submit button */}
+      <div className={`flex-shrink-0 px-5 py-4 border-t ${TH('border-base', darkMode)}`}>
+        <button onClick={handleSubmit} disabled={!canSubmit}
+          className={`w-full py-4 rounded-2xl font-semibold text-sm transition-all disabled:opacity-30`}
+          style={{
+            background: canSubmit
+              ? `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.15))`
+              : (darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+            border: `1px solid rgba(${c.rgb}, ${canSubmit ? 0.35 : 0.1})`,
+            color: canSubmit ? '#fff' : (darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'),
+          }}>
+          Submit Evaluation
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // VerifyEvalSummary — evaluation summary after completing
-const VerifyEvalSummary = ({ darkMode, data, subject, onSubmit, onBack }) => {
+const VerifyEvalSummary = ({ darkMode, data, subject, onSubmit, onBack, readOnly }) => {
   const { path, pathLabel, answers } = data;
   const config = VERIFY_PATH_CONFIG[path];
   const color = config.color;
   const c = COLOR_HEX[color];
-  const verdictKey = path === 'A' ? 'a3-verdict' : path === 'B' ? 'b5-verdict' : 'c6-verdict';
+  const verdictKey = path === 'A' ? 'a3-verdict' : path === 'B' ? 'b4-verdict' : 'c4-verdict';
   const verdictData = answers[verdictKey] || {};
   const verdict = verdictData.verdict;
   const isPositive = verdict === 'Yes';
   const confidence = verdictData.confidence || '--';
   const confLabels = { 1: 'Some confidence, notable gaps', 2: 'Fairly confident, minor uncertainty', 3: 'Very confident', 4: 'Certain' };
-  const rows = config.questions.filter(q => answers[q.id] !== undefined && q.type !== 'verdict').map(q => ({
-    label: q.text,
-    value: Array.isArray(answers[q.id]) ? answers[q.id].join(', ')
-      : (answers[q.id]?.items ? (answers[q.id].items.join(', ') + (answers[q.id].otherText ? ` (${answers[q.id].otherText})` : '')) : String(answers[q.id]))
-  }));
+  const rows = config.questions.filter(q => answers[q.id] !== undefined && q.type !== 'verdict').flatMap(q => {
+    const a = answers[q.id];
+    if (q.type === 'compact-connection') {
+      return (q.fields || []).filter(f => a?.[f.id]).map(f => ({ label: f.label, value: a[f.id] }));
+    }
+    if (q.type === 'evidence-combined') {
+      return (q.sections || []).map((s, si) => ({ label: s.label, value: (a?.[`s${si}`] || []).join(', ') || 'None' }));
+    }
+    if (q.type === 'identity-check') {
+      return (q.fields || []).filter(f => a?.[f.id]).map(f => ({ label: f.label, value: a[f.id] }));
+    }
+    return [{ label: q.text, value: Array.isArray(a) ? a.join(', ') : (a?.items ? (a.items.join(', ') + (a.otherText ? ` (${a.otherText})` : '')) : String(a)) }];
+  });
 
   return (
     <VerifyScreenLayout darkMode={darkMode} color={color} onBack={onBack}>
@@ -8446,6 +9011,16 @@ const VerifyEvalSummary = ({ darkMode, data, subject, onSubmit, onBack }) => {
             })}
           </div>
           <div className={`text-xs ${TH('text-muted', darkMode)}`}>{confLabels[confidence] || 'Confidence'}</div>
+          {verdictData.flags && verdictData.flags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 justify-center mt-3 pt-3" style={{ borderTop: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)' }}>
+              {verdictData.flags.map(f => (
+                <span key={f} className="px-2.5 py-1 rounded-full text-xs font-medium"
+                  style={{ background: darkMode ? 'rgba(251,191,36,0.15)' : 'rgba(217,119,6,0.1)', color: darkMode ? '#fbbf24' : '#d97706' }}>
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className={`rounded-2xl p-5 mb-4 ${TH('bg-card', darkMode)}`}>
           <h3 className={`text-xs font-semibold uppercase tracking-wider mb-4 ${TH('text-muted', darkMode)}`}>Responses</h3>
@@ -8458,19 +9033,25 @@ const VerifyEvalSummary = ({ darkMode, data, subject, onSubmit, onBack }) => {
             ))}
           </div>
         </div>
-        {answers['fit'] && (
+        {answers['gate'] && (
           <div className={`rounded-2xl p-4 mb-4 ${TH('bg-card', darkMode)}`}>
-            <div className={`text-xs mb-1 ${TH('text-muted', darkMode)}`}>Evaluator fit</div>
-            <div className={`text-sm ${darkMode ? 'text-white/80' : 'text-gray-800'}`}>{answers['fit']}</div>
+            <div className={`text-xs mb-1 ${TH('text-muted', darkMode)}`}>Relationship</div>
+            <div className={`text-sm ${darkMode ? 'text-white/80' : 'text-gray-800'}`}>{answers['gate']}</div>
           </div>
         )}
-        <p className={`text-xs text-center mb-6 px-4 ${TH('text-subtle', darkMode)}`}>
-          This evaluation will be weighted by your path ({pathLabel}), your confidence level, and your reputation in the network.
-        </p>
-        <VerifyActionButton label="Submit Evaluation" color={color} darkMode={darkMode} onClick={onSubmit} />
-        <div className="mt-3">
-          <VerifyActionButton label="Start Over" color="gray" darkMode={darkMode} onClick={onBack} secondary />
-        </div>
+        {readOnly ? (
+          <p className={`text-sm text-center mb-6 px-4 ${TH('text-subtle', darkMode)}`}>
+            Submitted {data.completedAt ? new Date(data.completedAt).toLocaleDateString() : ''}
+          </p>
+        ) : (<>
+          <p className={`text-xs text-center mb-6 px-4 ${TH('text-subtle', darkMode)}`}>
+            This evaluation will be weighted by your path ({pathLabel}), your confidence level, and your reputation in the network.
+          </p>
+          <VerifyActionButton label="Submit Evaluation" color={color} darkMode={darkMode} onClick={onSubmit} />
+          <div className="mt-3">
+            <VerifyActionButton label="Start Over" color="gray" darkMode={darkMode} onClick={onBack} secondary />
+          </div>
+        </>)}
       </div>
     </VerifyScreenLayout>
   );
@@ -8478,7 +9059,7 @@ const VerifyEvalSummary = ({ darkMode, data, subject, onSubmit, onBack }) => {
 
 
 // SettingsScreen
-const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak, showDemoControls, setShowDemoControls, entityType, setEntityType, onBack, onReset, onResetAssessments, hasAssessmentData, onHistory, onResetVerification, hasVerificationData }) => (
+const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak, showDemoControls, setShowDemoControls, entityType, setEntityType, onBack, onReset, onResetAssessments, hasAssessmentData, onHistory, onResetVerification, hasVerificationData, verifyExpertMode, setVerifyExpertMode }) => (
   <div className={`flex-1 flex flex-col overflow-hidden ${TH('bg-main', darkMode)}`}>
     <div className={`flex items-center justify-between px-4 py-3 border-b ${TH('border-base', darkMode)}`}>
       <button onClick={onBack} className={`text-sm btn-feedback ${TH('text-violet', darkMode)}`}>← Back</button>
@@ -8549,6 +9130,15 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
           <div><div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Demo Profiles</div><div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>View sample assessment data</div></div>
           <button onClick={() => setShowDemoControls(!showDemoControls)} className={`relative w-12 h-6 rounded-full btn-feedback ${showDemoControls ? 'bg-violet-600' : darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
             <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showDemoControls ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+      </div>
+      {/* Express Evaluation Mode */}
+      <div className={`rounded-lg p-3 ${TH('bg-card-shine', darkMode)}`}>
+        <div className="flex items-center justify-between">
+          <div><div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Express Evaluation Mode</div><div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Single-form compact evaluations</div></div>
+          <button onClick={() => setVerifyExpertMode(!verifyExpertMode)} className={`relative w-12 h-6 rounded-full btn-feedback ${verifyExpertMode ? 'bg-amber-500' : darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${verifyExpertMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
           </button>
         </div>
       </div>
@@ -9351,13 +9941,165 @@ const StampRow = ({ provider, claim, isEmail, isLinked, darkMode, onLink, onUnli
 };
 
 // IdentityScreen — Full stamp management with sharing
+const IDENTITY_STORAGE_KEY = 'aura-identity-v1';
+const IDENTITY_ONBOARDING_KEY = 'aura-identity-onboarding-v1';
+const identityLoad = () => { try { return JSON.parse(localStorage.getItem(IDENTITY_STORAGE_KEY)) || {}; } catch { return {}; } };
+const identitySave = (data) => { try { localStorage.setItem(IDENTITY_STORAGE_KEY, JSON.stringify(data)); } catch {} };
+const identityOnboardingLoad = () => { try { return JSON.parse(localStorage.getItem(IDENTITY_ONBOARDING_KEY)) || null; } catch { return null; } };
+const identityOnboardingSave = (data) => { try { localStorage.setItem(IDENTITY_ONBOARDING_KEY, JSON.stringify(data)); } catch {} };
+
+// Identity onboarding questions — conversational, helps find connections
+const IDENTITY_ONBOARDING_QUESTIONS = [
+  { id: 'source', color: 'emerald', sectionLabel: 'Getting Started', text: 'How did you find Aura?', type: 'single',
+    options: ['A friend told me about it', 'Just exploring on my own', 'I want to prove my identity', 'Someone sent me a link'] },
+  { id: 'referrer', color: 'emerald', sectionLabel: 'Getting Started', text: 'Who told you about it?', type: 'text', placeholder: 'Their name or username',
+    conditional: (a) => a.source === 'A friend told me about it' || a.source === 'Someone sent me a link' },
+  { id: 'know-anyone', color: 'blue', sectionLabel: 'Connections', text: 'Do you know anyone already using Aura?', type: 'single',
+    options: ["Yeah, I think so", "Maybe — not sure", "Nope, I'm new here"] },
+  { id: 'connection-name', color: 'blue', sectionLabel: 'Connections', text: 'Who? We\'ll help you find them.', type: 'text', placeholder: 'Their name or username',
+    conditional: (a) => a['know-anyone'] === "Yeah, I think so" || a['know-anyone'] === "Maybe — not sure" },
+  { id: 'location', color: 'emerald', sectionLabel: 'About You', text: 'Where are you based?', type: 'text', placeholder: 'City, Country',
+    subtitle: 'Helps connect you with people nearby. Private by default.' },
+];
+
+// IdentityOnboarding — guided setup flow, gates Identity screen on first visit
+const IdentityOnboarding = ({ darkMode, onComplete, onBack }) => {
+  const [answers, setAnswers] = useState({});
+  const [currentScreenId, setCurrentScreenId] = useState(IDENTITY_ONBOARDING_QUESTIONS[0].id);
+  const [animKey, setAnimKey] = useState(0);
+
+  const activeQuestions = useMemo(() => {
+    return IDENTITY_ONBOARDING_QUESTIONS.filter(q => !q.conditional || q.conditional(answers));
+  }, [answers]);
+
+  const allScreenIds = activeQuestions.map(q => q.id);
+  const currentIdx = allScreenIds.indexOf(currentScreenId);
+  const currentQ = IDENTITY_ONBOARDING_QUESTIONS.find(q => q.id === currentScreenId);
+
+  const goToScreen = (id) => { setAnimKey(k => k + 1); setCurrentScreenId(id); };
+  const advance = () => {
+    // Recompute active list with current answers (may have changed from this answer)
+    const freshActive = IDENTITY_ONBOARDING_QUESTIONS.filter(q => !q.conditional || q.conditional(answers)).map(q => q.id);
+    const freshIdx = freshActive.indexOf(currentScreenId);
+    const nextIdx = freshIdx + 1;
+    if (nextIdx < freshActive.length) goToScreen(freshActive[nextIdx]);
+    else {
+      // Save location as first check-in if provided
+      if (answers.location?.trim()) {
+        const existing = identityLoad();
+        const checkins = [...(existing.checkins || []), { location: answers.location.trim(), date: new Date().toISOString() }];
+        identitySave({ ...existing, checkins });
+      }
+      identityOnboardingSave(answers);
+      onComplete(answers);
+    }
+  };
+  const goBack = () => {
+    if (currentIdx > 0) goToScreen(allScreenIds[currentIdx - 1]);
+    else onBack();
+  };
+  const handleAnswer = (val) => setAnswers(prev => ({ ...prev, [currentScreenId]: val }));
+
+  if (!currentQ) return null;
+
+  const isSingle = currentQ.type === 'single';
+  const isText = currentQ.type === 'text';
+  const handleSingleAnswer = (val) => { handleAnswer(val); setTimeout(() => {
+    // Recompute after state update
+    const fresh = { ...answers, [currentScreenId]: val };
+    const freshActive = IDENTITY_ONBOARDING_QUESTIONS.filter(q => !q.conditional || q.conditional(fresh)).map(q => q.id);
+    const freshIdx = freshActive.indexOf(currentScreenId);
+    if (freshIdx + 1 < freshActive.length) goToScreen(freshActive[freshIdx + 1]);
+    else {
+      if (fresh.location?.trim()) {
+        const existing = identityLoad();
+        const checkins = [...(existing.checkins || []), { location: fresh.location.trim(), date: new Date().toISOString() }];
+        identitySave({ ...existing, checkins });
+      }
+      identityOnboardingSave(fresh);
+      onComplete(fresh);
+    }
+  }, 300); };
+
+  const needsContinueButton = isText;
+  const continueDisabled = isText ? !(answers[currentScreenId] || '').trim() : false;
+
+  return (
+    <VerifyScreenLayout darkMode={darkMode} color={currentQ.color} sectionLabel={currentQ.sectionLabel}
+      progress={currentIdx} total={allScreenIds.length}
+      onBack={goBack}
+      buttons={
+        <div className="flex flex-col gap-2">
+          {needsContinueButton && <VerifyActionButton label="Continue" color={currentQ.color} darkMode={darkMode} onClick={advance} disabled={continueDisabled} />}
+          {isText && <button onClick={() => { handleAnswer(''); advance(); }}
+            className={`text-xs py-2 transition-colors ${TH('text-subtle', darkMode)}`}>
+            Skip
+          </button>}
+        </div>
+      }>
+      <div key={`iq-${currentScreenId}-${animKey}`} className="flex flex-col items-center gap-5 w-full mt-4" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+        <h2 className={`question-text font-semibold px-2 text-center ${TH('text-primary', darkMode)}`}>{currentQ.text}</h2>
+        {currentQ.subtitle && <p className={`text-xs text-center -mt-2 px-4 ${TH('text-muted', darkMode)}`}>{currentQ.subtitle}</p>}
+        {isSingle && <VerifySingleSelect question={currentQ} color={currentQ.color} darkMode={darkMode} answer={answers[currentScreenId]} onAnswer={handleSingleAnswer} answers={answers} />}
+        {isText && <VerifyTextInput question={currentQ} color={currentQ.color} darkMode={darkMode} answer={answers[currentScreenId]} onAnswer={handleAnswer} onContinue={advance} />}
+      </div>
+    </VerifyScreenLayout>
+  );
+};
+
+// Human-readable labels for gateway verify signals
+const VERIFY_SIGNAL_LABELS = {
+  socialDepth: {
+    label: 'Social closeness',
+    values: ['Close relationships run deep', 'A few people really know you', 'You keep most people at arm\'s length'],
+  },
+  consistency: {
+    label: 'Consistency',
+    values: ['Creature of habit — same routines, same accounts', 'Somewhat consistent', 'Likes to mix things up'],
+  },
+  depth: {
+    label: 'Focus style',
+    values: ['Goes deep on one thing', 'Depends on the topic', 'Prefers variety'],
+  },
+  adaptability: {
+    label: 'Adaptability',
+    values: ['Rolls with whatever comes', 'Adapts after a moment', 'Likes knowing what\'s next'],
+  },
+  openToContact: {
+    label: 'Openness to new people',
+    values: ['Jumps in — life\'s short', 'Cautious but curious', 'Sticks with what they know'],
+  },
+};
+
 const IdentityScreen = ({ darkMode, userClaims, onClaimsChange, assessCompleted, entityType, displayName, onBack }) => {
+  const [onboardingDone, setOnboardingDone] = useState(() => !!identityOnboardingLoad());
   const [tempUnlocked, setTempUnlocked] = useState({});
   const [showUnlinked, setShowUnlinked] = useState(false);
   const [choosingPrimary, setChoosingPrimary] = useState(false);
+  // Self-verification fields (location check-ins) — must be above gate for hooks rules
+  const [selfVerify, setSelfVerify] = useState(identityLoad);
   const toggleTempUnlock = (providerId) => {
     setTempUnlocked(prev => ({ ...prev, [providerId]: !prev[providerId] }));
   };
+  const updateSelfVerify = (key, val) => {
+    setSelfVerify(prev => {
+      const next = { ...prev, [key]: val };
+      identitySave(next);
+      return next;
+    });
+  };
+
+  // Gateway verify signals
+  const verifySignals = assessCompleted?.['quick-profile']?.verifySignals || null;
+
+  // Gate: show onboarding flow if not completed
+  if (!onboardingDone) {
+    return (
+      <IdentityOnboarding darkMode={darkMode}
+        onComplete={() => setOnboardingDone(true)}
+        onBack={onBack} />
+    );
+  }
 
   const primaryClaim = (userClaims || []).find(c => c.weight === 1);
   const primaryClaimId = primaryClaim?.id || null;
@@ -9519,21 +10261,103 @@ const IdentityScreen = ({ darkMode, userClaims, onClaimsChange, assessCompleted,
             </>
           ))}
         </div>
+
+        {/* From Your Answers — gateway verify signals */}
+        {verifySignals && Object.keys(verifySignals).length > 0 && (
+          <div className="space-y-2">
+            <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>From Your Answers</div>
+            <div className={`rounded-xl overflow-hidden ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'}`}>
+              {Object.entries(verifySignals).map(([key, optIdx], i) => {
+                const info = VERIFY_SIGNAL_LABELS[key];
+                if (!info || info.values[optIdx] === undefined) return null;
+                return (
+                  <div key={key} className={`px-3 py-2.5 flex items-start gap-3 ${i > 0 ? (darkMode ? 'border-t border-white/[0.04]' : 'border-t border-gray-100') : ''}`}>
+                    <div className="flex-1">
+                      <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{info.label}</div>
+                      <div className={`text-sm mt-0.5 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{info.values[optIdx]}</div>
+                    </div>
+                    <div className={`text-xs px-1.5 py-0.5 rounded ${darkMode ? 'bg-white/[0.04] text-gray-500' : 'bg-gray-200 text-gray-400'}`}>private</div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+              Gathered from your assessment answers. Private by default — you choose what to share.
+            </p>
+          </div>
+        )}
+
+        {/* Location Check-in */}
+        <div className="space-y-2">
+          <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Location</div>
+          {selfVerify.checkins?.length > 0 ? (
+            <div className={`rounded-xl overflow-hidden ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'}`}>
+              {selfVerify.checkins.slice(-3).reverse().map((ci, i) => (
+                <div key={i} className={`px-3 py-2.5 flex items-center gap-3 ${i > 0 ? (darkMode ? 'border-t border-white/[0.04]' : 'border-t border-gray-100') : ''}`}>
+                  <span className="text-sm">📍</span>
+                  <div className="flex-1">
+                    <div className={`text-sm ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{ci.location}</div>
+                    <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{new Date(ci.date).toLocaleDateString()}</div>
+                  </div>
+                  <div className={`text-xs px-1.5 py-0.5 rounded ${darkMode ? 'bg-white/[0.04] text-gray-500' : 'bg-gray-200 text-gray-400'}`}>private</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {/* Check-in input */}
+          <div className={`rounded-xl px-3 py-2.5 flex items-center gap-3 ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'}`}>
+            <span className="text-sm">📍</span>
+            <input type="text" value={selfVerify._checkinDraft || ''} onChange={e => updateSelfVerify('_checkinDraft', e.target.value)}
+              placeholder="Where are you? City, Country"
+              maxLength={100}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && selfVerify._checkinDraft?.trim()) {
+                  const checkins = [...(selfVerify.checkins || []), { location: selfVerify._checkinDraft.trim(), date: new Date().toISOString() }];
+                  setSelfVerify(prev => {
+                    const next = { ...prev, checkins, _checkinDraft: '' };
+                    identitySave(next);
+                    return next;
+                  });
+                }
+              }}
+              className={`flex-1 text-sm bg-transparent outline-none ${darkMode ? 'text-white placeholder-gray-600' : 'text-gray-900 placeholder-gray-300'}`} />
+            <button onClick={() => {
+              if (!selfVerify._checkinDraft?.trim()) return;
+              const checkins = [...(selfVerify.checkins || []), { location: selfVerify._checkinDraft.trim(), date: new Date().toISOString() }];
+              setSelfVerify(prev => {
+                const next = { ...prev, checkins, _checkinDraft: '' };
+                identitySave(next);
+                return next;
+              });
+            }} className={`text-xs font-medium px-2.5 py-1 rounded-lg ${selfVerify._checkinDraft?.trim()
+              ? (darkMode ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-600 border border-emerald-200')
+              : (darkMode ? 'bg-white/[0.04] text-gray-600' : 'bg-gray-100 text-gray-300')}`}>
+              Check in
+            </button>
+          </div>
+          <p className={`text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+            Timestamped check-ins build location history. Private until you choose to share.
+          </p>
+        </div>
       </div>
     </div>
   );
 };
 
 // ProfileScreen — Clean hub with personality + assessments
-const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType, onboardingAnswers, onNavigate, userClaims, onClaimsChange }) => {
+const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType, onboardingAnswers, onNavigate, userClaims, onClaimsChange, demoOverrides }) => {
   // Display name editing
   const [profileDisplayName, setProfileDisplayName] = useState(getDisplayName);
   const [editingProfileName, setEditingProfileName] = useState(false);
   const [profileNameInput, setProfileNameInput] = useState('');
   const [profileNameSaving, setProfileNameSaving] = useState(false);
 
+  // Demo mode overrides — take over name and claims
+  const effectiveName = demoOverrides?.name || profileDisplayName;
+  const effectiveClaims = demoOverrides?.claims || userClaims;
+
   // Primary stamp — for identity card display
-  const primaryClaim = (userClaims || []).find(c => c.weight === 1);
+  const primaryClaim = (effectiveClaims || []).find(c => c.weight === 1);
 
   useEffect(() => {
     const handler = (e) => setProfileDisplayName(e.detail?.displayName || null);
@@ -9586,6 +10410,7 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
       <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 border-b ${TH('border-base', darkMode)}`}>
         <button onClick={() => onNavigate('categories')} className={darkMode ? 'text-gray-400' : 'text-gray-500'}>←</button>
         <span className="font-medium flex-1">Profile</span>
+        {demoOverrides && <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 font-medium">Demo</span>}
       </div>
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
         {/* Avatar with aura glow + basic stats */}
@@ -9598,7 +10423,7 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
           ) : (
             <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center font-bold text-xl text-white"
               style={getAuraStyle()}>
-              {(profileDisplayName || getCurrentEmail() || 'G')[0].toUpperCase()}
+              {(effectiveName || getCurrentEmail() || 'G')[0].toUpperCase()}
             </div>
           )}
           <div className="flex-1">
@@ -9624,8 +10449,8 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <h2 className="font-semibold text-lg">{profileDisplayName || getCurrentEmail() || 'Guest'}</h2>
-                {getCurrentUser() && (
+                <h2 className="font-semibold text-lg">{effectiveName || getCurrentEmail() || 'Guest'}</h2>
+                {getCurrentUser() && !demoOverrides && (
                   <button onClick={() => { setProfileNameInput(profileDisplayName || ''); setEditingProfileName(true); }}
                     className={`text-xs px-1.5 py-0.5 rounded btn-feedback ${darkMode ? 'bg-white/[0.06] text-gray-500 hover:text-gray-300' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
                     Edit
@@ -9679,26 +10504,39 @@ const ProfileScreen = ({ darkMode, responses, assessCompleted, stats, entityType
           </div>
         </button>
 
-        {/* Primary Identity — compact card with Manage link */}
-        {getCurrentUser() && (() => {
+        {/* Identity & Connections — always visible */}
+        {(() => {
           const primaryDisplay = primaryClaim
             ? (formatStampDisplay(primaryClaim.provider, primaryClaim.value) || primaryClaim.label || primaryClaim.provider)
             : getCurrentEmail();
           const primaryProvider = primaryClaim
             ? STAMP_PROVIDERS.find(p => p.id === primaryClaim.provider)
-            : STAMP_PROVIDERS.find(p => p.id === 'email');
-          const linkedCount = (userClaims || []).length;
+            : (getCurrentUser() ? STAMP_PROVIDERS.find(p => p.id === 'email') : null);
+          const linkedCount = (effectiveClaims || []).length;
+          const c = COLOR_HEX.emerald;
           return (
             <button
               onClick={() => onNavigate('identity')}
-              className={`w-full rounded-xl px-3 py-2.5 flex items-center gap-3 text-left ${darkMode ? 'bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.15]' : 'bg-white border border-gray-200 hover:border-gray-300'}`}
+              className={`w-full rounded-2xl p-4 flex items-center gap-4 text-left`}
+              style={{
+                background: darkMode
+                  ? `linear-gradient(135deg, rgba(${c.rgb}, 0.08), rgba(${c.rgb}, 0.03))`
+                  : `linear-gradient(135deg, rgba(${c.rgb}, 0.06), rgba(${c.rgb}, 0.02))`,
+                border: darkMode ? `1px solid rgba(${c.rgb}, 0.2)` : `1px solid rgba(${c.rgb}, 0.15)`,
+              }}
             >
-              {primaryProvider && <StampIcon provider={primaryProvider} size={16} />}
-              <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{primaryDisplay}</div>
-                {linkedCount > 1 && <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{linkedCount} linked accounts</div>}
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0`}
+                style={{ background: `rgba(${c.rgb}, ${darkMode ? 0.15 : 0.1})` }}>
+                {primaryProvider ? <StampIcon provider={primaryProvider} size={18} /> : <span className="text-lg">🔗</span>}
               </div>
-              <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Manage →</span>
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Identity & Connections</div>
+                <div className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {primaryDisplay ? primaryDisplay : 'Link accounts & build trust'}
+                  {linkedCount > 1 && ` · ${linkedCount} linked`}
+                </div>
+              </div>
+              <span className={`text-sm font-medium ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>→</span>
             </button>
           );
         })()}
@@ -9899,9 +10737,9 @@ const AssessPickerScreen = ({
 
         {!isFirstTimeUser && heroCategory && (() => {
           const { catId, cat, catTests, hasProgress } = heroCategory;
-          const totalQuestions = catTests.reduce((sum, [_, t]) => sum + t.items.length, 0);
+          const totalQuestions = catTests.reduce((sum, [_, t]) => sum + (t.questionCount || t.items.length), 0);
           const answeredQuestions = catTests.reduce((sum, [id, t]) => {
-            if (assessCompleted[id]) return sum + t.items.length;
+            if (assessCompleted[id]) return sum + (t.questionCount || t.items.length);
             const prog = assessInProgress[id];
             return sum + (prog ? Object.keys(prog.responses || {}).length : 0);
           }, 0);
@@ -9943,9 +10781,9 @@ const AssessPickerScreen = ({
         {!isFirstTimeUser && incompleteCategories.length > 0 && (
           <div className="space-y-3 mb-6">
             {incompleteCategories.map(({ catId, cat, catTests }) => {
-              const totalQuestions = catTests.reduce((sum, [_, t]) => sum + t.items.length, 0);
+              const totalQuestions = catTests.reduce((sum, [_, t]) => sum + (t.questionCount || t.items.length), 0);
               const answeredQuestions = catTests.reduce((sum, [id, t]) => {
-                if (assessCompleted[id]) return sum + t.items.length;
+                if (assessCompleted[id]) return sum + (t.questionCount || t.items.length);
                 const prog = assessInProgress[id];
                 return sum + (prog ? Object.keys(prog.responses || {}).length : 0);
               }, 0);
@@ -10007,8 +10845,9 @@ const AssessPickerScreen = ({
                     {standaloneTests.map(([id, test]) => {
                       const isCompleted = assessCompleted[id];
                       const progress = assessInProgress[id];
-                      const answered = isCompleted ? test.items.length : progress ? Object.keys(progress.responses || {}).length : 0;
-                      const modProgressPct = (answered / test.items.length) * 100;
+                      const qc = test.questionCount || test.items.length;
+                      const answered = isCompleted ? qc : progress ? Object.keys(progress.responses || {}).length : 0;
+                      const modProgressPct = (answered / qc) * 100;
                       const hex = COLOR_HEX[cat.color] || COLOR_HEX.violet;
                       const hasSpectrumResult = isCompleted && spectrumColors[id] && isCompleted.score !== undefined;
 
@@ -10090,7 +10929,7 @@ const AssessPickerScreen = ({
                             progressiveGroups.reasoning.forEach(([id, test], idx) => {
                               const isComplete = !!assessCompleted[id];
                               const inProg = assessInProgress[id];
-                              const totalQs = test.items.length;
+                              const totalQs = test.questionCount || test.items.length;
                               if (isComplete) { rings.push({ id, isComplete: true, progress: 100 }); }
                               else if (inProg) {
                                 const answered = Object.keys(inProg.responses || {}).length;
@@ -10179,10 +11018,10 @@ const AssessPickerScreen = ({
           if (!isAIUser) {
             return (
               <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border-blue-500/30 shadow-blue-500/20 border flex items-center gap-4 shadow-lg hover-glow hover-glow-blue`}>
-                <ProgressCircle progress={0} size={72} strokeWidth={5} color="blue" text="10" gradientId={`cat-first`} darkMode={darkMode} textSize="text-base" />
+                <ProgressCircle progress={0} size={72} strokeWidth={5} color="blue" text="5" gradientId={`cat-first`} darkMode={darkMode} textSize="text-base" />
                 <div className="flex-1 text-left">
                   <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Quick Profile</div>
-                  <div className={`text-sm text-blue-400`}>~2 minutes</div>
+                  <div className={`text-sm text-blue-400`}>~1 minute</div>
                 </div>
                 <span className={`text-2xl text-blue-400`}>→</span>
               </button>
@@ -10201,7 +11040,7 @@ const AssessPickerScreen = ({
               </button>
               <p className={`text-[11px] mt-3 max-w-sm text-center ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>Designed for AI minds. Humans welcome.</p>
               <button onClick={() => onStartTest('quick-profile')} className={`w-full max-w-sm mt-3 p-3 rounded-xl ${darkMode ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-gray-50 border border-gray-200'} flex items-center gap-3 hover-glow hover-glow-blue`}>
-                <ProgressCircle progress={0} size={36} strokeWidth={3} color="blue" text="10" gradientId="cat-qp-alt" darkMode={darkMode} textSize="text-xs" />
+                <ProgressCircle progress={0} size={36} strokeWidth={3} color="blue" text="5" gradientId="cat-qp-alt" darkMode={darkMode} textSize="text-xs" />
                 <div className="flex-1 text-left">
                   <div className={`text-sm font-medium ${TH('text-primary', darkMode)}`}>Quick Profile</div>
                   <div className={`text-xs ${TH('text-dim', darkMode)}`}>General personality snapshot</div>
@@ -10233,7 +11072,7 @@ const AssessPickerScreen = ({
 };
 
 const AssessQuestionScreen = ({
-  darkMode, assessCurrentTest, assessCurrentIndex, assessTotalQuestions,
+  darkMode, assessCurrentTest, assessCurrentIndex, assessTotalQuestions, assessGatewayActiveItems,
   assessResponses, assessSkipped, assessCurrentScale, assessSwipeHandlers,
   assessShowCompletion, assessUnlockMessage, assessShowUndoToast,
   assessShowExitConfirm, assessPending, assessEntering, assessTestColor, undoDelay,
@@ -10241,13 +11080,17 @@ const AssessQuestionScreen = ({
   onHandleAnswerTap, onHandleUndo, onFinalizeSubmit,
   onSetShowExitConfirm, onSetPending, onExitWithoutSaving,
 }) => {
-  const currentItem = assessCurrentTest.items[assessCurrentIndex];
+  // Gateway branching: map visual index → raw item index
+  const gwMap = assessGatewayActiveItems || null;
+  const rawIdx = gwMap ? gwMap[assessCurrentIndex] : assessCurrentIndex;
+  const currentItem = assessCurrentTest.items[rawIdx];
   const segments = [];
   for (let i = 0; i < assessTotalQuestions; i++) {
+    const ri = gwMap ? gwMap[i] : i;
     segments.push({
-      isAnswered: assessResponses[i] !== undefined && assessResponses[i] !== null,
-      isNA: assessResponses[i] === null,
-      isSkipped: assessSkipped.includes(i) && assessResponses[i] === undefined,
+      isAnswered: assessResponses[ri] !== undefined && assessResponses[ri] !== null,
+      isNA: assessResponses[ri] === null,
+      isSkipped: assessSkipped.includes(ri) && assessResponses[ri] === undefined,
       isCurrent: i === assessCurrentIndex
     });
   }
@@ -10354,7 +11197,7 @@ const AssessQuestionScreen = ({
         </div>
         <div className={`flex-shrink-0 px-4 pb-4 space-y-2 assess-btns`}>
           {(currentItem.o ? currentItem.o.map((label, i) => ({ v: i + 1, l: label })) : assessCurrentScale).map((option, i) => {
-            const isSelected = assessResponses[assessCurrentIndex] === option.v;
+            const isSelected = assessResponses[rawIdx] === option.v;
             const isPending = assessPending === option.v;
             const colorTint = gradientStyles[assessCurrentTest.color][i % 5];
             const selStyle = selectedStyles[assessCurrentTest.color];
@@ -10375,15 +11218,17 @@ const AssessQuestionScreen = ({
               </button>
             );
           })}
-          {/* N/A option - subtle text link below scale */}
-          <div className="text-center pt-1">
+          {/* N/A option - subtle text link below scale (hidden for gateway) */}
+          {!currentItem.o && <div className="text-center pt-1">
             <button
               onClick={(e) => { e.stopPropagation(); if (assessPending) { onHandleUndo(); } else { onFinalizeSubmit(null); } }}
-              className={`text-xs px-3 py-1 rounded-full transition-colors ${assessResponses[assessCurrentIndex] === null ? (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-300 text-gray-600') : (darkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}
+              className={`text-xs px-3 py-1 rounded-full transition-colors ${assessResponses[rawIdx] === null ? (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-300 text-gray-600') : (darkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}
             >
               Doesn't apply to me
             </button>
-          </div>
+          </div>}
+          {/* Spacer for gateway 3-option layout — matches where buttons 4-5 + N/A would be */}
+          {currentItem.o && <div style={{ height: '7.5rem' }} />}
         </div>
       </div>
     </div>
@@ -10455,64 +11300,36 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
 
         {/* Quick Profile Results - Simple personality snapshot */}
         {assessCurrentTestId === 'quick-profile' && results && (() => {
-          // Generate personality snapshot from trait scores
+          // Generate personality snapshot from pre-computed trait scores
           const getTraitDescription = () => {
-            const traits = [];
-            const items = test.items;
-            const resp = results.responses || {};
+            const phrases = [];
+            const t = results.traits || {};
 
-            // Calculate rough scores for each trait from responses
-            const traitScores = { E: 0, C: 0, A: 0, N: 0, O: 0, intuition: 0, depth: 0 };
-            const traitCounts = { E: 0, C: 0, A: 0, N: 0, O: 0, intuition: 0, depth: 0 };
+            const E = t.E ?? 50, C = t.C ?? 50, A = t.A ?? 50, N = t.N ?? 50, O = t.O ?? 50;
 
-            items.forEach((item, i) => {
-              const answer = resp[i];
-              if (answer !== undefined && item.c) {
-                const score = item.k === '-' ? (6 - answer) : answer; // Reverse for negative items
-                traitScores[item.c] = (traitScores[item.c] || 0) + score;
-                traitCounts[item.c] = (traitCounts[item.c] || 0) + 1;
-              }
-            });
+            if (E > 60) phrases.push("outgoing and energized by people");
+            else if (E < 40) phrases.push("reserved and recharge through solitude");
 
-            // Normalize scores to 0-100
-            Object.keys(traitScores).forEach(k => {
-              if (traitCounts[k] > 0) {
-                traitScores[k] = Math.round((traitScores[k] / (traitCounts[k] * 5)) * 100);
-              }
-            });
+            if (C > 60) phrases.push("organized and follow-through strong");
+            else if (C < 40) phrases.push("spontaneous and flexible");
 
-            // Build description
-            const E = traitScores.E || 50;
-            const C = traitScores.C || 50;
-            const A = traitScores.A || 50;
-            const N = traitScores.N || 50;
-            const O = traitScores.O || 50;
+            if (A > 60) phrases.push("deeply empathetic");
+            else if (A < 40) phrases.push("direct and truth-seeking");
 
-            if (E > 60) traits.push("outgoing and energized by people");
-            else if (E < 40) traits.push("reserved and recharge through solitude");
+            if (N > 60) phrases.push("reflective and emotionally aware");
 
-            if (C > 60) traits.push("organized and follow-through strong");
-            else if (C < 40) traits.push("spontaneous and flexible");
+            if (O > 60) phrases.push("drawn to the unconventional");
+            else if (O < 40) phrases.push("grounded and practical");
 
-            if (A > 60) traits.push("deeply empathetic");
-            else if (A < 40) traits.push("direct and truth-seeking");
-
-            if (N > 60) traits.push("reflective and emotionally aware");
-
-            if (O > 60) traits.push("drawn to the unconventional");
-
-            if (traitScores.depth > 60) traits.push("value deep connections over crowds");
-
-            // Combine into flowing sentences
             let description = "You're ";
-            if (traits.length === 0) {
-              description += "balanced across many dimensions - adaptable and well-rounded.";
-            } else if (traits.length === 1) {
-              description += traits[0] + ".";
-            } else if (traits.length === 2) {
-              description += traits[0] + " and " + traits[1] + ".";
+            if (phrases.length === 0) {
+              description += "balanced across many dimensions — adaptable and well-rounded.";
+            } else if (phrases.length === 1) {
+              description += phrases[0] + ".";
+            } else if (phrases.length === 2) {
+              description += phrases[0] + " and " + phrases[1] + ".";
             } else {
-              description += traits.slice(0, -1).join(", ") + ", and " + traits[traits.length - 1] + ".";
+              description += phrases.slice(0, -1).join(", ") + ", and " + phrases[phrases.length - 1] + ".";
             }
 
             return description;
@@ -12625,29 +13442,44 @@ const useQotd = () => {
 };
 
 // --- useVerification Hook ---
+const VERIFY_EXPERT_KEY = 'aura-verify-expert-v1';
 const useVerification = () => {
   const verifyStored = useRef(verifyLoadFromStorage());
-  const [verifySubjectProfile, setVerifySubjectProfile] = useState(() => verifyStored.current?.subjectProfile || null);
-  const [verifySubjectAnswers, setVerifySubjectAnswers] = useState({});
   const [verifyCurrentSubjectId, setVerifyCurrentSubjectId] = useState(null);
   const [verifyEvaluatorData, setVerifyEvaluatorData] = useState(null);
+  const [verifyFlowPath, setVerifyFlowPath] = useState(null);
+  const [verifyFlowAnswers, setVerifyFlowAnswers] = useState({});
   const [verifyEvaluations, setVerifyEvaluations] = useState(() => verifyStored.current?.evaluations || {});
+  const [verifyExpertMode, setVerifyExpertMode] = useState(() => {
+    try { return localStorage.getItem(VERIFY_EXPERT_KEY) === 'true'; } catch { return false; }
+  });
+  const [verifyExpertPromptShown, setVerifyExpertPromptShown] = useState(() => {
+    try {
+      const prompted = localStorage.getItem(VERIFY_EXPERT_KEY + '-prompted') === 'true';
+      const dismissed = localStorage.getItem(VERIFY_EXPERT_KEY + '-dismissed') === 'true';
+      return prompted && !dismissed;
+    } catch { return false; }
+  });
 
   const verifySaveAll = useCallback(() => {
-    verifySaveToStorage(verifySubjectProfile, verifyEvaluations);
-  }, [verifySubjectProfile, verifyEvaluations]);
+    verifySaveToStorage(null, verifyEvaluations);
+  }, [verifyEvaluations]);
 
   useEffect(() => { verifySaveAll(); }, [verifySaveAll]);
+  useEffect(() => { try { localStorage.setItem(VERIFY_EXPERT_KEY, String(verifyExpertMode)); } catch {} }, [verifyExpertMode]);
 
   const verifyPendingCount = VERIFY_MOCK_SUBJECTS.filter(s => !verifyEvaluations[s.id]).length;
+  const verifyCompletedCount = Object.keys(verifyEvaluations).length;
 
   return {
-    verifySubjectProfile, setVerifySubjectProfile,
-    verifySubjectAnswers, setVerifySubjectAnswers,
     verifyCurrentSubjectId, setVerifyCurrentSubjectId,
     verifyEvaluatorData, setVerifyEvaluatorData,
+    verifyFlowPath, setVerifyFlowPath,
+    verifyFlowAnswers, setVerifyFlowAnswers,
     verifyEvaluations, setVerifyEvaluations,
-    verifyPendingCount,
+    verifyPendingCount, verifyCompletedCount,
+    verifyExpertMode, setVerifyExpertMode,
+    verifyExpertPromptShown, setVerifyExpertPromptShown,
   };
 };
 
@@ -12729,7 +13561,22 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
   const assessCurrentTest = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
   const assessTestColor = assessCurrentTest ? getAssessColor(assessCurrentTest.color, darkMode) : null;
   const assessCurrentScale = assessCurrentTest ? ASSESS_SCALES[assessCurrentTest.scale] : null;
-  const assessTotalQuestions = assessCurrentTest?.items.length || 0;
+
+  // Gateway branching: compute active item indices based on Q0 answer
+  const assessGatewayActiveItems = useMemo(() => {
+    if (!assessCurrentTest || assessCurrentTest.scale !== 'gateway') return null;
+    const branchKey = assessResponses[0] != null ? assessResponses[0] - 1 : null; // 0-indexed
+    return assessCurrentTest.items.reduce((acc, item, i) => {
+      if (!item.branchIf) { acc.push(i); return acc; } // core items always shown
+      const [bKey, bVal] = Object.entries(item.branchIf)[0];
+      if (bKey === 'energy' && branchKey === bVal) acc.push(i);
+      return acc;
+    }, []);
+  }, [assessCurrentTest, assessResponses[0]]);
+
+  const assessTotalQuestions = assessGatewayActiveItems
+    ? assessGatewayActiveItems.length
+    : (assessCurrentTest?.items.length || 0);
 
   const assessStartTest = (testId) => {
     setAssessCurrentTestId(testId);
@@ -12750,7 +13597,7 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
     // Sync to cloud if signed in
     const user = getCurrentUser();
     if (user) {
-      const totalQ = assessCurrentTest?.items?.length || 1;
+      const totalQ = assessCurrentTest?.questionCount || assessCurrentTest?.items?.length || 1;
       const pct = Object.keys(assessResponses).length / totalQ;
       saveAssessmentToCloud(user.id, assessCurrentTestId, 'in-progress', {
         responses: assessResponses,
@@ -12784,17 +13631,46 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
   };
 
   const assessFinalizeSubmit = (value) => {
-    const newResponses = { ...assessResponses, [assessCurrentIndex]: value };
+    // For gateway: store at raw item index, not visual index
+    const gwActive = assessGatewayActiveItems;
+    const rawIdx = gwActive ? gwActive[assessCurrentIndex] : assessCurrentIndex;
+    const newResponses = { ...assessResponses, [rawIdx]: value };
     setAssessResponses(newResponses);
-    const newSkipped = assessSkipped.filter(i => i !== assessCurrentIndex);
+    const newSkipped = assessSkipped.filter(i => i !== rawIdx);
     setAssessSkipped(newSkipped);
     setAssessPending(null);
     // Capture assessment response to Supabase
-    captureAssessResponse(assessCurrentTestId, assessCurrentIndex, value);
+    captureAssessResponse(assessCurrentTestId, rawIdx, value);
     assessAdvanceToNext(newResponses, newSkipped);
   };
 
+  // Compute fresh gateway active items from current responses (avoids stale useMemo)
+  const getGatewayActive = (resp) => {
+    if (!assessCurrentTest || assessCurrentTest.scale !== 'gateway') return null;
+    const branchKey = resp[0] != null ? resp[0] - 1 : null;
+    return assessCurrentTest.items.reduce((acc, item, i) => {
+      if (!item.branchIf) { acc.push(i); return acc; }
+      const [bKey, bVal] = Object.entries(item.branchIf)[0];
+      if (bKey === 'energy' && branchKey === bVal) acc.push(i);
+      return acc;
+    }, []);
+  };
+
   const assessAdvanceToNext = (resp, skipped) => {
+    // For gateway: compute fresh active items from current responses
+    const gwActive = getGatewayActive(resp);
+    if (gwActive) {
+      const answered = gwActive.filter(ri => resp[ri] !== undefined).length;
+      if (answered >= gwActive.length) { assessCompleteTest(resp); return; }
+      // Find next unanswered visual index
+      for (let vi = assessCurrentIndex + 1; vi < gwActive.length; vi++) {
+        if (resp[gwActive[vi]] === undefined) { assessGoToQuestion(vi, 'fwd'); return; }
+      }
+      for (let vi = 0; vi < assessCurrentIndex; vi++) {
+        if (resp[gwActive[vi]] === undefined) { assessGoToQuestion(vi, 'fwd'); return; }
+      }
+      return;
+    }
     const total = assessCurrentTest.items.length;
     const answeredCount = Object.keys(resp).length;
     if (answeredCount >= total) { assessCompleteTest(resp); return; }
@@ -12808,6 +13684,8 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
 
   const assessCanFinish = () => {
     if (!assessCurrentTest) return false;
+    const gwActive = assessGatewayActiveItems;
+    if (gwActive) return gwActive.every(ri => assessResponses[ri] !== undefined);
     return Object.keys(assessResponses).length >= assessCurrentTest.items.length;
   };
 
@@ -12886,7 +13764,12 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
         if (traitData) traitData.forEach((val, i) => { answers[i] = val; });
         else return;
       } else if (profile[testId]) {
-        profile[testId].forEach((val, i) => { answers[i] = val; });
+        if (Array.isArray(profile[testId])) {
+          profile[testId].forEach((val, i) => { answers[i] = val; });
+        } else {
+          // Object format (e.g., gateway branching responses)
+          Object.entries(profile[testId]).forEach(([k, v]) => { answers[parseInt(k)] = v; });
+        }
       } else {
         // Skip tests without demo data (e.g., quick-profile)
         return;
@@ -12958,7 +13841,7 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
     assessUnlockMessage, setAssessUnlockMessage,
     assessNudgeData, setAssessNudgeData,
     assessSaveToStorage,
-    assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions,
+    assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions, assessGatewayActiveItems,
     assessStartTest, assessSaveAndExit, assessGoToQuestion,
     assessHandleAnswerTap, assessHandleUndo, assessFinalizeSubmit,
     assessAdvanceToNext, assessCanFinish, assessFinishAssessment,
@@ -13121,7 +14004,7 @@ function App() {
     assessProfileSwitching, setAssessProfileSwitching, assessTimeoutRef,
     assessShowUndoToast, setAssessShowUndoToast, assessUnlockMessage, setAssessUnlockMessage,
     assessNudgeData, setAssessNudgeData,
-    assessSaveToStorage, assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions,
+    assessSaveToStorage, assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions, assessGatewayActiveItems,
     assessStartTest, assessSaveAndExit, assessGoToQuestion,
     assessHandleAnswerTap, assessHandleUndo, assessFinalizeSubmit,
     assessAdvanceToNext, assessCanFinish, assessFinishAssessment,
@@ -13129,7 +14012,7 @@ function App() {
   } = useAssessment({ setScreen, darkMode, entityType });
 
   // --- Verification (via useVerification hook) ---
-  const { verifySubjectProfile, setVerifySubjectProfile, verifySubjectAnswers, setVerifySubjectAnswers, verifyCurrentSubjectId, setVerifyCurrentSubjectId, verifyEvaluatorData, setVerifyEvaluatorData, verifyEvaluations, setVerifyEvaluations, verifyPendingCount } = useVerification();
+  const { verifyCurrentSubjectId, setVerifyCurrentSubjectId, verifyEvaluatorData, setVerifyEvaluatorData, verifyFlowPath, setVerifyFlowPath, verifyFlowAnswers, setVerifyFlowAnswers, verifyEvaluations, setVerifyEvaluations, verifyPendingCount, verifyCompletedCount, verifyExpertMode, setVerifyExpertMode, verifyExpertPromptShown, setVerifyExpertPromptShown } = useVerification();
 
   // --- Refs & Derived ---
   const submitTimeoutRef = useRef(null);
@@ -13803,30 +14686,43 @@ function App() {
         onHistory={() => setScreen('history')}
         onResetVerification={() => {
           localStorage.removeItem(VERIFY_STORAGE_KEY);
-          setVerifySubjectProfile(null);
+          localStorage.removeItem(IDENTITY_STORAGE_KEY);
+          localStorage.removeItem(IDENTITY_ONBOARDING_KEY);
           setVerifyEvaluations({});
           setVerifyEvaluatorData(null);
           setVerifyCurrentSubjectId(null);
         }}
-        hasVerificationData={!!verifySubjectProfile || Object.keys(verifyEvaluations).length > 0}
+        hasVerificationData={Object.keys(verifyEvaluations).length > 0}
+        verifyExpertMode={verifyExpertMode}
+        setVerifyExpertMode={setVerifyExpertMode}
       />
     );
 
-    if (screen === 'profile') return (
-      <ProfileScreen darkMode={darkMode} responses={responses} assessCompleted={assessCompleted}
-        stats={stats} entityType={entityType} onboardingAnswers={onboardingAnswers}
-        userClaims={userClaims} onClaimsChange={setUserClaims}
-        onNavigate={(scr, opts) => {
-          if (opts?.testId) setAssessCurrentTestId(opts.testId);
-          setScreen(scr);
-        }} />
-    );
+    if (screen === 'profile') {
+      const demoProfile = assessDemoActive && assessDemoProfile ? ASSESS_DEMO_PROFILES[assessDemoProfile] : null;
+      const demoOverrides = demoProfile ? { name: demoProfile.name, claims: demoProfile.claims || [] } : null;
+      return (
+        <ProfileScreen darkMode={darkMode} responses={responses} assessCompleted={assessCompleted}
+          stats={stats} entityType={entityType} onboardingAnswers={onboardingAnswers}
+          userClaims={userClaims} onClaimsChange={setUserClaims}
+          demoOverrides={demoOverrides}
+          onNavigate={(scr, opts) => {
+            if (opts?.testId) setAssessCurrentTestId(opts.testId);
+            setScreen(scr);
+          }} />
+      );
+    }
 
-    if (screen === 'identity') return (
-      <IdentityScreen darkMode={darkMode} userClaims={userClaims} onClaimsChange={setUserClaims}
-        assessCompleted={assessCompleted} entityType={entityType} displayName={displayName}
-        onBack={() => setScreen('profile')} />
-    );
+    if (screen === 'identity') {
+      const demoProfile = assessDemoActive && assessDemoProfile ? ASSESS_DEMO_PROFILES[assessDemoProfile] : null;
+      return (
+        <IdentityScreen darkMode={darkMode}
+          userClaims={demoProfile?.claims || userClaims} onClaimsChange={demoProfile ? () => {} : setUserClaims}
+          assessCompleted={assessCompleted} entityType={entityType}
+          displayName={demoProfile?.name || displayName}
+          onBack={() => setScreen('profile')} />
+      );
+    }
 
     if (screen === 'history') return (
       <HistoryScreen darkMode={darkMode} questions={questions} responses={responses}
@@ -13849,6 +14745,12 @@ function App() {
 
     // ==================== ASSESSMENT SCREENS ====================
     if (screen === 'assess-picker') {
+      // Auto-start gateway for first-time users — skip the picker entirely
+      const currentTier = calculateAssessTier(assessCompleted);
+      if (currentTier === 0 && !assessCompleted['quick-profile'] && entityType !== 'ai') {
+        assessStartTest('quick-profile');
+        return null;
+      }
       const assessNavigate = (scr, opts) => {
         if (opts?.testId) setAssessCurrentTestId(opts.testId);
         setScreen(scr);
@@ -13879,6 +14781,7 @@ function App() {
           assessCurrentTest={assessCurrentTest}
           assessCurrentIndex={assessCurrentIndex}
           assessTotalQuestions={assessTotalQuestions}
+          assessGatewayActiveItems={assessGatewayActiveItems}
           assessResponses={assessResponses}
           assessSkipped={assessSkipped}
           assessCurrentScale={assessCurrentScale}
@@ -13949,38 +14852,67 @@ function App() {
     }
 
     // Verification screens
-    if (screen === 'verify-hub') return (
-      <VerifyHub darkMode={darkMode} subjectProfile={verifySubjectProfile}
-        onSubject={() => setScreen('verify-subject')}
-        onEvaluator={() => setScreen('verify-queue')}
-        onBack={() => setScreen('categories')} />
-    );
-    if (screen === 'verify-subject') return (
-      <VerifySubjectFlow darkMode={darkMode}
-        onComplete={(answers) => { setVerifySubjectProfile(answers); setVerifySubjectAnswers(answers); setScreen('verify-subject-card'); }}
-        onBack={() => setScreen('verify-hub')} />
-    );
-    if (screen === 'verify-subject-card') return (
-      <VerifySubjectCard darkMode={darkMode} answers={verifySubjectAnswers}
-        onSubmit={() => setScreen('verify-hub')}
-        onBack={() => setScreen('verify-hub')} />
-    );
-    if (screen === 'verify-queue') return (
-      <VerifyQueue darkMode={darkMode} subjects={VERIFY_MOCK_SUBJECTS} evaluations={verifyEvaluations}
-        onSelect={(id) => { setVerifyCurrentSubjectId(id); setScreen('verify-evaluator'); }}
-        onBack={() => setScreen('verify-hub')} />
-    );
+    if (screen === 'verify-hub') {
+      // Show expert mode prompt after 3rd completion
+      const showExpertPrompt = verifyCompletedCount >= 3 && !verifyExpertMode && verifyExpertPromptShown;
+      return (<>
+        <VerifyHub darkMode={darkMode} subjects={VERIFY_MOCK_SUBJECTS} evaluations={verifyEvaluations}
+          expertMode={verifyExpertMode} setExpertMode={setVerifyExpertMode} completedCount={verifyCompletedCount}
+          onSelect={(id) => { setVerifyCurrentSubjectId(id); setScreen('verify-evaluator'); }}
+          onViewCompleted={(id) => { setVerifyCurrentSubjectId(id); setVerifyEvaluatorData(verifyEvaluations[id]); setScreen('verify-eval-summary-readonly'); }}
+          onBack={() => setScreen('categories')} />
+        {showExpertPrompt && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => { setVerifyExpertPromptShown(false); try { localStorage.setItem(VERIFY_EXPERT_KEY + '-dismissed', 'true'); } catch {} }}>
+            <div className={`mx-6 p-5 rounded-2xl max-w-sm ${darkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-xl'}`}
+              onClick={e => e.stopPropagation()} style={{ animation: 'fadeSlideIn 0.3s ease-out both' }}>
+              <div className={`text-base font-semibold mb-2 ${TH('text-primary', darkMode)}`}>Switch to Express Mode?</div>
+              <p className={`text-sm mb-4 ${TH('text-muted', darkMode)}`}>
+                You've completed {verifyCompletedCount} evaluations. Want to switch to a compact single-form layout?
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => { setVerifyExpertMode(true); setVerifyExpertPromptShown(false); try { localStorage.setItem(VERIFY_EXPERT_KEY + '-dismissed', 'true'); } catch {} }}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  Enable Express Mode
+                </button>
+                <button onClick={() => { setVerifyExpertPromptShown(false); try { localStorage.setItem(VERIFY_EXPERT_KEY + '-dismissed', 'true'); } catch {} }}
+                  className={`flex-1 py-2.5 rounded-xl text-sm ${TH('text-subtle', darkMode)}`}>
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>);
+    }
     if (screen === 'verify-evaluator') {
       const subj = verifyCurrentSubjectId ? VERIFY_MOCK_SUBJECTS.find(s => s.id === verifyCurrentSubjectId) : null;
-      if (!subj) { setScreen('verify-queue'); return null; }
-      return (
-        <VerifyEvaluatorFlow darkMode={darkMode} subject={subj}
+      if (!subj) { setScreen('verify-hub'); return null; }
+      const sharedFlowProps = {
+        sharedPath: verifyFlowPath, setSharedPath: setVerifyFlowPath,
+        sharedAnswers: verifyFlowAnswers, setSharedAnswers: setVerifyFlowAnswers,
+        expertMode: verifyExpertMode, setExpertMode: setVerifyExpertMode,
+        completedCount: verifyCompletedCount,
+      };
+      const handleBack = () => { setVerifyFlowPath(null); setVerifyFlowAnswers({}); setScreen('verify-hub'); };
+      return verifyExpertMode ? (
+        <VerifyExpertForm darkMode={darkMode} subject={subj} {...sharedFlowProps}
+          onComplete={(data) => {
+            setVerifyEvaluations(prev => ({ ...prev, [verifyCurrentSubjectId]: { ...data, completedAt: Date.now() } }));
+            setVerifyEvaluatorData(null);
+            setVerifyCurrentSubjectId(null);
+            setVerifyFlowPath(null); setVerifyFlowAnswers({});
+            setScreen('verify-hub');
+          }}
+          onBack={handleBack} />
+      ) : (
+        <VerifyEvaluatorFlow darkMode={darkMode} subject={subj} {...sharedFlowProps}
           onComplete={(data) => { setVerifyEvaluatorData(data); setScreen('verify-eval-summary'); }}
-          onBack={() => setScreen('verify-queue')} />
+          onBack={handleBack} />
       );
     }
     if (screen === 'verify-eval-summary') {
-      if (!verifyEvaluatorData || !verifyCurrentSubjectId) { setScreen('verify-queue'); return null; }
+      if (!verifyEvaluatorData || !verifyCurrentSubjectId) { setScreen('verify-hub'); return null; }
       const subj = VERIFY_MOCK_SUBJECTS.find(s => s.id === verifyCurrentSubjectId);
       return (
         <VerifyEvalSummary darkMode={darkMode} data={verifyEvaluatorData} subject={subj}
@@ -13988,9 +14920,26 @@ function App() {
             setVerifyEvaluations(prev => ({ ...prev, [verifyCurrentSubjectId]: { ...verifyEvaluatorData, completedAt: Date.now() } }));
             setVerifyEvaluatorData(null);
             setVerifyCurrentSubjectId(null);
-            setScreen('verify-queue');
+            setVerifyFlowPath(null); setVerifyFlowAnswers({});
+            // Auto-prompt expert mode after 3 completions (once only)
+            const newCount = Object.keys(verifyEvaluations).length + 1;
+            const wasDismissed = (() => { try { return localStorage.getItem(VERIFY_EXPERT_KEY + '-dismissed') === 'true'; } catch { return false; } })();
+            if (newCount >= 3 && !verifyExpertMode && !verifyExpertPromptShown && !wasDismissed) {
+              setVerifyExpertPromptShown(true);
+              try { localStorage.setItem(VERIFY_EXPERT_KEY + '-prompted', 'true'); } catch {}
+            }
+            setScreen('verify-hub');
           }}
           onBack={() => setScreen('verify-evaluator')} />
+      );
+    }
+
+    if (screen === 'verify-eval-summary-readonly') {
+      if (!verifyCurrentSubjectId || !verifyEvaluatorData) { setScreen('verify-hub'); return null; }
+      const subj = VERIFY_MOCK_SUBJECTS.find(s => s.id === verifyCurrentSubjectId);
+      return (
+        <VerifyEvalSummary darkMode={darkMode} data={verifyEvaluatorData} subject={subj} readOnly
+          onBack={() => { setVerifyEvaluatorData(null); setVerifyCurrentSubjectId(null); setScreen('verify-hub'); }} />
       );
     }
 
@@ -14122,9 +15071,6 @@ function App() {
     { id: 'assess-analysis', label: 'Analysis', icon: '🔬' },
     { id: 'launch', label: 'Launch', icon: '🚀' },
     { id: 'verify-hub', label: 'V:Hub', icon: '🛡️' },
-    { id: 'verify-subject', label: 'V:Subj', icon: '👤' },
-    { id: 'verify-subject-card', label: 'V:Card', icon: '🪪' },
-    { id: 'verify-queue', label: 'V:Queue', icon: '📋' },
     { id: 'verify-evaluator', label: 'V:Eval', icon: '🔍' },
     { id: 'verify-eval-summary', label: 'V:Sum', icon: '📊' },
     { id: 'public-profile', label: 'Pub Prof', icon: '🔗' },
@@ -14258,6 +15204,7 @@ function App() {
           <div className="flex gap-1 ml-2">
             <button onClick={() => setDevMinimized(true)} className={`w-7 h-7 rounded flex items-center justify-center ${btnBase}`}>_</button>
             <button onClick={() => setShowDevPanel(false)} className={`w-7 h-7 rounded flex items-center justify-center ${btnBase}`}>×</button>
+            <button onClick={() => location.reload()} className={`px-2.5 h-7 rounded font-semibold ${btnBase}`} title="Hard refresh" style={{fontSize:'12px'}}>↻</button>
           </div>
         </div>
 
@@ -14481,7 +15428,7 @@ function App() {
             <button onClick={() => {
               const fakeCompleted = { ...assessCompleted };
               if (!fakeCompleted['quick-profile']) {
-                fakeCompleted['quick-profile'] = { score: 75, answers: {0:4,1:3,2:4,3:3,4:4,5:3,6:4,7:3,8:3,9:4}, traits: {E:70,A:60,C:65,N:45,O:75} };
+                fakeCompleted['quick-profile'] = { score: 62, responses: {0:1,1:1,2:1,3:2,4:1}, traits: {E:20,A:80,C:80,N:50,O:55}, verifySignals: {socialDepth:0,consistency:0,depth:0} };
               }
               ['starter-personality','starter-motivation','starter-thinking','starter-connection','starter-strategy'].forEach(id => {
                 if (!fakeCompleted[id]) {
@@ -14509,11 +15456,11 @@ function App() {
           <div className="px-4 py-2 border-b border-inherit">
             <div className="flex gap-1 flex-wrap items-center">
               <span className={`${sectionTitle} mr-1`} style={{fontSize:'11px'}}>{assessCurrentTest.name}</span>
-              {assessCurrentTest.items.map((_, i) => (
-                <button key={i} onClick={() => assessGoToQuestion(i, i > assessCurrentIndex ? 'fwd' : 'back')}
-                  className={`w-6 h-6 rounded flex items-center justify-center ${i === assessCurrentIndex ? btnAccent : assessResponses[i] !== undefined ? 'bg-cyan-800 text-cyan-200' : btnBase}`}
+              {(assessGatewayActiveItems || assessCurrentTest.items.map((_, i) => i)).map((ri, vi) => (
+                <button key={ri} onClick={() => assessGoToQuestion(vi, vi > assessCurrentIndex ? 'fwd' : 'back')}
+                  className={`w-6 h-6 rounded flex items-center justify-center ${vi === assessCurrentIndex ? btnAccent : assessResponses[ri] !== undefined ? 'bg-cyan-800 text-cyan-200' : btnBase}`}
                   style={{fontSize:'10px'}}>
-                  {i + 1}
+                  {vi + 1}
                 </button>
               ))}
             </div>
