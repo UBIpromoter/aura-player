@@ -4504,7 +4504,7 @@ const ASSESS_STYLES = (() => {
 // Tier system: 0 = always available, 1 = after Quick Profile, 2 = after Starter Pack
 const ASSESS_CATEGORIES = {
   'ai-identity': { name: 'AI Identity', icon: '🤖', color: 'cyan', tests: ['ai-style', 'ai-self', 'ai-values', 'ai-vision'], tier: 0, entityHint: 'ai' },
-  quickstart: { name: 'Quick Profile', icon: '✨', color: 'blue', tests: ['quick-profile'], tier: 0 },
+  quickstart: { name: 'Quick Profile', icon: '✨', color: 'blue', tests: ['quick-profile'], tier: 0, entityHint: 'human' },
   starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], tier: 1 },
   personality: { name: 'Personality', icon: '🎭', color: 'rose', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], tier: 2 },
   character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'], tier: 2 },
@@ -4528,8 +4528,8 @@ const calculateAssessTier = (completed) => {
   const starterComplete = starterModules.every(id => completed[id]);
   if (starterComplete) return 2;
 
-  // Check for tier 1: quick-profile completed
-  if (completed['quick-profile']) return 1;
+  // Check for tier 1: quick-profile completed OR any AI module completed
+  if (completed['quick-profile'] || completed['ai-style'] || completed['ai-self'] || completed['ai-values'] || completed['ai-vision']) return 1;
 
   return 0;
 };
@@ -13563,13 +13563,19 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
   const assessCurrentScale = assessCurrentTest ? ASSESS_SCALES[assessCurrentTest.scale] : null;
 
   // Gateway branching: compute active item indices based on Q0 answer
+  // Always returns 5 items (3 core + 2 branch) so progress shows "1/5" from the start
   const assessGatewayActiveItems = useMemo(() => {
     if (!assessCurrentTest || assessCurrentTest.scale !== 'gateway') return null;
     const branchKey = assessResponses[0] != null ? assessResponses[0] - 1 : null; // 0-indexed
     return assessCurrentTest.items.reduce((acc, item, i) => {
       if (!item.branchIf) { acc.push(i); return acc; } // core items always shown
       const [bKey, bVal] = Object.entries(item.branchIf)[0];
-      if (bKey === 'energy' && branchKey === bVal) acc.push(i);
+      if (branchKey === null) {
+        // Before Q0 answered: use first branch as placeholders to keep count at 5
+        if (bVal === 0) acc.push(i);
+      } else {
+        if (bKey === 'energy' && branchKey === bVal) acc.push(i);
+      }
       return acc;
     }, []);
   }, [assessCurrentTest, assessResponses[0]]);
@@ -13651,7 +13657,11 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
     return assessCurrentTest.items.reduce((acc, item, i) => {
       if (!item.branchIf) { acc.push(i); return acc; }
       const [bKey, bVal] = Object.entries(item.branchIf)[0];
-      if (bKey === 'energy' && branchKey === bVal) acc.push(i);
+      if (branchKey === null) {
+        if (bVal === 0) acc.push(i);
+      } else {
+        if (bKey === 'energy' && branchKey === bVal) acc.push(i);
+      }
       return acc;
     }, []);
   };
