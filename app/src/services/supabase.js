@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { SCALE_LABELS, CONFIDENCE_LABELS } from '../data/constants';
 
-const SUPABASE_URL = 'https://tzhmhlllblhfvtqmmsuu.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_5qNssH06WHWBYSKDVGGrHg_m4MOC7su';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://tzhmhlllblhfvtqmmsuu.supabase.co';
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || 'sb_publishable_5qNssH06WHWBYSKDVGGrHg_m4MOC7su';
 
 export const auraDB = createClient(SUPABASE_URL, SUPABASE_KEY);
 
