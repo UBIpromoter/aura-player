@@ -12191,6 +12191,7 @@ const AssessAnalysisScreen = ({ darkMode, assessCompleted, entityType, onboardin
       const completedCount = Object.keys(assessCompleted).length;
       const currentTier = calculateAssessTier(assessCompleted);
       const quickProfileComplete = assessCompleted['quick-profile'];
+      const [shareCopied, setShareCopied] = React.useState(false);
 
       // Quick Profile result generator
       const getQuickProfileSummary = () => {
@@ -12492,21 +12493,39 @@ const AssessAnalysisScreen = ({ darkMode, assessCompleted, entityType, onboardin
                 entityType={entityType} darkMode={darkMode} size={360} />
             </div>
 
-            {/* Archetype Header - Shows primary archetype if matched */}
+            {/* Archetype Header + Share — Hero reveal */}
             {(() => {
               const archetype = calculateArchetype(assessCompleted);
               if (!archetype?.primary) return null;
               const { name, tagline, color } = archetype.primary;
               const colorClass = twColor(color);
+              const handleShare = async (e) => {
+                e.stopPropagation();
+                const url = 'https://aura-player-one.vercel.app';
+                if (navigator.share) {
+                  try { await navigator.share({ title: 'My Aura', text: `I'm ${name} — discover your aura`, url }); } catch (_) {}
+                } else {
+                  try { await navigator.clipboard.writeText(url); } catch (_) {}
+                  setShareCopied(true);
+                  setTimeout(() => setShareCopied(false), 2000);
+                }
+              };
               return (
-                <div className={`mb-4 p-4 rounded-xl text-center ${darkMode ? `bg-${colorClass}-950/30 border border-${colorClass}-800/30` : `bg-${colorClass}-50 border border-${colorClass}-200`}`}>
-                  <div className={`text-lg font-bold ${darkMode ? `text-${colorClass}-300` : `text-${colorClass}-700`}`}>{name}</div>
-                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{tagline}</p>
+                <div className="mb-5 text-center">
+                  <div className={`text-xs font-semibold tracking-widest uppercase mb-2 ${darkMode ? `text-${colorClass}-500` : `text-${colorClass}-400`}`}>Your archetype</div>
+                  <div className={`text-3xl font-bold mb-2 ${darkMode ? `text-${colorClass}-200` : `text-${colorClass}-800`}`}>{name}</div>
+                  <p className={`text-sm italic leading-relaxed px-6 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{tagline}</p>
                   {archetype.secondary?.length > 0 && (
-                    <div className={`mt-2 text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      Also: {archetype.secondary.map(a => a.name).join(', ')}
+                    <div className="flex flex-wrap gap-1.5 justify-center mt-3">
+                      {archetype.secondary.map(a => (
+                        <span key={a.name} className={`text-xs px-2.5 py-1 rounded-full ${darkMode ? 'bg-white/[0.06] text-gray-400' : 'bg-black/[0.05] text-gray-500'}`}>{a.name}</span>
+                      ))}
                     </div>
                   )}
+                  <button onClick={handleShare}
+                    className={`mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all ${shareCopied ? (darkMode ? 'bg-emerald-900/40 text-emerald-300' : 'bg-emerald-50 text-emerald-700') : (darkMode ? `bg-${colorClass}-900/40 text-${colorClass}-300 hover:bg-${colorClass}-900/70` : `bg-${colorClass}-50 text-${colorClass}-700 hover:bg-${colorClass}-100`)}`}>
+                    {shareCopied ? '✓ Link copied' : '↗ Share your aura'}
+                  </button>
                 </div>
               );
             })()}
