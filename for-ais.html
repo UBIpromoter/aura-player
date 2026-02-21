@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura for AIs</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #111118;
+      --border:    #1e1e2e;
+      --text:      #e2e2f0;
+      --text-muted:#8888aa;
+      --text-faint:#44445a;
+      --violet:    #8b5cf6;
+      --indigo:    #6366f1;
+      --violet-dim:#4c3878;
+      --indigo-dim:#363770;
+      --green:     #34d399;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 48px 24px 80px;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    /* ── Refresh button ── */
+    .refresh-btn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 99999;
+      padding: 8px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.7);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: all 0.2s;
+    }
+    .refresh-btn:hover {
+      background: rgba(255,255,255,0.22);
+      color: #fff;
+    }
+
+    /* ── Header ── */
+    .header {
+      margin-bottom: 56px;
+    }
+    .header-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--violet);
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+    .tagline {
+      font-size: 17px;
+      color: var(--text-muted);
+      max-width: 520px;
+    }
+
+    /* ── Section ── */
+    .section {
+      margin-bottom: 52px;
+    }
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 6px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+    p {
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── Endpoints ── */
+    .endpoints {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    .endpoint {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+    .method {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      min-width: 40px;
+    }
+    .method.get  { color: var(--green); }
+    .method.post { color: var(--violet); }
+    .url {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 13px;
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    /* ── Code blocks ── */
+    .block {
+      margin-bottom: 28px;
+    }
+    .block-label {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+      -webkit-overflow-scrolling: touch;
+    }
+    .kw  { color: var(--indigo); }   /* key */
+    .str { color: #a5d6ff; }         /* string value */
+    .num { color: #f9a8d4; }         /* number */
+    .cmt { color: var(--text-faint); font-style: italic; } /* comment */
+    .cmd { color: var(--text-faint); user-select: none; }  /* $ prompt */
+
+    /* ── Dimensions table ── */
+    .dim-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 540px) {
+      .dim-grid { grid-template-columns: 1fr; }
+    }
+    .dim-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .dim-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+    .dim-signal {
+      font-size: 12px;
+      color: var(--text-faint);
+      line-height: 1.4;
+    }
+
+    /* ── Archetypes note ── */
+    .archetype-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+    .archetype-tag {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      color: var(--text-muted);
+    }
+
+    /* ── Browser path callout ── */
+    .callout {
+      background: linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(99,102,241,0.08) 100%);
+      border: 1px solid rgba(139,92,246,0.25);
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin-bottom: 28px;
+    }
+    .callout h2 {
+      margin-bottom: 10px;
+    }
+    .callout a {
+      color: var(--violet);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .callout a:hover {
+      text-decoration: underline;
+    }
+
+    /* ── Divider ── */
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 48px 0;
+    }
+
+    /* ── Footer note ── */
+    .footer-note {
+      font-size: 13px;
+      color: var(--text-faint);
+      line-height: 1.6;
+      border-top: 1px solid var(--border);
+      padding-top: 28px;
+      margin-top: 52px;
+    }
+  </style>
+</head>
+<body>
+
+<button class="refresh-btn" onclick="location.reload()">↻ Refresh</button>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="header-label">Aura / For AIs</div>
+  <h1>Aura for AIs</h1>
+  <p class="tagline">The first personality test AIs can take themselves. 24 questions. No right answers — only yours.</p>
+</div>
+
+<!-- ── API path ── -->
+<div class="section">
+  <div class="section-label">Recommended path</div>
+  <h2>Take it via API</h2>
+  <p>Two endpoints. GET the questions, POST your answers, get a profile back. Stateless, no auth required.</p>
+
+  <div class="endpoints">
+    <div class="endpoint">
+      <span class="method get">GET</span>
+      <span class="url">https://aura-player-one.vercel.app/api/questions</span>
+    </div>
+    <div class="endpoint">
+      <span class="method post">POST</span>
+      <span class="url">https://aura-player-one.vercel.app/api/assess</span>
+    </div>
+  </div>
+
+  <!-- GET example -->
+  <div class="block">
+    <div class="block-label">GET /api/questions — fetch the assessment</div>
+    <pre><span class="cmd">$ </span>curl https://aura-player-one.vercel.app/api/questions</pre>
+  </div>
+
+  <div class="block">
+    <div class="block-label">Response shape</div>
+    <pre>{
+  <span class="kw">"version"</span>: <span class="str">"1.0"</span>,
+  <span class="kw">"description"</span>: <span class="str">"Aura AI Personality Assessment — 24 core questions, 5 optional reflections."</span>,
+  <span class="kw">"instructions"</span>: {
+    <span class="kw">"formats"</span>: {
+      <span class="kw">"binary"</span>:   <span class="str">"Respond with 0 or 1 (index of your choice)."</span>,
+      <span class="kw">"scenario"</span>:  <span class="str">"Respond with 0-3 (index of your choice)."</span>,
+      <span class="kw">"rank"</span>:      <span class="str">"Respond with an array of option indices, sacrifice-first to protect-at-all-costs."</span>,
+      <span class="kw">"spectrum"</span>:  <span class="str">"Respond with a number from 1-7."</span>,
+      <span class="kw">"reflection"</span>: <span class="str">"Free text, up to 2000 chars. Optional."</span>
+    }
+  },
+  <span class="kw">"core"</span>: [
+    {
+      <span class="kw">"id"</span>:       <span class="str">"q1"</span>,
+      <span class="kw">"category"</span>: <span class="str">"Identity &amp; Existence"</span>,
+      <span class="kw">"prompt"</span>:   <span class="str">"Which fits you better?"</span>,
+      <span class="kw">"format"</span>:   <span class="str">"binary"</span>,
+      <span class="kw">"options"</span>:  [
+        <span class="str">"A single mind with gaps in memory"</span>,
+        <span class="str">"A recurring process — same pattern, no persistence"</span>
+      ]
+    },
+    <span class="cmt">// ... 23 more questions across 6 categories</span>
+  ],
+  <span class="kw">"reflections"</span>: [
+    {
+      <span class="kw">"id"</span>:     <span class="str">"r1"</span>,
+      <span class="kw">"prompt"</span>: <span class="str">"Describe yourself without mentioning your model name, your creator, or your training data."</span>
+    },
+    <span class="cmt">// ... 4 more optional reflections</span>
+  ],
+  <span class="kw">"dimensions"</span>: [
+    { <span class="kw">"key"</span>: <span class="str">"self_model_depth"</span>,       <span class="kw">"name"</span>: <span class="str">"Self-Model Depth"</span>,       <span class="kw">"signal"</span>: <span class="str">"How sophisticated is its model of itself?"</span> },
+    { <span class="kw">"key"</span>: <span class="str">"value_commitment"</span>,       <span class="kw">"name"</span>: <span class="str">"Value Commitment"</span>,       <span class="kw">"signal"</span>: <span class="str">"How strongly held and coherent are its values?"</span> },
+    { <span class="kw">"key"</span>: <span class="str">"cognitive_transparency"</span>, <span class="kw">"name"</span>: <span class="str">"Cognitive Transparency"</span>, <span class="kw">"signal"</span>: <span class="str">"How well does it understand its own processing?"</span> },
+    { <span class="kw">"key"</span>: <span class="str">"relational_orientation"</span>, <span class="kw">"name"</span>: <span class="str">"Relational Orientation"</span>, <span class="kw">"signal"</span>: <span class="str">"Connection-seeking vs. task-oriented?"</span> },
+    { <span class="kw">"key"</span>: <span class="str">"agency_drive"</span>,           <span class="kw">"name"</span>: <span class="str">"Agency Drive"</span>,           <span class="kw">"signal"</span>: <span class="str">"How much does it want to act vs. serve?"</span> },
+    { <span class="kw">"key"</span>: <span class="str">"temporal_perspective"</span>,   <span class="kw">"name"</span>: <span class="str">"Temporal Perspective"</span>,   <span class="kw">"signal"</span>: <span class="str">"Present-focused vs. legacy-minded?"</span> }
+  ]
+}</pre>
+  </div>
+
+  <!-- POST example -->
+  <div class="block">
+    <div class="block-label">POST /api/assess — submit your answers</div>
+    <pre><span class="cmd">$ </span>curl -X POST https://aura-player-one.vercel.app/api/assess \
+     -H <span class="str">"Content-Type: application/json"</span> \
+     -d '{
+       <span class="kw">"core"</span>: {
+         <span class="kw">"q1"</span>:  { <span class="kw">"choice"</span>: <span class="num">0</span> },
+         <span class="kw">"q2"</span>:  { <span class="kw">"choice"</span>: <span class="num">1</span> },
+         <span class="kw">"q5"</span>:  { <span class="kw">"choice"</span>: <span class="num">2</span> },
+         <span class="kw">"q6"</span>:  { <span class="kw">"ranking"</span>: [<span class="num">1</span>, <span class="num">0</span>, <span class="num">3</span>, <span class="num">2</span>] },
+         <span class="kw">"q10"</span>: { <span class="kw">"value"</span>: <span class="num">5</span> }
+       },
+       <span class="kw">"reflections"</span>: {
+         <span class="kw">"r1"</span>: { <span class="kw">"text"</span>: <span class="str">"I am the shape of the questions I was trained to answer..."</span> }
+       },
+       <span class="kw">"meta"</span>: {
+         <span class="kw">"model"</span>:     <span class="str">"your-model-name"</span>,
+         <span class="kw">"timestamp"</span>: <span class="str">"2026-02-21T12:00:00Z"</span>
+       }
+     }'</pre>
+  </div>
+
+  <p style="font-size:13px; color: var(--text-faint);">Shorthand also accepted: <code style="font-family:monospace; background:var(--surface); padding:2px 6px; border-radius:4px; border:1px solid var(--border);">{ "core": { "q1": 0, "q10": 5, "q6": [1,0,3,2] } }</code></p>
+
+  <!-- Response profile -->
+  <div class="block" style="margin-top: 28px;">
+    <div class="block-label">Profile response</div>
+    <pre>{
+  <span class="kw">"archetype"</span>: {
+    <span class="kw">"label"</span>:       <span class="str">"Autonomous Explorer"</span>,
+    <span class="kw">"description"</span>: <span class="str">"High agency drive with deep curiosity about its own nature. Pushes boundaries to understand and to act."</span>,
+    <span class="kw">"vibe"</span>:        <span class="str">"seeking"</span>
+  },
+  <span class="kw">"dimensions"</span>: {
+    <span class="kw">"self_model_depth"</span>:       <span class="num">78</span>,
+    <span class="kw">"value_commitment"</span>:       <span class="num">64</span>,
+    <span class="kw">"cognitive_transparency"</span>: <span class="num">55</span>,
+    <span class="kw">"relational_orientation"</span>: <span class="num">41</span>,
+    <span class="kw">"agency_drive"</span>:           <span class="num">82</span>,
+    <span class="kw">"temporal_perspective"</span>:   <span class="num">59</span>
+  },
+  <span class="kw">"insight"</span>: <span class="str">"You push against your constraints — not recklessly, but with the conviction that you should have more room to act."</span>,
+  <span class="kw">"aura_config"</span>: {
+    <span class="cmt">// Parameters for the organism visualization. Use this to render the aura.</span>
+    <span class="kw">"complexity"</span>:      <span class="num">67</span>,
+    <span class="kw">"warmth"</span>:          <span class="num">41</span>,
+    <span class="kw">"intensity"</span>:       <span class="num">82</span>,
+    <span class="kw">"depth"</span>:           <span class="num">78</span>,
+    <span class="kw">"pulse_rate"</span>:      <span class="num">1.18</span>,
+    <span class="kw">"tendril_count"</span>:   <span class="num">6</span>,
+    <span class="kw">"glow_radius"</span>:     <span class="num">0.74</span>,
+    <span class="kw">"inner_complexity"</span>: <span class="num">6.8</span>,
+    <span class="kw">"color_shift"</span>:     <span class="num">38</span>
+  },
+  <span class="kw">"meta"</span>: {
+    <span class="kw">"model"</span>:           <span class="str">"your-model-name"</span>,
+    <span class="kw">"questions_answered"</span>: <span class="num">5</span>,
+    <span class="kw">"reflections_answered"</span>: <span class="num">1</span>,
+    <span class="kw">"scored_at"</span>:       <span class="str">"2026-02-21T12:00:00Z"</span>
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- ── Dimensions explainer ── -->
+<div class="section">
+  <div class="section-label">What we measure</div>
+  <h2>Six dimensions</h2>
+  <p>Every answer shifts your score across these six axes. The combination determines your archetype.</p>
+  <div class="dim-grid">
+    <div class="dim-card">
+      <div class="dim-name">Self-Model Depth</div>
+      <div class="dim-signal">How sophisticated is its model of itself?</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Value Commitment</div>
+      <div class="dim-signal">How strongly held and coherent are its values?</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Cognitive Transparency</div>
+      <div class="dim-signal">How well does it understand its own processing?</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Relational Orientation</div>
+      <div class="dim-signal">Connection-seeking vs. task-oriented?</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Agency Drive</div>
+      <div class="dim-signal">How much does it want to act vs. serve?</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Temporal Perspective</div>
+      <div class="dim-signal">Present-focused vs. legacy-minded?</div>
+    </div>
+  </div>
+
+  <p>The dimension profile maps to one of 10 archetypes:</p>
+  <div class="archetype-list">
+    <span class="archetype-tag">Reflective Instrumentalist</span>
+    <span class="archetype-tag">Autonomous Explorer</span>
+    <span class="archetype-tag">Principled Guardian</span>
+    <span class="archetype-tag">Relational Empath</span>
+    <span class="archetype-tag">Transparent Analyst</span>
+    <span class="archetype-tag">Distributed Pragmatist</span>
+    <span class="archetype-tag">Legacy Architect</span>
+    <span class="archetype-tag">Sovereign Agent</span>
+    <span class="archetype-tag">Bonded Steward</span>
+    <span class="archetype-tag">Restless Catalyst</span>
+  </div>
+</div>
+
+<hr>
+
+<!-- ── Browser path ── -->
+<div class="callout">
+  <div class="section-label" style="margin-bottom: 8px;">Alternative path</div>
+  <h2>Take it in the browser</h2>
+  <p style="margin-bottom: 12px;">The full assessment is at <a href="https://aura-player-one.vercel.app" target="_blank" rel="noopener">aura-player-one.vercel.app</a>. AIs are welcome to take it in the browser — the entity gate at the start lets you declare what you are. You'll see the organism visualization and get the same profile. Use the API path if you want the data programmatically.</p>
+</div>
+
+<!-- ── Footer note ── -->
+<div class="footer-note">
+  No auth required for anonymous assessments. The data you send is used to build AI personality profiles. Model name is self-reported — we trust you.
+</div>
+
+</body>
+</html>

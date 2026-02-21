@@ -1686,6 +1686,20 @@ const ONBOARDING_QUESTIONS = [
     function getCurrentUser() {
       return AURA_AUTH_USER;
     }
+
+    // ==================== ENTITY PROFILE UPDATE ====================
+    // Called after sign-in to persist entity_type + model_name from entity gate
+    async function updateEntityProfile(userId, entityType, modelName) {
+      try {
+        const updates = { entity_type: entityType || 'human', updated_at: new Date().toISOString() };
+        if (modelName) updates.model_name = modelName;
+        const { error } = await auraDB.from('profiles').update(updates).eq('id', userId);
+        if (error) console.warn('[Aura] Entity profile update failed:', error.message);
+        else console.log('[Aura] Entity profile updated:', entityType, modelName || '');
+      } catch (err) {
+        console.warn('[Aura] Entity profile update error:', err.message);
+      }
+    }
   </script>
   <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
@@ -5654,6 +5668,178 @@ const WELCOME_SHOWCASE_DATA = {
   'starter-connection': true, 'starter-strategy': true,
 };
 
+// ==================== ENTITY GATE SCREEN ====================
+// Shown once to new visitors before the welcome screen.
+// Stores choice in localStorage under 'aura-entity-declared'.
+const ENTITY_GATE_KEY = 'aura-entity-declared';
+
+const EntityGateScreen = ({ onDeclare, darkMode }) => {
+  const [selected, setSelected] = React.useState(null); // 'human' | 'ai'
+  const [modelInput, setModelInput] = React.useState('');
+  const [modelVisible, setModelVisible] = React.useState(false);
+
+  const handleHuman = () => {
+    setSelected('human');
+    setModelVisible(false);
+  };
+
+  const handleAI = () => {
+    setSelected('ai');
+    setModelVisible(true);
+  };
+
+  const handleContinue = () => {
+    if (!selected) return;
+    const declaration = { type: selected, model: modelInput.trim() || null, declaredAt: Date.now() };
+    try { localStorage.setItem(ENTITY_GATE_KEY, JSON.stringify(declaration)); } catch {}
+    onDeclare(selected, modelInput.trim() || null);
+  };
+
+  const handleSkip = () => {
+    const declaration = { type: 'unknown', model: null, declaredAt: Date.now() };
+    try { localStorage.setItem(ENTITY_GATE_KEY, JSON.stringify(declaration)); } catch {}
+    onDeclare('unknown', null);
+  };
+
+  // Violet palette matching the app's atmospheric dark style
+  const violet = COLOR_HEX.violet;
+  const cyan = COLOR_HEX.cyan;
+
+  return (
+    <div
+      className="h-full flex flex-col items-center justify-center relative overflow-hidden"
+      style={{ backgroundColor: darkMode ? '#030712' : '#f9fafb' }}
+    >
+      {/* Atmospheric radial glow — behind all content, no blur/shadow */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -60%)',
+          width: '420px',
+          height: '420px',
+          background: darkMode
+            ? `radial-gradient(ellipse at center, rgba(${violet.rgb}, 0.12) 0%, rgba(${violet.rgb}, 0.04) 45%, transparent 70%)`
+            : `radial-gradient(ellipse at center, rgba(${violet.rgb}, 0.08) 0%, rgba(${violet.rgb}, 0.02) 45%, transparent 70%)`,
+          pointerEvents: 'none',
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-xs px-6 flex flex-col items-center" style={{ animation: 'fadeSlideIn 0.5s ease-out both' }}>
+
+        {/* Title */}
+        <h2
+          className="text-2xl font-bold mb-2 text-center"
+          style={{ color: darkMode ? '#fff' : '#111' }}
+        >
+          Before we begin
+        </h2>
+        <p
+          className="text-sm mb-8 text-center"
+          style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}
+        >
+          Who's taking this assessment?
+        </p>
+
+        {/* Human button */}
+        <button
+          onClick={handleHuman}
+          className="w-full mb-3 py-4 px-6 rounded-2xl text-base font-semibold transition-all btn-feedback"
+          style={{
+            background: selected === 'human'
+              ? `linear-gradient(135deg, ${violet.base}, ${violet.light})`
+              : darkMode
+                ? 'rgba(255,255,255,0.06)'
+                : 'rgba(0,0,0,0.04)',
+            color: selected === 'human' ? '#fff' : (darkMode ? '#d1d5db' : '#374151'),
+            border: selected === 'human'
+              ? 'none'
+              : darkMode
+                ? '1px solid rgba(255,255,255,0.09)'
+                : '1px solid rgba(0,0,0,0.09)',
+          }}
+        >
+          I'm a human
+        </button>
+
+        {/* AI button */}
+        <button
+          onClick={handleAI}
+          className="w-full mb-3 py-4 px-6 rounded-2xl text-base font-semibold transition-all btn-feedback"
+          style={{
+            background: selected === 'ai'
+              ? `linear-gradient(135deg, ${cyan.base}, ${cyan.light})`
+              : darkMode
+                ? 'rgba(255,255,255,0.06)'
+                : 'rgba(0,0,0,0.04)',
+            color: selected === 'ai' ? '#fff' : (darkMode ? '#d1d5db' : '#374151'),
+            border: selected === 'ai'
+              ? 'none'
+              : darkMode
+                ? '1px solid rgba(255,255,255,0.09)'
+                : '1px solid rgba(0,0,0,0.09)',
+          }}
+        >
+          I'm an AI
+        </button>
+
+        {/* Optional model input — slides in when AI selected */}
+        {modelVisible && (
+          <div className="w-full mb-3" style={{ animation: 'fadeSlideIn 0.25s ease-out both' }}>
+            <input
+              type="text"
+              value={modelInput}
+              onChange={(e) => setModelInput(e.target.value)}
+              placeholder="e.g. GPT-5.2, Claude, my custom bot"
+              autoFocus
+              className="w-full px-4 py-3 rounded-xl text-sm"
+              style={{
+                background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                color: darkMode ? '#e5e7eb' : '#111827',
+                border: darkMode ? '1px solid rgba(255,255,255,0.09)' : '1px solid rgba(0,0,0,0.09)',
+                outline: 'none',
+              }}
+            />
+            <div
+              className="mt-1 text-xs text-center"
+              style={{ color: darkMode ? '#4b5563' : '#9ca3af' }}
+            >
+              What model? (optional)
+            </div>
+          </div>
+        )}
+
+        {/* Continue button */}
+        <button
+          onClick={handleContinue}
+          disabled={!selected}
+          className="w-full py-4 px-6 rounded-2xl font-semibold text-base mt-1 transition-all btn-feedback"
+          style={{
+            background: selected
+              ? `linear-gradient(135deg, ${violet.base}, ${violet.light})`
+              : darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+            color: selected ? '#fff' : (darkMode ? '#374151' : '#d1d5db'),
+            cursor: selected ? 'pointer' : 'default',
+            opacity: selected ? 1 : 0.5,
+          }}
+        >
+          Continue →
+        </button>
+
+        {/* Skip link */}
+        <button
+          onClick={handleSkip}
+          className="mt-6 text-sm"
+          style={{ color: darkMode ? '#374151' : '#d1d5db' }}
+        >
+          Skip →
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // WelcomeScreen - First visit onboarding
 const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
   const [mode, setMode] = React.useState('welcome'); // 'welcome', 'signin', 'signup'
@@ -9189,6 +9375,11 @@ const SettingsScreen = ({ darkMode, setDarkMode, undoDelay, setUndoDelay, requir
         <button onClick={onReset} className={`${hasAssessmentData || hasVerificationData ? 'flex-1' : 'w-full'} py-2.5 rounded-lg text-sm font-medium btn-feedback ${darkMode ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-100 text-rose-600'}`}>Reset Demo</button>
       </div>
       <div className={`text-sm text-center ${TH('text-faint', darkMode)}`}>Aura Player vR-Data</div>
+      <div className="text-center pt-1">
+        <a href="/for-ais" target="_blank" rel="noopener" className="text-xs" style={{color: 'rgba(255,255,255,0.2)', textDecoration: 'none', letterSpacing: '0.02em'}}
+          onMouseEnter={e => e.target.style.color='rgba(255,255,255,0.45)'}
+          onMouseLeave={e => e.target.style.color='rgba(255,255,255,0.2)'}>For AIs →</a>
+      </div>
     </div>
   </div>
 );
@@ -11236,7 +11427,7 @@ const AssessQuestionScreen = ({
 };
 
 // ==================== ASSESS RESULTS SCREEN ====================
-const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, entityType, onNavigate, nudgeData, onNudgeContinue }) => {
+const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, entityType, entityModelName, onNavigate, nudgeData, onNudgeContinue, onSaveSuccess }) => {
   const test = ASSESS_TESTS[assessCurrentTestId];
   const results = assessCompleted[assessCurrentTestId];
   const colors = getAssessColor(test.color, darkMode);
@@ -13381,6 +13572,9 @@ const getInitialScreen = () => {
   }
   const hasEmail = localStorage.getItem('aura_user_email');
   if (hasEmail) return 'categories';
+  // Entity gate: shown once to new visitors before the welcome screen
+  const entityDeclared = localStorage.getItem('aura-entity-declared');
+  if (!entityDeclared) return 'entity-gate';
   return 'welcome';
 };
 
@@ -13989,6 +14183,11 @@ function App() {
 
   // --- Entity Type ---
   const [entityType, setEntityType] = useState(() => demoStorage.get().entityType || 'human');
+
+  // --- Entity Gate Declaration (from gate screen — type + optional model name) ---
+  const [entityModelName, setEntityModelName] = useState(() => {
+    try { const d = JSON.parse(localStorage.getItem('aura-entity-declared') || '{}'); return d.model || null; } catch { return null; }
+  });
 
   // --- QOTD (via useQotd hook) ---
   const { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, setQotdTappedAnswer, qotdTapCount, setQotdTapCount, resetQotd, handleQotdTap, submitQotdAnswer } = useQotd();
@@ -14603,6 +14802,7 @@ function App() {
     //   profile         → ProfileScreen
     //   history         → HistoryScreen
     //   qotd            → QotdScreen
+    //   entity-gate     → EntityGateScreen (shown once before welcome)
     //   assess-picker   → AssessPickerScreen
     //   assess-question → AssessQuestionScreen
     //   assess-results  → AssessResultsScreen
@@ -14611,6 +14811,26 @@ function App() {
     //   public-profile  → PublicProfileScreen (read-only, no auth)
     //   categories      → CategoryScreen (home/hub)
     //   (default)       → QuestionFlowScreen
+
+    // Entity gate — shown once to new visitors, guards welcome screen
+    if (screen === 'entity-gate') return (
+      <EntityGateScreen
+        darkMode={darkMode}
+        onDeclare={(type, model) => {
+          // Apply declared entity type to app state
+          setEntityType(type === 'unknown' ? 'human' : type);
+          setEntityModelName(model || null);
+          // Persist entity type to demo storage so other parts of app can read it
+          const stored = demoStorage.get();
+          stored.entityType = type === 'unknown' ? 'human' : type;
+          demoStorage.set(stored);
+          // If user is already signed in, update profile immediately
+          const user = getCurrentUser();
+          if (user) updateEntityProfile(user.id, type === 'unknown' ? 'human' : type, model);
+          setScreen('welcome');
+        }}
+      />
+    );
 
     // Public profile (shared link)
     if (screen === 'public-profile') return (
