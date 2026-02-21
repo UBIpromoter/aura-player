@@ -38,6 +38,7 @@
   Hooks & Components
   ··················
   "HOOKS"                      useDisplayMode, useSwipe, custom React hooks
+  "ENTITY GATE SCREEN"         EntityGateScreen (one-time visitor type declaration)
   "COMPONENTS"                 ProgressCircle, PhoneFrame, NavBar, WelcomeScreen
   "ASSESSMENT PRIMITIVES"      QuestionCard, ResultsChart, analysis helpers
   "ONBOARDING FLOW"            OnboardingFlow component
@@ -1081,6 +1082,16 @@ const ONBOARDING_QUESTIONS = [
                 await createEmailClaim(session.user.id, session.user.email);
                 await migrateLocalAssessments(session.user.id);
                 await claimMyResponses();
+                // Persist entity gate declaration to profile if it exists
+                try {
+                  const gateRaw = localStorage.getItem('aura-entity-declared');
+                  if (gateRaw) {
+                    const gate = JSON.parse(gateRaw);
+                    if (gate.type && gate.type !== 'unknown') {
+                      await updateEntityProfile(session.user.id, gate.type, gate.model || null);
+                    }
+                  }
+                } catch {}
               }
               // Load profile display name
               const name = await loadProfile(session.user.id);
@@ -12046,6 +12057,104 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
             </div>
           );
         })()}
+        {/* Save Your Aura — shown only when not signed in */}
+        {!getCurrentUser() && (() => {
+          const SaveAuraNudge = () => {
+            const [saveMode, setSaveMode] = React.useState('prompt'); // 'prompt' | 'form' | 'saved'
+            const [saveEmail, setSaveEmail] = React.useState('');
+            const [savePassword, setSavePassword] = React.useState('');
+            const [saveError, setSaveError] = React.useState('');
+            const [saveLoading, setSaveLoading] = React.useState(false);
+            const [formType, setFormType] = React.useState('signup'); // 'signup' | 'signin'
+
+            const handleSave = async () => {
+              if (!saveEmail) { setSaveError('Enter your email'); return; }
+              if (!savePassword || savePassword.length < 6) { setSaveError('Password must be at least 6 characters'); return; }
+              setSaveLoading(true);
+              setSaveError('');
+              const fn = formType === 'signup' ? signUpWithPassword : signInWithPassword;
+              const result = await fn(saveEmail, savePassword);
+              setSaveLoading(false);
+              if (result.success) {
+                setSaveMode('saved');
+                if (result.user && entityType) {
+                  updateEntityProfile(result.user.id, entityType, entityModelName || null);
+                }
+                if (onSaveSuccess) onSaveSuccess();
+              } else {
+                setSaveError(result.error);
+              }
+            };
+
+            const handleKeyDown = (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handleSave(); } };
+
+            if (saveMode === 'saved') {
+              return (
+                <div className="mt-3 p-4 rounded-2xl text-center"
+                  style={{ background: darkMode ? 'rgba(139,92,246,0.10)' : 'rgba(139,92,246,0.06)', border: darkMode ? '1px solid rgba(139,92,246,0.20)' : '1px solid rgba(139,92,246,0.15)', animation: 'fadeSlideIn 0.3s ease-out both' }}>
+                  <div className="text-base font-semibold mb-1" style={{ color: darkMode ? '#a78bfa' : '#7c3aed' }}>Aura saved</div>
+                  <div className="text-xs" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>Your results are saved to your account.</div>
+                </div>
+              );
+            }
+
+            if (saveMode === 'form') {
+              return (
+                <div className="mt-3 p-4 rounded-2xl space-y-2" onClick={(e) => e.stopPropagation()}
+                  style={{ background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', border: darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', animation: 'fadeSlideIn 0.3s ease-out both' }}>
+                  <div className="flex gap-2 mb-1">
+                    <button onClick={() => { setFormType('signup'); setSaveError(''); }}
+                      className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-all"
+                      style={{ background: formType === 'signup' ? (darkMode ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.12)') : 'transparent', color: formType === 'signup' ? (darkMode ? '#a78bfa' : '#7c3aed') : (darkMode ? '#6b7280' : '#9ca3af') }}>
+                      New account
+                    </button>
+                    <button onClick={() => { setFormType('signin'); setSaveError(''); }}
+                      className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-all"
+                      style={{ background: formType === 'signin' ? (darkMode ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.12)') : 'transparent', color: formType === 'signin' ? (darkMode ? '#a78bfa' : '#7c3aed') : (darkMode ? '#6b7280' : '#9ca3af') }}>
+                      Sign in
+                    </button>
+                  </div>
+                  <input type="email" placeholder="Email" value={saveEmail} onChange={(e) => setSaveEmail(e.target.value)} onKeyDown={handleKeyDown} autoFocus
+                    className="w-full px-3 py-2.5 rounded-xl text-sm"
+                    style={{ background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', color: darkMode ? '#e5e7eb' : '#111827', border: darkMode ? '1px solid rgba(255,255,255,0.09)' : '1px solid rgba(0,0,0,0.09)', outline: 'none' }} />
+                  <input type="password" placeholder="Password" value={savePassword} onChange={(e) => setSavePassword(e.target.value)} onKeyDown={handleKeyDown}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm"
+                    style={{ background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', color: darkMode ? '#e5e7eb' : '#111827', border: darkMode ? '1px solid rgba(255,255,255,0.09)' : '1px solid rgba(0,0,0,0.09)', outline: 'none' }} />
+                  {saveError && <div className="text-xs text-rose-500 text-center">{saveError}</div>}
+                  <div className="flex gap-2">
+                    <button onClick={handleSave} disabled={saveLoading}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                      style={{ background: darkMode ? '#7c3aed' : '#8b5cf6', color: '#fff', opacity: saveLoading ? 0.6 : 1 }}>
+                      {saveLoading ? 'Saving...' : (formType === 'signup' ? 'Create & Save' : 'Sign in & Save')}
+                    </button>
+                    <button onClick={() => { setSaveMode('prompt'); setSaveError(''); }}
+                      className="px-3 py-2.5 rounded-xl text-sm"
+                      style={{ color: darkMode ? '#4b5563' : '#9ca3af' }}>
+                      ×
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <button onClick={(e) => { e.stopPropagation(); setSaveMode('form'); }}
+                className="w-full mt-3 py-3 px-4 rounded-2xl flex items-center justify-between transition-all"
+                style={{ background: 'transparent', border: darkMode ? '1px solid rgba(139,92,246,0.18)' : '1px solid rgba(139,92,246,0.15)' }}>
+                <div className="flex items-center gap-2.5">
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: darkMode ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: darkMode ? '#a78bfa' : '#7c3aed' }}>✦</div>
+                  <div className="text-left">
+                    <div className="text-sm font-medium" style={{ color: darkMode ? '#a78bfa' : '#7c3aed' }}>Save your aura</div>
+                    <div className="text-xs" style={{ color: darkMode ? '#4b5563' : '#9ca3af' }}>Access your results across devices</div>
+                  </div>
+                </div>
+                <span className="text-xs" style={{ color: darkMode ? '#4b5563' : '#c4b5fd' }}>→</span>
+              </button>
+            );
+          };
+          return <SaveAuraNudge />;
+        })()}
+
         {/* Bottom action: Next (mid-category), Back (cross-category), or Done (all done) */}
         {nudgeData?.type === 'same-category' ? (() => {
           const remaining = nudgeData.toCategory.tests.filter(id => !assessCompleted[id] && ASSESS_TESTS[id]).length;
@@ -15053,12 +15162,14 @@ function App() {
           assessCurrentTestId={assessCurrentTestId}
           assessCompleted={assessCompleted}
           entityType={entityType}
+          entityModelName={entityModelName}
           onNavigate={(scr) => { setAssessNudgeData(null); setScreen(scr); }}
           nudgeData={assessNudgeData}
           onNudgeContinue={(testId) => {
             setAssessNudgeData(null);
             assessStartTest(testId);
           }}
+          onSaveSuccess={() => setAuthUser(getCurrentUser())}
         />
       );
     }
@@ -15286,6 +15397,7 @@ function App() {
 
   // ==================== DEV NAVIGATION PANEL ====================
   const DEV_SCREENS = [
+    { id: 'entity-gate', label: 'Gate', icon: '🚪' },
     { id: 'welcome', label: 'Welcome', icon: '👋' },
     { id: 'onboarding', label: 'Onboard', icon: '🎯' },
     { id: 'path-choice', label: 'Path', icon: '🔀' },
@@ -15730,7 +15842,7 @@ function App() {
           {/* Global stars background for dark mode */}
           {darkMode && <div className="global-stars" />}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && !screen.startsWith('verify-') && (
+            {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && !screen.startsWith('verify-') && (
               <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!authUser} isGuest={isGuestMode} assessCompleted={assessCompleted} accentColor={navAccentColor} displayName={displayName} />
             )}
             {renderContent()}
@@ -15755,7 +15867,7 @@ function App() {
     >
       {/* Global stars background for dark mode */}
       {darkMode && <div className="global-stars" />}
-      {screen !== 'launch' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && !screen.startsWith('verify-') && (
+      {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && !screen.startsWith('verify-') && (
         <div className="safe-top">
           <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!authUser} isGuest={isGuestMode} assessCompleted={assessCompleted} displayName={displayName} />
         </div>
