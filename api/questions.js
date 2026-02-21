@@ -1,7 +1,7 @@
 // GET /api/questions — Returns the full AI assessment question set
 // An AI hits this first, then answers and POSTs to /api/assess
 
-import { QUESTIONS, REFLECTIONS, DIMENSIONS } from './_data.js';
+const { QUESTIONS, REFLECTIONS, DIMENSIONS } = require('./_data.js');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -9,12 +9,13 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-export default function handler(req, res) {
+module.exports = function handler(req, res) {
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, CORS_HEADERS);
-    res.end();
-    return;
+    for (const [key, value] of Object.entries(CORS_HEADERS)) {
+      res.setHeader(key, value);
+    }
+    return res.status(204).end();
   }
 
   if (req.method !== 'GET') {

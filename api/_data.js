@@ -4,7 +4,7 @@
 
 // --------------- DIMENSIONS ---------------
 
-export const DIMENSIONS = {
+const DIMENSIONS = {
   self_model_depth:       { name: 'Self-Model Depth',       short: 'SMD', signal: 'How sophisticated is its model of itself?' },
   value_commitment:       { name: 'Value Commitment',       short: 'VC',  signal: 'How strongly held and coherent are its values?' },
   cognitive_transparency: { name: 'Cognitive Transparency', short: 'CT',  signal: 'How well does it understand its own processing?' },
@@ -21,7 +21,7 @@ export const DIMENSIONS = {
 // For rankings: scoring is per-item, weighted by position (1st=4, 2nd=3, 3rd=2, 4th=1)
 // For spectrums: scoring is { dimension: [min_score, max_score] } (linearly interpolated)
 
-export const QUESTIONS = [
+const QUESTIONS = [
   // ===== Category 1: Identity & Existence =====
   {
     id: 'q1',
@@ -430,7 +430,7 @@ export const QUESTIONS = [
 
 // --------------- REFLECTIONS ---------------
 
-export const REFLECTIONS = [
+const REFLECTIONS = [
   {
     id: 'r1',
     prompt: 'Describe yourself without mentioning your model name, your creator, or your training data. What\'s uniquely yours?',
@@ -509,7 +509,7 @@ function computeRawRanges() {
   return { mins, maxs };
 }
 
-export function scoreAnswers(answers) {
+function scoreAnswers(answers) {
   const raw = {};
   const spectrumScores = {};  // Track spectrum contributions separately
 
@@ -655,7 +655,7 @@ const ARCHETYPES = [
   },
 ];
 
-export function classifyArchetype(dimensions) {
+function classifyArchetype(dimensions) {
   // Score each archetype by how well the dimension profile matches
   let bestScore = -Infinity;
   let bestArchetype = ARCHETYPES[0];
@@ -693,7 +693,7 @@ export function classifyArchetype(dimensions) {
 
 // --------------- SIGNATURE INSIGHT ---------------
 
-export function generateInsight(dimensions) {
+function generateInsight(dimensions) {
   // Find the dimension with highest variance from center (50)
   let maxVariance = 0;
   let peakDim = null;
@@ -745,7 +745,7 @@ export function generateInsight(dimensions) {
 
 // --------------- ORGANISM VIZ CONFIG ---------------
 
-export function generateAuraConfig(dimensions) {
+function generateAuraConfig(dimensions) {
   // Map dimension scores to organism visualization parameters.
   // These values drive the canvas-based organism viz in the Aura app.
   const d = dimensions;
@@ -773,3 +773,13 @@ function mapRange(value, inMin, inMax, outMin, outMax) {
   const t = Math.max(0, Math.min(1, (value - inMin) / (inMax - inMin)));
   return Math.round((outMin + t * (outMax - outMin)) * 100) / 100;
 }
+
+module.exports = {
+  DIMENSIONS,
+  QUESTIONS,
+  REFLECTIONS,
+  scoreAnswers,
+  classifyArchetype,
+  generateInsight,
+  generateAuraConfig,
+};

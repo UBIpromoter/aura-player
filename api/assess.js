@@ -1,7 +1,7 @@
 // POST /api/assess — Scores AI assessment answers, returns a full profile
 // GET  /api/assess — Returns the question set (convenience alias for /api/questions)
 
-import {
+const {
   QUESTIONS,
   REFLECTIONS,
   DIMENSIONS,
@@ -9,7 +9,7 @@ import {
   classifyArchetype,
   generateInsight,
   generateAuraConfig,
-} from './_data.js';
+} = require('./_data.js');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +17,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // CORS preflight
   if (req.method === 'OPTIONS') {
     for (const [key, value] of Object.entries(CORS_HEADERS)) {
