@@ -11591,39 +11591,30 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
 
         {/* Quick Profile Results - Simple personality snapshot */}
         {assessCurrentTestId === 'quick-profile' && results && (() => {
-          // Generate personality snapshot from pre-computed trait scores
+          // Generate personality snapshot — punchy observations, not adjective lists
           const getTraitDescription = () => {
-            const phrases = [];
             const t = results.traits || {};
+            const E = t.E ?? 50, A = t.A ?? 50, C = t.C ?? 50, N = t.N ?? 50, O = t.O ?? 50;
 
-            const E = t.E ?? 50, C = t.C ?? 50, A = t.A ?? 50, N = t.N ?? 50, O = t.O ?? 50;
+            const obs = {
+              E: { high: "Social energy is your fuel.", low: "Your best thinking happens alone." },
+              A: { high: "You read people before they've said a word.", low: "You call it like you see it." },
+              C: { high: "You finish what you start.", low: "You adapt faster than you plan." },
+              N: { high: "You feel things at full volume.", low: "Not much shakes you." },
+              O: { high: "The unconventional pulls you in.", low: "You trust what's proven." }
+            };
 
-            if (E > 60) phrases.push("outgoing and energized by people");
-            else if (E < 40) phrases.push("reserved and recharge through solitude");
+            const ranked = [
+              { k: 'E', v: E }, { k: 'A', v: A }, { k: 'C', v: C },
+              { k: 'N', v: N }, { k: 'O', v: O }
+            ].map(t => ({ ...t, dist: Math.abs(t.v - 50), dir: t.v >= 55 ? 'high' : t.v <= 45 ? 'low' : null }))
+             .filter(t => t.dir)
+             .sort((a, b) => b.dist - a.dist);
 
-            if (C > 60) phrases.push("organized and follow-through strong");
-            else if (C < 40) phrases.push("spontaneous and flexible");
-
-            if (A > 60) phrases.push("deeply empathetic");
-            else if (A < 40) phrases.push("direct and truth-seeking");
-
-            if (N > 60) phrases.push("reflective and emotionally aware");
-
-            if (O > 60) phrases.push("drawn to the unconventional");
-            else if (O < 40) phrases.push("grounded and practical");
-
-            let description = "You're ";
-            if (phrases.length === 0) {
-              description += "balanced across many dimensions — adaptable and well-rounded.";
-            } else if (phrases.length === 1) {
-              description += phrases[0] + ".";
-            } else if (phrases.length === 2) {
-              description += phrases[0] + " and " + phrases[1] + ".";
-            } else {
-              description += phrases.slice(0, -1).join(", ") + ", and " + phrases[phrases.length - 1] + ".";
-            }
-
-            return description;
+            if (ranked.length === 0) return "You don't fit in a box — adaptable, balanced, a little unpredictable.";
+            const s1 = obs[ranked[0].k][ranked[0].dir];
+            if (ranked.length === 1) return s1;
+            return s1 + " " + obs[ranked[1].k][ranked[1].dir];
           };
 
           const shareText = `${displayName ? displayName + "'s" : 'My'} Aura — compare yours`;
