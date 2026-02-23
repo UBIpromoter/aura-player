@@ -96,12 +96,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Aura">
   <meta name="theme-color" content="#030712">
-  <meta property="og:title" content="Aura — Discover Your Personality">
-  <meta property="og:description" content="Answer questions, reveal who you are. Personality assessments that go deeper.">
+  <meta property="og:title" content="Compare Auras — What's your personality?">
+  <meta property="og:description" content="Take a 60-second personality quiz and compare with friends. See where you land on the Big Five.">
   <meta property="og:type" content="website">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Aura — Discover Your Personality">
-  <meta name="twitter:description" content="Answer questions, reveal who you are. Personality assessments that go deeper.">
+  <meta property="og:image" content="https://auraplayer.com/og-card.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Compare Auras — What's your personality?">
+  <meta name="twitter:description" content="Take a 60-second personality quiz and compare with friends.">
+  <meta name="twitter:image" content="https://auraplayer.com/og-card.png">
   <title>Aura Player</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -1031,19 +1033,11 @@ const getCategoryList = () => Object.values(CAT_MAP);
 // Fun "world" questions for new users - not about themselves
 // These feel like a game, build momentum before self-discovery
 const ONBOARDING_QUESTIONS = [
-  // Entity gating — question 1
-  { id: 'onboard-entity', text: "Do you have a biological body?", options: ["Yes", "No, I'm an AI"], icons: ["🧬", "🤖"], colors: ['emerald', 'cyan'], type: 'binary', gate: 'entity' },
-  // Fun warmup questions — each option gets a distinct color from the game palette
   { id: 'onboard-1', text: "Which came first?", options: ["The chicken", "The egg"], icons: ["🐔", "🥚"], colors: ['amber', 'blue'], type: 'binary' },
   { id: 'onboard-2', text: "Better pizza topping:", options: ["Pepperoni", "Pineapple"], icons: ["🍕", "🍍"], colors: ['rose', 'emerald'], type: 'binary' },
-  { id: 'onboard-3', text: "Getting around the city in 2035:", options: ["Human-driven", "Self-driving"], icons: ["🧑", "🤖"], colors: ['blue', 'cyan'], type: 'binary' },
-  { id: 'onboard-4', text: "Is a hot dog a sandwich?", options: ["Yes, obviously", "No way"], icons: ["🌭", "🙅"], colors: ['emerald', 'violet'], type: 'binary' },
-  { id: 'onboard-5', text: "Will any humans live on Mars by 2050?", options: ["Yes", "No"], icons: ["🚀", "🌍"], colors: ['violet', 'blue'], type: 'binary' },
-  { id: 'onboard-6', text: "Better superpower:", options: ["Flight", "Invisibility"], icons: ["🦅", "👻"], colors: ['cyan', 'pink'], type: 'binary' },
-  { id: 'onboard-7', text: "Coffee in the morning?", options: ["Yes please", "Not for me"], icons: ["☕", "🚫"], colors: ['amber', 'teal'], type: 'binary' },
-  { id: 'onboard-8', text: "Dogs or cats?", options: ["Dogs", "Cats"], icons: ["🐕", "🐈"], colors: ['blue', 'emerald'], type: 'binary' },
-  { id: 'onboard-9', text: "Will AI replace most jobs?", options: ["Yes, big changes coming", "No, jobs will adapt"], icons: ["🤖", "💼"], colors: ['violet', 'cyan'], type: 'binary' },
-  { id: 'onboard-10', text: "Is water wet?", options: ["Yes", "No"], icons: ["💧", "🏜️"], colors: ['teal', 'amber'], type: 'binary' },
+  { id: 'onboard-3', text: "Better superpower:", options: ["Flight", "Invisibility"], icons: ["🦅", "👻"], colors: ['cyan', 'pink'], type: 'binary' },
+  { id: 'onboard-4', text: "Dogs or cats?", options: ["Dogs", "Cats"], icons: ["🐕", "🐈"], colors: ['blue', 'emerald'], type: 'binary' },
+  { id: 'onboard-5', text: "Will AI fundamentally change most jobs?", options: ["Yes, nothing's safe", "No, mostly the same"], icons: ["🤖", "💼"], colors: ['violet', 'cyan'], type: 'binary' },
 ];
   </script>
   <script>
@@ -1521,6 +1515,58 @@ const ONBOARDING_QUESTIONS = [
       }
     }
 
+    // ==================== COMPARISON SHORT LINKS ====================
+
+    // Generate 8-char alphanumeric ID
+    function generateCompareId() {
+      const chars = 'abcdefghijkmnpqrstuvwxyz23456789'; // no ambiguous chars (0/O, 1/l)
+      let id = '';
+      for (let i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+      return id;
+    }
+
+    // Create a comparison link — returns short ID
+    async function createComparison(traits, name, entityType) {
+      const id = generateCompareId();
+      try {
+        const { error } = await auraDB.from('comparisons').insert({
+          id,
+          traits,
+          name: name || null,
+          entity_type: entityType || 'human'
+        });
+        if (error) {
+          console.warn('[Aura] Comparison save failed:', error.message);
+          return null;
+        }
+        return id;
+      } catch (err) {
+        console.warn('[Aura] Comparison save error:', err.message);
+        return null;
+      }
+    }
+
+    // Load comparison data by short ID
+    async function loadComparison(id) {
+      try {
+        const { data, error } = await auraDB.from('comparisons')
+          .select('traits, name, entity_type')
+          .eq('id', id)
+          .single();
+        if (error || !data) return null;
+        return { traits: data.traits, name: data.name, entity: data.entity_type };
+      } catch (err) {
+        console.warn('[Aura] Comparison load error:', err.message);
+        return null;
+      }
+    }
+
+    // Build a clean compare URL from a short ID
+    function getCompareUrl(shortId) {
+      const base = window.location.origin + window.location.pathname;
+      return `${base}?c=${shortId}`;
+    }
+
     // ==================== ASSESSMENT SYNC ====================
 
     async function saveAssessmentToCloud(userId, testId, status, answers, traits, progress) {
@@ -1835,13 +1881,13 @@ const AuraVisualization = React.memo(function AuraVisualization({
     const SSC = [0.20, 0.45, 0.72, 1.0];
     const GSC = [0.35, 0.55, 0.78, 1.0];
 
-    // Onboarding question → primary mapping
+    // Onboarding question → primary mapping (5 questions → 5 traits)
     const NEURON_MAP = [
       { colorQ:'onboard-1', posQ:'onboard-2' },
-      { colorQ:'onboard-4', posQ:'onboard-8' },
-      { colorQ:'onboard-5', posQ:'onboard-3' },
-      { colorQ:'onboard-6', posQ:'onboard-9' },
-      { colorQ:'onboard-7', posQ:'onboard-10' },
+      { colorQ:'onboard-2', posQ:'onboard-3' },
+      { colorQ:'onboard-3', posQ:'onboard-4' },
+      { colorQ:'onboard-4', posQ:'onboard-5' },
+      { colorQ:'onboard-5', posQ:'onboard-1' },
     ];
 
     // ═══ HELPERS ═══
@@ -2130,7 +2176,25 @@ const AuraVisualization = React.memo(function AuraVisualization({
       return ns;
     }
 
-    function filt(ns, si) { return ns.filter(n => n.tp==='p' || (n.tp==='c' && si>=1) || (n.tp==='a' && si>=n.stg)); }
+    function filt(ns, si, depth) {
+      // At depth 1 (QP only), show top 3 dominant traits + 2 children each
+      // At depth 2-3, show all 5 traits + normal children
+      // At depth 4+, full viz
+      if (depth != null && depth <= 1) {
+        const prims = ns.filter(n => n.tp === 'p').sort((a, b) => b.tv - a.tv);
+        const topKeys = new Set(prims.slice(0, 3).map(n => n.k));
+        const childCount = {};
+        return ns.filter(n => {
+          if (n.tp === 'p') return topKeys.has(n.k);
+          if (n.tp === 'c' && si >= 1 && topKeys.has(n.k)) {
+            childCount[n.k] = (childCount[n.k] || 0) + 1;
+            return childCount[n.k] <= 2;
+          }
+          return false;
+        });
+      }
+      return ns.filter(n => n.tp==='p' || (n.tp==='c' && si>=1) || (n.tp==='a' && si>=n.stg));
+    }
 
     // ═══ CONTOUR ═══
     function computeHull(ns, oR, stg, CX, CY) {
@@ -2496,7 +2560,7 @@ const AuraVisualization = React.memo(function AuraVisualization({
       gen = deriveGenome(p.onboardingAnswers, curScores);
       curTraitAngles = computeTraitAngles(curScores, gen.s);
       allN = mkNodes(gen, oR, curTraitAngles, curMods);
-      actN = filt(allN, stg);
+      actN = filt(allN, stg, curScores.depth);
       cons = mkCon(actN, curMods);
       puls = mkPul(cons, gen.s, curMods);
     }
@@ -4559,6 +4623,15 @@ const calculateAssessTier = (completed) => {
   return 0;
 };
 
+// Progressive disclosure: feature gating based on completion + auth
+const getFeatureTier = (assessCompleted, isLoggedIn) => {
+  const completedCount = Object.keys(assessCompleted || {}).length;
+  if (completedCount >= 5 || isLoggedIn) return 3;
+  if (completedCount >= 3) return 2;
+  if (completedCount >= 1) return 1;
+  return 0;
+};
+
 // Static category ordering for post-assessment nudge (excludes ai-identity)
 const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow'];
 
@@ -5520,8 +5593,7 @@ const PhoneFrame = ({ children, darkMode = true, width = 440, height = 956, devO
   const resolvedZoom = zoom === 'max' ? maxZoom : zoom;
   const effectiveZoom = scale * resolvedZoom;
   return (
-  <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-start justify-center pt-3 pb-4 px-4"
-    style={devOffset ? { paddingRight: 280 } : undefined}>
+  <div className={`min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-start pt-3 pb-4 px-4 ${devOffset ? 'justify-start pl-16' : 'justify-center'}`}>
     <div className="fixed top-3 left-3 z-50 flex flex-col gap-1">
       {ZOOM_LEVELS.map(level => {
         const active = zoom === level;
@@ -5852,7 +5924,7 @@ const EntityGateScreen = ({ onDeclare, darkMode }) => {
 };
 
 // WelcomeScreen - First visit onboarding
-const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
+const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, onAI, darkMode }) => {
   const [mode, setMode] = React.useState('welcome'); // 'welcome', 'signin', 'signup'
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -5926,6 +5998,7 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, darkMode }) => {
           </button>
         </div>
         <button onClick={() => setMode('signin')} className="mt-8 text-sm" style={{color: darkMode ? '#6b7280' : '#9ca3af'}}>Sign In</button>
+        {onAI && <button onClick={onAI} className="mt-4 text-sm" style={{color: darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'}}>I'm an AI →</button>}
       </div>
     );
   }
@@ -6988,8 +7061,8 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-5 pt-2 pb-8 space-y-4 scroll-smooth">
-        {/* QOD Card - a5 style with shine */}
-        {qotdData && (
+        {/* QOD Card - a5 style with shine (unlocks at tier 2: 3+ assessments) */}
+        {qotdData && getFeatureTier(assessCompleted, isLoggedIn) >= 2 && (
           <button
             onClick={onQotdClick}
             className={`w-full rounded-2xl transition-colors shine-card shine-blue glow-blue ${
@@ -7121,14 +7194,17 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
 
         </div>
 
-        {/* DIVIDER — Self ↔ Work */}
+        {/* DIVIDER — Self ↔ Work (hidden until tier 3) */}
+        {getFeatureTier(assessCompleted, isLoggedIn) >= 3 && (
         <div className="flex items-center gap-3 my-4">
           <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
           <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Work</span>
           <div className={`flex-1 h-px ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
         </div>
+        )}
 
-        {/* SECTION 3: Work Tasks */}
+        {/* SECTION 3: Work Tasks (unlocks at tier 3: 5+ assessments or logged in) */}
+        {getFeatureTier(assessCompleted, isLoggedIn) >= 3 && (
         <div className="grid grid-cols-2 gap-2.5">
           <button
             onClick={onVerify}
@@ -7149,6 +7225,7 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
             </div>
           </button>
         </div>
+        )}
       </div>
 
       {/* Scroll fade indicator at bottom */}
@@ -10432,8 +10509,8 @@ const IdentityScreen = ({ darkMode, userClaims, onClaimsChange, assessCompleted,
           <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{getCurrentEmail()}</div>
         )}
 
-        {/* Linked accounts */}
-        <div className="space-y-2">
+        {/* Linked accounts (unlocks at tier 3: 5+ assessments or logged in) */}
+        {getFeatureTier(assessCompleted, !!getCurrentUser()) >= 3 && <div className="space-y-2">
           <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Linked Accounts</div>
           {linked.map(renderStampRow)}
           {/* Inline primary picker */}
@@ -10474,7 +10551,7 @@ const IdentityScreen = ({ darkMode, userClaims, onClaimsChange, assessCompleted,
               {showUnlinked && unlinked.map(renderStampRow)}
             </>
           ))}
-        </div>
+        </div>}
 
         {/* From Your Answers — gateway verify signals */}
         {verifySignals && Object.keys(verifySignals).length > 0 && (
@@ -11450,7 +11527,7 @@ const AssessQuestionScreen = ({
 };
 
 // ==================== ASSESS RESULTS SCREEN ====================
-const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, entityType, entityModelName, onNavigate, nudgeData, onNudgeContinue, onSaveSuccess }) => {
+const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, entityType, entityModelName, onboardingAnswers, displayName, onNavigate, nudgeData, onNudgeContinue, onSaveSuccess }) => {
   const test = ASSESS_TESTS[assessCurrentTestId];
   const results = assessCompleted[assessCurrentTestId];
   const colors = getAssessColor(test.color, darkMode);
@@ -11549,12 +11626,84 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
             return description;
           };
 
-          return (
-            <ResultCard icon="✨" title="Quick Profile" subtitle="Your personality snapshot" darkMode={darkMode} gradientClass={colors.grad}>
-              <div className={`text-center py-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                <p className="text-sm leading-relaxed italic">"{getTraitDescription()}"</p>
+          const shareText = `${displayName ? displayName + "'s" : 'My'} Aura — compare yours`;
+          let _qpCompareId = null;
+          const getShareUrlQP = async () => {
+            if (_qpCompareId) return getCompareUrl(_qpCompareId);
+            const id = await createComparison(results.traits || {}, displayName, entityType);
+            if (id) {
+              _qpCompareId = id;
+              return getCompareUrl(id);
+            }
+            // Fallback
+            return `${window.location.origin}${window.location.pathname}?compare=${btoa(JSON.stringify({ traits: results.traits || {}, entity: entityType, name: displayName || undefined }))}`;
+          };
+
+          const ShareQPButton = () => {
+            const [copied, setCopied] = React.useState(false);
+            const btnStyle = `px-3.5 py-2 rounded-xl text-xs font-medium transition-all btn-feedback`;
+            const btnClass = `${btnStyle} ${darkMode ? 'bg-white/[0.08] text-gray-300 hover:bg-white/[0.15]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`;
+            const shareAsync = async (handler) => { const url = await getShareUrlQP(); if (url) handler(url); };
+            return (
+              <div className="flex items-center justify-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
+                <button onClick={() => shareAsync(url => window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`, '_blank'))}
+                  className={btnClass}>𝕏 Post</button>
+                <button onClick={() => shareAsync(url => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(shareText)}`, '_blank'))}
+                  className={btnClass}>FB Share</button>
+                {typeof navigator.share === 'function' && (
+                  <button onClick={() => shareAsync(async url => {
+                    try { await navigator.share({ title: 'Compare Auras', text: shareText, url }); } catch (_) {}
+                  })}
+                    className={`${btnStyle} bg-gradient-to-r from-blue-500 to-violet-500 text-white`}>
+                    💬 Text
+                  </button>
+                )}
+                <button onClick={async () => {
+                  const url = await getShareUrlQP();
+                  if (!url) return;
+                  try { await navigator.clipboard.writeText(`${shareText}\n${url}`); } catch (_) {}
+                  setCopied(true); setTimeout(() => setCopied(false), 2000);
+                }}
+                  className={`${btnStyle} ${copied ? (darkMode ? 'bg-emerald-900/40 text-emerald-300' : 'bg-emerald-50 text-emerald-700') : (darkMode ? 'bg-white/[0.08] text-gray-300 hover:bg-white/[0.15]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}`}>
+                  {copied ? '✓ Copied' : '📋 Copy'}
+                </button>
               </div>
-            </ResultCard>
+            );
+          };
+
+          return (
+            <>
+              <ResultCard icon="✨" title="Quick Profile" subtitle="Your personality snapshot" darkMode={darkMode} gradientClass={colors.grad}>
+                {/* Mini Aura Visualization */}
+                <div className="flex justify-center py-2" style={{ height: 160 }}>
+                  <AuraVisualization onboardingAnswers={onboardingAnswers || {}} assessCompleted={assessCompleted} entityType={entityType} darkMode={darkMode} width={160} height={160} />
+                </div>
+                <div className={`text-center py-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                  <p className="text-sm leading-relaxed italic">"{getTraitDescription()}"</p>
+                </div>
+                {/* Trait spectrum bars */}
+                <div className="space-y-2 mt-3">
+                  {Object.entries(results.traits || {}).map(([key, val]) => {
+                    const info = traitInfo[key];
+                    if (!info) return null;
+                    return (
+                      <div key={key}>
+                        <div className="flex justify-between mb-0.5">
+                          <span className={`text-[10px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info.low}</span>
+                          <span className={`text-[10px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info.high}</span>
+                        </div>
+                        <div className="h-2 rounded-full relative" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}>
+                          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500" style={{ width: `${Math.max(5, Math.min(95, val))}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="text-center mt-4">
+                  <ShareQPButton />
+                </div>
+              </ResultCard>
+            </>
           );
         })()}
 
@@ -12167,8 +12316,20 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
           return <SaveAuraNudge />;
         })()}
 
-        {/* Bottom action: Next (mid-category), Back (cross-category), or Done (all done) */}
-        {nudgeData?.type === 'same-category' ? (() => {
+        {/* Bottom action: Keep Going (QP first-time), Next (mid-category), Back (cross-category), or Done */}
+        {assessCurrentTestId === 'quick-profile' && nudgeData ? (
+          <div className="space-y-3">
+            <button onClick={(e) => { e.stopPropagation(); onNudgeContinue(nudgeData.nextTestId); }}
+              className={`w-full py-4 rounded-xl font-medium text-white bg-gradient-to-r ${colors.grad}`}>
+              <div>Keep going</div>
+              <div className="text-xs font-normal opacity-75 mt-0.5">Unlock deeper insights</div>
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onNavigate('assess-picker'); }}
+              className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${darkMode ? 'text-gray-400 hover:text-gray-200 bg-white/[0.04] hover:bg-white/[0.08]' : 'text-gray-500 hover:text-gray-700 bg-black/[0.04] hover:bg-black/[0.08]'}`}>
+              Browse all assessments
+            </button>
+          </div>
+        ) : nudgeData?.type === 'same-category' ? (() => {
           const remaining = nudgeData.toCategory.tests.filter(id => !assessCompleted[id] && ASSESS_TESTS[id]).length;
           return (
             <div className="space-y-3">
@@ -13007,6 +13168,7 @@ const QuestionFlowScreen = ({
   communityBrowseIndex, setCommunityBrowseIndex,
   communityDisplayMode, setCommunityDisplayMode,
   communityExpanded, setCommunityExpanded,
+  assessCompleted,
 }) => {
   if (!currentQuestion) return (
     <div className={`flex-1 flex items-center justify-center ${TH('text-primary', darkMode)}`}>
@@ -13389,9 +13551,11 @@ const QuestionFlowScreen = ({
               </div>
             </div>
 
-            {/* ZONE 3: Community Browse */}
+            {/* ZONE 3: Community Browse (unlocks at tier 2: 3+ assessments) */}
             <div className="px-4 pb-3 pt-1">
               {(() => {
+                // Gate behind feature tier 2
+                if (getFeatureTier(assessCompleted || {}, false) < 2) return null;
                 // Only show community results after user has answered the current question
                 const currentIsAnswered = currentQuestion && responses[currentQuestion.id];
 
@@ -13702,6 +13866,18 @@ const getPublicProfileId = () => {
 const getInitialScreen = () => {
   // Public profile link takes priority
   if (getPublicProfileId()) return 'public-profile';
+  // ?c= (short link) or ?compare= (legacy) → compare screen
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('c') || params.get('compare')) return 'compare';
+    // ?entity=ai → silently set AI entity and proceed
+    const entityParam = params.get('entity');
+    if (entityParam === 'ai') {
+      localStorage.setItem('aura-entity-declared', JSON.stringify({ type: 'ai', model: null, ts: Date.now() }));
+      localStorage.setItem('aura_entity_context', JSON.stringify({ type: 'ai' }));
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  } catch {}
   // Check Supabase auth session (stored in localStorage by Supabase client)
   const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
   if (sbKey) {
@@ -13712,9 +13888,11 @@ const getInitialScreen = () => {
   }
   const hasEmail = localStorage.getItem('aura_user_email');
   if (hasEmail) return 'categories';
-  // Entity gate: shown once to new visitors before the welcome screen
-  const entityDeclared = localStorage.getItem('aura-entity-declared');
-  if (!entityDeclared) return 'entity-gate';
+  // Default to human if entity not declared (entity gate removed from default path)
+  if (!localStorage.getItem('aura-entity-declared')) {
+    localStorage.setItem('aura-entity-declared', JSON.stringify({ type: 'human', model: null, ts: Date.now() }));
+    localStorage.setItem('aura_entity_context', JSON.stringify({ type: 'human' }));
+  }
   return 'welcome';
 };
 
@@ -14071,12 +14249,8 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
     setTimeout(() => {
       setAssessShowCompletion(false);
       setAssessUnlockMessage(null);
-      // For quick-profile, go to assess-picker to show newly unlocked content
-      if (assessCurrentTestId === 'quick-profile') {
-        setScreen('assess-picker');
-      } else {
-        setScreen('assess-results');
-      }
+      // All tests → results screen (including quick-profile)
+      setScreen('assess-results');
     }, assessCurrentTestId === 'quick-profile' ? 2500 : 1500);
   };
 
@@ -14205,6 +14379,18 @@ function App() {
   const [displayName, setDisplayName] = useState(null);
   const [showSaveNudge, setShowSaveNudge] = useState(false);
   const [nudgeShown, setNudgeShown] = useState(() => localStorage.getItem('aura_nudge_shown') === 'true');
+  const [compareData, setCompareData] = useState(() => {
+    // Sync parse of legacy ?compare= base64
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get('compare');
+      if (raw) return JSON.parse(atob(raw));
+    } catch {}
+    return null; // ?c= loaded async below
+  });
+  const [compareLoading, setCompareLoading] = useState(() => {
+    try { return !!new URLSearchParams(window.location.search).get('c'); } catch { return false; }
+  });
 
   // Listen for auth state changes to trigger re-renders + navigate
   useEffect(() => {
@@ -14235,6 +14421,17 @@ function App() {
     const handler = (e) => setDisplayName(e.detail?.displayName || null);
     window.addEventListener('aura-profile-change', handler);
     return () => window.removeEventListener('aura-profile-change', handler);
+  }, []);
+
+  // Load comparison data from ?c= short link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shortId = params.get('c');
+    if (!shortId) return;
+    loadComparison(shortId).then(data => {
+      if (data) setCompareData(data);
+      setCompareLoading(false);
+    });
   }, []);
 
   // --- Claims (stamps) ---
@@ -14814,6 +15011,14 @@ function App() {
     }
   };
 
+  const handleAIEntry = () => {
+    localStorage.setItem('aura-entity-declared', JSON.stringify({ type: 'ai', model: null, ts: Date.now() }));
+    localStorage.setItem('aura_entity_context', JSON.stringify({ type: 'ai' }));
+    setEntityType('ai');
+    // Continue into the same flow as "Let's Go"
+    handleTryFirst();
+  };
+
   // Handle onboarding completion
   const handleOnboardingComplete = (answers) => {
     // Normalize to flat { 'onboard-1': 0, ... } format for viz component
@@ -14825,12 +15030,13 @@ function App() {
     localStorage.setItem(ONBOARD_STORAGE_KEY, JSON.stringify(flat));
     localStorage.setItem('aura_onboarding_complete', 'true');
     setOnboardingComplete(true);
-    // Extract entity type from gating question (option 1 = AI)
-    const isAI = answers['onboard-entity']?.answer === 1;
-    setEntityType(isAI ? 'ai' : 'human');
-    localStorage.setItem('aura_entity_context', JSON.stringify({ type: isAI ? 'ai' : 'human' }));
-    // Show path choice screen
-    setScreen('path-choice');
+    // Entity type already set by getInitialScreen (defaults to human, or AI via URL param)
+    // Auto-start Quick Profile instead of path choice
+    if (!assessCompleted['quick-profile']) {
+      assessStartTest('quick-profile');
+    } else {
+      setScreen('assess-picker');
+    }
   };
 
   // Handle path choice after onboarding
@@ -14949,6 +15155,7 @@ function App() {
     //   assess-analysis → AssessAnalysisScreen
     //   verify-*        → Verify* components
     //   public-profile  → PublicProfileScreen (read-only, no auth)
+    //   compare         → Compare Auras (URL-encoded trait comparison)
     //   categories      → CategoryScreen (home/hub)
     //   (default)       → QuestionFlowScreen
 
@@ -14985,12 +15192,208 @@ function App() {
       />
     );
 
+    // Compare Auras — URL-encoded trait comparison
+    if (screen === 'compare') return (() => {
+      if (compareLoading) return (
+        <div className={`h-full flex items-center justify-center ${TH('bg-main', darkMode)}`}>
+          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading comparison...</div>
+        </div>
+      );
+      const theirData = compareData;
+      const myResults = assessCompleted['quick-profile'];
+      const myTraits = myResults?.traits;
+      const traitLabels = { E: ['Reserved', 'Outgoing'], A: ['Direct', 'Empathetic'], C: ['Flexible', 'Organized'], N: ['Steady', 'Sensitive'], O: ['Practical', 'Curious'] };
+      const traitColors = { E: ['#6366f1', '#f59e0b'], A: ['#3b82f6', '#ec4899'], C: ['#8b5cf6', '#10b981'], N: ['#06b6d4', '#f97316'], O: ['#64748b', '#a855f7'] };
+
+      const theirName = theirData?.name || 'Friend';
+      const myName = displayName || 'You';
+      const theirInitial = theirName[0].toUpperCase();
+      const myInitial = myName === 'You' ? 'Y' : myName[0].toUpperCase();
+
+      // Share URL generation — async, cached
+      let _compareIdCache = null;
+      const getShareUrl = async () => {
+        if (!myTraits) return null;
+        if (_compareIdCache) return getCompareUrl(_compareIdCache);
+        const id = await createComparison(myTraits, displayName, entityType);
+        if (id) {
+          _compareIdCache = id;
+          return getCompareUrl(id);
+        }
+        // Fallback to legacy base64 if Supabase fails
+        return `${window.location.origin}${window.location.pathname}?compare=${btoa(JSON.stringify({ traits: myTraits, entity: entityType, name: displayName || undefined }))}`;
+      };
+      const myShareText = `${displayName ? displayName + "'s" : 'My'} Aura — compare yours`;
+      const socialBtn = `px-3.5 py-2 rounded-xl text-xs font-medium transition-all btn-feedback`;
+
+      // Trait bar renderer — reused for both real comparison and preview
+      const TraitBars = ({ traits1, traits2, name1, name2, initial1, initial2, isPreview }) => (
+        <div className="space-y-3">
+          {Object.entries(traits1).map(([key, val1]) => {
+            const labels = traitLabels[key];
+            const colors = traitColors[key];
+            if (!labels) return null;
+            const val2 = traits2?.[key];
+            return (
+              <div key={key}>
+                <div className="flex justify-between mb-1">
+                  <span className={`text-[11px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{labels[0]}</span>
+                  <span className={`text-[11px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{labels[1]}</span>
+                </div>
+                <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${colors[0]}${darkMode ? '40' : '30'}, ${colors[1]}${darkMode ? '40' : '30'})` }}>
+                  {/* Person 1 dot */}
+                  <div className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-white border-2 border-white text-[8px] font-bold text-gray-800"
+                    style={{ left: `${Math.max(5, Math.min(95, val1))}%`, marginLeft: -10, boxShadow: '0 1px 4px rgba(0,0,0,0.35)', opacity: isPreview ? 0.5 : 1 }}>
+                    {initial1}
+                  </div>
+                  {/* Person 2 dot */}
+                  {val2 !== undefined && (
+                    <div className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-violet-500 border-2 border-violet-400 text-[8px] font-bold text-white"
+                      style={{ left: `${Math.max(5, Math.min(95, val2))}%`, marginLeft: -10, boxShadow: '0 1px 4px rgba(0,0,0,0.35)' }}>
+                      {initial2}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex items-center gap-5 mt-2 justify-center">
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 rounded-full bg-white border-2 border-white flex items-center justify-center text-[7px] font-bold text-gray-800" style={{ opacity: isPreview ? 0.5 : 1 }}>{initial1}</div>
+              <span className={`text-[11px] ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{name1}</span>
+            </div>
+            {traits2 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 rounded-full bg-violet-500 border-2 border-violet-400 flex items-center justify-center text-[7px] font-bold text-white">{initial2}</div>
+                <span className={`text-[11px] ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{name2}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+
+      // Social share buttons — async URL generation
+      const SocialShare = ({ text }) => {
+        const btnClass = `${socialBtn} ${darkMode ? 'bg-white/[0.08] text-gray-300 hover:bg-white/[0.15]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`;
+        const share = async (handler) => {
+          const url = await getShareUrl();
+          if (url) handler(url);
+        };
+        return (
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <button onClick={() => share(url => window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank'))}
+              className={btnClass}>𝕏 Post</button>
+            <button onClick={() => share(url => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}`, '_blank'))}
+              className={btnClass}>FB Share</button>
+            {typeof navigator.share === 'function' && (
+              <button onClick={() => share(async url => {
+                try { await navigator.share({ title: 'Compare Auras', text, url }); } catch (_) {}
+              })}
+                className={`${socialBtn} bg-gradient-to-r from-blue-500 to-violet-500 text-white`}>
+                💬 Text
+              </button>
+            )}
+            <button onClick={async (e) => {
+              const btn = e.currentTarget;
+              const url = await getShareUrl();
+              if (!url) return;
+              try { await navigator.clipboard.writeText(`${text}\n${url}`); } catch (_) {}
+              const orig = btn.textContent;
+              btn.textContent = '✓ Copied';
+              setTimeout(() => { btn.textContent = orig; }, 2000);
+            }}
+              className={btnClass}>📋 Copy</button>
+          </div>
+        );
+      };
+
+      return (
+        <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`}>
+          <div className={`h-[44px] flex-shrink-0 flex items-center px-4 border-b ${TH('border-base', darkMode)}`}>
+            <button onClick={() => { window.history.replaceState({}, '', window.location.pathname); setScreen(myTraits ? 'assess-picker' : 'welcome'); }} className={`text-lg ${TH('text-dim', darkMode)}`}>←</button>
+            <span className={`flex-1 text-center font-medium ${TH('text-primary', darkMode)}`}>Compare Auras</span>
+            <div className="w-6" />
+          </div>
+          <div className="flex-1 overflow-auto p-4 space-y-4 hide-scrollbar">
+            {/* REAL COMPARISON — someone opened a shared link */}
+            {theirData && (
+              <div className={`rounded-2xl p-5 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-gray-50 border border-gray-200'}`}>
+                <div className={`text-base font-semibold mb-1 ${TH('text-primary', darkMode)}`}>
+                  {theirName}{theirData.entity === 'ai' ? <span className="ml-2 text-xs text-cyan-400">AI</span> : ''} {myTraits ? `vs ${myName}` : ''}
+                </div>
+                <p className={`text-xs mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Big Five personality traits</p>
+                <TraitBars
+                  traits1={theirData.traits || {}}
+                  traits2={myTraits}
+                  name1={theirName}
+                  name2={myName}
+                  initial1={theirInitial}
+                  initial2={myInitial}
+                />
+              </div>
+            )}
+
+            {/* NO TRAITS YET — prompt to take assessment */}
+            {!myTraits && !theirData ? (
+              <div className="text-center space-y-4 pt-8">
+                <div className="text-4xl">✨</div>
+                <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Take the assessment to compare</div>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Complete your Quick Profile to see how your aura compares.</p>
+                <button onClick={() => { window.history.replaceState({}, '', window.location.pathname); setScreen('welcome'); }}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-medium">
+                  Get started
+                </button>
+              </div>
+            ) : !myTraits && theirData ? (
+              /* RECEIVED a comparison link but haven't taken assessment yet */
+              <div className="text-center space-y-4 pt-4">
+                <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Take the quiz to see how you compare with {theirName}</div>
+                <button onClick={() => { setScreen('welcome'); }}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-medium">
+                  Get started
+                </button>
+              </div>
+            ) : myTraits && !theirData ? (
+              /* HAS TRAITS but no comparison — share flow */
+              <div className="space-y-5 pt-1">
+                <div className="text-center space-y-3">
+                  <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Challenge a friend to compare</div>
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>They'll take the Quick Profile and see how you match up</p>
+                </div>
+                <SocialShare text={myShareText} />
+                {/* Preview using simulated friend */}
+                <div className={`rounded-2xl p-4 mt-2 ${darkMode ? 'bg-white/[0.04] border border-white/[0.08]' : 'bg-gray-50 border border-gray-200'}`}>
+                  <div className={`text-xs font-medium uppercase tracking-wide mb-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>What it looks like</div>
+                  <TraitBars
+                    traits1={Object.fromEntries(Object.entries(myTraits).map(([k, v]) => [k, Math.max(5, Math.min(95, v + (k === 'E' ? 25 : k === 'A' ? -20 : k === 'N' ? 15 : k === 'O' ? -10 : 12)))]))}
+                    traits2={myTraits}
+                    name1="Friend"
+                    name2={myName}
+                    initial1="F"
+                    initial2={myInitial}
+                    isPreview={true}
+                  />
+                </div>
+              </div>
+            ) : (
+              /* BOTH HAVE DATA — comparison is showing above, add share to compare with someone else */
+              <div className="space-y-3">
+                <div className={`text-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Challenge someone else?</div>
+                <SocialShare text={myShareText} />
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    })();
+
     // Welcome screen
     if (screen === 'welcome') return (
       <WelcomeScreen
         onSignIn={handleSignIn}
         onCreateAccount={handleCreateAccount}
         onTryFirst={handleTryFirst}
+        onAI={handleAIEntry}
         darkMode={darkMode}
       />
     );
@@ -15194,6 +15597,8 @@ function App() {
           assessCompleted={assessCompleted}
           entityType={entityType}
           entityModelName={entityModelName}
+          onboardingAnswers={onboardingAnswers}
+          displayName={displayName}
           onNavigate={(scr) => { setAssessNudgeData(null); setScreen(scr); }}
           nudgeData={assessNudgeData}
           onNudgeContinue={(testId) => {
@@ -15422,6 +15827,7 @@ function App() {
         setCommunityDisplayMode={setCommunityDisplayMode}
         communityExpanded={communityExpanded}
         setCommunityExpanded={setCommunityExpanded}
+        assessCompleted={assessCompleted}
       />
     );
   };
@@ -15447,6 +15853,7 @@ function App() {
     { id: 'verify-evaluator', label: 'V:Eval', icon: '🔍' },
     { id: 'verify-eval-summary', label: 'V:Sum', icon: '📊' },
     { id: 'public-profile', label: 'Pub Prof', icon: '🔗' },
+    { id: 'compare', label: 'Compare', icon: '⚖️' },
   ];
 
   // ── Dev Q&A Channel ──
@@ -15558,26 +15965,26 @@ function App() {
     const sectionTitle = darkMode ? 'text-gray-400' : 'text-gray-500';
 
     return (
-      <div className={`fixed top-4 right-4 z-[10000] max-h-[92vh] overflow-y-auto rounded-xl border shadow-2xl ${bg}`} style={{fontSize:'13px', width: '580px'}}>
+      <div className={`fixed top-4 z-[10000] max-h-[92vh] overflow-y-auto rounded-xl border shadow-2xl ${bg}`} style={{fontSize:'13px', width: '340px', left: '540px'}}>
         {/* ── Header ── */}
-        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-inherit">
-          <span className="font-bold text-violet-400" style={{fontSize:'15px'}}>Dev</span>
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-inherit">
+          <span className="font-bold text-violet-400" style={{fontSize:'14px'}}>Dev</span>
           <button onClick={() => setDarkMode(d => !d)}
-            className={`px-4 py-1.5 rounded-full font-bold transition-all ${darkMode ? 'bg-gray-800 text-amber-400 hover:bg-gray-700 ring-1 ring-amber-500/30' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 ring-1 ring-amber-300'}`}
-            style={{fontSize:'13px'}}>
-            {darkMode ? '🌙 Dark' : '☀️ Light'}
+            className={`px-2.5 py-1 rounded-full font-bold transition-all ${darkMode ? 'bg-gray-800 text-amber-400 hover:bg-gray-700 ring-1 ring-amber-500/30' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 ring-1 ring-amber-300'}`}
+            style={{fontSize:'11px'}}>
+            {darkMode ? '🌙' : '☀️'}
           </button>
-          <div className="flex-1" />
-          <div className="flex items-center" style={{gap:'2px'}}>
+          <div className="flex items-center" style={{gap:'1px'}}>
             <button onClick={() => { setEntityType('human'); localStorage.setItem('aura-entity-type', 'human'); }}
-              className={`py-1.5 rounded-l font-medium ${entityType === 'human' ? btnAccent : btnBase}`} style={{width:'64px', textAlign:'center', fontSize:'12px'}}>Human</button>
+              className={`py-1 rounded-l font-medium ${entityType === 'human' ? btnAccent : btnBase}`} style={{width:'48px', textAlign:'center', fontSize:'10px'}}>Human</button>
             <button onClick={() => { setEntityType('ai'); localStorage.setItem('aura-entity-type', 'ai'); }}
-              className={`py-1.5 rounded-r font-medium ${entityType === 'ai' ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : btnBase}`} style={{width:'64px', textAlign:'center', fontSize:'12px'}}>AI</button>
+              className={`py-1 rounded-r font-medium ${entityType === 'ai' ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : btnBase}`} style={{width:'32px', textAlign:'center', fontSize:'10px'}}>AI</button>
           </div>
-          <div className="flex gap-1 ml-2">
-            <button onClick={() => setDevMinimized(true)} className={`w-7 h-7 rounded flex items-center justify-center ${btnBase}`}>_</button>
-            <button onClick={() => setShowDevPanel(false)} className={`w-7 h-7 rounded flex items-center justify-center ${btnBase}`}>×</button>
-            <button onClick={() => location.reload()} className={`px-2.5 h-7 rounded font-semibold ${btnBase}`} title="Hard refresh" style={{fontSize:'12px'}}>↻</button>
+          <div className="flex-1" />
+          <div className="flex gap-1">
+            <button onClick={() => setDevMinimized(true)} className={`w-6 h-6 rounded flex items-center justify-center ${btnBase}`} style={{fontSize:'11px'}}>_</button>
+            <button onClick={() => setShowDevPanel(false)} className={`w-6 h-6 rounded flex items-center justify-center ${btnBase}`} style={{fontSize:'11px'}}>×</button>
+            <button onClick={() => location.reload()} className={`px-2 h-6 rounded font-semibold ${btnBase}`} title="Hard refresh" style={{fontSize:'10px'}}>↻</button>
           </div>
         </div>
 
@@ -15736,8 +16143,8 @@ function App() {
         })()}
 
         {/* ── Screens ── */}
-        <div className="px-4 py-2 border-b border-inherit">
-          <div className="grid grid-cols-7 gap-1">
+        <div className="px-3 py-2 border-b border-inherit">
+          <div className="grid grid-cols-4 gap-1">
             {DEV_SCREENS.map(s => (
               <button key={s.id} onClick={() => {
                 if (s.id === 'verify-evaluator' && !verifyCurrentSubjectId) setVerifyCurrentSubjectId('mock-1');
@@ -15755,36 +16162,37 @@ function App() {
           </div>
         </div>
 
-        {/* ── Device + Demos ── */}
-        <div className="px-4 py-2 border-b border-inherit" style={{ background: darkMode ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.02)' }}>
-          <div className="flex items-center gap-1.5">
-            <div className="grid gap-1" style={{gridTemplateColumns: 'repeat(5, 72px)'}}>
-              {PHONE_SIZES.map(p => (
-                <button key={p.id} onClick={() => setDevPhoneSize(p.id)}
-                  className={`py-1.5 rounded text-center ${devPhoneSize === p.id ? btnAccent : btnBase}`}
-                  style={{fontSize:'10px'}}
-                  title={`${p.w}\u00d7${p.h}`}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
+        {/* ── Device ── */}
+        <div className="px-3 py-2 border-b border-inherit" style={{ background: darkMode ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.02)' }}>
+          <div className="flex flex-wrap gap-1">
+            {PHONE_SIZES.map(p => (
+              <button key={p.id} onClick={() => setDevPhoneSize(p.id)}
+                className={`py-1 px-2 rounded text-center ${devPhoneSize === p.id ? btnAccent : btnBase}`}
+                style={{fontSize:'10px'}}
+                title={`${p.w}\u00d7${p.h}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* ── Demos ── */}
+        <div className="px-3 py-2 border-b border-inherit">
+          <div className="flex items-center gap-1">
+            <button onClick={() => assessLoadDemoProfile(1)} className={`px-2 py-1 rounded ${assessDemoActive && Number(assessDemoProfile) === 1 ? btnAccent : btnBase}`} style={{fontSize:'11px'}}>D1</button>
+            <button onClick={() => assessLoadDemoProfile(2)} className={`px-2 py-1 rounded ${assessDemoActive && Number(assessDemoProfile) === 2 ? btnAccent : btnBase}`} style={{fontSize:'11px'}}>D2</button>
+            <button onClick={() => assessLoadDemoProfile(3)} className={`px-2 py-1 rounded ${assessDemoActive && Number(assessDemoProfile) === 3 ? btnAccent : btnBase}`} style={{fontSize:'11px'}}>D3</button>
             <div className="flex-1" />
-            <div className="flex items-center gap-1">
-              <button onClick={() => assessLoadDemoProfile(1)} className={`px-2.5 py-1.5 rounded ${assessDemoActive && Number(assessDemoProfile) === 1 ? btnAccent : btnBase}`} style={{fontSize:'11px'}}>D1</button>
-              <button onClick={() => assessLoadDemoProfile(2)} className={`px-2.5 py-1.5 rounded ${assessDemoActive && Number(assessDemoProfile) === 2 ? btnAccent : btnBase}`} style={{fontSize:'11px'}}>D2</button>
-              <button onClick={() => assessLoadDemoProfile(3)} className={`px-2.5 py-1.5 rounded ${assessDemoActive && Number(assessDemoProfile) === 3 ? btnAccent : btnBase}`} style={{fontSize:'11px'}}>D3</button>
-              <button onClick={resetDemo} className="px-2.5 py-1.5 rounded bg-rose-800/50 hover:bg-rose-700 text-rose-300" style={{fontSize:'11px'}}>Reset</button>
-            </div>
+            <button onClick={resetDemo} className="px-2 py-1 rounded bg-rose-800/50 hover:bg-rose-700 text-rose-300" style={{fontSize:'11px'}}>Reset</button>
           </div>
         </div>
 
         {/* ── Q Jump + Assess ── */}
-        <div className="flex items-center border-b border-inherit">
-          <div className="flex-1 flex items-center gap-2 px-4 py-2 border-r border-inherit">
-            <span className={`font-medium ${sectionTitle}`} style={{fontSize:'12px'}}>Q</span>
+        <div className="border-b border-inherit">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-inherit">
+            <span className={`font-medium ${sectionTitle}`} style={{fontSize:'11px'}}>Q</span>
             <input type="number" placeholder="ID"
-              className={`w-16 px-2 py-1.5 rounded border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-300'}`}
-              style={{fontSize:'12px'}}
+              className={`w-14 px-2 py-1 rounded border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-300'}`}
+              style={{fontSize:'11px'}}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const id = parseInt(e.target.value);
@@ -15794,10 +16202,10 @@ function App() {
                 }
               }}
             />
-            <button onClick={() => { setCurrentIndex(0); setScreen('question'); }} className={`px-2.5 py-1.5 rounded ${btnBase}`} style={{fontSize:'11px'}}>First</button>
-            <button onClick={() => { setCurrentIndex(questions.length - 1); setScreen('question'); }} className={`px-2.5 py-1.5 rounded ${btnBase}`} style={{fontSize:'11px'}}>Last</button>
+            <button onClick={() => { setCurrentIndex(0); setScreen('question'); }} className={`px-2 py-1 rounded ${btnBase}`} style={{fontSize:'11px'}}>First</button>
+            <button onClick={() => { setCurrentIndex(questions.length - 1); setScreen('question'); }} className={`px-2 py-1 rounded ${btnBase}`} style={{fontSize:'11px'}}>Last</button>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2">
+          <div className="flex items-center gap-1.5 px-3 py-1.5">
             <button onClick={() => {
               const fakeCompleted = { ...assessCompleted };
               if (!fakeCompleted['quick-profile']) {
@@ -15873,7 +16281,7 @@ function App() {
           {/* Global stars background for dark mode */}
           {darkMode && <div className="global-stars" />}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && !screen.startsWith('verify-') && (
+            {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && screen !== 'compare' && !screen.startsWith('verify-') && (
               <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!authUser} isGuest={isGuestMode} assessCompleted={assessCompleted} accentColor={navAccentColor} displayName={displayName} />
             )}
             {renderContent()}
@@ -15898,7 +16306,7 @@ function App() {
     >
       {/* Global stars background for dark mode */}
       {darkMode && <div className="global-stars" />}
-      {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && !screen.startsWith('verify-') && (
+      {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && screen !== 'compare' && !screen.startsWith('verify-') && (
         <div className="safe-top">
           <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!authUser} isGuest={isGuestMode} assessCompleted={assessCompleted} displayName={displayName} />
         </div>
