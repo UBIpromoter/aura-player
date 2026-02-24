@@ -1778,6 +1778,7 @@ const COLOR_HEX = {
   gray:    { base: '#6b7280', light: '#9ca3af', rgb: '107, 114, 128' },
 };
 const twColor = (c) => COLOR_HEX[c]?.tw || c; // pink -> fuchsia for Tailwind
+const colorOf = (name, fallback = 'violet') => COLOR_HEX[name] || COLOR_HEX[fallback];
 
 // Binary answer colors - single source of truth
 // Array order: light→dark (index 0=lightest conf1, index 3=darkest conf4)
@@ -5665,7 +5666,7 @@ const VortexButton = ({ onSingleTap, onDoubleTap, className = "text-xl btn-feedb
 
 // NavBar
 const NavBar = ({ darkMode, stats, showStreak, onHome, onDoubleClickHome, onSettings, onProfile, isLoggedIn, isGuest, assessCompleted, accentColor = 'violet', displayName }) => {
-  const accent = COLOR_HEX[accentColor] || COLOR_HEX.violet;
+  const accent = colorOf(accentColor);
   // Calculate aura glow colors based on assessment progress
   const getAuraGlow = () => {
     if (!assessCompleted || Object.keys(assessCompleted).length === 0) {
@@ -6187,8 +6188,8 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
         {/* Persistent aura glow — breathing, multi-layered */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-8%' }}>
           {(() => {
-            const c0 = COLOR_HEX[question.colors?.[0]] || COLOR_HEX.violet;
-            const c1 = COLOR_HEX[question.colors?.[1]] || COLOR_HEX.blue;
+            const c0 = colorOf(question.colors?.[0]);
+            const c1 = colorOf(question.colors?.[1], 'blue');
             return <>
               <div style={{
                 position: 'absolute', width: 420, height: 420, borderRadius: '50%',
@@ -6211,7 +6212,7 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
         {/* Question text with radial glow (no rectangular card edges) */}
         <div className="max-w-sm px-4 relative">
           {(() => {
-            const c = COLOR_HEX[question.colors?.[0]] || COLOR_HEX.violet;
+            const c = colorOf(question.colors?.[0]);
             return (
               <div className="absolute inset-0 pointer-events-none" style={{
                 width: '200%', height: '200%', left: '-50%', top: '-50%',
@@ -6234,7 +6235,7 @@ const OnboardingFlow = ({ darkMode, onComplete, onSkip, onSettings, onReset }) =
             const answered = answers[question.id]?.answer === idx;
             const icon = question.icons?.[idx];
             const colorName = question.colors?.[idx] || 'violet';
-            const c = COLOR_HEX[colorName] || COLOR_HEX.violet;
+            const c = colorOf(colorName);
             const btnStyle = answered
               ? {
                   borderColor: `rgba(${c.rgb}, 0.6)`,
@@ -7394,8 +7395,52 @@ const QuestionCard = ({ question, darkMode, evidenceExpanded, onToggleEvidence }
   );
 };
 
-// Binary Answer Buttons — Onboarding language: stacked, subtle gradients, glow confidence ramp
-const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentResponse, onTap, onRightClick, pendingSubmit, requireConfirmation, onSubmit, onClear, category }) => {
+// getConfidenceStyle — shared gradient/glow math for confidence-ramp answer buttons
+// c: { rgb, base, light }, returns { borderColor, background, boxShadow, opacity, textColor }
+const getConfidenceStyle = ({ c, darkMode, tapCount, isSelected, isPending, wasAnswered, isAnswered, otherSelected, confidence, grayMode }) => {
+  if (wasAnswered || isPending) {
+    const r = Math.min(confidence, 4);
+    const bA = darkMode ? 0.40 + r * 0.10 : 0.50 + r * 0.12;
+    return {
+      borderColor: `rgba(${c.rgb}, ${bA})`,
+      background: darkMode
+        ? `linear-gradient(135deg, rgba(${c.rgb},${0.10 + r * 0.05}) 0%, rgba(${c.rgb},${0.05 + r * 0.025}) 100%)`
+        : `linear-gradient(135deg, rgba(${c.rgb},${0.14 + r * 0.05}) 0%, rgba(${c.rgb},${0.06 + r * 0.025}) 100%)`,
+      boxShadow: `0 0 ${14 + r * 4}px rgba(${c.rgb},${darkMode ? 0.15 + r * 0.05 : 0.18 + r * 0.06}), 0 0 ${30 + r * 5}px rgba(${c.rgb},${darkMode ? 0.08 + r * 0.02 : 0.10 + r * 0.03})`,
+      textColor: darkMode ? '#fff' : c.base,
+    };
+  }
+  if (isSelected) {
+    const r = Math.min(tapCount, 4);
+    const bA = darkMode ? 0.30 + r * 0.12 : 0.40 + r * 0.12;
+    return {
+      borderColor: `rgba(${c.rgb}, ${bA})`,
+      background: darkMode
+        ? `linear-gradient(135deg, rgba(${c.rgb},${0.06 + r * 0.05}) 0%, rgba(${c.rgb},${0.02 + r * 0.03}) 100%)`
+        : `linear-gradient(135deg, rgba(${c.rgb},${0.10 + r * 0.05}) 0%, rgba(${c.rgb},${0.04 + r * 0.03}) 100%)`,
+      boxShadow: `0 0 ${12 + r * 4}px rgba(${c.rgb},${darkMode ? 0.10 + r * 0.05 : 0.15 + r * 0.06}), 0 0 ${30 + r * 5}px rgba(${c.rgb},${darkMode ? 0.05 + r * 0.025 : 0.08 + r * 0.03})`,
+      textColor: darkMode ? '#fff' : c.base,
+    };
+  }
+  if (otherSelected || isAnswered) {
+    if (grayMode) return { borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)', background: darkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', boxShadow: 'none', opacity: 0.4, textColor: darkMode ? '#6b7280' : '#9ca3af' };
+    return { borderColor: `rgba(${c.rgb}, ${darkMode ? 0.10 : 0.15})`, background: `rgba(${c.rgb}, ${darkMode ? 0.02 : 0.04})`, boxShadow: 'none', opacity: 0.45, textColor: darkMode ? c.light : c.base };
+  }
+  if (grayMode) return { borderColor: darkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.12)', background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', boxShadow: 'none', textColor: darkMode ? '#d1d5db' : '#1f2937' };
+  return {
+    borderColor: darkMode ? `rgba(${c.rgb}, 0.25)` : `rgba(${c.rgb}, 0.50)`,
+    background: darkMode
+      ? `linear-gradient(135deg, rgba(${c.rgb},0.08) 0%, rgba(${c.rgb},0.03) 100%)`
+      : `linear-gradient(135deg, rgba(${c.rgb},0.14) 0%, rgba(${c.rgb},0.06) 100%)`,
+    boxShadow: darkMode
+      ? `0 0 12px rgba(${c.rgb},0.10), 0 0 30px rgba(${c.rgb},0.05)`
+      : `0 0 12px rgba(${c.rgb},0.14), 0 0 30px rgba(${c.rgb},0.08)`,
+    textColor: darkMode ? c.light : c.base,
+  };
+};
+
+// Binary Answer Buttons
+const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentResponse, onTap, onRightClick, pendingSubmit, category }) => {
   const isOpinion = category === 'judgment';
   const colors = [
     COLOR_HEX[isOpinion ? 'cyan' : 'emerald'],
@@ -7403,67 +7448,18 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
   ];
   const labels = ['YES', 'NO'];
 
-  const getStyle = (answer) => {
-    const c = colors[answer];
-    const isSelected = tappedAnswer === answer;
-    const isPending = pendingSubmit?.answer === answer;
-    const wasAnswered = currentResponse?.answer === answer;
-    const otherSelected = tappedAnswer !== null && tappedAnswer !== answer;
-    const conf = isSelected ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2);
-
-    // Committed or pending — strong glow at confidence level
-    if (wasAnswered || isPending) {
-      const r = Math.min(conf, 4);
-      const bA = darkMode ? 0.40 + r * 0.10 : 0.50 + r * 0.12;
-      return {
-        borderColor: `rgba(${c.rgb}, ${bA})`,
-        background: darkMode
-          ? `linear-gradient(135deg, rgba(${c.rgb},${0.10 + r * 0.05}) 0%, rgba(${c.rgb},${0.05 + r * 0.025}) 100%)`
-          : `linear-gradient(135deg, rgba(${c.rgb},${0.14 + r * 0.05}) 0%, rgba(${c.rgb},${0.06 + r * 0.025}) 100%)`,
-        boxShadow: `0 0 ${14 + r * 4}px rgba(${c.rgb},${darkMode ? 0.15 + r * 0.05 : 0.18 + r * 0.06}), 0 0 ${30 + r * 5}px rgba(${c.rgb},${darkMode ? 0.08 + r * 0.02 : 0.10 + r * 0.03})`,
-      };
-    }
-
-    // Active selection — confidence ramp: brighter with each tap
-    if (isSelected) {
-      const r = Math.min(tapCount, 4);
-      const bA = darkMode ? 0.30 + r * 0.12 : 0.40 + r * 0.12;
-      return {
-        borderColor: `rgba(${c.rgb}, ${bA})`,
-        background: darkMode
-          ? `linear-gradient(135deg, rgba(${c.rgb},${0.06 + r * 0.05}) 0%, rgba(${c.rgb},${0.02 + r * 0.03}) 100%)`
-          : `linear-gradient(135deg, rgba(${c.rgb},${0.10 + r * 0.05}) 0%, rgba(${c.rgb},${0.04 + r * 0.03}) 100%)`,
-        boxShadow: `0 0 ${12 + r * 4}px rgba(${c.rgb},${darkMode ? 0.10 + r * 0.05 : 0.15 + r * 0.06}), 0 0 ${30 + r * 5}px rgba(${c.rgb},${darkMode ? 0.05 + r * 0.025 : 0.08 + r * 0.03})`,
-      };
-    }
-
-    // Dimmed — other option is selected, or already answered
-    if (otherSelected || isAnswered) {
-      return {
-        borderColor: `rgba(${c.rgb}, ${darkMode ? 0.10 : 0.15})`,
-        background: `rgba(${c.rgb}, ${darkMode ? 0.02 : 0.04})`,
-        boxShadow: 'none',
-        opacity: 0.45,
-      };
-    }
-
-    // Neutral — onboarding unselected
-    return {
-      borderColor: darkMode ? `rgba(${c.rgb}, 0.25)` : `rgba(${c.rgb}, 0.50)`,
-      background: darkMode
-        ? `linear-gradient(135deg, rgba(${c.rgb},0.08) 0%, rgba(${c.rgb},0.03) 100%)`
-        : `linear-gradient(135deg, rgba(${c.rgb},0.14) 0%, rgba(${c.rgb},0.06) 100%)`,
-      boxShadow: darkMode
-        ? `0 0 12px rgba(${c.rgb},0.10), 0 0 30px rgba(${c.rgb},0.05)`
-        : `0 0 12px rgba(${c.rgb},0.14), 0 0 30px rgba(${c.rgb},0.08)`,
-    };
-  };
-
   return (
     <div className="w-full max-w-sm resp-max-w mx-auto space-y-3 resp-gap">
       {[0, 1].map(answer => {
         const c = colors[answer];
-        const style = getStyle(answer);
+        const style = getConfidenceStyle({
+          c, darkMode, tapCount,
+          isSelected: tappedAnswer === answer,
+          isPending: pendingSubmit?.answer === answer,
+          wasAnswered: currentResponse?.answer === answer,
+          isAnswered, otherSelected: tappedAnswer !== null && tappedAnswer !== answer,
+          confidence: tappedAnswer === answer ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2),
+        });
         return (
           <button
             key={answer}
@@ -7471,13 +7467,9 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
             onContextMenu={(e) => onRightClick && onRightClick(e, answer)}
             disabled={isAnswered || pendingSubmit}
             className="w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none"
-            style={style}
+            style={{ borderColor: style.borderColor, background: style.background, boxShadow: style.boxShadow, opacity: style.opacity }}
           >
-            <span className="resp-text-lg font-semibold" style={{
-              color: (tappedAnswer === answer || currentResponse?.answer === answer)
-                ? (darkMode ? '#fff' : c.base)
-                : (darkMode ? c.light : c.base),
-            }}>
+            <span className="resp-text-lg font-semibold" style={{ color: style.textColor }}>
               {labels[answer]}
             </span>
             {tappedAnswer === answer && tapCount >= 1 && (
@@ -7492,93 +7484,23 @@ const BinaryButtons = ({ darkMode, tappedAnswer, tapCount, isAnswered, currentRe
   );
 };
 
-// Multiple Choice Buttons — Onboarding language: stacked rounded-2xl, glow confidence ramp
-// Supports mcColorMode: 'color' (per-option from MC_COLORS) or 'gray' (neutral until selected)
-const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, currentResponse, onTap, onRightClick, pendingSubmit, requireConfirmation, onSubmit, onClear, mcColorMode }) => {
-  const mode = mcColorMode || 'gray';
-
-  const getStyle = (index) => {
-    const mc = MC_COLORS[index % MC_COLORS.length];
-    const c = { rgb: mc.rgb, base: mc.hex, light: mc.shades?.[1] || mc.hex };
-    const isSelected = tappedAnswer === index;
-    const isPending = pendingSubmit?.answer === index;
-    const wasAnswered = currentResponse?.answer === index;
-    const otherSelected = tappedAnswer !== null && tappedAnswer !== index;
-    const conf = isSelected ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2);
-
-    // Committed or pending
-    if (wasAnswered || isPending) {
-      const r = Math.min(conf, 4);
-      const bA = darkMode ? 0.40 + r * 0.10 : 0.50 + r * 0.12;
-      return {
-        borderColor: `rgba(${c.rgb}, ${bA})`,
-        background: darkMode
-          ? `linear-gradient(135deg, rgba(${c.rgb},${0.10 + r * 0.05}) 0%, rgba(${c.rgb},${0.05 + r * 0.025}) 100%)`
-          : `linear-gradient(135deg, rgba(${c.rgb},${0.14 + r * 0.05}) 0%, rgba(${c.rgb},${0.06 + r * 0.025}) 100%)`,
-        boxShadow: `0 0 ${14 + r * 4}px rgba(${c.rgb},${darkMode ? 0.15 + r * 0.05 : 0.18 + r * 0.06}), 0 0 ${30 + r * 5}px rgba(${c.rgb},${darkMode ? 0.08 + r * 0.02 : 0.10 + r * 0.03})`,
-        textColor: darkMode ? '#fff' : c.base,
-      };
-    }
-
-    // Active selection — confidence ramp
-    if (isSelected) {
-      const r = Math.min(tapCount, 4);
-      const bA = darkMode ? 0.30 + r * 0.12 : 0.40 + r * 0.12;
-      return {
-        borderColor: `rgba(${c.rgb}, ${bA})`,
-        background: darkMode
-          ? `linear-gradient(135deg, rgba(${c.rgb},${0.06 + r * 0.05}) 0%, rgba(${c.rgb},${0.02 + r * 0.03}) 100%)`
-          : `linear-gradient(135deg, rgba(${c.rgb},${0.10 + r * 0.05}) 0%, rgba(${c.rgb},${0.04 + r * 0.03}) 100%)`,
-        boxShadow: `0 0 ${12 + r * 4}px rgba(${c.rgb},${darkMode ? 0.10 + r * 0.05 : 0.15 + r * 0.06}), 0 0 ${30 + r * 5}px rgba(${c.rgb},${darkMode ? 0.05 + r * 0.025 : 0.08 + r * 0.03})`,
-        textColor: darkMode ? '#fff' : c.base,
-      };
-    }
-
-    // Dimmed — other is selected or already answered
-    if (otherSelected || isAnswered) {
-      if (mode === 'gray') {
-        return {
-          borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)',
-          background: darkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
-          boxShadow: 'none',
-          opacity: 0.4,
-          textColor: darkMode ? '#6b7280' : '#9ca3af',
-        };
-      }
-      return {
-        borderColor: `rgba(${c.rgb}, ${darkMode ? 0.10 : 0.15})`,
-        background: `rgba(${c.rgb}, ${darkMode ? 0.02 : 0.04})`,
-        boxShadow: 'none',
-        opacity: 0.45,
-        textColor: darkMode ? c.light : c.base,
-      };
-    }
-
-    // Neutral — gray or colored
-    if (mode === 'gray') {
-      return {
-        borderColor: darkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.12)',
-        background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-        boxShadow: 'none',
-        textColor: darkMode ? '#d1d5db' : '#1f2937',
-      };
-    }
-    return {
-      borderColor: darkMode ? `rgba(${c.rgb}, 0.25)` : `rgba(${c.rgb}, 0.50)`,
-      background: darkMode
-        ? `linear-gradient(135deg, rgba(${c.rgb},0.08) 0%, rgba(${c.rgb},0.03) 100%)`
-        : `linear-gradient(135deg, rgba(${c.rgb},0.14) 0%, rgba(${c.rgb},0.06) 100%)`,
-      boxShadow: darkMode
-        ? `0 0 12px rgba(${c.rgb},0.10), 0 0 30px rgba(${c.rgb},0.05)`
-        : `0 0 12px rgba(${c.rgb},0.14), 0 0 30px rgba(${c.rgb},0.08)`,
-      textColor: darkMode ? c.light : c.base,
-    };
-  };
+// Multiple Choice Buttons — supports mcColorMode: 'color' or 'gray' (neutral until selected)
+const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, currentResponse, onTap, onRightClick, pendingSubmit, mcColorMode }) => {
+  const grayMode = (mcColorMode || 'gray') === 'gray';
 
   return (
     <div className="w-full max-w-sm resp-max-w mx-auto space-y-2.5 resp-gap-sm">
       {options.map((option, index) => {
-        const style = getStyle(index);
+        const mc = MC_COLORS[index % MC_COLORS.length];
+        const c = { rgb: mc.rgb, base: mc.hex, light: mc.shades?.[1] || mc.hex };
+        const style = getConfidenceStyle({
+          c, darkMode, tapCount, grayMode,
+          isSelected: tappedAnswer === index,
+          isPending: pendingSubmit?.answer === index,
+          wasAnswered: currentResponse?.answer === index,
+          isAnswered, otherSelected: tappedAnswer !== null && tappedAnswer !== index,
+          confidence: tappedAnswer === index ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2),
+        });
         return (
           <button
             key={option}
@@ -7586,12 +7508,7 @@ const MCButtons = ({ options, darkMode, tappedAnswer, tapCount, isAnswered, curr
             onContextMenu={(e) => onRightClick && onRightClick(e, index)}
             disabled={isAnswered || pendingSubmit}
             className="w-full h-12 resp-h-md rounded-2xl flex items-center justify-center relative px-5 transition-all btn-feedback shine-card border select-none"
-            style={{
-              borderColor: style.borderColor,
-              background: style.background,
-              boxShadow: style.boxShadow,
-              opacity: style.opacity || 1,
-            }}
+            style={{ borderColor: style.borderColor, background: style.background, boxShadow: style.boxShadow, opacity: style.opacity || 1 }}
           >
             <span className="resp-text-md font-semibold text-center" style={{ color: style.textColor }}>
               {option}
@@ -7914,7 +7831,7 @@ const VERIFY_MOCK_SUBJECTS = [
 const VerifySubjectBanner = ({ subject, color, darkMode }) => {
   const [expanded, setExpanded] = useState(false);
   if (!subject) return null;
-  const c = COLOR_HEX[color] || COLOR_HEX.emerald;
+  const c = colorOf(color, 'emerald');
   return (
     <div className="w-full mb-3">
       <button onClick={() => setExpanded(!expanded)}
@@ -7952,7 +7869,7 @@ const VerifySubjectBanner = ({ subject, color, darkMode }) => {
 
 // Shared: VerifyScreenLayout — split layout with ambient glow, content top, buttons bottom
 const VerifyScreenLayout = ({ darkMode, color, sectionLabel, progress, total, onBack, children, buttons, subject }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   return (
     <div className={`flex-1 flex flex-col relative overflow-hidden ${TH('bg-main', darkMode)}`}>
       {/* Ambient breathing glow */}
@@ -7987,7 +7904,7 @@ const VerifyScreenLayout = ({ darkMode, color, sectionLabel, progress, total, on
         <div className="flex-1 overflow-y-auto flex flex-col items-center w-full">
           <div className="w-full max-w-sm mx-auto px-5 pt-12 pb-4 flex flex-col items-center">
             {(sectionLabel || (progress !== undefined && total !== undefined)) && (() => {
-              const sc = COLOR_HEX[color] || COLOR_HEX.violet;
+              const sc = colorOf(color);
               const pct = total > 0 ? ((progress + 1) / total) * 100 : 0;
               return (
                 <div className="flex items-center gap-3 w-full mb-3">
@@ -8027,7 +7944,7 @@ const VerifyScreenLayout = ({ darkMode, color, sectionLabel, progress, total, on
 
 // Shared: VerifyActionButton
 const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, secondary }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   if (secondary) {
     return (
       <button onClick={onClick} disabled={disabled}
@@ -8061,7 +7978,7 @@ const VerifyActionButton = ({ label, color, darkMode, onClick, disabled, seconda
 
 // Shared: VerifyOptionButton
 const VerifyOptionButton = ({ label, selected, color, darkMode, onClick }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   const dashRe = / [—\u2014] /;
   const parts = dashRe.test(label) ? label.split(dashRe) : null;
   return (
@@ -8089,7 +8006,7 @@ const VerifyOptionButton = ({ label, selected, color, darkMode, onClick }) => {
 
 // Shared: VerifyStarConfidence — 1-4 confidence selector
 const VerifyStarConfidence = ({ color, darkMode, value, onChange }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   const labels = ['Gaps', 'Fair', 'Confident', 'Certain'];
   return (
     <div className="flex flex-col items-center gap-4 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
@@ -8141,7 +8058,7 @@ const VerifyStarConfidence = ({ color, darkMode, value, onChange }) => {
 
 // Shared: VerifyVerdict — yes/no + confidence + expandable flags
 const VerifyVerdict = ({ question, color, darkMode, answer, onAnswer }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   const val = answer || {};
   const verdict = val.verdict;
   const confidence = val.confidence;
@@ -8246,7 +8163,7 @@ const VerifyMultiToggle = ({ question, color, darkMode, answer, onAnswer }) => {
   const selected = Array.isArray(answer) ? answer : (answer && typeof answer === 'object' ? answer.items || [] : []);
   const otherText = (answer && typeof answer === 'object') ? answer.otherText || '' : '';
   const maxSelect = question.maxSelect || Infinity;
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   const hasOther = question.hasOtherInput;
   const toggle = (opt) => {
     let next;
@@ -8273,7 +8190,7 @@ const VerifyMultiToggle = ({ question, color, darkMode, answer, onAnswer }) => {
 };
 
 const VerifyTextInput = ({ question, color, darkMode, answer, onAnswer, onContinue }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   const inputRef = React.useRef(null);
   React.useEffect(() => { if (inputRef.current) inputRef.current.focus(); }, [question.id]);
   return (
@@ -8292,7 +8209,7 @@ const VerifyTextInput = ({ question, color, darkMode, answer, onAnswer, onContin
 };
 
 const VerifyToggleSwitch = ({ label, subtitle, color, darkMode, isOn, onToggle }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   return (
     <button onClick={onToggle}
       className={`w-full flex items-center justify-between rounded-2xl px-4 py-3.5 transition-all duration-200 hover-glow hover-glow-${color}`}
@@ -8530,7 +8447,7 @@ const VerifyHub = ({ darkMode, onBack, subjects, evaluations, onSelect, onViewCo
 
 // Shared: VerifyChipButton — reusable chip for compact selectors
 const VerifyChipButton = ({ label, selected, color, darkMode, onClick, stretch }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   return (
     <button onClick={onClick}
       className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-center hover-glow hover-glow-${color}`}
@@ -8552,7 +8469,7 @@ const VerifyChipButton = ({ label, selected, color, darkMode, onClick, stretch }
 
 // VerifyCompactConnection — 3 inline chip selectors on one screen
 const VerifyCompactConnection = ({ question, color, darkMode, answer, onAnswer }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   const val = answer || {};
   const setField = (fieldId, v) => onAnswer({ ...val, [fieldId]: v });
   return (
@@ -8586,7 +8503,7 @@ const VerifyCompactConnection = ({ question, color, darkMode, answer, onAnswer }
 
 // VerifyIdentityCheck — 3 identity questions on one screen
 const VerifyIdentityCheck = ({ question, color, darkMode, answer, onAnswer }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   const val = answer || {};
   const setField = (fieldId, v) => onAnswer({ ...val, [fieldId]: v });
   return (
@@ -8621,7 +8538,7 @@ const VerifyIdentityCheck = ({ question, color, darkMode, answer, onAnswer }) =>
 
 // VerifyEvidenceCombined — merged evidence checklist with section headers
 const VerifyEvidenceCombined = ({ question, color, darkMode, answer, onAnswer }) => {
-  const c = COLOR_HEX[color] || COLOR_HEX.violet;
+  const c = colorOf(color);
   const val = answer || {};
   const toggleItem = (sectionIdx, opt) => {
     const key = `s${sectionIdx}`;
@@ -8826,7 +8743,7 @@ const VerifyEvaluatorFlow = ({ darkMode, subject, onComplete, onBack, sharedPath
           const total = question.fields.length;
           const filled = question.fields.filter(f => val[f.id]).length;
           if (filled < total) {
-            const cc = COLOR_HEX[color] || COLOR_HEX.violet;
+            const cc = colorOf(color);
             return (
               <div className="w-full h-14 resp-h-lg rounded-2xl font-medium text-sm flex items-center justify-center transition-all duration-300"
                 style={{
@@ -8877,7 +8794,7 @@ const VerifyExpertForm = ({ darkMode, subject, onComplete, onBack, sharedPath, s
 
   const config = path ? VERIFY_PATH_CONFIG[path] : null;
   const color = config ? config.color : 'emerald';
-  const c = COLOR_HEX[color] || COLOR_HEX.emerald;
+  const c = colorOf(color, 'emerald');
   const verdictKey = path === 'A' ? 'a3-verdict' : path === 'B' ? 'b4-verdict' : 'c4-verdict';
   const verdict = answers[verdictKey];
   const canSubmit = verdict?.verdict && verdict?.confidence;
@@ -11014,7 +10931,7 @@ const AssessPickerScreen = ({
             return sum + (prog ? Object.keys(prog.responses || {}).length : 0);
           }, 0);
           const progressPct = (answeredQuestions / totalQuestions) * 100;
-          const hex = COLOR_HEX[cat.color] || COLOR_HEX.violet;
+          const hex = colorOf(cat.color);
           const colors = getAssessColor(cat.color, darkMode);
           const t = twColor(cat.color);
           const hasModules = catTests.length > 1;
@@ -11067,7 +10984,7 @@ const AssessPickerScreen = ({
                 const [testId, test] = catTests[0];
                 return (
                   <button key={catId} onClick={() => onStartTest(testId)} className={`w-full p-3.5 rounded-2xl ${TH('bg-card', darkMode)} flex items-center gap-3 hover-glow hover-glow-${cat.color} relative overflow-hidden`}>
-                    {darkMode && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 200, height: 200, background: `radial-gradient(ellipse at center, rgba(${(COLOR_HEX[cat.color] || COLOR_HEX.violet).rgb}, 0.08) 0%, transparent 70%)` }} /></div>}
+                    {darkMode && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 200, height: 200, background: `radial-gradient(ellipse at center, rgba(${(colorOf(cat.color)).rgb}, 0.08) 0%, transparent 70%)` }} /></div>}
                     <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={progressPct > 0 ? `${Math.round(progressPct)}%` : totalQuestions} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-xs" orbit={assessProfileSwitching} />
                     <div className={`flex-1 text-left font-semibold ${TH('text-primary', darkMode)}`}>{cat.name}</div>
                     <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${darkMode ? `bg-${twColor(cat.color)}-500/25 text-${twColor(cat.color)}-300 border border-${twColor(cat.color)}-500/30` : `bg-${twColor(cat.color)}-100 text-${twColor(cat.color)}-600`}`}>{progressPct > 0 ? 'Continue →' : 'Start →'}</span>
@@ -11084,7 +11001,7 @@ const AssessPickerScreen = ({
 
               return (
                 <div key={catId} className={`rounded-2xl ${TH('bg-card', darkMode)} relative overflow-hidden`}>
-                  {darkMode && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 200, height: 200, background: `radial-gradient(ellipse at center, rgba(${(COLOR_HEX[cat.color] || COLOR_HEX.violet).rgb}, 0.08) 0%, transparent 70%)` }} /></div>}
+                  {darkMode && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 200, height: 200, background: `radial-gradient(ellipse at center, rgba(${(colorOf(cat.color)).rgb}, 0.08) 0%, transparent 70%)` }} /></div>}
                   <div className={`p-3.5 hover-glow hover-glow-${cat.color} cursor-pointer relative`} onClick={() => onSetExpandedCategory(isExpanded ? null : catId)}>
                     <div className="flex items-center gap-3">
                       <ProgressCircle progress={progressPct} size={44} strokeWidth={3} color={cat.color} text={incompleteModules} gradientId={`cat-${catId}`} darkMode={darkMode} textSize="text-sm" orbit={assessProfileSwitching} />
@@ -11118,7 +11035,7 @@ const AssessPickerScreen = ({
                       const qc = test.questionCount || test.items.length;
                       const answered = isCompleted ? qc : progress ? Object.keys(progress.responses || {}).length : 0;
                       const modProgressPct = (answered / qc) * 100;
-                      const hex = COLOR_HEX[cat.color] || COLOR_HEX.violet;
+                      const hex = colorOf(cat.color);
                       const hasSpectrumResult = isCompleted && spectrumColors[id] && isCompleted.score !== undefined;
 
                       if (hasSpectrumResult) {
@@ -11371,7 +11288,7 @@ const AssessQuestionScreen = ({
     <div className={`h-full flex flex-col overflow-hidden ${TH('bg-main', darkMode)} relative`} {...assessSwipeHandlers}>
       {/* Breathing ambient gradient */}
       {(() => {
-        const ac = COLOR_HEX[assessCurrentTest.color] || COLOR_HEX.violet;
+        const ac = colorOf(assessCurrentTest.color);
         return (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-20%' }}>
             <div style={{
@@ -11445,7 +11362,7 @@ const AssessQuestionScreen = ({
             {/* Radial glow behind assessment question text — no visible card */}
             <div className="assess-glow absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true" style={{ overflow: 'visible' }}>
               {(() => {
-                const ac = COLOR_HEX[assessCurrentTest.color] || COLOR_HEX.violet;
+                const ac = colorOf(assessCurrentTest.color);
                 return <div style={{
                   width: '300%',
                   height: '300%',
@@ -12069,7 +11986,7 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
                 {dimOrder.filter(d => dims[d] !== undefined).map(d => {
                   const info = AI_DIMENSIONS[d];
                   const score = dims[d];
-                  const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
+                  const barColor = colorOf(dimColors[d], 'cyan');
                   return (
                     <div key={d}>
                       <div className="flex justify-between items-baseline mb-1">
@@ -12093,7 +12010,7 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
                   <div className="grid grid-cols-4 gap-1.5 mb-2">
                     {dimOrder.filter(d => combinedDims[d] !== undefined && AI_DIMENSIONS[d]?.group === 'style').map(d => {
                       const info = AI_DIMENSIONS[d];
-                      const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
+                      const barColor = colorOf(dimColors[d], 'cyan');
                       return (
                         <div key={d} className={`p-1.5 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
                           <div className={`text-[9px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info?.name || d}</div>
@@ -12107,7 +12024,7 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
                   <div className="grid grid-cols-3 gap-1.5">
                     {dimOrder.filter(d => combinedDims[d] !== undefined && AI_DIMENSIONS[d]?.group === 'identity').map(d => {
                       const info = AI_DIMENSIONS[d];
-                      const barColor = COLOR_HEX[dimColors[d]] || COLOR_HEX.cyan;
+                      const barColor = colorOf(dimColors[d], 'cyan');
                       return (
                         <div key={d} className={`p-1.5 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-gray-50'}`}>
                           <div className={`text-[9px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{info?.name || d}</div>
@@ -12147,7 +12064,7 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
           const recs = nudgeData.recommendations;
           const primary = recs[0];
           const secondary = recs[1];
-          const pc = COLOR_HEX[primary.toCategory.color] || COLOR_HEX.violet;
+          const pc = colorOf(primary.toCategory.color);
           return (
             <div className="space-y-3 mt-2">
               <div className={`text-center text-sm font-semibold uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>What's next</div>
@@ -12168,7 +12085,7 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
               </button>
               {/* Secondary: soft color wash — clearly tappable but not as loud */}
               {secondary && (() => {
-                const sc = COLOR_HEX[secondary.toCategory.color] || COLOR_HEX.violet;
+                const sc = colorOf(secondary.toCategory.color);
                 return (
                   <button onClick={(e) => { e.stopPropagation(); onNudgeContinue(secondary.nextTestId); }}
                     className={`w-full rounded-xl p-4 text-left transition-all hover-glow hover-glow-${secondary.toCategory.color}`}
@@ -13177,8 +13094,8 @@ const QuestionFlowScreen = ({
       {(() => {
         const catColorMap = CAT_COLOR_MAP;
         const catSecondary = { prediction: 'rose', reasoning: 'blue', judgment: 'cyan' };
-        const c0 = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
-        const c1 = COLOR_HEX[catSecondary[currentQuestion?.category]] || COLOR_HEX.blue;
+        const c0 = colorOf(catColorMap[currentQuestion?.category]);
+        const c1 = colorOf(catSecondary[currentQuestion?.category], 'blue');
         return (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div style={{
@@ -13213,7 +13130,7 @@ const QuestionFlowScreen = ({
         style={{
           borderBottom: (() => {
             const catColorMap = CAT_COLOR_MAP;
-            const qColor = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
+            const qColor = colorOf(catColorMap[currentQuestion?.category]);
             return darkMode
               ? `1px solid rgba(${qColor.rgb},0.15)`
               : `1px solid rgba(${qColor.rgb},0.20)`;
@@ -13372,7 +13289,7 @@ const QuestionFlowScreen = ({
                   style={{ background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}
                 >✕</button>
                 <button
-                  onClick={() => submitAnswer(tappedAnswer, tapCount)}
+                  onClick={() => submitAnswer()}
                   className="w-11 h-11 rounded-full btn-feedback flex items-center justify-center text-lg transition-all"
                   style={{
                     color: darkMode ? '#fff' : confirmColor?.base,
@@ -13391,7 +13308,7 @@ const QuestionFlowScreen = ({
           <div className="flex-shrink-0 border-t relative z-10"
             style={(() => {
               const catColorMap = CAT_COLOR_MAP;
-              const qColor = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
+              const qColor = colorOf(catColorMap[currentQuestion?.category]);
               return darkMode
                 ? { borderColor: `rgba(${qColor.rgb},0.12)`, background: `linear-gradient(180deg, rgba(3,7,18,1) 0%, rgba(${qColor.rgb},0.04) 100%)` }
                 : { borderColor: `rgba(${qColor.rgb},0.15)`, background: `linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(${qColor.rgb},0.04) 100%)` };
@@ -13835,71 +13752,161 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// --- useAnswerFlow Hook ---
+// Unified tap → pending → undo → finalize state machine.
+// Used by main questions (with grace period) and QotD (simple mode).
+const useAnswerFlow = ({
+  undoDelay = 1,
+  tapDelay = 400,
+  graceEnabled = false,
+  graceDuration = 1200,
+  requireConfirmation = false,
+  onPending,
+  onFinalize,
+}) => {
+  const [tappedAnswer, setTappedAnswer] = useState(null);
+  const [tapCount, setTapCount] = useState(0);
+  const [pendingSubmit, setPendingSubmit] = useState(null);
+  const [inGracePeriod, setInGracePeriod] = useState(false);
+  const [justUndone, setJustUndone] = useState(false);
+  const submitTimeoutRef = useRef(null);
+  const tapTimeoutRef = useRef(null);
+  const graceTimeoutRef = useRef(null);
+  const pendingStartRef = useRef(null);
+  const onPendingRef = useRef(onPending);
+  const onFinalizeRef = useRef(onFinalize);
+  onPendingRef.current = onPending;
+  onFinalizeRef.current = onFinalize;
+
+  const doFinalize = (answer, confidence, extra) => {
+    if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
+    setInGracePeriod(false);
+    setPendingSubmit(null);
+    onFinalizeRef.current?.(answer, confidence, extra);
+  };
+
+  const doPend = (answer, confidence) => {
+    if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    setJustUndone(false);
+    const extra = onPendingRef.current?.(answer, confidence);
+    setPendingSubmit({ answer, confidence, extra });
+    pendingStartRef.current = Date.now();
+    setTappedAnswer(null);
+    setTapCount(0);
+    if (graceEnabled) {
+      setInGracePeriod(true);
+      if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
+      graceTimeoutRef.current = setTimeout(() => setInGracePeriod(false), graceDuration);
+    }
+    if (undoDelay === 0) {
+      doFinalize(answer, confidence, extra);
+    } else {
+      submitTimeoutRef.current = setTimeout(() => doFinalize(answer, confidence, extra), undoDelay * 1000);
+    }
+  };
+
+  const handleTap = (answer) => {
+    if (pendingSubmit && inGracePeriod && graceEnabled) {
+      if (answer === pendingSubmit.answer && pendingSubmit.confidence < 4) {
+        const newConf = pendingSubmit.confidence + 1;
+        setPendingSubmit({ ...pendingSubmit, confidence: newConf });
+        pendingStartRef.current = Date.now();
+        if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
+        graceTimeoutRef.current = setTimeout(() => setInGracePeriod(false), graceDuration);
+        if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
+        if (undoDelay > 0) {
+          submitTimeoutRef.current = setTimeout(() => doFinalize(answer, newConf, pendingSubmit.extra), undoDelay * 1000);
+        }
+      }
+      return;
+    }
+    if (pendingSubmit) return;
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    let newCount;
+    if (tappedAnswer === answer) {
+      newCount = Math.min(tapCount + 1, 4);
+      setTapCount(newCount);
+    } else {
+      newCount = 1;
+      setTappedAnswer(answer);
+      setTapCount(1);
+    }
+    if (!requireConfirmation) {
+      tapTimeoutRef.current = setTimeout(() => doPend(answer, newCount), tapDelay);
+    }
+  };
+
+  const handleRightClick = (e, answer) => {
+    e.preventDefault();
+    if (pendingSubmit) return;
+    if (tappedAnswer !== answer) return;
+    if (tapCount > 1) setTapCount(tapCount - 1);
+  };
+
+  const handleUndo = () => {
+    if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
+    if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
+    setInGracePeriod(false);
+    if (pendingSubmit) {
+      setTappedAnswer(pendingSubmit.answer);
+      setTapCount(pendingSubmit.confidence);
+      setJustUndone(true);
+    }
+    setPendingSubmit(null);
+  };
+
+  const clearUndone = () => {
+    setTappedAnswer(null);
+    setTapCount(0);
+    setJustUndone(false);
+  };
+
+  const submit = () => {
+    if (tappedAnswer === null) return;
+    doPend(tappedAnswer, tapCount);
+  };
+
+  const reset = () => {
+    if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
+    setTappedAnswer(null);
+    setTapCount(0);
+    setPendingSubmit(null);
+    setInGracePeriod(false);
+    setJustUndone(false);
+  };
+
+  return {
+    tappedAnswer, setTappedAnswer, tapCount, setTapCount,
+    pendingSubmit, inGracePeriod, justUndone, setJustUndone,
+    handleTap, handleRightClick, handleUndo, clearUndone, submit, reset,
+  };
+};
+
 // --- useQotd Hook ---
 const useQotd = (undoDelay = 1) => {
   const [qotdData, setQotdData] = useState(() => getRandomQOTD());
   const [qotdResponse, setQotdResponse] = useState(null);
-  const [qotdTappedAnswer, setQotdTappedAnswer] = useState(null);
-  const [qotdTapCount, setQotdTapCount] = useState(0);
-  const [qotdPending, setQotdPending] = useState(null);
-  const qotdSubmitRef = useRef(null);
-  const qotdTapTimeoutRef = useRef(null);
+  const flow = useAnswerFlow({
+    undoDelay,
+    onFinalize: (answer, confidence) => setQotdResponse({ answer, confidence }),
+  });
 
   const resetQotd = () => {
-    if (qotdSubmitRef.current) clearTimeout(qotdSubmitRef.current);
-    if (qotdTapTimeoutRef.current) clearTimeout(qotdTapTimeoutRef.current);
+    flow.reset();
     setQotdData(getRandomQOTD());
     setQotdResponse(null);
-    setQotdTappedAnswer(null);
-    setQotdTapCount(0);
-    setQotdPending(null);
   };
 
-  const handleQotdTap = (answer) => {
-    if (qotdResponse) return;
-    if (qotdPending) return;
-
-    if (qotdTapTimeoutRef.current) clearTimeout(qotdTapTimeoutRef.current);
-
-    let newCount;
-    if (qotdTappedAnswer === answer) {
-      newCount = Math.min(4, qotdTapCount + 1);
-      setQotdTapCount(newCount);
-    } else {
-      newCount = 1;
-      setQotdTappedAnswer(answer);
-      setQotdTapCount(1);
-    }
-
-    // Auto-submit after 400ms (same as main questions)
-    qotdTapTimeoutRef.current = setTimeout(() => {
-      setQotdPending({ answer, confidence: newCount });
-      setQotdTappedAnswer(null);
-      setQotdTapCount(0);
-
-      if (undoDelay === 0) {
-        setQotdResponse({ answer, confidence: newCount });
-        setQotdPending(null);
-      } else {
-        qotdSubmitRef.current = setTimeout(() => {
-          setQotdResponse({ answer, confidence: newCount });
-          setQotdPending(null);
-        }, undoDelay * 1000);
-      }
-    }, 400);
+  return {
+    qotdData, qotdResponse, setQotdResponse,
+    qotdTappedAnswer: flow.tappedAnswer,
+    qotdTapCount: flow.tapCount,
+    qotdPending: flow.pendingSubmit,
+    resetQotd, handleQotdTap: flow.handleTap, handleQotdUndo: flow.handleUndo,
   };
-
-  const handleQotdUndo = () => {
-    if (qotdSubmitRef.current) clearTimeout(qotdSubmitRef.current);
-    if (qotdTapTimeoutRef.current) clearTimeout(qotdTapTimeoutRef.current);
-    if (qotdPending) {
-      setQotdTappedAnswer(qotdPending.answer);
-      setQotdTapCount(qotdPending.confidence);
-    }
-    setQotdPending(null);
-  };
-
-  return { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, setQotdTappedAnswer, qotdTapCount, setQotdTapCount, qotdPending, resetQotd, handleQotdTap, handleQotdUndo };
 };
 
 // --- useVerification Hook ---
@@ -14446,11 +14453,57 @@ function App() {
   const [showTips, setShowTips] = useState(() => demoStorage.get().settings.showTips !== false);
   const [showGestureHint, setShowGestureHint] = useState(true);
   const [stats, setStats] = useState(() => demoStorage.get().stats);
-  const [pendingSubmit, setPendingSubmit] = useState(null);
-  const [inGracePeriod, setInGracePeriod] = useState(false); // Grace period for multi-tap confidence
-  const [justUndone, setJustUndone] = useState(false); // Shows "Undone" modal after canceling submit
-  const [tappedAnswer, setTappedAnswer] = useState(null);
-  const [tapCount, setTapCount] = useState(0);
+  // --- Main Answer Flow (via useAnswerFlow hook) ---
+  // Callbacks use refs internally — safe to reference values defined later in this scope
+  const mainFlow = useAnswerFlow({
+    undoDelay,
+    graceEnabled: true,
+    graceDuration: 1200,
+    requireConfirmation,
+    onPending: (answer, confidence) => {
+      if (showGestureHint) setShowGestureHint(false);
+      return { community: generateFakeResults(currentQuestion), question: currentQuestion };
+    },
+    onFinalize: (answer, confidence, extra) => {
+      const { community, question } = extra;
+      const data = demoStorage.get();
+      data.answers[question.id] = { answer, confidence, timestamp: Date.now() };
+      data.stats.answered = Object.keys(data.answers).length;
+      const today = new Date().toDateString();
+      const isNewDay = data.stats.lastAnswerDate !== today;
+      if (isNewDay) {
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+        data.stats.streak = data.stats.lastAnswerDate === yesterday ? data.stats.streak + 1 : 1;
+        data.stats.lastAnswerDate = today;
+      }
+      let xpEarned = XP_RATES.answer;
+      if (confidence >= 3) xpEarned += XP_RATES.highConfidence;
+      if (isNewDay) xpEarned += XP_RATES.dailyFirst;
+      if (data.stats.streak >= 7 && isNewDay) xpEarned += XP_RATES.streakBonus;
+      const oldXP = data.stats.xp || 0;
+      const oldLevel = data.stats.level || calculateLevel(oldXP);
+      const newXP = oldXP + xpEarned;
+      const newLevel = calculateLevel(newXP);
+      data.stats.xp = newXP;
+      data.stats.level = newLevel;
+      demoStorage.set(data);
+      captureResponse(question.id, answer, confidence);
+      setLastAnsweredQuestion(question);
+      setCommunityBrowseIndex(0);
+      if (question.category) {
+        setSessionAnsweredCategories(prev => new Set([...prev, question.category]));
+      }
+      setSessionAnsweredIds(prev => new Set([...prev, question.id]));
+      setResponses(data.answers);
+      setCommunityResults(prev => ({ ...prev, [question.id]: community }));
+      setStats(data.stats);
+      if (newLevel > oldLevel) {
+        setLevelUpData({ level: newLevel, title: getLevelTitle(newLevel) });
+      }
+      goToNext();
+    },
+  });
+  const { tappedAnswer, setTappedAnswer, tapCount, setTapCount, pendingSubmit, inGracePeriod, justUndone, setJustUndone } = mainFlow;
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
   const [showFullResults, setShowFullResults] = useState(null);
   const [lastAnsweredQuestion, setLastAnsweredQuestion] = useState(null); // Track the question we just answered
@@ -14476,7 +14529,7 @@ function App() {
   });
 
   // --- QOTD (via useQotd hook) ---
-  const { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, setQotdTappedAnswer, qotdTapCount, setQotdTapCount, qotdPending, resetQotd, handleQotdTap, handleQotdUndo } = useQotd(undoDelay);
+  const { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, qotdTapCount, qotdPending, resetQotd, handleQotdTap, handleQotdUndo } = useQotd(undoDelay);
 
   // --- Profile & History ---
   const [showStreak, setShowStreak] = useState(true);
@@ -14509,13 +14562,7 @@ function App() {
   // --- Verification (via useVerification hook) ---
   const { verifyCurrentSubjectId, setVerifyCurrentSubjectId, verifyEvaluatorData, setVerifyEvaluatorData, verifyFlowPath, setVerifyFlowPath, verifyFlowAnswers, setVerifyFlowAnswers, verifyEvaluations, setVerifyEvaluations, verifyPendingCount, verifyCompletedCount, verifyExpertMode, setVerifyExpertMode, verifyExpertPromptShown, setVerifyExpertPromptShown } = useVerification();
 
-  // --- Refs & Derived ---
-  const submitTimeoutRef = useRef(null);
-  const tapTimeoutRef = useRef(null);
-  const graceTimeoutRef = useRef(null);
-  const pendingSubmitStartRef = useRef(null);
-  const CONFIDENCE_GRACE_PERIOD = 1200; // ms to allow additional taps to increase confidence
-
+  // --- Derived ---
   const currentQuestion = questions[currentIndex];
   const currentResponse = currentQuestion ? responses[currentQuestion.id] : null;
   const isAnswered = !!currentResponse;
@@ -14666,169 +14713,12 @@ function App() {
     enabled: screen === 'assess-question' && !assessPending
   });
 
-  const handleAnswerTap = (answer) => {
-    if (isAnswered) return;
-
-    // During grace period, allow confidence increases on pending answer
-    if (pendingSubmit && inGracePeriod) {
-      if (answer === pendingSubmit.answer && pendingSubmit.confidence < 4) {
-        // Increase confidence during grace period
-        const newConfidence = Math.min(pendingSubmit.confidence + 1, 4);
-        setPendingSubmit({ ...pendingSubmit, confidence: newConfidence });
-        pendingSubmitStartRef.current = Date.now(); // Reset grace period timer
-        // Reset grace period
-        if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
-        graceTimeoutRef.current = setTimeout(() => setInGracePeriod(false), CONFIDENCE_GRACE_PERIOD);
-        // Restart the submit timeout with new confidence
-        if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
-        if (undoDelay > 0) {
-          submitTimeoutRef.current = setTimeout(() => {
-            finalizeSubmit(answer, newConfidence, pendingSubmit.community);
-          }, undoDelay * 1000);
-        }
-      }
-      return;
-    }
-
-    // If pending but not in grace period, ignore tap (handled by overlay)
-    if (pendingSubmit) return;
-
-    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-
-    let newTapCount;
-    if (tappedAnswer === answer) {
-      newTapCount = Math.min(tapCount + 1, 4);
-      setTapCount(newTapCount);
-    } else {
-      newTapCount = 1;
-      setTappedAnswer(answer);
-      setTapCount(1);
-    }
-
-    // Auto-submit if not requiring confirmation
-    if (!requireConfirmation) {
-      tapTimeoutRef.current = setTimeout(() => {
-        submitAnswer(answer, newTapCount);
-      }, 400);
-    }
-  };
-
-  // Right-click to decrease confidence
-  const handleAnswerRightClick = (e, answer) => {
-    e.preventDefault();
-    if (isAnswered || pendingSubmit) return;
-    if (tappedAnswer !== answer) return; // Can only decrease if this answer is selected
-
-    if (tapCount > 1) {
-      setTapCount(tapCount - 1);
-    }
-  };
-
-  const submitAnswer = (answer, confidence) => {
-    if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
-    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-    if (justUndone) setJustUndone(false); // Clear undo state
-
-    const community = generateFakeResults(currentQuestion);
-
-    setPendingSubmit({ answer, confidence, community });
-    pendingSubmitStartRef.current = Date.now(); // Track when pending started for grace period
-    setTappedAnswer(null);
-    setTapCount(0);
-
-    // Start grace period for multi-tap confidence
-    setInGracePeriod(true);
-    if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
-    graceTimeoutRef.current = setTimeout(() => setInGracePeriod(false), CONFIDENCE_GRACE_PERIOD);
-
-    // Hide gesture hint after first answer
-    if (showGestureHint) setShowGestureHint(false);
-
-    if (undoDelay === 0) {
-      finalizeSubmit(answer, confidence, community);
-    } else {
-      submitTimeoutRef.current = setTimeout(() => {
-        finalizeSubmit(answer, confidence, community);
-      }, undoDelay * 1000);
-    }
-  };
-
-  const finalizeSubmit = (answer, confidence, community) => {
-    if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
-    setInGracePeriod(false);
-    const data = demoStorage.get();
-    data.answers[currentQuestion.id] = { answer, confidence, timestamp: Date.now() };
-    data.stats.answered = Object.keys(data.answers).length;
-    const today = new Date().toDateString();
-    const isNewDay = data.stats.lastAnswerDate !== today;
-    if (isNewDay) {
-      const yesterday = new Date(Date.now() - 86400000).toDateString();
-      data.stats.streak = data.stats.lastAnswerDate === yesterday ? data.stats.streak + 1 : 1;
-      data.stats.lastAnswerDate = today;
-    }
-
-    // Calculate XP earned
-    let xpEarned = XP_RATES.answer;
-    if (confidence >= 3) xpEarned += XP_RATES.highConfidence;
-    if (isNewDay) xpEarned += XP_RATES.dailyFirst;
-    if (data.stats.streak >= 7 && isNewDay) xpEarned += XP_RATES.streakBonus;
-
-    // Initialize XP if not exists
-    const oldXP = data.stats.xp || 0;
-    const oldLevel = data.stats.level || calculateLevel(oldXP);
-    const newXP = oldXP + xpEarned;
-    const newLevel = calculateLevel(newXP);
-    data.stats.xp = newXP;
-    data.stats.level = newLevel;
-
-    demoStorage.set(data);
-
-    // Capture to Firebase (if configured)
-    captureResponse(currentQuestion.id, answer, confidence);
-
-    // Track this as last answered question BEFORE advancing
-    setLastAnsweredQuestion(currentQuestion);
-    setCommunityBrowseIndex(0); // Reset to show most recent
-
-    // Track that user has answered in this category this session
-    if (currentQuestion.category) {
-      setSessionAnsweredCategories(prev => new Set([...prev, currentQuestion.category]));
-    }
-    // Track this question as answered THIS session (for showing results)
-    setSessionAnsweredIds(prev => new Set([...prev, currentQuestion.id]));
-
-    setResponses(data.answers);
-    setCommunityResults(prev => ({ ...prev, [currentQuestion.id]: community }));
-    setStats(data.stats);
-    setPendingSubmit(null);
-
-    // Check for level up
-    if (newLevel > oldLevel) {
-      setLevelUpData({ level: newLevel, title: getLevelTitle(newLevel) });
-    }
-
-    // Go straight to next question (no flash of results screen)
-    goToNext();
-  };
-
-  const handleUndo = () => {
-    if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
-    if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
-    setInGracePeriod(false);
-    // Restore selection state like vG
-    if (pendingSubmit) {
-      setTappedAnswer(pendingSubmit.answer);
-      setTapCount(pendingSubmit.confidence);
-      setJustUndone(true);
-    }
-    setPendingSubmit(null);
-  };
-
-  const clearUndoneState = () => {
-    setTappedAnswer(null);
-    setTapCount(0);
-    setJustUndone(false);
-  };
+  // Answer flow wrappers (delegate to mainFlow hook, add external guards)
+  const handleAnswerTap = (answer) => { if (!isAnswered) mainFlow.handleTap(answer); };
+  const handleAnswerRightClick = (e, answer) => { if (!isAnswered) mainFlow.handleRightClick(e, answer); };
+  const submitAnswer = () => mainFlow.submit();
+  const handleUndo = mainFlow.handleUndo;
+  const clearUndoneState = mainFlow.clearUndone;
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -15068,9 +14958,7 @@ function App() {
     setCurrentIndex(0);
     setShowGestureHint(true);
     setLevelUpData(null);
-    setQotdResponse(null);
-    setQotdTappedAnswer(null);
-    setQotdTapCount(0);
+    resetQotd();
     // Clear all guest/login tracking
     localStorage.removeItem('aura_guest_mode');
     localStorage.removeItem('aura_nudge_shown');
