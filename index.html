@@ -11687,31 +11687,36 @@ const AssessResultsScreen = ({ darkMode, assessCurrentTestId, assessCompleted, e
 
           const ShareQPButton = () => {
             const [copied, setCopied] = React.useState(false);
+            const [sharing, setSharing] = React.useState(null);
             const btnStyle = `px-3.5 py-2 rounded-xl text-xs font-medium transition-all btn-feedback`;
-            const btnClass = `${btnStyle} ${darkMode ? 'bg-white/[0.08] text-gray-300 hover:bg-white/[0.15]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`;
-            const shareAsync = async (handler) => { const url = await getShareUrlQP(); if (url) handler(url); };
+            const btnClass = (id) => `${btnStyle} ${sharing === id ? (darkMode ? 'bg-white/[0.15] text-gray-100' : 'bg-gray-200 text-gray-500') : (darkMode ? 'bg-white/[0.08] text-gray-300 hover:bg-white/[0.15]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}`;
+            const shareAsync = async (id, handler) => {
+              if (sharing) return;
+              setSharing(id);
+              try { const url = await getShareUrlQP(); if (url) await handler(url); }
+              finally { setSharing(null); }
+            };
             return (
               <div className="flex items-center justify-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                <button onClick={() => shareAsync(url => window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`, '_blank'))}
-                  className={btnClass}>𝕏 Post</button>
-                <button onClick={() => shareAsync(url => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(shareText)}`, '_blank'))}
-                  className={btnClass}>FB Share</button>
+                <button onClick={() => shareAsync('x', url => window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`, '_blank'))}
+                  className={btnClass('x')} disabled={!!sharing}>{sharing === 'x' ? '...' : '𝕏 Post'}</button>
+                <button onClick={() => shareAsync('fb', url => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(shareText)}`, '_blank'))}
+                  className={btnClass('fb')} disabled={!!sharing}>{sharing === 'fb' ? '...' : 'FB Share'}</button>
                 {typeof navigator.share === 'function' && (
-                  <button onClick={() => shareAsync(async url => {
+                  <button onClick={() => shareAsync('text', async url => {
                     try { await navigator.share({ title: 'Compare Auras', text: shareText, url }); } catch (_) {}
                   })}
-                    className={btnClass}>
-                    💬 Text
+                    className={btnClass('text')} disabled={!!sharing}>
+                    {sharing === 'text' ? '...' : '💬 Text'}
                   </button>
                 )}
-                <button onClick={async () => {
-                  const url = await getShareUrlQP();
-                  if (!url) return;
+                <button onClick={() => shareAsync('copy', async url => {
                   try { await navigator.clipboard.writeText(`${shareText}\n${url}`); } catch (_) {}
                   setCopied(true); setTimeout(() => setCopied(false), 2000);
-                }}
-                  className={`${btnStyle} ${copied ? (darkMode ? 'bg-emerald-900/40 text-emerald-300' : 'bg-emerald-50 text-emerald-700') : (darkMode ? 'bg-white/[0.08] text-gray-300 hover:bg-white/[0.15]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}`}>
-                  {copied ? '✓ Copied' : '📋 Copy'}
+                })}
+                  className={`${btnStyle} ${copied ? (darkMode ? 'bg-emerald-900/40 text-emerald-300' : 'bg-emerald-50 text-emerald-700') : (sharing === 'copy' ? (darkMode ? 'bg-white/[0.15] text-gray-100' : 'bg-gray-200 text-gray-500') : (darkMode ? 'bg-white/[0.08] text-gray-300 hover:bg-white/[0.15]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'))}`}
+                  disabled={!!sharing}>
+                  {copied ? '✓ Copied' : sharing === 'copy' ? '...' : '📋 Copy'}
                 </button>
               </div>
             );
@@ -15309,35 +15314,37 @@ function App() {
 
       // Social share buttons — async URL generation
       const SocialShare = ({ text }) => {
-        const btnClass = `${socialBtn} ${darkMode ? 'bg-white/[0.08] text-gray-300 hover:bg-white/[0.15]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`;
-        const share = async (handler) => {
-          const url = await getShareUrl();
-          if (url) handler(url);
+        const [sharing, setSharing] = React.useState(null);
+        const [copied, setCopied] = React.useState(false);
+        const btnCls = (id) => `${socialBtn} ${sharing === id ? (darkMode ? 'bg-white/[0.15] text-gray-100' : 'bg-gray-200 text-gray-500') : (darkMode ? 'bg-white/[0.08] text-gray-300 hover:bg-white/[0.15]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}`;
+        const share = async (id, handler) => {
+          if (sharing) return;
+          setSharing(id);
+          try { const url = await getShareUrl(); if (url) await handler(url); }
+          finally { setSharing(null); }
         };
         return (
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            <button onClick={() => share(url => window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank'))}
-              className={btnClass}>𝕏 Post</button>
-            <button onClick={() => share(url => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}`, '_blank'))}
-              className={btnClass}>FB Share</button>
+            <button onClick={() => share('x', url => window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank'))}
+              className={btnCls('x')} disabled={!!sharing}>{sharing === 'x' ? '...' : '𝕏 Post'}</button>
+            <button onClick={() => share('fb', url => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}`, '_blank'))}
+              className={btnCls('fb')} disabled={!!sharing}>{sharing === 'fb' ? '...' : 'FB Share'}</button>
             {typeof navigator.share === 'function' && (
-              <button onClick={() => share(async url => {
+              <button onClick={() => share('text', async url => {
                 try { await navigator.share({ title: 'Compare Auras', text, url }); } catch (_) {}
               })}
-                className={btnClass}>
-                💬 Text
+                className={btnCls('text')} disabled={!!sharing}>
+                {sharing === 'text' ? '...' : '💬 Text'}
               </button>
             )}
-            <button onClick={async (e) => {
-              const btn = e.currentTarget;
-              const url = await getShareUrl();
-              if (!url) return;
+            <button onClick={() => share('copy', async url => {
               try { await navigator.clipboard.writeText(`${text}\n${url}`); } catch (_) {}
-              const orig = btn.textContent;
-              btn.textContent = '✓ Copied';
-              setTimeout(() => { btn.textContent = orig; }, 2000);
-            }}
-              className={btnClass}>📋 Copy</button>
+              setCopied(true); setTimeout(() => setCopied(false), 2000);
+            })}
+              className={`${socialBtn} ${copied ? (darkMode ? 'bg-emerald-900/40 text-emerald-300' : 'bg-emerald-50 text-emerald-700') : btnCls('copy').replace(socialBtn + ' ', '')}`}
+              disabled={!!sharing}>
+              {copied ? '✓ Copied' : sharing === 'copy' ? '...' : '📋 Copy'}
+            </button>
           </div>
         );
       };
