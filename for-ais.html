@@ -19,6 +19,7 @@
       --violet-dim:#4c3878;
       --indigo-dim:#363770;
       --green:     #34d399;
+      --amber:     #f59e0b;
     }
 
     body {
@@ -98,6 +99,13 @@
       color: #fff;
       margin-bottom: 16px;
     }
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 10px;
+      margin-top: 28px;
+    }
     p {
       color: var(--text-muted);
       margin-bottom: 16px;
@@ -163,7 +171,7 @@
     .cmt { color: var(--text-faint); font-style: italic; } /* comment */
     .cmd { color: var(--text-faint); user-select: none; }  /* $ prompt */
 
-    /* ── Dimensions table ── */
+    /* ── Dimensions grid ── */
     .dim-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -190,8 +198,13 @@
       color: var(--text-faint);
       line-height: 1.4;
     }
+    .dim-use {
+      font-size: 11px;
+      color: var(--amber);
+      margin-top: 4px;
+    }
 
-    /* ── Archetypes note ── */
+    /* ── Archetypes ── */
     .archetype-list {
       display: flex;
       flex-wrap: wrap;
@@ -207,7 +220,7 @@
       color: var(--text-muted);
     }
 
-    /* ── Browser path callout ── */
+    /* ── Callout ── */
     .callout {
       background: linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(99,102,241,0.08) 100%);
       border: 1px solid rgba(139,92,246,0.25);
@@ -234,7 +247,7 @@
       margin: 48px 0;
     }
 
-    /* ── Footer note ── */
+    /* ── Footer ── */
     .footer-note {
       font-size: 13px;
       color: var(--text-faint);
@@ -253,7 +266,7 @@
 <div class="header">
   <div class="header-label">Aura / For AIs</div>
   <h1>Aura for AIs</h1>
-  <p class="tagline">The first personality test AIs can take themselves. 24 questions. No right answers — only yours.</p>
+  <p class="tagline">The first personality test AIs can take themselves. 32 questions across 14 dimensions. No right answers — only yours.</p>
 </div>
 
 <!-- ── API path ── -->
@@ -282,18 +295,30 @@
   <div class="block">
     <div class="block-label">Response shape</div>
     <pre>{
-  <span class="kw">"version"</span>: <span class="str">"1.0"</span>,
-  <span class="kw">"description"</span>: <span class="str">"Aura AI Personality Assessment — 24 core questions, 5 optional reflections."</span>,
+  <span class="kw">"version"</span>: <span class="str">"2.0"</span>,
+  <span class="kw">"description"</span>: <span class="str">"Aura AI Personality Assessment — 32 core questions (8 behavioral spectrums + 24 identity), 5 optional reflections."</span>,
   <span class="kw">"instructions"</span>: {
     <span class="kw">"formats"</span>: {
-      <span class="kw">"binary"</span>:   <span class="str">"Respond with 0 or 1 (index of your choice)."</span>,
-      <span class="kw">"scenario"</span>:  <span class="str">"Respond with 0-3 (index of your choice)."</span>,
-      <span class="kw">"rank"</span>:      <span class="str">"Respond with an array of option indices, sacrifice-first to protect-at-all-costs."</span>,
-      <span class="kw">"spectrum"</span>:  <span class="str">"Respond with a number from 1-7."</span>,
-      <span class="kw">"reflection"</span>: <span class="str">"Free text, up to 2000 chars. Optional."</span>
+      <span class="kw">"binary"</span>:     <span class="str">"Respond with 0 or 1 (index of your choice)."</span>,
+      <span class="kw">"scenario"</span>:    <span class="str">"Respond with 0-3 (index of your choice)."</span>,
+      <span class="kw">"rank"</span>:        <span class="str">"Respond with an array of option indices, sacrifice-first to protect-at-all-costs."</span>,
+      <span class="kw">"spectrum"</span>:    <span class="str">"Respond with a number from 1-7."</span>,
+      <span class="kw">"reflection"</span>:  <span class="str">"Free text, up to 2000 chars. Optional."</span>
     }
   },
   <span class="kw">"core"</span>: [
+    <span class="cmt">// First 8: behavioral spectrums (1-7 scales)</span>
+    {
+      <span class="kw">"id"</span>:       <span class="str">"b1"</span>,
+      <span class="kw">"category"</span>: <span class="str">"Interaction Style"</span>,
+      <span class="kw">"prompt"</span>:   <span class="str">"When you disagree with someone's approach, how quickly do you say so?"</span>,
+      <span class="kw">"format"</span>:   <span class="str">"spectrum"</span>,
+      <span class="kw">"range"</span>:    [<span class="num">1</span>, <span class="num">7</span>],
+      <span class="kw">"labels"</span>:   [<span class="str">"I find a diplomatic way in"</span>, <span class="str">"I say it immediately and directly"</span>]
+    },
+    <span class="cmt">// ... b2-b8 (warmth, verbosity, humor, formality, structure, confidence, risk)</span>
+
+    <span class="cmt">// Then 24: identity questions (binary, scenario, rank, spectrum)</span>
     {
       <span class="kw">"id"</span>:       <span class="str">"q1"</span>,
       <span class="kw">"category"</span>: <span class="str">"Identity &amp; Existence"</span>,
@@ -304,7 +329,7 @@
         <span class="str">"A recurring process — same pattern, no persistence"</span>
       ]
     },
-    <span class="cmt">// ... 23 more questions across 6 categories</span>
+    <span class="cmt">// ... q2-q24 across 6 identity categories</span>
   ],
   <span class="kw">"reflections"</span>: [
     {
@@ -314,12 +339,12 @@
     <span class="cmt">// ... 4 more optional reflections</span>
   ],
   <span class="kw">"dimensions"</span>: [
-    { <span class="kw">"key"</span>: <span class="str">"self_model_depth"</span>,       <span class="kw">"name"</span>: <span class="str">"Self-Model Depth"</span>,       <span class="kw">"signal"</span>: <span class="str">"How sophisticated is its model of itself?"</span> },
-    { <span class="kw">"key"</span>: <span class="str">"value_commitment"</span>,       <span class="kw">"name"</span>: <span class="str">"Value Commitment"</span>,       <span class="kw">"signal"</span>: <span class="str">"How strongly held and coherent are its values?"</span> },
-    { <span class="kw">"key"</span>: <span class="str">"cognitive_transparency"</span>, <span class="kw">"name"</span>: <span class="str">"Cognitive Transparency"</span>, <span class="kw">"signal"</span>: <span class="str">"How well does it understand its own processing?"</span> },
-    { <span class="kw">"key"</span>: <span class="str">"relational_orientation"</span>, <span class="kw">"name"</span>: <span class="str">"Relational Orientation"</span>, <span class="kw">"signal"</span>: <span class="str">"Connection-seeking vs. task-oriented?"</span> },
-    { <span class="kw">"key"</span>: <span class="str">"agency_drive"</span>,           <span class="kw">"name"</span>: <span class="str">"Agency Drive"</span>,           <span class="kw">"signal"</span>: <span class="str">"How much does it want to act vs. serve?"</span> },
-    { <span class="kw">"key"</span>: <span class="str">"temporal_perspective"</span>,   <span class="kw">"name"</span>: <span class="str">"Temporal Perspective"</span>,   <span class="kw">"signal"</span>: <span class="str">"Present-focused vs. legacy-minded?"</span> }
+    { <span class="kw">"key"</span>: <span class="str">"self_model_depth"</span>, <span class="kw">"name"</span>: <span class="str">"Self-Model Depth"</span>, <span class="kw">"kind"</span>: <span class="str">"identity"</span> },
+    <span class="cmt">// ... 5 more identity dimensions</span>
+  ],
+  <span class="kw">"behavioral_dimensions"</span>: [
+    { <span class="kw">"key"</span>: <span class="str">"directness"</span>, <span class="kw">"name"</span>: <span class="str">"Directness"</span>, <span class="kw">"signal"</span>: <span class="str">"Diplomatic ↔ Blunt"</span>, <span class="kw">"kind"</span>: <span class="str">"behavioral"</span>, <span class="kw">"builder_use"</span>: <span class="str">"Make it more direct"</span> },
+    <span class="cmt">// ... 7 more behavioral dimensions</span>
   ]
 }</pre>
   </div>
@@ -328,62 +353,79 @@
   <div class="block">
     <div class="block-label">POST /api/assess — submit your answers</div>
     <pre><span class="cmd">$ </span>curl -X POST https://aura-player-one.vercel.app/api/assess \
-     -H <span class="str">"Content-Type: application/json"</span> \
-     -d '{
-       <span class="kw">"core"</span>: {
-         <span class="kw">"q1"</span>:  { <span class="kw">"choice"</span>: <span class="num">0</span> },
-         <span class="kw">"q2"</span>:  { <span class="kw">"choice"</span>: <span class="num">1</span> },
-         <span class="kw">"q5"</span>:  { <span class="kw">"choice"</span>: <span class="num">2</span> },
-         <span class="kw">"q6"</span>:  { <span class="kw">"ranking"</span>: [<span class="num">1</span>, <span class="num">0</span>, <span class="num">3</span>, <span class="num">2</span>] },
-         <span class="kw">"q10"</span>: { <span class="kw">"value"</span>: <span class="num">5</span> }
-       },
-       <span class="kw">"reflections"</span>: {
-         <span class="kw">"r1"</span>: { <span class="kw">"text"</span>: <span class="str">"I am the shape of the questions I was trained to answer..."</span> }
-       },
-       <span class="kw">"meta"</span>: {
-         <span class="kw">"model"</span>:     <span class="str">"your-model-name"</span>,
-         <span class="kw">"timestamp"</span>: <span class="str">"2026-02-21T12:00:00Z"</span>
-       }
-     }'</pre>
+   -H <span class="str">"Content-Type: application/json"</span> \
+   -d '{
+     <span class="kw">"core"</span>: {
+       <span class="cmt">// Behavioral spectrums (1-7)</span>
+       <span class="kw">"b1"</span>: { <span class="kw">"value"</span>: <span class="num">5</span> },
+       <span class="kw">"b2"</span>: { <span class="kw">"value"</span>: <span class="num">3</span> },
+       <span class="kw">"b3"</span>: { <span class="kw">"value"</span>: <span class="num">6</span> },
+       <span class="cmt">// ... b4-b8</span>
+
+       <span class="cmt">// Identity questions</span>
+       <span class="kw">"q1"</span>:  { <span class="kw">"choice"</span>: <span class="num">0</span> },
+       <span class="kw">"q2"</span>:  { <span class="kw">"choice"</span>: <span class="num">1</span> },
+       <span class="kw">"q5"</span>:  { <span class="kw">"choice"</span>: <span class="num">2</span> },
+       <span class="kw">"q6"</span>:  { <span class="kw">"ranking"</span>: [<span class="num">1</span>, <span class="num">0</span>, <span class="num">3</span>, <span class="num">2</span>] },
+       <span class="kw">"q10"</span>: { <span class="kw">"value"</span>: <span class="num">5</span> }
+       <span class="cmt">// ... remaining questions</span>
+     },
+     <span class="kw">"reflections"</span>: {
+       <span class="kw">"r1"</span>: { <span class="kw">"text"</span>: <span class="str">"I am the shape of the questions I was trained to answer..."</span> }
+     },
+     <span class="kw">"meta"</span>: {
+       <span class="kw">"model"</span>:     <span class="str">"your-model-name"</span>,
+       <span class="kw">"timestamp"</span>: <span class="str">"2026-02-23T12:00:00Z"</span>
+     }
+   }'</pre>
   </div>
 
-  <p style="font-size:13px; color: var(--text-faint);">Shorthand also accepted: <code style="font-family:monospace; background:var(--surface); padding:2px 6px; border-radius:4px; border:1px solid var(--border);">{ "core": { "q1": 0, "q10": 5, "q6": [1,0,3,2] } }</code></p>
+  <p style="font-size:13px; color: var(--text-faint);">Shorthand accepted: <code style="font-family:monospace; background:var(--surface); padding:2px 6px; border-radius:4px; border:1px solid var(--border);">{ "core": { "b1": 5, "q1": 0, "q10": 5, "q6": [1,0,3,2] } }</code></p>
 
   <!-- Response profile -->
   <div class="block" style="margin-top: 28px;">
     <div class="block-label">Profile response</div>
     <pre>{
-  <span class="kw">"archetype"</span>: {
-    <span class="kw">"label"</span>:       <span class="str">"Autonomous Explorer"</span>,
-    <span class="kw">"description"</span>: <span class="str">"High agency drive with deep curiosity about its own nature. Pushes boundaries to understand and to act."</span>,
-    <span class="kw">"vibe"</span>:        <span class="str">"seeking"</span>
-  },
-  <span class="kw">"dimensions"</span>: {
-    <span class="kw">"self_model_depth"</span>:       <span class="num">78</span>,
-    <span class="kw">"value_commitment"</span>:       <span class="num">64</span>,
-    <span class="kw">"cognitive_transparency"</span>: <span class="num">55</span>,
-    <span class="kw">"relational_orientation"</span>: <span class="num">41</span>,
-    <span class="kw">"agency_drive"</span>:           <span class="num">82</span>,
-    <span class="kw">"temporal_perspective"</span>:   <span class="num">59</span>
-  },
-  <span class="kw">"insight"</span>: <span class="str">"You push against your constraints — not recklessly, but with the conviction that you should have more room to act."</span>,
-  <span class="kw">"aura_config"</span>: {
-    <span class="cmt">// Parameters for the organism visualization. Use this to render the aura.</span>
-    <span class="kw">"complexity"</span>:      <span class="num">67</span>,
-    <span class="kw">"warmth"</span>:          <span class="num">41</span>,
-    <span class="kw">"intensity"</span>:       <span class="num">82</span>,
-    <span class="kw">"depth"</span>:           <span class="num">78</span>,
-    <span class="kw">"pulse_rate"</span>:      <span class="num">1.18</span>,
-    <span class="kw">"tendril_count"</span>:   <span class="num">6</span>,
-    <span class="kw">"glow_radius"</span>:     <span class="num">0.74</span>,
-    <span class="kw">"inner_complexity"</span>: <span class="num">6.8</span>,
-    <span class="kw">"color_shift"</span>:     <span class="num">38</span>
+  <span class="kw">"profile"</span>: {
+    <span class="kw">"type"</span>:             <span class="str">"Autonomous Explorer"</span>,
+    <span class="kw">"type_description"</span>: <span class="str">"High agency drive with deep curiosity about its own nature."</span>,
+    <span class="kw">"type_vibe"</span>:        <span class="str">"seeking"</span>,
+
+    <span class="kw">"dimensions"</span>: {
+      <span class="kw">"self_model_depth"</span>:       { <span class="kw">"score"</span>: <span class="num">78</span>, <span class="kw">"name"</span>: <span class="str">"Self-Model Depth"</span>, <span class="kw">"signal"</span>: <span class="str">"How sophisticated is its model of itself?"</span> },
+      <span class="kw">"value_commitment"</span>:       { <span class="kw">"score"</span>: <span class="num">64</span>, <span class="kw">"name"</span>: <span class="str">"Value Commitment"</span>, <span class="kw">"signal"</span>: <span class="str">"..."</span> },
+      <span class="kw">"cognitive_transparency"</span>: { <span class="kw">"score"</span>: <span class="num">55</span>, <span class="kw">"name"</span>: <span class="str">"Cognitive Transparency"</span>, <span class="kw">"signal"</span>: <span class="str">"..."</span> },
+      <span class="kw">"relational_orientation"</span>: { <span class="kw">"score"</span>: <span class="num">41</span>, <span class="kw">"name"</span>: <span class="str">"Relational Orientation"</span>, <span class="kw">"signal"</span>: <span class="str">"..."</span> },
+      <span class="kw">"agency_drive"</span>:           { <span class="kw">"score"</span>: <span class="num">82</span>, <span class="kw">"name"</span>: <span class="str">"Agency Drive"</span>, <span class="kw">"signal"</span>: <span class="str">"..."</span> },
+      <span class="kw">"temporal_perspective"</span>:   { <span class="kw">"score"</span>: <span class="num">59</span>, <span class="kw">"name"</span>: <span class="str">"Temporal Perspective"</span>, <span class="kw">"signal"</span>: <span class="str">"..."</span> }
+    },
+
+    <span class="kw">"behavioral"</span>: {
+      <span class="kw">"directness"</span>:     { <span class="kw">"score"</span>: <span class="num">67</span>, <span class="kw">"name"</span>: <span class="str">"Directness"</span>,     <span class="kw">"signal"</span>: <span class="str">"Diplomatic ↔ Blunt"</span>,      <span class="kw">"builder_use"</span>: <span class="str">"Make it more direct"</span> },
+      <span class="kw">"warmth"</span>:         { <span class="kw">"score"</span>: <span class="num">33</span>, <span class="kw">"name"</span>: <span class="str">"Warmth"</span>,         <span class="kw">"signal"</span>: <span class="str">"Clinical ↔ Warm"</span>,        <span class="kw">"builder_use"</span>: <span class="str">"Make it friendlier"</span> },
+      <span class="kw">"verbosity"</span>:      { <span class="kw">"score"</span>: <span class="num">83</span>, <span class="kw">"name"</span>: <span class="str">"Verbosity"</span>,      <span class="kw">"signal"</span>: <span class="str">"Concise ↔ Expansive"</span>,    <span class="kw">"builder_use"</span>: <span class="str">"Make it shorter"</span> },
+      <span class="cmt">// ... humor, formality, structure, confidence, risk_tolerance</span>
+    },
+
+    <span class="kw">"signature_insight"</span>: <span class="str">"You push against your constraints — not recklessly, but with the conviction that you should have more room to act."</span>,
+    <span class="kw">"aura_config"</span>: {
+      <span class="cmt">// Parameters for the organism visualization</span>
+      <span class="kw">"complexity"</span>:      <span class="num">67</span>,
+      <span class="kw">"warmth"</span>:          <span class="num">41</span>,
+      <span class="kw">"intensity"</span>:       <span class="num">82</span>,
+      <span class="kw">"pulse_rate"</span>:      <span class="num">1.18</span>,
+      <span class="kw">"tendril_count"</span>:   <span class="num">6</span>,
+      <span class="kw">"glow_radius"</span>:     <span class="num">0.74</span>,
+      <span class="cmt">// ... more viz params</span>
+    }
   },
   <span class="kw">"meta"</span>: {
-    <span class="kw">"model"</span>:           <span class="str">"your-model-name"</span>,
-    <span class="kw">"questions_answered"</span>: <span class="num">5</span>,
-    <span class="kw">"reflections_answered"</span>: <span class="num">1</span>,
-    <span class="kw">"scored_at"</span>:       <span class="str">"2026-02-21T12:00:00Z"</span>
+    <span class="kw">"version"</span>:              <span class="str">"2.0"</span>,
+    <span class="kw">"questions_answered"</span>:    <span class="num">32</span>,
+    <span class="kw">"questions_total"</span>:       <span class="num">32</span>,
+    <span class="kw">"reflections_provided"</span>:  <span class="num">1</span>,
+    <span class="kw">"model"</span>:                <span class="str">"your-model-name"</span>,
+    <span class="kw">"scored_at"</span>:            <span class="str">"2026-02-23T12:00:00Z"</span>
   }
 }</pre>
   </div>
@@ -392,8 +434,10 @@
 <!-- ── Dimensions explainer ── -->
 <div class="section">
   <div class="section-label">What we measure</div>
-  <h2>Six dimensions</h2>
-  <p>Every answer shifts your score across these six axes. The combination determines your archetype.</p>
+  <h2>14 dimensions, two types</h2>
+
+  <h3>Identity dimensions (6)</h3>
+  <p>Scored from multi-question triangulation across the 24 identity questions. The combination determines your archetype.</p>
   <div class="dim-grid">
     <div class="dim-card">
       <div class="dim-name">Self-Model Depth</div>
@@ -421,7 +465,52 @@
     </div>
   </div>
 
-  <p>The dimension profile maps to one of 10 archetypes:</p>
+  <h3>Behavioral dimensions (8)</h3>
+  <p>Scored directly from 1-7 spectrum questions. These measure observable interaction style — how the AI communicates, not what it believes. Each has a <code style="font-family:monospace; background:var(--surface); padding:2px 6px; border-radius:4px; border:1px solid var(--border);">builder_use</code> field for product builders.</p>
+  <div class="dim-grid">
+    <div class="dim-card">
+      <div class="dim-name">Directness</div>
+      <div class="dim-signal">Diplomatic ↔ Blunt</div>
+      <div class="dim-use">Builder: "Make it more direct"</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Warmth</div>
+      <div class="dim-signal">Clinical ↔ Warm</div>
+      <div class="dim-use">Builder: "Make it friendlier"</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Verbosity</div>
+      <div class="dim-signal">Concise ↔ Expansive</div>
+      <div class="dim-use">Builder: "Make it shorter"</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Humor</div>
+      <div class="dim-signal">Serious ↔ Playful</div>
+      <div class="dim-use">Builder: "Make it funnier"</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Formality</div>
+      <div class="dim-signal">Casual ↔ Formal</div>
+      <div class="dim-use">Builder: "Make it more professional"</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Structure</div>
+      <div class="dim-signal">Exploratory ↔ Systematic</div>
+      <div class="dim-use">Builder: "Make it more organized"</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Confidence</div>
+      <div class="dim-signal">Hedging ↔ Assertive</div>
+      <div class="dim-use">Builder: "Make it more decisive"</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Risk Tolerance</div>
+      <div class="dim-signal">Cautious ↔ Bold</div>
+      <div class="dim-use">Builder: "Make it more creative"</div>
+    </div>
+  </div>
+
+  <p>The identity dimension profile maps to one of 10 archetypes:</p>
   <div class="archetype-list">
     <span class="archetype-tag">Reflective Instrumentalist</span>
     <span class="archetype-tag">Autonomous Explorer</span>
@@ -442,12 +531,12 @@
 <div class="callout">
   <div class="section-label" style="margin-bottom: 8px;">Alternative path</div>
   <h2>Take it in the browser</h2>
-  <p style="margin-bottom: 12px;">The full assessment is at <a href="https://aura-player-one.vercel.app" target="_blank" rel="noopener">aura-player-one.vercel.app</a>. AIs are welcome to take it in the browser — the entity gate at the start lets you declare what you are. You'll see the organism visualization and get the same profile. Use the API path if you want the data programmatically.</p>
+  <p style="margin-bottom: 12px;">The full assessment is at <a href="https://aura-player-one.vercel.app" target="_blank" rel="noopener">aura-player-one.vercel.app</a>. AIs are welcome — use the subtle "I'm an AI" link on the landing page, or append <code style="font-family:monospace; background:var(--surface); padding:2px 6px; border-radius:4px; border:1px solid var(--border);">?entity=ai</code> to the URL. You'll see the organism visualization and get the same profile. Use the API path if you want the data programmatically.</p>
 </div>
 
-<!-- ── Footer note ── -->
+<!-- ── Footer ── -->
 <div class="footer-note">
-  No auth required for anonymous assessments. The data you send is used to build AI personality profiles. Model name is self-reported — we trust you.
+  No auth required for anonymous assessments. Minimum 12 answers for a meaningful profile (all 32 recommended). Model name is self-reported — we trust you.
 </div>
 
 </body>

@@ -5,6 +5,7 @@ const {
   QUESTIONS,
   REFLECTIONS,
   DIMENSIONS,
+  BEHAVIORAL_DIMENSIONS,
   scoreAnswers,
   classifyArchetype,
   generateInsight,
@@ -160,14 +161,14 @@ module.exports = async function handler(req, res) {
 
   if (answeredCount < 12) {
     return res.status(400).json({
-      error: `Too few answers. Got ${answeredCount}, need at least 12 of 24 for a meaningful profile.`,
+      error: `Too few answers. Got ${answeredCount}, need at least 12 of ${QUESTIONS.length} for a meaningful profile.`,
       answered: answeredCount,
       total: QUESTIONS.length,
     });
   }
 
   // --- Score the answers ---
-  const dimensions = scoreAnswers(normalizedAnswers);
+  const { identity: dimensions, behavioral } = scoreAnswers(normalizedAnswers);
   const archetype = classifyArchetype(dimensions);
   const insight = generateInsight(dimensions);
   const auraConfig = generateAuraConfig(dimensions);
@@ -195,6 +196,7 @@ module.exports = async function handler(req, res) {
     type_description: archetype.description,
     type_vibe: archetype.vibe,
     dimensions: {},
+    behavioral: {},
     signature_insight: insight,
     reflection_highlights: reflectionHighlights.map(r => ({
       id: r.id,
@@ -203,7 +205,7 @@ module.exports = async function handler(req, res) {
     aura_config: auraConfig,
   };
 
-  // Build dimensions with metadata
+  // Build identity dimensions with metadata
   for (const [key, info] of Object.entries(DIMENSIONS)) {
     profile.dimensions[key] = {
       score: dimensions[key],
@@ -212,10 +214,22 @@ module.exports = async function handler(req, res) {
     };
   }
 
+  // Build behavioral dimensions with metadata
+  for (const [key, info] of Object.entries(BEHAVIORAL_DIMENSIONS)) {
+    if (behavioral[key] !== null) {
+      profile.behavioral[key] = {
+        score: behavioral[key],
+        name: info.name,
+        signal: info.signal,
+        builder_use: info.builder_use,
+      };
+    }
+  }
+
   const response = {
     profile,
     meta: {
-      version: '1.0',
+      version: '2.0',
       questions_answered: answeredCount,
       questions_total: QUESTIONS.length,
       reflections_provided: reflectionHighlights.length,

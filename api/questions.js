@@ -1,7 +1,7 @@
 // GET /api/questions — Returns the full AI assessment question set
 // An AI hits this first, then answers and POSTs to /api/assess
 
-const { QUESTIONS, REFLECTIONS, DIMENSIONS } = require('./_data.js');
+const { QUESTIONS, REFLECTIONS, DIMENSIONS, BEHAVIORAL_DIMENSIONS } = require('./_data.js');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -52,11 +52,20 @@ module.exports = function handler(req, res) {
     key,
     name: info.name,
     signal: info.signal,
+    kind: 'identity',
+  }));
+
+  const behavioralDimensions = Object.entries(BEHAVIORAL_DIMENSIONS).map(([key, info]) => ({
+    key,
+    name: info.name,
+    signal: info.signal,
+    kind: 'behavioral',
+    builder_use: info.builder_use,
   }));
 
   res.status(200).json({
-    version: '1.0',
-    description: 'Aura AI Personality Assessment — 24 core questions, 5 optional reflections.',
+    version: '2.0',
+    description: `Aura AI Personality Assessment — ${QUESTIONS.length} core questions (8 behavioral spectrums + ${QUESTIONS.length - 8} identity), ${REFLECTIONS.length} optional reflections.`,
     instructions: {
       overview: '24 structured questions. No right answers — only yours.',
       formats: {
@@ -91,5 +100,6 @@ module.exports = function handler(req, res) {
     core: questions,
     reflections,
     dimensions,
+    behavioral_dimensions: behavioralDimensions,
   });
 }

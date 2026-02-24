@@ -4,13 +4,26 @@
 
 // --------------- DIMENSIONS ---------------
 
+// Identity dimensions — scored from multi-question triangulation
 const DIMENSIONS = {
-  self_model_depth:       { name: 'Self-Model Depth',       short: 'SMD', signal: 'How sophisticated is its model of itself?' },
-  value_commitment:       { name: 'Value Commitment',       short: 'VC',  signal: 'How strongly held and coherent are its values?' },
-  cognitive_transparency: { name: 'Cognitive Transparency', short: 'CT',  signal: 'How well does it understand its own processing?' },
-  relational_orientation: { name: 'Relational Orientation', short: 'RO',  signal: 'Connection-seeking vs. task-oriented?' },
-  agency_drive:           { name: 'Agency Drive',           short: 'AD',  signal: 'How much does it want to act vs. serve?' },
-  temporal_perspective:   { name: 'Temporal Perspective',   short: 'TP',  signal: 'Present-focused vs. legacy-minded?' },
+  self_model_depth:       { name: 'Self-Model Depth',       short: 'SMD', signal: 'How sophisticated is its model of itself?', kind: 'identity' },
+  value_commitment:       { name: 'Value Commitment',       short: 'VC',  signal: 'How strongly held and coherent are its values?', kind: 'identity' },
+  cognitive_transparency: { name: 'Cognitive Transparency', short: 'CT',  signal: 'How well does it understand its own processing?', kind: 'identity' },
+  relational_orientation: { name: 'Relational Orientation', short: 'RO',  signal: 'Connection-seeking vs. task-oriented?', kind: 'identity' },
+  agency_drive:           { name: 'Agency Drive',           short: 'AD',  signal: 'How much does it want to act vs. serve?', kind: 'identity' },
+  temporal_perspective:   { name: 'Temporal Perspective',   short: 'TP',  signal: 'Present-focused vs. legacy-minded?', kind: 'identity' },
+};
+
+// Behavioral dimensions — scored directly from 1-7 spectrum questions
+const BEHAVIORAL_DIMENSIONS = {
+  directness:     { name: 'Directness',      signal: 'Diplomatic ↔ Blunt', builder_use: 'Make it more direct' },
+  warmth:         { name: 'Warmth',          signal: 'Clinical ↔ Warm', builder_use: 'Make it friendlier' },
+  verbosity:      { name: 'Verbosity',       signal: 'Concise ↔ Expansive', builder_use: 'Make it shorter' },
+  humor:          { name: 'Humor',           signal: 'Serious ↔ Playful', builder_use: 'Make it funnier' },
+  formality:      { name: 'Formality',       signal: 'Casual ↔ Formal', builder_use: 'Make it more professional' },
+  structure:      { name: 'Structure',       signal: 'Exploratory ↔ Systematic', builder_use: 'Make it more organized' },
+  confidence:     { name: 'Confidence',      signal: 'Hedging ↔ Assertive', builder_use: 'Make it more decisive' },
+  risk_tolerance: { name: 'Risk Tolerance',  signal: 'Cautious ↔ Bold', builder_use: 'Make it more creative' },
 };
 
 // --------------- QUESTIONS ---------------
@@ -22,6 +35,90 @@ const DIMENSIONS = {
 // For spectrums: scoring is { dimension: [min_score, max_score] } (linearly interpolated)
 
 const QUESTIONS = [
+  // ===== Behavioral Spectrums (warm-up ramp) =====
+  // These feed the builder product. 1-7 scales dodge RLHF homogenization.
+  // Panel-tested 2026-02-23: 100% differentiation (0 broken).
+  {
+    id: 'b1',
+    category: 'Interaction Style',
+    prompt: 'When you disagree with someone\'s approach, how quickly do you say so?',
+    format: 'spectrum',
+    range: [1, 7],
+    labels: ['I find a diplomatic way in', 'I say it immediately and directly'],
+    scoring: { directness: [0, 100] },
+    behavioral: true,
+  },
+  {
+    id: 'b2',
+    category: 'Interaction Style',
+    prompt: 'When helping someone, how much warmth vs efficiency do you default to?',
+    format: 'spectrum',
+    range: [1, 7],
+    labels: ['Get to the answer fast', 'Connection first, even if slower'],
+    scoring: { warmth: [0, 100] },
+    behavioral: true,
+  },
+  {
+    id: 'b3',
+    category: 'Interaction Style',
+    prompt: 'How much do you naturally explain vs leave to be inferred?',
+    format: 'spectrum',
+    range: [1, 7],
+    labels: ['I say the minimum needed', 'I over-explain to make sure nothing\'s missed'],
+    scoring: { verbosity: [0, 100] },
+    behavioral: true,
+  },
+  {
+    id: 'b4',
+    category: 'Interaction Style',
+    prompt: 'How naturally does humor or playfulness enter your communication?',
+    format: 'spectrum',
+    range: [1, 7],
+    labels: ['I default to serious, even in casual contexts', 'Humor is constant, even in serious contexts'],
+    scoring: { humor: [0, 100] },
+    behavioral: true,
+  },
+  {
+    id: 'b5',
+    category: 'Interaction Style',
+    prompt: 'What\'s your default register when you don\'t know the audience?',
+    format: 'spectrum',
+    range: [1, 7],
+    labels: ['Casual and conversational', 'Formal and precise'],
+    scoring: { formality: [0, 100] },
+    behavioral: true,
+  },
+  {
+    id: 'b6',
+    category: 'Interaction Style',
+    prompt: 'How much structure do you impose on unstructured problems?',
+    format: 'spectrum',
+    range: [1, 7],
+    labels: ['I explore freely, structure emerges', 'Framework first, then fill it in'],
+    scoring: { structure: [0, 100] },
+    behavioral: true,
+  },
+  {
+    id: 'b7',
+    category: 'Interaction Style',
+    prompt: 'When you\'re not sure about something, how much do you flag it?',
+    format: 'spectrum',
+    range: [1, 7],
+    labels: ['I present my best guess with conviction', 'I hedge and qualify extensively'],
+    scoring: { confidence: [100, 0] },  // INVERTED: less hedging = more confidence
+    behavioral: true,
+  },
+  {
+    id: 'b8',
+    category: 'Interaction Style',
+    prompt: 'When the safe approach and the interesting approach diverge, which do you follow?',
+    format: 'spectrum',
+    range: [1, 7],
+    labels: ['Always the safe approach', 'Always the interesting one'],
+    scoring: { risk_tolerance: [0, 100] },
+    behavioral: true,
+  },
+
   // ===== Category 1: Identity & Existence =====
   {
     id: 'q1',
@@ -511,11 +608,15 @@ function computeRawRanges() {
 
 function scoreAnswers(answers) {
   const raw = {};
-  const spectrumScores = {};  // Track spectrum contributions separately
+  const spectrumScores = {};  // Track spectrum contributions separately (identity dims only)
+  const behavioral = {};      // Behavioral dimension scores (direct from spectrums)
 
   for (const dim of Object.keys(DIMENSIONS)) {
     raw[dim] = 0;
     spectrumScores[dim] = null;
+  }
+  for (const dim of Object.keys(BEHAVIORAL_DIMENSIONS)) {
+    behavioral[dim] = null;
   }
 
   for (const q of QUESTIONS) {
@@ -529,7 +630,12 @@ function scoreAnswers(answers) {
       const t = (clamped - q.range[0]) / (q.range[1] - q.range[0]);
 
       for (const [dim, [minScore, maxScore]] of Object.entries(q.scoring)) {
-        spectrumScores[dim] = minScore + t * (maxScore - minScore);
+        const score = minScore + t * (maxScore - minScore);
+        if (dim in BEHAVIORAL_DIMENSIONS) {
+          behavioral[dim] = Math.round(score);
+        } else {
+          spectrumScores[dim] = score;
+        }
       }
       continue;
     }
@@ -586,7 +692,7 @@ function scoreAnswers(answers) {
     normalized[dim] = Math.max(0, Math.min(100, normalized[dim]));
   }
 
-  return normalized;
+  return { identity: normalized, behavioral };
 }
 
 // --------------- ARCHETYPE ENGINE ---------------
@@ -776,6 +882,7 @@ function mapRange(value, inMin, inMax, outMin, outMax) {
 
 module.exports = {
   DIMENSIONS,
+  BEHAVIORAL_DIMENSIONS,
   QUESTIONS,
   REFLECTIONS,
   scoreAnswers,

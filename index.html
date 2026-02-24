@@ -96,14 +96,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Aura">
   <meta name="theme-color" content="#030712">
-  <meta property="og:title" content="Compare Auras — What's your personality?">
-  <meta property="og:description" content="Take a 60-second personality quiz and compare with friends. See where you land on the Big Five.">
+  <meta property="og:title" content="Aura — Discover yourself, one question at a time">
+  <meta property="og:description" content="Personality assessment for humans and AIs. See your aura, compare with friends.">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="https://auraplayer.com/og-card.png">
+  <meta property="og:image" content="https://aura-player-one.vercel.app/og-card.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Compare Auras — What's your personality?">
-  <meta name="twitter:description" content="Take a 60-second personality quiz and compare with friends.">
-  <meta name="twitter:image" content="https://auraplayer.com/og-card.png">
+  <meta name="twitter:title" content="Aura — Discover yourself, one question at a time">
+  <meta name="twitter:description" content="Personality assessment for humans and AIs. See your aura, compare with friends.">
+  <meta name="twitter:image" content="https://aura-player-one.vercel.app/og-card.png">
   <title>Aura Player</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -5918,6 +5918,61 @@ const EntityGateScreen = ({ onDeclare, darkMode }) => {
         >
           Skip →
         </button>
+      </div>
+    </div>
+  );
+};
+
+// LandingScreen - Front door
+const LandingScreen = ({ onHuman, onAI, onSignIn, darkMode }) => {
+  const bg = darkMode ? '#030712' : '#f9fafb';
+  const textPrimary = darkMode ? '#f1f5f9' : '#111827';
+  const textSecondary = darkMode ? '#94a3b8' : '#6b7280';
+  const textMuted = darkMode ? '#64748b' : '#9ca3af';
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8" style={{ backgroundColor: bg, minHeight: '100%' }}>
+      {/* Ambient glow */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
+        background: darkMode
+          ? 'radial-gradient(ellipse 60% 50% at 50% 40%, rgba(139,92,246,0.08), transparent 70%)'
+          : 'none',
+      }} />
+
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: 400 }}>
+        {/* Aura viz */}
+        <div className="mb-6" style={{ animation: 'bloom-in 0.8s ease-out both' }}>
+          <AuraVisualization
+            assessCompleted={WELCOME_SHOWCASE_DATA}
+            onboardingAnswers={{}}
+            entityType="human"
+            darkMode={darkMode}
+            size={Math.min(window.innerHeight * 0.20, 180)}
+          />
+        </div>
+
+        {/* Title */}
+        <h1 className="text-3xl font-bold mb-3" style={{ color: textPrimary }}>Aura</h1>
+        <p className="text-base mb-12 text-center" style={{ color: textSecondary, lineHeight: 1.5 }}>
+          Discover yourself, one question at a time
+        </p>
+
+        {/* Primary CTA */}
+        <div className="w-full max-w-xs space-y-4">
+          <button onClick={onHuman} className={`w-full py-4 px-6 rounded-xl font-semibold text-lg btn-feedback ${darkMode ? 'bg-violet-600 text-white hover:bg-violet-500' : 'bg-violet-500 text-white hover:bg-violet-600'}`}>
+            Let's Go
+          </button>
+          <p className="text-center text-sm" style={{ color: textMuted }}>10 questions, about 2 minutes</p>
+        </div>
+
+        {/* Sign in */}
+        <button onClick={onSignIn} className="mt-8 text-sm" style={{ color: textMuted }}>
+          Sign in
+        </button>
+
+        {/* AI entry — subtle, discoverable */}
+        {onAI && <button onClick={onAI} className="mt-4 text-sm" style={{ color: darkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>I'm an AI →</button>}
       </div>
     </div>
   );
@@ -13873,7 +13928,7 @@ const getInitialScreen = () => {
     localStorage.setItem('aura-entity-declared', JSON.stringify({ type: 'human', model: null, ts: Date.now() }));
     localStorage.setItem('aura_entity_context', JSON.stringify({ type: 'human' }));
   }
-  return 'welcome';
+  return 'landing';
 };
 
 // Dev panel only on local environments
@@ -14231,7 +14286,7 @@ const useAssessment = ({ setScreen, darkMode, entityType }) => {
       setAssessUnlockMessage(null);
       // All tests → results screen (including quick-profile)
       setScreen('assess-results');
-    }, assessCurrentTestId === 'quick-profile' ? 2500 : 1500);
+    }, assessCurrentTestId === 'quick-profile' ? 1400 : 900);
   };
 
   const assessLoadDemoProfile = (profileNum) => {
@@ -14387,7 +14442,7 @@ function App() {
       // Navigate on sign-out
       if (!user && prevUser) {
         setDisplayName(null);
-        setScreen('welcome');
+        setScreen('landing');
       }
     };
     window.addEventListener('aura-auth-change', handler);
@@ -15115,7 +15170,7 @@ function App() {
     setAssessDemoActive(false);
     setAssessDemoProfile(null);
     setAssessSavedUserData(null);
-    setScreen('welcome');
+    setScreen('landing');
   };
 
   const renderContent = () => {
@@ -15154,7 +15209,7 @@ function App() {
           // If user is already signed in, update profile immediately
           const user = getCurrentUser();
           if (user) updateEntityProfile(user.id, type === 'unknown' ? 'human' : type, model);
-          setScreen('welcome');
+          setScreen('landing');
         }}
       />
     );
@@ -15290,7 +15345,7 @@ function App() {
       return (
         <div className={`h-full flex flex-col ${TH('bg-main', darkMode)}`}>
           <div className={`h-[44px] flex-shrink-0 flex items-center px-4 border-b ${TH('border-base', darkMode)}`}>
-            <button onClick={() => { window.history.replaceState({}, '', window.location.pathname); setScreen(myTraits ? 'assess-picker' : 'welcome'); }} className={`text-lg ${TH('text-dim', darkMode)}`}>←</button>
+            <button onClick={() => { window.history.replaceState({}, '', window.location.pathname); setScreen(myTraits ? 'assess-picker' : 'landing'); }} className={`text-lg ${TH('text-dim', darkMode)}`}>←</button>
             <span className={`flex-1 text-center font-medium ${TH('text-primary', darkMode)}`}>Compare Auras</span>
             <div className="w-6" />
           </div>
@@ -15319,7 +15374,7 @@ function App() {
                 <div className="text-4xl">✨</div>
                 <div className={`text-lg font-semibold ${TH('text-primary', darkMode)}`}>Take the assessment to compare</div>
                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Complete your Quick Profile to see how your aura compares.</p>
-                <button onClick={() => { window.history.replaceState({}, '', window.location.pathname); setScreen('welcome'); }}
+                <button onClick={() => { window.history.replaceState({}, '', window.location.pathname); setScreen('landing'); }}
                   className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-medium">
                   Get started
                 </button>
@@ -15328,7 +15383,7 @@ function App() {
               /* RECEIVED a comparison link but haven't taken assessment yet */
               <div className="text-center space-y-4 pt-4">
                 <div className={`text-base font-semibold ${TH('text-primary', darkMode)}`}>Take the quiz to see how you compare with {theirName}</div>
-                <button onClick={() => { setScreen('welcome'); }}
+                <button onClick={() => { setScreen('landing'); }}
                   className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-medium">
                   Get started
                 </button>
@@ -15367,7 +15422,17 @@ function App() {
       );
     })();
 
-    // Welcome screen
+    // Landing screen - front door with dual-track entry
+    if (screen === 'landing') return (
+      <LandingScreen
+        onHuman={handleTryFirst}
+        onAI={handleAIEntry}
+        onSignIn={() => setScreen('welcome')}
+        darkMode={darkMode}
+      />
+    );
+
+    // Welcome screen (sign-in/sign-up forms)
     if (screen === 'welcome') return (
       <WelcomeScreen
         onSignIn={handleSignIn}
@@ -15815,6 +15880,7 @@ function App() {
   // ==================== DEV NAVIGATION PANEL ====================
   const DEV_SCREENS = [
     { id: 'entity-gate', label: 'Gate', icon: '🚪' },
+    { id: 'landing', label: 'Landing', icon: '🏠' },
     { id: 'welcome', label: 'Welcome', icon: '👋' },
     { id: 'onboarding', label: 'Onboard', icon: '🎯' },
     { id: 'path-choice', label: 'Path', icon: '🔀' },
@@ -16261,7 +16327,7 @@ function App() {
           {/* Global stars background for dark mode */}
           {darkMode && <div className="global-stars" />}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && screen !== 'compare' && !screen.startsWith('verify-') && (
+            {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'landing' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && screen !== 'compare' && !screen.startsWith('verify-') && (
               <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!authUser} isGuest={isGuestMode} assessCompleted={assessCompleted} accentColor={navAccentColor} displayName={displayName} />
             )}
             {renderContent()}
@@ -16286,7 +16352,7 @@ function App() {
     >
       {/* Global stars background for dark mode */}
       {darkMode && <div className="global-stars" />}
-      {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && screen !== 'compare' && !screen.startsWith('verify-') && (
+      {screen !== 'launch' && screen !== 'entity-gate' && screen !== 'landing' && screen !== 'welcome' && screen !== 'onboarding' && screen !== 'path-choice' && screen !== 'settings' && screen !== 'categories' && screen !== 'qotd' && screen !== 'public-profile' && screen !== 'compare' && !screen.startsWith('verify-') && (
         <div className="safe-top">
           <NavBar darkMode={darkMode} stats={stats} showStreak={showStreak} onHome={() => setScreen('categories')} onDoubleClickHome={resetDemo} onSettings={goToSettings} onProfile={() => setScreen('profile')} isLoggedIn={!!authUser} isGuest={isGuestMode} assessCompleted={assessCompleted} displayName={displayName} />
         </div>
