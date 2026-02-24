@@ -9609,7 +9609,7 @@ const HistoryScreen = ({ darkMode, questions, responses, communityResults, quest
 };
 
 // QotdScreen - Question of the Day with blue glow, reuses Q&A components
-const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTapCount, onTap, onSubmit, onClear, onBack, onGoToQuestions }) => {
+const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTapCount, qotdPending, onTap, onUndo, undoDelay, onBack, onGoToQuestions }) => {
   const qotdQuestion = {
     id: qotdData.id,
     text: qotdData.text,
@@ -9665,37 +9665,92 @@ const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTa
         </div>
       ) : (
         <>
-          <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-y-auto">
+          <div className="flex-1 flex flex-col justify-center px-4 pb-3 overflow-y-auto" onClick={() => qotdPending && onUndo()}>
             <QuestionCard question={qotdQuestion} darkMode={darkMode} evidenceExpanded={false} onToggleEvidence={() => {}} />
             <div className={`flex items-center justify-center gap-2 mt-3 ${darkMode ? 'text-gray-600' : 'text-gray-500'}`}>
               <span className="text-sm">{qotdData.sponsor.avatar}</span>
               <span className="text-sm">Sponsored by {qotdData.sponsor.name}</span>
             </div>
           </div>
-          <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-800 bg-gray-950/80' : 'border-gray-200 bg-white/80'}`}>
+          <div className={`flex-shrink-0 border-t ${darkMode ? 'border-blue-900/30 bg-gray-950/80' : 'border-blue-100 bg-white/80'}`}>
             <div className="px-4 pt-3">
-              {isBinary ? (
-                <BinaryButtons darkMode={darkMode} tappedAnswer={qotdTappedAnswer} tapCount={qotdTapCount}
-                  isAnswered={false} currentResponse={null} onTap={onTap} onRightClick={() => {}}
-                  pendingSubmit={null} requireConfirmation={true} onSubmit={onSubmit} onClear={onClear} />
-              ) : (
-                <MCButtons options={qotdData.options || []} darkMode={darkMode} tappedAnswer={qotdTappedAnswer} tapCount={qotdTapCount}
-                  isAnswered={false} currentResponse={null} onTap={onTap} onRightClick={() => {}}
-                  pendingSubmit={null} requireConfirmation={true} onSubmit={onSubmit} onClear={onClear} />
-              )}
-            </div>
-            {qotdTappedAnswer !== null && (
-              <div className="px-4 pt-2 flex gap-2">
-                <button onClick={onClear}
-                  className={`h-10 px-4 rounded-xl text-sm font-medium transition-all ${darkMode ? 'bg-white/[0.06] text-gray-400 hover:bg-white/[0.10]' : 'bg-black/[0.05] text-gray-500 hover:bg-black/[0.09]'}`}>
-                  ✕
-                </button>
-                <button onClick={onSubmit}
-                  className="flex-1 h-10 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all">
-                  ✓ Submit
-                </button>
+              <div className="relative w-full max-w-sm resp-max-w mx-auto">
+                <div className={qotdPending ? 'opacity-60 pointer-events-none' : ''}>
+                  {isBinary ? (
+                    <BinaryButtons darkMode={darkMode} tappedAnswer={qotdTappedAnswer} tapCount={qotdTapCount}
+                      isAnswered={false} currentResponse={null} onTap={onTap} onRightClick={() => {}}
+                      pendingSubmit={qotdPending} />
+                  ) : (
+                    <MCButtons options={qotdData.options || []} darkMode={darkMode} tappedAnswer={qotdTappedAnswer} tapCount={qotdTapCount}
+                      isAnswered={false} currentResponse={null} onTap={onTap} onRightClick={() => {}}
+                      pendingSubmit={qotdPending} />
+                  )}
+                </div>
+                {/* Undo bar — mirrors button layout, same as main questions */}
+                {qotdPending && (() => {
+                  const ansIdx = qotdPending.answer;
+                  const numOptions = isBinary ? 2 : (qotdData.options?.length || 3);
+                  const undoColor = isBinary
+                    ? (ansIdx === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+                    : { rgb: MC_COLORS[ansIdx % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[ansIdx % MC_COLORS.length]?.hex || '#8b5cf6' };
+                  const answerLabel = isBinary
+                    ? (ansIdx === 0 ? 'YES' : 'NO')
+                    : `${String.fromCharCode(65 + ansIdx)}. ${qotdData.options?.[ansIdx] || ''}`;
+                  const heightClass = isBinary ? 'h-14 resp-h-lg' : 'h-12 resp-h-md';
+                  const gapClass = isBinary ? 'space-y-3 resp-gap' : 'space-y-2.5 resp-gap-sm';
+                  return (
+                    <div className={`absolute inset-0 z-10 ${gapClass}`}>
+                      {Array.from({ length: numOptions }, (_, i) =>
+                        i === ansIdx ? (
+                          <div key={i} className={heightClass}>
+                            <div
+                              onClick={onUndo}
+                              className="cursor-pointer rounded-2xl h-full flex items-center gap-3 px-4"
+                              style={{
+                                background: darkMode
+                                  ? `rgba(${undoColor.rgb}, 0.15)`
+                                  : `rgba(${undoColor.rgb}, 0.12)`,
+                                border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
+                                backdropFilter: 'blur(8px)',
+                                WebkitBackdropFilter: 'blur(8px)',
+                              }}
+                            >
+                              <div className="flex-shrink-0 w-7 h-7 relative">
+                                <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                                  <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                                  <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                                    strokeDasharray="75.4"
+                                    strokeDashoffset="0"
+                                    style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                                  />
+                                </svg>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  {answerLabel}
+                                </div>
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onUndo(); }}
+                                className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                                style={{
+                                  background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
+                                  color: undoColor.hex,
+                                }}
+                              >
+                                Undo
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div key={i} className={`${heightClass} invisible`} />
+                        )
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
-            )}
+            </div>
             <div className="h-3" />
           </div>
         </>
@@ -13476,86 +13531,100 @@ const QuestionFlowScreen = ({
             {/* Answer zone wrapper — FIXED position, nothing above can push these */}
             <div className="relative">
               {/* ZONE 1: Answer Buttons */}
-              <div className="relative px-4 resp-px pt-3">
-                <div className={pendingSubmit ? 'opacity-60 pointer-events-none' : ''}>
-                  {isBinary ? (
-                    <BinaryButtons
-                      darkMode={darkMode}
-                      tappedAnswer={tappedAnswer}
-                      tapCount={tapCount}
-                      isAnswered={isAnswered}
-                      currentResponse={currentResponse}
-                      onTap={handleAnswerTap}
-                      onRightClick={handleAnswerRightClick}
-                      pendingSubmit={pendingSubmit}
-                      category={currentQuestion?.category}
-                    />
-                  ) : (
-                    <MCButtons
-                      options={currentQuestion.options}
-                      darkMode={darkMode}
-                      tappedAnswer={tappedAnswer}
-                      tapCount={tapCount}
-                      isAnswered={isAnswered}
-                      currentResponse={currentResponse}
-                      onTap={handleAnswerTap}
-                      onRightClick={handleAnswerRightClick}
-                      pendingSubmit={pendingSubmit}
-                      mcColorMode={mcColorMode}
-                    />
-                  )}
-                </div>
-                {/* Undo toast — overlays the answer buttons */}
-                {pendingSubmit && (() => {
-                  const undoColor = isBinary
-                    ? (pendingSubmit.answer === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
-                    : { rgb: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[pendingSubmit.answer % MC_COLORS.length]?.hex || '#8b5cf6' };
-                  const answerLabel = isBinary
-                    ? (pendingSubmit.answer === 0 ? 'YES' : 'NO')
-                    : `${String.fromCharCode(65 + pendingSubmit.answer)}. ${currentQuestion?.options?.[pendingSubmit.answer] || ''}`;
-                  return (
-                    <div className="absolute inset-0 flex items-center justify-center z-10 px-4">
-                      <div
-                        onClick={handleUndo}
-                        className="cursor-pointer rounded-xl px-4 py-2.5 flex items-center gap-3 w-full max-w-sm"
-                        style={{
-                          background: darkMode
-                            ? `rgba(${undoColor.rgb}, 0.15)`
-                            : `rgba(${undoColor.rgb}, 0.12)`,
-                          border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
-                          backdropFilter: 'blur(8px)',
-                          WebkitBackdropFilter: 'blur(8px)',
-                        }}
-                      >
-                        <div className="flex-shrink-0 w-7 h-7 relative">
-                          <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
-                            <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
-                            <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
-                              strokeDasharray="75.4"
-                              strokeDashoffset="0"
-                              style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
-                            />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                            {answerLabel}
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleUndo(); }}
-                          className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
-                          style={{
-                            background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
-                            color: undoColor.hex,
-                          }}
-                        >
-                          Undo
-                        </button>
+              <div className="px-4 resp-px pt-3">
+                <div className="relative w-full max-w-sm resp-max-w mx-auto">
+                  <div className={pendingSubmit ? 'opacity-60 pointer-events-none' : ''}>
+                    {isBinary ? (
+                      <BinaryButtons
+                        darkMode={darkMode}
+                        tappedAnswer={tappedAnswer}
+                        tapCount={tapCount}
+                        isAnswered={isAnswered}
+                        currentResponse={currentResponse}
+                        onTap={handleAnswerTap}
+                        onRightClick={handleAnswerRightClick}
+                        pendingSubmit={pendingSubmit}
+                        category={currentQuestion?.category}
+                      />
+                    ) : (
+                      <MCButtons
+                        options={currentQuestion.options}
+                        darkMode={darkMode}
+                        tappedAnswer={tappedAnswer}
+                        tapCount={tapCount}
+                        isAnswered={isAnswered}
+                        currentResponse={currentResponse}
+                        onTap={handleAnswerTap}
+                        onRightClick={handleAnswerRightClick}
+                        pendingSubmit={pendingSubmit}
+                        mcColorMode={mcColorMode}
+                      />
+                    )}
+                  </div>
+                  {/* Undo bar — mirrors button layout exactly, overlays the selected answer */}
+                  {pendingSubmit && (() => {
+                    const ansIdx = pendingSubmit.answer;
+                    const numOptions = isBinary ? 2 : (currentQuestion?.options?.length || 3);
+                    const undoColor = isBinary
+                      ? (ansIdx === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+                      : { rgb: MC_COLORS[ansIdx % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[ansIdx % MC_COLORS.length]?.hex || '#8b5cf6' };
+                    const answerLabel = isBinary
+                      ? (ansIdx === 0 ? 'YES' : 'NO')
+                      : `${String.fromCharCode(65 + ansIdx)}. ${currentQuestion?.options?.[ansIdx] || ''}`;
+                    const heightClass = isBinary ? 'h-14 resp-h-lg' : 'h-12 resp-h-md';
+                    const gapClass = isBinary ? 'space-y-3 resp-gap' : 'space-y-2.5 resp-gap-sm';
+                    return (
+                      <div className={`absolute inset-0 z-10 ${gapClass}`}>
+                        {Array.from({ length: numOptions }, (_, i) =>
+                          i === ansIdx ? (
+                            <div key={i} className={heightClass}>
+                              <div
+                                onClick={handleUndo}
+                                className="cursor-pointer rounded-2xl h-full flex items-center gap-3 px-4"
+                                style={{
+                                  background: darkMode
+                                    ? `rgba(${undoColor.rgb}, 0.15)`
+                                    : `rgba(${undoColor.rgb}, 0.12)`,
+                                  border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
+                                  backdropFilter: 'blur(8px)',
+                                  WebkitBackdropFilter: 'blur(8px)',
+                                }}
+                              >
+                                <div className="flex-shrink-0 w-7 h-7 relative">
+                                  <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                                    <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                                    <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                                      strokeDasharray="75.4"
+                                      strokeDashoffset="0"
+                                      style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                                    />
+                                  </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                    {answerLabel}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleUndo(); }}
+                                  className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                                  style={{
+                                    background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
+                                    color: undoColor.hex,
+                                  }}
+                                >
+                                  Undo
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div key={i} className={`${heightClass} invisible`} />
+                          )
+                        )}
                       </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
+                </div>
               </div>
 
               {/* Action buttons row — always rendered, invisible during pending to preserve layout */}
@@ -13960,37 +14029,70 @@ class ErrorBoundary extends React.Component {
 }
 
 // --- useQotd Hook ---
-const useQotd = () => {
+const useQotd = (undoDelay = 1) => {
   const [qotdData, setQotdData] = useState(() => getRandomQOTD());
   const [qotdResponse, setQotdResponse] = useState(null);
   const [qotdTappedAnswer, setQotdTappedAnswer] = useState(null);
   const [qotdTapCount, setQotdTapCount] = useState(0);
+  const [qotdPending, setQotdPending] = useState(null);
+  const qotdSubmitRef = useRef(null);
+  const qotdTapTimeoutRef = useRef(null);
 
   const resetQotd = () => {
+    if (qotdSubmitRef.current) clearTimeout(qotdSubmitRef.current);
+    if (qotdTapTimeoutRef.current) clearTimeout(qotdTapTimeoutRef.current);
     setQotdData(getRandomQOTD());
     setQotdResponse(null);
     setQotdTappedAnswer(null);
     setQotdTapCount(0);
+    setQotdPending(null);
   };
 
   const handleQotdTap = (answer) => {
     if (qotdResponse) return;
+    if (qotdPending) return;
+
+    if (qotdTapTimeoutRef.current) clearTimeout(qotdTapTimeoutRef.current);
+
+    let newCount;
     if (qotdTappedAnswer === answer) {
-      setQotdTapCount(Math.min(4, qotdTapCount + 1));
+      newCount = Math.min(4, qotdTapCount + 1);
+      setQotdTapCount(newCount);
     } else {
+      newCount = 1;
       setQotdTappedAnswer(answer);
       setQotdTapCount(1);
     }
+
+    // Auto-submit after 400ms (same as main questions)
+    qotdTapTimeoutRef.current = setTimeout(() => {
+      setQotdPending({ answer, confidence: newCount });
+      setQotdTappedAnswer(null);
+      setQotdTapCount(0);
+
+      if (undoDelay === 0) {
+        setQotdResponse({ answer, confidence: newCount });
+        setQotdPending(null);
+      } else {
+        qotdSubmitRef.current = setTimeout(() => {
+          setQotdResponse({ answer, confidence: newCount });
+          setQotdPending(null);
+        }, undoDelay * 1000);
+      }
+    }, 400);
   };
 
-  const submitQotdAnswer = () => {
-    if (qotdTappedAnswer === null) return;
-    setQotdResponse({ answer: qotdTappedAnswer, confidence: qotdTapCount });
-    setQotdTappedAnswer(null);
-    setQotdTapCount(0);
+  const handleQotdUndo = () => {
+    if (qotdSubmitRef.current) clearTimeout(qotdSubmitRef.current);
+    if (qotdTapTimeoutRef.current) clearTimeout(qotdTapTimeoutRef.current);
+    if (qotdPending) {
+      setQotdTappedAnswer(qotdPending.answer);
+      setQotdTapCount(qotdPending.confidence);
+    }
+    setQotdPending(null);
   };
 
-  return { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, setQotdTappedAnswer, qotdTapCount, setQotdTapCount, resetQotd, handleQotdTap, submitQotdAnswer };
+  return { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, setQotdTappedAnswer, qotdTapCount, setQotdTapCount, qotdPending, resetQotd, handleQotdTap, handleQotdUndo };
 };
 
 // --- useVerification Hook ---
@@ -14567,7 +14669,7 @@ function App() {
   });
 
   // --- QOTD (via useQotd hook) ---
-  const { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, setQotdTappedAnswer, qotdTapCount, setQotdTapCount, resetQotd, handleQotdTap, submitQotdAnswer } = useQotd();
+  const { qotdData, qotdResponse, setQotdResponse, qotdTappedAnswer, setQotdTappedAnswer, qotdTapCount, setQotdTapCount, qotdPending, resetQotd, handleQotdTap, handleQotdUndo } = useQotd(undoDelay);
 
   // --- Profile & History ---
   const [showStreak, setShowStreak] = useState(true);
@@ -14950,16 +15052,21 @@ function App() {
 
       // QOTD screen shortcuts
       if (screen === 'qotd' && !qotdResponse) {
-        const qotdIsBinary = qotdData?.type === 'binary';
-        if (key === 'y' || key === '1') {
+        if (key === 'escape' && qotdPending) {
           e.preventDefault();
-          handleQotdTap(0);
-        } else if (key === 'n' || key === '2') {
-          e.preventDefault();
-          handleQotdTap(1);
-        } else if (['3', '4', '5'].includes(key) && !qotdIsBinary) {
-          e.preventDefault();
-          handleQotdTap(parseInt(key) - 1);
+          handleQotdUndo();
+        } else if (!qotdPending) {
+          const qotdIsBinary = qotdData?.type === 'binary';
+          if (key === 'y' || key === '1') {
+            e.preventDefault();
+            handleQotdTap(0);
+          } else if (key === 'n' || key === '2') {
+            e.preventDefault();
+            handleQotdTap(1);
+          } else if (['3', '4', '5'].includes(key) && !qotdIsBinary) {
+            e.preventDefault();
+            handleQotdTap(parseInt(key) - 1);
+          }
         }
       }
 
@@ -14977,7 +15084,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [screen, isAnswered, isBinary, pendingSubmit, qotdResponse, qotdData, handleAnswerTap, handleUndo, handleQotdTap, goToNext, goToPrev]);
+  }, [screen, isAnswered, isBinary, pendingSubmit, qotdResponse, qotdData, qotdPending, handleAnswerTap, handleUndo, handleQotdTap, handleQotdUndo, goToNext, goToPrev]);
 
   // Go to settings, remembering where we came from
   const goToSettings = () => {
@@ -15558,9 +15665,9 @@ function App() {
     if (screen === 'qotd') return (
       <QotdScreen darkMode={darkMode} qotdData={qotdData} qotdResponse={qotdResponse}
         qotdTappedAnswer={qotdTappedAnswer} qotdTapCount={qotdTapCount}
-        onTap={handleQotdTap} onSubmit={submitQotdAnswer}
-        onClear={() => { setQotdTappedAnswer(null); setQotdTapCount(0); }}
-        onBack={() => setScreen('categories')}
+        qotdPending={qotdPending} undoDelay={undoDelay}
+        onTap={handleQotdTap} onUndo={handleQotdUndo}
+        onBack={() => { if (qotdPending) handleQotdUndo(); setScreen('categories'); }}
         onGoToQuestions={() => {
           const firstUnanswered = questions.findIndex(q => !responses[q.id]);
           if (firstUnanswered >= 0) { setCurrentIndex(firstUnanswered); setScreen('questions'); }
