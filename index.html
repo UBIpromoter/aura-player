@@ -2729,6 +2729,14 @@ const AuraVisualization = React.memo(function AuraVisualization({
 // ==================== DATA ====================
 const CATEGORIES = getCategoryList();
 
+// Category color maps — shared across question cards and flow screens
+const CAT_COLOR_MAP = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
+const getCatTextColor = (cat, darkMode) => {
+  const map = { prediction: darkMode ? 'text-amber-400' : 'text-amber-700', reasoning: darkMode ? 'text-violet-400' : 'text-violet-700', judgment: darkMode ? 'text-teal-400' : 'text-teal-700' };
+  return map[cat] || (darkMode ? 'text-violet-400' : 'text-violet-700');
+};
+const CAT_GLOW_RGB = { prediction: '245, 158, 11', reasoning: '139, 92, 246', judgment: '20, 184, 166' };
+
 // MC option colors - uses COLOR_HEX for base values, keeps specific shades
 const MC_COLORS = [
   { hex: COLOR_HEX.blue.base, name: 'blue', shades: ['#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'], rgb: COLOR_HEX.blue.rgb },
@@ -6424,33 +6432,6 @@ const LevelUpModal = ({ level, title, onClose, darkMode }) => (
   </div>
 );
 
-// Legacy LaunchScreen - kept for compatibility
-const LaunchScreen = ({ onDemo, onLogin, darkMode }) => (
-  <WelcomeScreen onSignIn={onLogin} onCreateAccount={onLogin} onTryFirst={onDemo} darkMode={darkMode} />
-);
-
-// ConfidenceSegments - fills up inside button
-const ConfidenceSegments = ({ level, color = 'violet', active = false, darkMode = true }) => {
-  const colors = {
-    emerald: ['rgba(6,78,59,0.6)', 'rgba(4,120,87,0.7)', 'rgba(5,150,105,0.8)', 'rgba(16,185,129,0.9)'],
-    rose: ['rgba(136,19,55,0.6)', 'rgba(190,18,60,0.7)', 'rgba(225,29,72,0.8)', 'rgba(244,63,94,0.9)'],
-  };
-  const shades = colors[color] || colors.emerald;
-  if (!active || level === 0) return null;
-  return (
-    <div className="absolute bottom-0 left-0 right-0 h-2 flex">
-      {[1, 2, 3, 4].map(i => (
-        <div key={i} className={`flex-1 transition-all duration-150 ${i === 1 ? 'rounded-bl-xl' : ''} ${i === 4 ? 'rounded-br-xl' : ''}`}
-          style={{
-            backgroundColor: level >= i ? shades[i - 1] : 'rgba(0,0,0,0.2)',
-            borderRight: i < 4 ? '1px solid rgba(0,0,0,0.3)' : 'none'
-          }}
-        />
-      ))}
-    </div>
-  );
-};
-
 // ResultChart - unified confidence breakdown for binary and MC questions
 // Uses aggregateResults helper for data aggregation
 const ResultChart = ({ evaluators, userResponse, question, darkMode = true }) => {
@@ -6907,11 +6888,7 @@ const NoneOptionModal = ({ questionId, onClose, onSubmit, darkMode = true }) => 
 const AnsweredQuestionView = ({ question, response, results, darkMode, questionFlag, explanation, onFlagClick, onExplainClick }) => {
   const isBinary = question.type === 'binary';
   const category = CATEGORIES.find(c => c.id === question.category);
-  const categoryColors = {
-    prediction: darkMode ? 'text-amber-400' : 'text-amber-700',
-    reasoning: darkMode ? 'text-violet-400' : 'text-violet-700',
-    judgment: darkMode ? 'text-teal-400' : 'text-teal-700',
-  };
+  const categoryColors = { prediction: getCatTextColor('prediction', darkMode), reasoning: getCatTextColor('reasoning', darkMode), judgment: getCatTextColor('judgment', darkMode) };
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto px-4 py-3">
@@ -7289,96 +7266,54 @@ const CategoryScreen = ({ darkMode, categories, questions, responses, onSelectCa
   );
 };
 
-// UndoBar - selected answer bubble sweeps across its row, styled like actual buttons
-const UndoBar = ({ darkMode, undoDelay, onUndo, answer, confidence, isBinary, options, fullHeight, requireConfirmation = true }) => {
-  const answerText = isBinary
-    ? (answer === 0 ? 'YES' : 'NO')
-    : `${String.fromCharCode(65 + answer)}. ${options?.[answer] || ''}`;
-
-  // Get the exact button gradient colors based on confidence
-  const conf = Math.min(confidence, 4);
-  let bgGradient;
-  if (isBinary) {
-    const yesShades = darkMode
-      ? [['#065f46', '#059669'], ['#047857', '#10b981'], ['#059669', '#34d399'], ['#10b981', '#6ee7b7']]
-      : [['#a7f3d0', '#6ee7b7'], ['#6ee7b7', '#34d399'], ['#34d399', '#10b981'], ['#10b981', '#059669']];
-    const noShades = darkMode
-      ? [['#9f1239', '#e11d48'], ['#be123c', '#f43f5e'], ['#e11d48', '#fb7185'], ['#f43f5e', '#fda4af']]
-      : [['#fecdd3', '#fda4af'], ['#fda4af', '#fb7185'], ['#fb7185', '#f43f5e'], ['#f43f5e', '#e11d48']];
-    const shades = answer === 0 ? yesShades : noShades;
-    const s = shades[conf - 1];
-    bgGradient = `linear-gradient(135deg, ${s[0]} 0%, ${s[1]} 100%)`;
-  } else {
-    const color = MC_COLORS[answer % MC_COLORS.length];
-    bgGradient = `linear-gradient(135deg, ${color.shades[conf - 1]} 0%, ${color.shades[Math.min(conf, 3)]} 100%)`;
-  }
-
-  // Button dimensions accounting for checkmark slots
-  // MC: px-4 (16px), with confirmation: gap-1.5 (6px) + checkmark w-9 (36px) = 42px extra on right
-  // Y/N: px-4 (16px), outer gap-1.5 (6px) splits halves, each half has button + gap-1.5 + checkmark
-  // Y/N with confirmation: button ends 45px before center (3px half-gap + 6px inner gap + 36px checkmark)
-
+// UndoOverlay — shared undo bar that overlays the selected answer button
+// Uses mirrored layout (same CSS classes as buttons) for pixel-perfect alignment at any screen size
+const UndoOverlay = ({ answerIndex, numOptions, isBinary, options, darkMode, undoDelay, onUndo }) => {
+  const undoColor = isBinary
+    ? (answerIndex === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
+    : { rgb: MC_COLORS[answerIndex % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[answerIndex % MC_COLORS.length]?.hex || '#8b5cf6' };
+  const answerLabel = isBinary
+    ? (answerIndex === 0 ? 'YES' : 'NO')
+    : `${String.fromCharCode(65 + answerIndex)}. ${options?.[answerIndex] || ''}`;
+  const heightClass = isBinary ? 'h-14 resp-h-lg' : 'h-12 resp-h-md';
+  const gapClass = isBinary ? 'space-y-3 resp-gap' : 'space-y-2.5 resp-gap-sm';
   return (
-    <div
-      onClick={onUndo}
-      className={`relative cursor-pointer active:opacity-80 overflow-hidden ${fullHeight ? 'h-full' : 'rounded-xl'}`}
-    >
-      {/* Light backdrop */}
-      <div className={`h-full ${darkMode ? 'bg-gray-900/40' : 'bg-white/40'}`}>
-        {/* Selected answer bubble positioned exactly over its button */}
-        <div
-          className={`absolute overflow-hidden ${isBinary ? 'rounded-xl' : 'rounded-lg'}`}
-          style={isBinary ? (requireConfirmation ? {
-            // Y/N with confirmation: YES | gap-2 (8px) | submit(44px) | gap-2 (8px) | NO
-            top: '12px',
-            height: '57px',
-            left: answer === 0 ? '16px' : 'calc(50% + 30px)',
-            right: answer === 0 ? 'calc(50% + 30px)' : '16px',
-          } : {
-            // Y/N without confirmation: grid-cols-2 gap-2
-            top: '12px',
-            height: '57px',
-            left: answer === 0 ? '16px' : 'calc(50% + 4px)',
-            right: answer === 0 ? 'calc(50% + 4px)' : '16px',
-          }) : {
-            // MC buttons: wrapper extends 16px past each side (-left-4 -right-4)
-            // Need to add 16px to both left and right to compensate
-            // Base: 16px (px-4 padding) + 16px (wrapper offset) = 32px
-            // Right with checkmark: 32px + 42px (6px gap + 36px checkmark) = 74px
-            left: '32px',
-            right: requireConfirmation ? '74px' : '32px',
-            top: `${12 + answer * 44}px`,
-            height: '40px',
-          }}
-        >
-          {/* Button styled exactly like the real answer buttons */}
-          <div
-            className={`relative h-full flex items-center overflow-hidden ${isBinary ? 'justify-center' : 'px-3 text-base text-white'}`}
-            style={{ background: bgGradient }}
-          >
-            {/* Sweep overlay */}
+    <div className={`absolute inset-0 z-10 ${gapClass}`}>
+      {Array.from({ length: numOptions }, (_, i) =>
+        i === answerIndex ? (
+          <div key={i} className={heightClass}>
             <div
-              className="absolute inset-0 bg-black/30"
-              style={{ animation: `sweepFill ${undoDelay}s linear forwards` }}
-            />
-            {/* Answer text - match actual button styling */}
-            {isBinary ? (
-              <div className="relative z-10 flex items-center justify-center gap-1.5">
-                <span className="text-2xl font-bold text-white">{answer === 0 ? 'YES' : 'NO'}</span>
-                <span className="text-sm font-medium text-white/70">{getStars(confidence)}</span>
+              onClick={onUndo}
+              className="cursor-pointer rounded-2xl h-full flex items-center gap-3 px-4"
+              style={{
+                background: darkMode ? `rgba(${undoColor.rgb}, 0.15)` : `rgba(${undoColor.rgb}, 0.12)`,
+                border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
+                backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+              }}
+            >
+              <div className="flex-shrink-0 w-7 h-7 relative">
+                <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+                  <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                  <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
+                    strokeDasharray="75.4" strokeDashoffset="0"
+                    style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
+                  />
+                </svg>
               </div>
-            ) : (
-              <>
-                <span className="relative z-10 font-medium mr-1 opacity-60">{String.fromCharCode(65 + answer)}.</span>
-                <span className="relative z-10 truncate">{options?.[answer] || ''}</span>
-                <span className="absolute top-1/2 right-2 -translate-y-1/2 z-10 text-sm font-bold bg-white/30 w-5 h-5 rounded-full flex items-center justify-center">
-                  {confidence}
-                </span>
-              </>
-            )}
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{answerLabel}</div>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onUndo(); }}
+                className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+                style={{ background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`, color: undoColor.hex }}
+              >Undo</button>
+            </div>
           </div>
-        </div>
-      </div>
+        ) : (
+          <div key={i} className={`${heightClass} invisible`} />
+        )
+      )}
     </div>
   );
 };
@@ -7402,12 +7337,8 @@ const TipBanner = ({ darkMode, onDismiss }) => (
 const QuestionCard = ({ question, darkMode, evidenceExpanded, onToggleEvidence }) => {
   const category = CATEGORIES.find(c => c.id === question.category);
   const hasEvidence = question.preEvidence && question.preEvidence.length > 0;
-  const categoryColors = {
-    prediction: darkMode ? 'text-amber-400' : 'text-amber-700',
-    reasoning: darkMode ? 'text-violet-400' : 'text-violet-700',
-    judgment: darkMode ? 'text-teal-400' : 'text-teal-700',
-  };
-  const glowRgbMap = { prediction: '245, 158, 11', reasoning: '139, 92, 246', judgment: '20, 184, 166' };
+  const categoryColors = { prediction: getCatTextColor('prediction', darkMode), reasoning: getCatTextColor('reasoning', darkMode), judgment: getCatTextColor('judgment', darkMode) };
+  const glowRgbMap = CAT_GLOW_RGB;
   const glowRgb = question.category ? glowRgbMap[question.category] || '139, 92, 246' : '139, 92, 246';
   return (
     <div className="space-y-2 relative">
@@ -9686,69 +9617,7 @@ const QotdScreen = ({ darkMode, qotdData, qotdResponse, qotdTappedAnswer, qotdTa
                       pendingSubmit={qotdPending} />
                   )}
                 </div>
-                {/* Undo bar — mirrors button layout, same as main questions */}
-                {qotdPending && (() => {
-                  const ansIdx = qotdPending.answer;
-                  const numOptions = isBinary ? 2 : (qotdData.options?.length || 3);
-                  const undoColor = isBinary
-                    ? (ansIdx === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
-                    : { rgb: MC_COLORS[ansIdx % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[ansIdx % MC_COLORS.length]?.hex || '#8b5cf6' };
-                  const answerLabel = isBinary
-                    ? (ansIdx === 0 ? 'YES' : 'NO')
-                    : `${String.fromCharCode(65 + ansIdx)}. ${qotdData.options?.[ansIdx] || ''}`;
-                  const heightClass = isBinary ? 'h-14 resp-h-lg' : 'h-12 resp-h-md';
-                  const gapClass = isBinary ? 'space-y-3 resp-gap' : 'space-y-2.5 resp-gap-sm';
-                  return (
-                    <div className={`absolute inset-0 z-10 ${gapClass}`}>
-                      {Array.from({ length: numOptions }, (_, i) =>
-                        i === ansIdx ? (
-                          <div key={i} className={heightClass}>
-                            <div
-                              onClick={onUndo}
-                              className="cursor-pointer rounded-2xl h-full flex items-center gap-3 px-4"
-                              style={{
-                                background: darkMode
-                                  ? `rgba(${undoColor.rgb}, 0.15)`
-                                  : `rgba(${undoColor.rgb}, 0.12)`,
-                                border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
-                                backdropFilter: 'blur(8px)',
-                                WebkitBackdropFilter: 'blur(8px)',
-                              }}
-                            >
-                              <div className="flex-shrink-0 w-7 h-7 relative">
-                                <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
-                                  <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
-                                  <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
-                                    strokeDasharray="75.4"
-                                    strokeDashoffset="0"
-                                    style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
-                                  />
-                                </svg>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                  {answerLabel}
-                                </div>
-                              </div>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); onUndo(); }}
-                                className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
-                                style={{
-                                  background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
-                                  color: undoColor.hex,
-                                }}
-                              >
-                                Undo
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div key={i} className={`${heightClass} invisible`} />
-                        )
-                      )}
-                    </div>
-                  );
-                })()}
+                {qotdPending && <UndoOverlay answerIndex={qotdPending.answer} numOptions={isBinary ? 2 : (qotdData.options?.length || 3)} isBinary={isBinary} options={qotdData.options} darkMode={darkMode} undoDelay={undoDelay} onUndo={onUndo} />}
               </div>
             </div>
             <div className="h-3" />
@@ -13306,7 +13175,7 @@ const QuestionFlowScreen = ({
       )}
       {/* Breathing ambient aura — dual-layer, onboarding-style */}
       {(() => {
-        const catColorMap = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
+        const catColorMap = CAT_COLOR_MAP;
         const catSecondary = { prediction: 'rose', reasoning: 'blue', judgment: 'cyan' };
         const c0 = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
         const c1 = COLOR_HEX[catSecondary[currentQuestion?.category]] || COLOR_HEX.blue;
@@ -13343,7 +13212,7 @@ const QuestionFlowScreen = ({
       <div className={`h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10 ${darkMode ? 'bg-gray-900/50' : 'bg-white/90'}`}
         style={{
           borderBottom: (() => {
-            const catColorMap = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
+            const catColorMap = CAT_COLOR_MAP;
             const qColor = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
             return darkMode
               ? `1px solid rgba(${qColor.rgb},0.15)`
@@ -13521,7 +13390,7 @@ const QuestionFlowScreen = ({
           {/* FIXED BOTTOM AREA - answer zones */}
           <div className="flex-shrink-0 border-t relative z-10"
             style={(() => {
-              const catColorMap = { prediction: 'amber', reasoning: 'violet', judgment: 'teal' };
+              const catColorMap = CAT_COLOR_MAP;
               const qColor = COLOR_HEX[catColorMap[currentQuestion?.category]] || COLOR_HEX.violet;
               return darkMode
                 ? { borderColor: `rgba(${qColor.rgb},0.12)`, background: `linear-gradient(180deg, rgba(3,7,18,1) 0%, rgba(${qColor.rgb},0.04) 100%)` }
@@ -13561,69 +13430,7 @@ const QuestionFlowScreen = ({
                       />
                     )}
                   </div>
-                  {/* Undo bar — mirrors button layout exactly, overlays the selected answer */}
-                  {pendingSubmit && (() => {
-                    const ansIdx = pendingSubmit.answer;
-                    const numOptions = isBinary ? 2 : (currentQuestion?.options?.length || 3);
-                    const undoColor = isBinary
-                      ? (ansIdx === 0 ? { rgb: '16,185,129', hex: '#10b981' } : { rgb: '239,68,68', hex: '#ef4444' })
-                      : { rgb: MC_COLORS[ansIdx % MC_COLORS.length]?.rgb || '139,92,246', hex: MC_COLORS[ansIdx % MC_COLORS.length]?.hex || '#8b5cf6' };
-                    const answerLabel = isBinary
-                      ? (ansIdx === 0 ? 'YES' : 'NO')
-                      : `${String.fromCharCode(65 + ansIdx)}. ${currentQuestion?.options?.[ansIdx] || ''}`;
-                    const heightClass = isBinary ? 'h-14 resp-h-lg' : 'h-12 resp-h-md';
-                    const gapClass = isBinary ? 'space-y-3 resp-gap' : 'space-y-2.5 resp-gap-sm';
-                    return (
-                      <div className={`absolute inset-0 z-10 ${gapClass}`}>
-                        {Array.from({ length: numOptions }, (_, i) =>
-                          i === ansIdx ? (
-                            <div key={i} className={heightClass}>
-                              <div
-                                onClick={handleUndo}
-                                className="cursor-pointer rounded-2xl h-full flex items-center gap-3 px-4"
-                                style={{
-                                  background: darkMode
-                                    ? `rgba(${undoColor.rgb}, 0.15)`
-                                    : `rgba(${undoColor.rgb}, 0.12)`,
-                                  border: `1px solid ${darkMode ? `rgba(${undoColor.rgb}, 0.5)` : `rgba(${undoColor.rgb}, 0.35)`}`,
-                                  backdropFilter: 'blur(8px)',
-                                  WebkitBackdropFilter: 'blur(8px)',
-                                }}
-                              >
-                                <div className="flex-shrink-0 w-7 h-7 relative">
-                                  <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
-                                    <circle cx="14" cy="14" r="12" fill="none" stroke={darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
-                                    <circle cx="14" cy="14" r="12" fill="none" stroke={undoColor.hex} strokeWidth="2.5"
-                                      strokeDasharray="75.4"
-                                      strokeDashoffset="0"
-                                      style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }}
-                                    />
-                                  </svg>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className={`text-sm font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                    {answerLabel}
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleUndo(); }}
-                                  className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
-                                  style={{
-                                    background: darkMode ? `rgba(${undoColor.rgb}, 0.3)` : `rgba(${undoColor.rgb}, 0.2)`,
-                                    color: undoColor.hex,
-                                  }}
-                                >
-                                  Undo
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div key={i} className={`${heightClass} invisible`} />
-                          )
-                        )}
-                      </div>
-                    );
-                  })()}
+                  {pendingSubmit && <UndoOverlay answerIndex={pendingSubmit.answer} numOptions={isBinary ? 2 : (currentQuestion?.options?.length || 3)} isBinary={isBinary} options={currentQuestion?.options} darkMode={darkMode} undoDelay={undoDelay} onUndo={handleUndo} />}
                 </div>
               </div>
 
@@ -15583,7 +15390,7 @@ function App() {
     );
 
     // Launch screen
-    if (screen === 'launch') return <LaunchScreen onDemo={startDemo} onLogin={() => {}} darkMode={darkMode} />;
+    if (screen === 'launch') return <WelcomeScreen onSignIn={() => {}} onCreateAccount={() => {}} onTryFirst={startDemo} darkMode={darkMode} />;
 
     // Settings screen
     if (screen === 'settings') return (
