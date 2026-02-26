@@ -1,0 +1,2223 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aura Lego Gallery</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <style>
+    /* Override theme.css app-mode locking — gallery must scroll */
+    html, body {
+      overflow: visible !important;
+      height: auto !important;
+      min-height: 100vh;
+      overscroll-behavior: auto !important;
+    }
+    #root {
+      height: auto !important;
+      min-height: 100vh;
+      overflow: visible !important;
+    }
+    .gallery-section { animation: fadeSlideIn 0.4s ease-out both; }
+    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .demo-box {
+      padding: 20px; border-radius: 16px;
+      background: var(--bg-card); border: 1px solid var(--border-card); box-shadow: var(--shadow-card);
+    }
+    .demo-label {
+      font-size: 14px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-subtle); margin-bottom: 14px;
+    }
+    /* Phone frame — dimensions set via inline style */
+    .phone-frame {
+      border-radius: 33px; /* 44 × 0.74 */
+      border: none; overflow: hidden;
+      background: var(--bg-main); position: relative; flex-shrink: 0;
+      transition: width 0.3s ease, height 0.3s ease;
+    }
+    /* Border drawn as overlay so content can't leak past it */
+    .phone-frame::after {
+      content: ''; position: absolute; inset: 0; z-index: 20;
+      border-radius: inherit; pointer-events: none;
+      border: 2px solid var(--border-subtle);
+    }
+    .phone-notch {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 89px; height: 21px; background: var(--border-subtle);
+      border-radius: 0 0 12px 12px; z-index: 10;
+    }
+    .phone-content {
+      position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden;
+      padding-top: 44px; padding-bottom: 20px;
+      /* Hide scrollbar in gallery preview — scroll still works */
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .phone-content::-webkit-scrollbar { display: none; }
+    /* Device toggle */
+    .device-toggle { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--bg-elevated); }
+    .device-btn {
+      padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 8px;
+      cursor: pointer; border: none; transition: all 0.15s; line-height: 1.4;
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+    }
+    .device-btn .device-label { font-size: 10px; font-weight: 400; opacity: 0.7; }
+    /* Screen group in "All" mode */
+    .screen-group { display: flex; gap: 12px; align-items: flex-start; }
+    .screen-group .size-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-subtle); text-align: center;
+      margin-top: 4px;
+    }
+    /* Aura orb placeholder */
+    .aura-orb {
+      border-radius: 50%; position: relative;
+      background: radial-gradient(circle at 40% 35%, rgba(139,92,246,0.5), rgba(59,130,246,0.3) 40%, rgba(20,184,166,0.2) 70%, transparent 90%);
+      animation: aura-breathe 4s ease-in-out infinite;
+      box-shadow: 0 0 30px rgba(139,92,246,0.3), 0 0 60px rgba(59,130,246,0.15);
+    }
+    .aura-orb::after {
+      content: ''; position: absolute; inset: 15%; border-radius: 50%;
+      background: radial-gradient(circle at 55% 40%, rgba(244,63,94,0.3), rgba(217,70,239,0.2) 50%, transparent 80%);
+    }
+    @keyframes aura-breathe {
+      0%, 100% { transform: scale(0.94); opacity: 0.85; }
+      50% { transform: scale(1.06); opacity: 1; }
+    }
+    @keyframes float-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .float-in { animation: float-in 0.5s ease-out both; }
+    .float-in-d1 { animation-delay: 0.1s; }
+    .float-in-d2 { animation-delay: 0.2s; }
+    .float-in-d3 { animation-delay: 0.3s; }
+    /* Breathing glow layer — will-change isolates compositing so animation can't shift layout */
+    .breathe-glow {
+      position: absolute; border-radius: 50%; pointer-events: none;
+      animation: aura-breathe 8s ease-in-out infinite;
+      will-change: transform, opacity;
+    }
+    /* Progress segment bar */
+    .seg-bar { display: flex; gap: 1px; height: 10px; padding: 2px 4px; }
+    .seg-bar > div { flex: 1; border-radius: 2px; transition: background 0.2s; }
+    /* Tab for gallery nav */
+    .tab-btn { padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.15s; border: none; }
+    /* Q-circle mini */
+    .q-circ { width: 40px; height: 40px; border-radius: 50%; padding: 3px; display: flex; align-items: center; justify-content: center; }
+    .q-circ-inner { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; }
+    .q-circ-yn { background: conic-gradient(#ef4444 0deg 180deg, #10b981 180deg 360deg); }
+    .q-circ-mc { background: conic-gradient(#3b82f6 0deg 72deg, #8b5cf6 72deg 144deg, #14b8a6 144deg 216deg, #06b6d4 216deg 288deg, #ec4899 288deg 360deg); }
+    .q-circ-mix { background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 50%, #e2e8f0 100%); }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body style="background: var(--bg-main);">
+  <div id="root"></div>
+
+  <button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.22)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.7)'">&#x21bb; Refresh</button>
+
+  <script>
+  const _warn = console.warn;
+  console.warn = (...args) => {
+    if (typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+    _warn.apply(console, args);
+  };
+  </script>
+
+  <script type="text/babel">
+const { useState, useCallback } = React;
+
+// ============================================================
+// COLOR SYSTEM
+// ============================================================
+const COLOR_HEX = {
+  violet:  { base: '#8b5cf6', light: '#a78bfa', rgb: '139, 92, 246' },
+  blue:    { base: '#3b82f6', light: '#60a5fa', rgb: '59, 130, 246' },
+  teal:    { base: '#14b8a6', light: '#2dd4bf', rgb: '20, 184, 166' },
+  rose:    { base: '#f43f5e', light: '#fb7185', rgb: '244, 63, 94' },
+  pink:    { base: '#d946ef', light: '#e879f9', rgb: '217, 70, 239' },
+  emerald: { base: '#10b981', light: '#34d399', rgb: '16, 185, 129' },
+  slate:   { base: '#7c85a6', light: '#a0a8c8', rgb: '124, 133, 166' },
+  amber:   { base: '#f59e0b', light: '#fbbf24', rgb: '245, 158, 11' },
+  indigo:  { base: '#6366f1', light: '#818cf8', rgb: '99, 102, 241' },
+  cyan:    { base: '#06b6d4', light: '#67e8f9', rgb: '6, 182, 212' },
+  gray:    { base: '#6b7280', light: '#9ca3af', rgb: '107, 114, 128' },
+};
+const colorOf = (name, fallback = 'violet') => COLOR_HEX[name] || COLOR_HEX[fallback];
+
+// ============================================================
+// DEVICE SIZES — calibrated to Philip's monitor
+// ============================================================
+// Monitor: LG 27UN850-W, 109 CSS px/inch (2560 logical / 23.49" active)
+// Phone logical PPI: 153 (460 native / 3× retina)
+// Base scale: 109/153 ≈ 0.712, nudged to 0.74 to match real phone held to screen
+// (accounts for bezel presence making the device appear slightly larger)
+const PX_SCALE = 0.74;
+const DEVICES = {
+  sm: { label: 'SE',         name: 'iPhone SE',         pw: 375, ph: 667 },
+  md: { label: '16',         name: 'iPhone 16',         pw: 393, ph: 852 },
+  lg: { label: '16 Pro Max', name: 'iPhone 16 Pro Max', pw: 440, ph: 956 },
+};
+// Pre-compute CSS pixel sizes
+Object.values(DEVICES).forEach(d => {
+  d.w = Math.round(d.pw * PX_SCALE);
+  // Derive height from the actual scale factor (d.w/d.pw) to avoid subpixel overflow
+  d.h = Math.ceil(d.ph * (d.w / d.pw));
+});
+const DEVICE_KEYS = ['sm', 'md', 'lg'];
+
+// Pro Max dimensions = the fixed slot size for all phones
+const SLOT = DEVICES.lg;
+
+// Reusable phone frame — ALL devices render at Pro Max logical resolution (440×956),
+// then CSS-scale to their physical size. Bigger phones = more physical space = everything looks bigger.
+// Smaller phones = same content squeezed tighter = everything looks smaller. Real responsive behavior.
+const PhoneFrame = ({ width, height, label, sublabel, children }) => {
+  const scale = width / SLOT.pw;
+  return (
+    <div style={{ width: SLOT.w, minHeight: SLOT.h + 32, verticalAlign: 'top' }}>
+      <div className="phone-frame" style={{ width, height }}>
+        <div className="phone-notch" />
+        <div style={{
+          width: SLOT.pw, height: SLOT.ph,
+          transform: `scale(${scale})`, transformOrigin: 'top left',
+          position: 'absolute', top: 0, left: 0,
+          overflow: 'hidden',
+        }}>
+          {children}
+        </div>
+      </div>
+      <Text size="sm" weight="semibold" className="mt-3">{label}</Text>
+      {sublabel && <Text size="sm" emphasis="subtle" className="mt-0.5">{sublabel}</Text>}
+    </div>
+  );
+};
+
+// ============================================================
+// THEME HOOK
+// ============================================================
+const useTheme = () => {
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+  const toggle = useCallback(() => {
+    document.documentElement.classList.toggle('dark');
+    setIsDark(d => !d);
+  }, []);
+  return { isDark, toggle };
+};
+
+// ============================================================
+// LEGO PRIMITIVES
+// ============================================================
+
+const Stack = ({ direction = 'column', gap = 3, align, children, className = '', style, ...props }) => {
+  const isRow = direction === 'row';
+  const al = align || (isRow ? 'center' : undefined);
+  return <div className={`flex ${isRow ? 'flex-row' : 'flex-col'} gap-${gap} ${al ? `items-${al}` : ''} ${className}`} style={style} {...props}>{children}</div>;
+};
+const Container = ({ maxWidth = 480, padding = true, children, className = '', style, ...props }) => (
+  <div className={`mx-auto w-full ${padding ? 'px-4 sm:px-6' : ''} ${className}`} style={{ maxWidth, ...style }} {...props}>{children}</div>
+);
+
+// Text scale — bumped up one step, xs removed, 4xl added
+const TEXT_SIZES = { sm: 'text-base', base: 'text-lg', lg: 'text-xl', xl: 'text-2xl', '2xl': 'text-3xl', '3xl': 'text-4xl', '4xl': 'text-5xl' };
+const TEXT_WEIGHTS = { normal: 'font-normal', medium: 'font-medium', semibold: 'font-semibold', bold: 'font-bold' };
+
+const HEADING_PRESETS = {
+  1: { as: 'h1', size: '2xl', weight: 'bold' },
+  2: { as: 'h2', size: 'xl',  weight: 'bold' },
+  3: { as: 'h3', size: 'lg',  weight: 'semibold' },
+  4: { as: 'h4', size: 'base', weight: 'semibold' },
+  5: { as: 'h5', size: 'sm',  weight: 'semibold' },
+};
+
+const Text = ({ as, heading, size, weight, emphasis = 'primary', color, children, className = '', style, ...props }) => {
+  const preset = heading ? HEADING_PRESETS[heading] : null;
+  const Tag = as || preset?.as || 'p';
+  const sz = size || preset?.size || 'base';
+  const wt = weight || preset?.weight || 'normal';
+  const emphasisColor = { primary: 'var(--text-primary)', secondary: 'var(--text-secondary)', muted: 'var(--text-muted)', subtle: 'var(--text-subtle)' };
+  const colorStyle = color ? { color } : { color: emphasisColor[emphasis] };
+  return <Tag className={`${TEXT_SIZES[sz]} ${TEXT_WEIGHTS[wt]} ${className}`} style={{ ...colorStyle, ...style }} {...props}>{children}</Tag>;
+};
+
+const Button = ({ variant = 'primary', color = 'violet', size = 'md', shine, loading, children, className = '', style, disabled, onClick, ...props }) => {
+  const c = colorOf(color);
+  const isDisabled = disabled || loading;
+  const sizes = { sm: 'px-3 py-1.5 text-sm rounded-lg', md: 'px-5 py-2.5 text-base rounded-xl', lg: 'px-6 py-3.5 text-lg rounded-xl', full: 'w-full py-3.5 px-6 text-lg rounded-xl' };
+  const sizeClass = sizes[size] || sizes.md;
+  const shineCls = shine ? 'shine-card' : '';
+  const accentVar = shine ? { '--accent-rgb': c.rgb } : {};
+  const variants = {
+    primary: { cls: `text-white font-semibold btn-feedback ${shineCls} ${sizeClass}`, st: { background: `linear-gradient(135deg, ${c.base}, ${c.light})`, ...accentVar } },
+    secondary: { cls: `font-medium btn-feedback ${sizeClass}`, st: { background: 'var(--btn-secondary-bg)', color: 'var(--text-secondary)' } },
+    ghost: { cls: `font-medium ${sizeClass}`, st: { background: 'transparent', color: 'var(--btn-ghost-text)' } },
+    outline: { cls: `font-medium btn-feedback ${sizeClass}`, st: { background: 'transparent', border: `1.5px solid ${c.base}`, color: c.base } },
+  };
+  const v = variants[variant] || variants.primary;
+  return <button className={`transition-all cursor-pointer select-none ${v.cls} ${className}`} style={{ ...v.st, ...(isDisabled ? { opacity: 0.4, pointerEvents: 'none' } : {}), ...style }} disabled={isDisabled} onClick={onClick} {...props}>
+    {loading ? <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full mr-2" style={{ animation: 'spin 0.6s linear infinite' }} />Loading...</> : children}
+  </button>;
+};
+
+const Card = ({ variant = 'plain', color, glow, shine, padding = true, children, className = '', style, onClick, ...props }) => {
+  const base = `rounded-2xl overflow-hidden transition-all ${onClick ? 'cursor-pointer' : ''}`;
+  const pad = padding ? 'p-4' : '';
+  const c = color ? colorOf(color) : null;
+  const glowFull = glow && glow !== 'soft';
+  const coloredSt = c ? {
+    background: `linear-gradient(135deg, rgba(${c.rgb},${glowFull ? 0.15 : 0.08}), rgba(${c.rgb},${glowFull ? 0.05 : 0.02}))`,
+    border: `1px solid rgba(${c.rgb},${glowFull ? 0.4 : 0.3})`
+  } : null;
+  const variants = {
+    plain: { cls: `${base} ${pad}`, st: coloredSt || { background: 'var(--bg-card)', border: '1px solid var(--border-card)', boxShadow: 'var(--shadow-card)' } },
+    elevated: { cls: `${base} ${pad}`, st: { background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-elevated)' } },
+  };
+  const v = variants[variant] || variants.plain;
+  const glowCls = glow && c ? (glow === 'soft' ? 'glow-soft' : 'glow') : '';
+  const shineCls = shine && c ? 'shine-card' : '';
+  const accentVar = c ? { '--accent-rgb': c.rgb } : {};
+  return <div className={`${v.cls} ${glowCls} ${shineCls} ${className}`} style={{ ...v.st, ...accentVar, ...style }} onClick={onClick} {...props}>{children}</div>;
+};
+Card.Header = ({ icon, title, subtitle, color = 'violet', children, className = '' }) => {
+  const c = colorOf(color);
+  return (
+    <div className={`relative px-4 py-3 flex items-center gap-3 ${className}`}>
+      <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${c.base}, ${c.light})`, opacity: 0.9 }} />
+      {icon && <span className="text-2xl relative z-10">{icon}</span>}
+      <div className="relative z-10 flex-1">
+        {title && <h3 className="text-white text-lg font-bold">{title}</h3>}
+        {subtitle && <p className="text-white/70 text-sm">{subtitle}</p>}
+      </div>
+      {children && <div className="relative z-10">{children}</div>}
+    </div>
+  );
+};
+Card.Body = ({ children, className = '' }) => <div className={`p-4 ${className}`}>{children}</div>;
+
+const Input = ({ type = 'text', value, onChange, placeholder, label, focusColor = 'violet', className = '', style, ...props }) => {
+  const [focused, setFocused] = useState(false);
+  const c = colorOf(focusColor);
+  const Tag = type === 'textarea' ? 'textarea' : 'input';
+  return (
+    <div className={className}>
+      {label && <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>{label}</label>}
+      <Tag type={type === 'textarea' ? undefined : type} value={value} onChange={onChange} placeholder={placeholder}
+        rows={type === 'textarea' ? 3 : undefined} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        className="w-full px-3.5 py-2.5 rounded-xl outline-none transition-all text-base"
+        style={{ background: 'var(--bg-input)', color: 'var(--input-text)',
+          border: focused ? `1.5px solid ${c.base}` : '1.5px solid var(--border-base)',
+          boxShadow: focused ? `0 0 0 3px rgba(${c.rgb}, 0.15)` : 'none', ...style }} {...props} />
+    </div>
+  );
+};
+
+const Field = ({ label, hint, error, required, children, className = '' }) => (
+  <div className={className}>
+    {label && <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>{label}{required && <span style={{ color: 'var(--status-rose)', marginLeft: 4 }}>*</span>}</label>}
+    {children}
+    {(error || hint) && <p className="text-sm mt-1.5" style={{ color: error ? 'var(--status-rose)' : 'var(--text-subtle)' }}>{error || hint}</p>}
+  </div>
+);
+
+const Screen = ({ header, footer, children, className = '', style }) => (
+  <div className={`phone-content flex flex-col ${className}`} style={{ background: 'var(--bg-main)', ...style }}>
+    {header}
+    {children}
+    {footer}
+  </div>
+);
+Screen.Body = ({ children, className = '', padding = true }) => (
+  <div className={`flex-1 overflow-y-auto ${padding ? 'p-4' : ''} ${className}`}>{children}</div>
+);
+
+const Skeleton = ({ width, height, rounded = 'xl', className = '' }) => (
+  <div className={`rounded-${rounded} ${className}`}
+    style={{ width, height, background: 'var(--bg-elevated)', animation: 'shimmer-pulse 1.5s ease-in-out infinite' }} />
+);
+
+const Placeholder = ({ icon, title, description, action, className = '' }) => (
+  <div className={`flex flex-col items-center justify-center text-center py-12 px-6 ${className}`}>
+    {icon && <span className="text-4xl mb-4 opacity-50">{icon}</span>}
+    {title && <Text weight="semibold" emphasis="secondary" size="lg">{title}</Text>}
+    {description && <Text emphasis="muted" className="mt-2">{description}</Text>}
+    {action && <div className="mt-4">{action}</div>}
+  </div>
+);
+
+const Modal = ({ open, onClose, variant = 'centered', title, children }) => {
+  if (!open) return null;
+  const isSheet = variant === 'bottom-sheet';
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+      <div className={`w-full ${isSheet ? 'sm:max-w-lg' : 'max-w-md mx-4'}`} onClick={e => e.stopPropagation()}
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-modal)',
+          borderRadius: isSheet ? '20px 20px 0 0' : '20px', animation: isSheet ? 'slideUp 0.3s ease-out' : 'bloom-in 0.2s ease-out' }}>
+        {(title || onClose) && (
+          <div className="flex items-center justify-between px-5 pt-5 pb-2">
+            {title && <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h3>}
+            {onClose && <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full cursor-pointer"
+              style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>&times;</button>}
+          </div>
+        )}
+        <div className="px-5 pb-5">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+const Toast = ({ children, visible, position = 'bottom-center', color = 'emerald' }) => {
+  if (!visible) return null;
+  const c = colorOf(color);
+  const pos = { 'bottom-center': { bottom: 24, left: '50%', transform: 'translateX(-50%)' }, 'top-right': { top: 24, right: 24 } };
+  return <div className="fixed z-50 px-4 py-2.5 rounded-xl font-medium text-sm text-white shadow-lg"
+    style={{ ...pos[position], background: c.base, animation: 'fadeSlideIn 0.3s ease-out' }}>{children}</div>;
+};
+
+const ProgressRing = ({ progress = 0, size = 48, strokeWidth = 3, color = 'violet', children }) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const c = colorOf(color);
+  const gradId = `ring-${color}-${size}-${Math.random().toString(36).slice(2,6)}`;
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="absolute">
+        <defs><linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={progress > 0 ? c.base : 'var(--ring-track)'} />
+          <stop offset="100%" stopColor={progress > 0 ? c.light : 'var(--ring-track)'} />
+        </linearGradient></defs>
+        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="var(--ring-track)" strokeWidth={strokeWidth} />
+        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={`url(#${gradId})`} strokeWidth={strokeWidth}
+          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress / 100)}
+          transform={`rotate(-90 ${size/2} ${size/2})`} className="transition-all duration-500" />
+      </svg>
+      {children && <span className="relative z-10">{children}</span>}
+    </div>
+  );
+};
+
+const SpectrumBar = ({ value = 50, leftColor = '#6b7280', rightColor = '#8b5cf6', leftLabel, rightLabel, showLabels }) => (
+  <div className="w-full">
+    {showLabels && leftLabel && rightLabel && (
+      <div className="flex justify-between text-sm mb-1.5" style={{ color: 'var(--text-subtle)' }}>
+        <span>{leftLabel}</span><span>{rightLabel}</span>
+      </div>
+    )}
+    <div className="h-4 rounded-full relative" style={{ background: `linear-gradient(to right, ${leftColor}, ${rightColor})` }}>
+      <div className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white"
+        style={{ left: `${Math.max(5, Math.min(95, value))}%`, marginLeft: -8, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+    </div>
+  </div>
+);
+
+// ============================================================
+// NEW TIER 1 — CONFIDENCE, CHIP, TOGGLE, CHECKBOX
+// ============================================================
+
+const CONFIDENCE_LABELS = ['Gaps', 'Fair', 'Confident', 'Certain'];
+const CONFIDENCE_LONG_LABELS = [
+  '1 — Notable gaps in my knowledge',
+  '2 — Fairly confident, some uncertainty',
+  '3 — Very confident, no reason to doubt',
+  "4 — Certain, I'd stake my reputation",
+];
+
+const Confidence = ({ value = 0, onChange, color = 'violet', labels = CONFIDENCE_LABELS, variant = 'stars', showLabel = true, className = '' }) => {
+  const c = colorOf(color);
+  if (variant === 'inline') {
+    // Compact inline display — just stars, for embedding in answer buttons
+    return (
+      <span className={`font-medium opacity-60 ${className}`} style={{ color: c.light, '--accent-rgb': c.rgb }}>
+        {'★'.repeat(Math.min(Math.max(value, 1), 4))}
+      </span>
+    );
+  }
+  // Stars mode — explicit 1-4 selector with glow
+  return (
+    <div className={`flex flex-col items-center gap-2 ${className}`}>
+      <div className="flex gap-3" style={{ '--accent-rgb': c.rgb }}>
+        {[1, 2, 3, 4].map(level => {
+          const active = value >= level;
+          const isExact = value === level;
+          return (
+            <button key={level} onClick={() => onChange?.(level)}
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer btn-feedback"
+              style={{
+                background: active ? `rgba(${c.rgb}, ${0.10 + level * 0.05})` : 'var(--bg-elevated)',
+                border: `2px solid ${active ? `rgba(${c.rgb}, ${0.3 + level * 0.1})` : 'var(--border-subtle)'}`,
+                boxShadow: active ? `0 0 ${8 + level * 4}px rgba(${c.rgb}, ${0.1 + level * 0.05})` : 'none',
+                color: active ? c.light : 'var(--text-subtle)',
+                fontSize: 18,
+                animation: isExact ? 'star-glow 2s ease-in-out infinite' : 'none',
+                '--accent-rgb': c.rgb,
+              }}>
+              {active ? '★' : '☆'}
+            </button>
+          );
+        })}
+      </div>
+      {showLabel && value > 0 && (
+        <Text size="sm" emphasis="muted" className="text-center transition-all">
+          {labels[value - 1]}
+        </Text>
+      )}
+    </div>
+  );
+};
+
+const Chip = ({ label, selected, onClick, color = 'violet', size = 'md' }) => {
+  const c = colorOf(color);
+  const sizes = { sm: 'px-2 py-0.5 text-xs', md: 'px-3 py-1.5 text-sm', lg: 'px-4 py-2 text-base' };
+  return (
+    <button onClick={onClick}
+      className={`rounded-lg font-medium transition-all cursor-pointer btn-feedback select-none ${sizes[size]}`}
+      style={selected ? {
+        background: `rgba(${c.rgb}, 0.8)`, color: 'white',
+        border: `1px solid rgba(${c.rgb}, 0.9)`,
+      } : {
+        background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+        border: '1px solid var(--border-subtle)',
+      }}>
+      {label}
+    </button>
+  );
+};
+
+const ChipGroup = ({ options = [], selected = [], onChange, color = 'violet', multi = true, size = 'md', className = '' }) => {
+  const handleClick = (val) => {
+    if (multi) {
+      onChange?.(selected.includes(val) ? selected.filter(s => s !== val) : [...selected, val]);
+    } else {
+      onChange?.(selected[0] === val ? [] : [val]);
+    }
+  };
+  return (
+    <div className={`flex flex-wrap gap-2 ${className}`}>
+      {options.map(opt => {
+        const val = typeof opt === 'string' ? opt : opt.value;
+        const label = typeof opt === 'string' ? opt : opt.label;
+        return <Chip key={val} label={label} selected={selected.includes(val)} onClick={() => handleClick(val)} color={color} size={size} />;
+      })}
+    </div>
+  );
+};
+
+const Toggle = ({ label, checked = false, onChange, color = 'violet', className = '' }) => {
+  const c = colorOf(color);
+  return (
+    <div className={`flex items-center justify-between gap-3 ${className}`} onClick={() => onChange?.(!checked)} style={{ cursor: 'pointer' }}>
+      {label && <Text size="sm" weight="medium" emphasis="secondary">{label}</Text>}
+      <div className="toggle-track" data-on={String(checked)} style={{ '--accent-rgb': c.rgb }}>
+        <div className="toggle-thumb" />
+      </div>
+    </div>
+  );
+};
+
+const Checkbox = ({ label, checked = false, onChange, color = 'violet', className = '' }) => {
+  const c = colorOf(color);
+  return (
+    <div className={`flex items-center gap-3 cursor-pointer py-0.5 ${className}`} onClick={() => onChange?.(!checked)}>
+      <div className="check-box" data-on={String(checked)} style={{ '--accent-rgb': c.rgb }}>
+        {checked && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+      </div>
+      {label && <Text emphasis="secondary">{label}</Text>}
+    </div>
+  );
+};
+
+// ============================================================
+// STRUCTURAL PRIMITIVES
+// ============================================================
+
+const NavBar = ({ back, title, left, right, borderless, children, className = '' }) => (
+  <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 relative z-10 ${className}`}
+    style={borderless ? {} : { borderBottom: '1px solid var(--border-base)' }}>
+    {children || <>
+      {back && <button className="text-base" style={{ color: 'var(--text-muted)' }}>←</button>}
+      {left}
+      <div className="flex-1">
+        {typeof title === 'string'
+          ? <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{title}</span>
+          : title}
+      </div>
+      {right && <div className="flex items-center gap-3">{right}</div>}
+    </>}
+  </div>
+);
+
+const SegmentBar = ({ total = 10, completed = 0, current = -1, color = 'violet' }) => {
+  const c = colorOf(color);
+  return (
+    <div className="seg-bar" style={{ background: 'rgba(255,255,255,0.03)' }}>
+      {Array.from({ length: total }, (_, i) => (
+        <div key={i} style={{
+          background: i < completed ? c.base : i === current ? '#fff' : 'rgba(255,255,255,0.08)'
+        }} />
+      ))}
+    </div>
+  );
+};
+
+const CategoryCard = ({ icon, name, count, label = 'remaining', color = 'violet', glow = 'soft', onClick }) => (
+  <Card color={color} glow={glow} shine onClick={onClick} style={{ padding: '14px 16px' }}>
+    <Stack direction="row" gap={2} className="mb-2">
+      <span className="text-xl">{icon}</span>
+      <Text weight="semibold">{name}</Text>
+    </Stack>
+    {count !== undefined && <Text size="sm" emphasis="subtle">{count} {label}</Text>}
+  </Card>
+);
+
+const AnswerButton = ({ label, color = 'violet', variant = 'binary', value, intensity, onClick }) => {
+  const c = colorOf(color);
+  if (variant === 'likert') {
+    const op = intensity || 0.10;
+    return (
+      <button className="w-full py-3.5 px-4 rounded-xl flex items-center justify-between transition-all btn-feedback"
+        style={{
+          background: `linear-gradient(135deg, rgba(${c.rgb},${op}), rgba(${c.rgb},${op * 0.5}))`,
+          border: `1px solid rgba(${c.rgb},${op + 0.05})`,
+          color: 'var(--text-secondary)',
+        }} onClick={onClick}>
+        <span className="text-left">{label}</span>
+        {value !== undefined && <span className="text-sm font-medium" style={{ color: `rgba(${c.rgb},0.6)` }}>{value}</span>}
+      </button>
+    );
+  }
+  return (
+    <button className="w-full py-4 px-6 rounded-xl font-semibold text-lg btn-feedback"
+      style={{ background: `linear-gradient(135deg, ${c.base}, ${c.light})`, color: 'white' }} onClick={onClick}>
+      {label}
+    </button>
+  );
+};
+
+const ActionBar = ({ actions = [], className = '' }) => (
+  <div className={`flex items-center justify-center gap-6 ${className}`}>
+    {actions.map((a, i) => (
+      <button key={i} className="text-sm" style={{ color: 'var(--text-subtle)' }} onClick={a.onClick}>{a.label}</button>
+    ))}
+  </div>
+);
+
+const TrackSelector = ({ tracks = [], onBack, onForward }) => (
+  <div className="h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10"
+    style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid rgba(139,92,246,0.15)' }}>
+    {onBack && <button className="text-xl font-bold w-8 h-8 flex items-center justify-center" style={{ color: 'var(--text-muted)' }} onClick={onBack}>◀</button>}
+    <div className="flex-1 flex items-center justify-center gap-3">
+      {tracks.map(t => (
+        <div key={t.id} className={`q-circ ${t.ringClass || ''}`} style={{ opacity: t.active ? 1 : 0.6, ...(t.active ? { width: 48, height: 48 } : {}) }}>
+          <div className="q-circ-inner" style={{ background: 'var(--bg-main)', color: 'var(--text-primary)' }}>{t.label}</div>
+        </div>
+      ))}
+    </div>
+    {onForward && <button className="text-xl font-bold w-8 h-8 flex items-center justify-center" style={{ color: 'var(--text-secondary)' }} onClick={onForward}>▶</button>}
+  </div>
+);
+
+const AvatarRow = ({ name, subtitle, orbSize = 64, action, children, className = '' }) => (
+  <div className={`flex items-center gap-4 ${className}`}>
+    <div className="flex-shrink-0 rounded-full aura-orb" style={{ width: orbSize, height: orbSize }} />
+    <div className="flex-1">
+      <Stack direction="row" gap={2}>
+        <Text heading={4}>{name}</Text>
+        {action}
+      </Stack>
+      {subtitle && <Text size="sm" color={COLOR_HEX.violet.light} className="mt-0.5">{subtitle}</Text>}
+      {children}
+    </div>
+  </div>
+);
+
+const ListItem = ({ icon, label, action, color = 'violet', completed, onClick }) => {
+  const c = colorOf(color);
+  if (completed) {
+    return (
+      <div className="w-full rounded-xl px-3 py-2 flex items-center gap-3" style={{ opacity: 0.5, background: 'rgba(255,255,255,0.02)' }}>
+        <span className="text-base">{icon}</span>
+        <Text size="sm" emphasis="subtle" className="flex-1">{label}</Text>
+        <Text size="sm" color="var(--text-faint)">✓</Text>
+      </div>
+    );
+  }
+  return (
+    <div className="w-full rounded-xl px-4 py-3 flex items-center gap-3 cursor-pointer"
+      style={{ background: `rgba(${c.rgb},0.06)`, border: `1px solid rgba(${c.rgb},0.15)` }}
+      onClick={onClick}>
+      <span className="text-lg">{icon}</span>
+      <Text weight="medium" color={c.light} className="flex-1">{label}</Text>
+      {action || <span className="text-sm px-2.5 py-0.5 rounded-full" style={{ background: `rgba(${c.rgb},0.15)`, color: c.light }}>Start →</span>}
+    </div>
+  );
+};
+
+// ============================================================
+// TIER 2 — VERIFY & QUESTION FLOW COMPOSITIONS
+// ============================================================
+
+// --- Undo Overlay ---
+// Renders at 100% of parent height — parent slot controls the size.
+// This ensures undo always covers exactly the same space as the button it replaces.
+const UndoOverlay = ({ answerLabel, color = 'emerald', duration = 1.5, onUndo, onExpire, className = '' }) => {
+  const c = colorOf(color);
+  const timerRef = React.useRef(null);
+  React.useEffect(() => {
+    timerRef.current = setTimeout(() => onExpire?.(), duration * 1000);
+    return () => clearTimeout(timerRef.current);
+  }, [duration]);
+  return (
+    <div onClick={onUndo}
+      className={`cursor-pointer rounded-2xl h-full flex items-center gap-3 px-4 ${className}`}
+      style={{
+        background: `rgba(${c.rgb}, 0.15)`,
+        border: `1px solid rgba(${c.rgb}, 0.5)`,
+        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+      }}>
+      <div className="flex-shrink-0 w-7 h-7 relative">
+        <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+          <circle cx="14" cy="14" r="12" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
+          <circle cx="14" cy="14" r="12" fill="none" stroke={c.base} strokeWidth="2.5"
+            strokeDasharray="75.4" strokeDashoffset="0"
+            style={{ animation: `ringCountdown ${duration}s linear forwards` }} />
+        </svg>
+      </div>
+      <div className="flex-1 min-w-0">
+        <Text size="sm" weight="semibold" className="truncate">{answerLabel}</Text>
+      </div>
+      <button onClick={(e) => { e.stopPropagation(); onUndo?.(); }}
+        className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors"
+        style={{ background: `rgba(${c.rgb}, 0.3)`, color: c.base }}>
+        Undo
+      </button>
+    </div>
+  );
+};
+
+// --- Question Actions (Can't/None, Explain, Skip, Save) ---
+const QuestionActions = ({ actions, visible = true, className = '' }) => {
+  const defaultActions = [
+    { label: "Can't", color: null, active: false },
+    { label: 'Explain', color: COLOR_HEX.amber, active: false },
+    { label: 'Skip', color: null, active: false },
+    { label: 'Save', color: COLOR_HEX.violet, active: false },
+  ];
+  const items = actions || defaultActions;
+  return (
+    <div className={`relative px-4 mt-4 mb-2 flex items-center justify-center max-w-sm mx-auto ${!visible ? 'invisible' : ''} ${className}`}>
+      <div className="grid grid-cols-4 gap-2.5 w-full">
+        {items.map((btn, i) => (
+          <button key={btn.label || i} onClick={btn.onClick}
+            className="py-3 rounded-xl text-sm font-medium transition-all btn-feedback border"
+            style={btn.active && btn.color ? {
+              borderColor: `rgba(${btn.color.rgb}, 0.30)`,
+              background: `rgba(${btn.color.rgb}, 0.08)`,
+              color: btn.color.light,
+            } : {
+              borderColor: 'var(--border-subtle)',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-subtle)',
+            }}>
+            {btn.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// --- Action Sheet (reason picker bottom sheet) ---
+const ActionSheet = ({ title, icon, reasons = [], color = 'violet', allowCustom = true, onSubmit, onClose, onClear, existing }) => {
+  const c = colorOf(color);
+  const [selected, setSelected] = useState(existing ? existing.split(', ').filter(r => reasons.includes(r)) : []);
+  const [custom, setCustom] = useState(existing ? existing.split(', ').filter(r => !reasons.includes(r)).join(', ') : '');
+  const toggle = (r) => setSelected(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+  const canSubmit = selected.length > 0 || custom.trim();
+  const handleSubmit = () => { onSubmit?.([...selected, custom.trim()].filter(Boolean).join(', ')); onClose?.(); };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 pb-8" onClick={onClose}>
+      <div className="rounded-xl p-4 w-[calc(100%-2rem)] max-w-xs backdrop-blur-xl"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-3">
+          {icon && <span style={{ color: c.light }}>{icon}</span>}
+          <Text size="sm" weight="medium">{title}</Text>
+        </div>
+        <div className="flex gap-1.5 mb-3 flex-wrap">
+          {reasons.map(r => (
+            <Chip key={r} label={r} selected={selected.includes(r)} onClick={() => toggle(r)} color={color} size="sm" />
+          ))}
+        </div>
+        {allowCustom && (
+          <Input value={custom} onChange={e => setCustom(e.target.value)} placeholder="Other..." focusColor={color} className="mb-3" />
+        )}
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={onClose} className="flex-1">Cancel</Button>
+          {existing && onClear && <Button variant="secondary" size="sm" onClick={() => { onClear(); onClose?.(); }} className="flex-1">Clear</Button>}
+          <Button color={color} size="sm" onClick={handleSubmit} disabled={!canSubmit} className="flex-1">
+            {existing ? 'Update' : 'Submit'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- ChipFieldGroup (multi-field chip selector) ---
+const ChipFieldGroup = ({ fields = [], values = {}, onChange, color = 'violet', className = '' }) => (
+  <div className={`space-y-5 ${className}`}>
+    {fields.map(field => (
+      <div key={field.id}>
+        <Text size="sm" weight="medium" emphasis="secondary" className="mb-2">{field.label}</Text>
+        <div className={`grid gap-2 ${field.columns === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {field.options.map(opt => (
+            <Chip key={opt} label={opt} selected={values[field.id] === opt}
+              onClick={() => onChange?.({ ...values, [field.id]: values[field.id] === opt ? null : opt })}
+              color={color} size="sm" />
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+// --- ChecklistGroup (sectioned checkbox list) ---
+const ChecklistGroup = ({ sections = [], values = {}, onChange, color = 'violet', className = '' }) => (
+  <div className={`space-y-5 ${className}`}>
+    {sections.map((section, si) => (
+      <div key={si}>
+        <Text size="sm" weight="semibold" emphasis="muted" className="mb-3 uppercase tracking-wide" style={{ fontSize: 11 }}>
+          {section.title}
+        </Text>
+        <Stack gap={3}>
+          {section.items.map(item => {
+            const key = `s${si}`;
+            const checked = (values[key] || []).includes(item);
+            return (
+              <Checkbox key={item} label={item} checked={checked} color={color}
+                onChange={() => {
+                  const current = values[key] || [];
+                  onChange?.({ ...values, [key]: checked ? current.filter(x => x !== item) : [...current, item] });
+                }} />
+            );
+          })}
+        </Stack>
+      </div>
+    ))}
+  </div>
+);
+
+// --- Verdict (Yes/No + confidence + flags) ---
+const Verdict = ({ value, confidence = 0, flags = [], onVerdict, onConfidence, onFlag, color = 'emerald', flagOptions = [], className = '' }) => {
+  const cYes = colorOf('emerald');
+  const cNo = colorOf('rose');
+  const [showFlags, setShowFlags] = useState(false);
+  return (
+    <div className={`space-y-4 ${className}`}>
+      <Stack direction="row" gap={3}>
+        {[{ label: 'Yes', val: true, c: cYes }, { label: 'No', val: false, c: cNo }].map(opt => {
+          const active = value === opt.val;
+          return (
+            <button key={opt.label} onClick={() => onVerdict?.(opt.val)}
+              className="flex-1 py-4 rounded-2xl font-semibold text-lg transition-all btn-feedback"
+              style={{
+                background: active ? `linear-gradient(135deg, ${opt.c.base}, ${opt.c.light})` : `rgba(${opt.c.rgb}, 0.08)`,
+                border: `2px solid ${active ? opt.c.base : `rgba(${opt.c.rgb}, 0.2)`}`,
+                color: active ? 'white' : opt.c.light,
+                boxShadow: active ? `0 0 20px rgba(${opt.c.rgb}, 0.3)` : 'none',
+              }}>
+              {opt.label}
+            </button>
+          );
+        })}
+      </Stack>
+      {value !== undefined && value !== null && (
+        <div style={{ animation: 'fadeSlideIn 0.3s ease-out' }}>
+          <Text size="sm" emphasis="muted" className="text-center mb-2">How confident are you?</Text>
+          <Confidence value={confidence} onChange={onConfidence} color={value ? 'emerald' : 'rose'} />
+        </div>
+      )}
+      {value !== undefined && value !== null && flagOptions.length > 0 && (
+        <div>
+          <button onClick={() => setShowFlags(!showFlags)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm"
+            style={{
+              background: flags.length > 0 ? `rgba(${COLOR_HEX.amber.rgb}, 0.08)` : 'var(--bg-surface)',
+              border: `1px solid ${flags.length > 0 ? `rgba(${COLOR_HEX.amber.rgb}, 0.3)` : 'var(--border-subtle)'}`,
+              color: flags.length > 0 ? COLOR_HEX.amber.light : 'var(--text-subtle)',
+            }}>
+            <span>⚑ Flags {flags.length > 0 && `(${flags.length})`}</span>
+            <span>{showFlags ? '▾' : '▸'}</span>
+          </button>
+          {showFlags && (
+            <div className="mt-2 pl-1">
+              <ChipGroup options={flagOptions} selected={flags} onChange={onFlag} color="amber" size="sm" />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Subject Banner (expandable person card) ---
+const SubjectBanner = ({ name, location, connections = 0, availability = {}, color = 'violet', className = '' }) => {
+  const c = colorOf(color);
+  const [expanded, setExpanded] = useState(false);
+  const initials = name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?';
+  return (
+    <div className={`rounded-2xl overflow-hidden transition-all ${className}`}
+      style={{ background: `rgba(${c.rgb}, 0.06)`, border: `1px solid rgba(${c.rgb}, 0.15)` }}>
+      <div className="flex items-center gap-3 px-4 py-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
+          style={{ background: `linear-gradient(135deg, ${c.base}, ${c.light})`, color: 'white' }}>
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <Text weight="semibold" size="sm" className="truncate">{name}</Text>
+          <Text size="sm" emphasis="subtle">{location} · {connections} connections</Text>
+        </div>
+        <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>{expanded ? '▾' : '▸'}</span>
+      </div>
+      {expanded && (
+        <div className="px-4 pb-3 flex gap-2" style={{ animation: 'fadeSlideIn 0.2s ease-out' }}>
+          {[
+            { key: 'video', label: '📹 Video', ok: availability.video },
+            { key: 'meet', label: '🤝 Meet', ok: availability.meet },
+            { key: 'vouch', label: '✋ Vouch', ok: availability.vouch },
+          ].map(a => (
+            <span key={a.key} className="text-xs px-2 py-1 rounded-md"
+              style={{
+                background: a.ok ? `rgba(${COLOR_HEX.emerald.rgb}, 0.12)` : 'var(--bg-elevated)',
+                color: a.ok ? COLOR_HEX.emerald.light : 'var(--text-faint)',
+              }}>
+              {a.label}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Path Selector (route cards) ---
+const PathSelector = ({ paths = [], selected, onSelect, className = '' }) => (
+  <Stack gap={3} className={className}>
+    {paths.map(path => {
+      const c = colorOf(path.color);
+      const active = selected === path.id;
+      return (
+        <div key={path.id} onClick={() => onSelect?.(path.id)}
+          className="rounded-2xl px-4 py-4 cursor-pointer transition-all btn-feedback"
+          style={{
+            background: active ? `rgba(${c.rgb}, 0.12)` : 'var(--bg-surface)',
+            border: `2px solid ${active ? `rgba(${c.rgb}, 0.5)` : 'var(--border-subtle)'}`,
+            boxShadow: active ? `0 0 16px rgba(${c.rgb}, 0.15)` : 'none',
+          }}>
+          <Stack direction="row" gap={3}>
+            <span className="text-2xl">{path.icon}</span>
+            <div className="flex-1">
+              <Text weight="semibold" color={active ? c.light : undefined}>{path.label}</Text>
+              <Text size="sm" emphasis="muted" className="mt-0.5">{path.description}</Text>
+            </div>
+          </Stack>
+        </div>
+      );
+    })}
+  </Stack>
+);
+
+// ============================================================
+// SCREEN COMPOSITIONS
+// ============================================================
+
+// --- Landing Screen ---
+const ScreenLanding = () => (
+  <div className="phone-content flex flex-col items-center justify-center px-10 py-8" style={{ background: 'var(--bg-main)' }}>
+    <div className="breathe-glow" style={{ width: 300, height: 300, top: '15%', left: '50%', marginLeft: -150,
+      background: 'radial-gradient(circle, rgba(139,92,246,0.08), transparent 70%)' }} />
+    <div className="relative z-10 flex flex-col items-center w-full">
+      <div className="aura-orb mb-8 float-in" style={{ width: '45%', aspectRatio: '1', maxWidth: 200 }} />
+      <Text heading={1} className="mb-3 float-in float-in-d1">Aura</Text>
+      <Text size="lg" emphasis="muted" className="mb-12 text-center float-in float-in-d2">Discover yourself, one question at a time</Text>
+      <Stack gap={4} className="w-full float-in float-in-d3">
+        <Button variant="primary" color="violet" size="full">Let's Go</Button>
+        <Text emphasis="subtle" className="text-center">10 questions, about 2 minutes</Text>
+      </Stack>
+      <Button variant="ghost" size="sm" className="mt-8">Sign in</Button>
+      <Button variant="ghost" size="sm" className="mt-4" style={{ opacity: 0.35 }}>I'm an AI →</Button>
+    </div>
+  </div>
+);
+
+// --- Category Hub ---
+const ScreenCategoryHub = () => {
+  const cats = [
+    { icon: '☀️', name: 'Predict', color: 'amber', remaining: 23 },
+    { icon: '🧠', name: 'Think', color: 'violet', remaining: 18 },
+    { icon: '⚖️', name: 'Judge', color: 'teal', remaining: 31 },
+    { icon: '🎲', name: 'Random', color: 'gray', remaining: 72 },
+  ];
+  return (
+    <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+      {/* Ambient wash */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 200, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 80% 100% at 50% -10%, rgba(139,92,246,0.08), transparent 70%)' }} />
+      <NavBar borderless
+        left={<Stack direction="row" gap={3}><span className="text-3xl">🌀</span><Text size="sm" weight="bold" color={COLOR_HEX.violet.base}>Lv.3</Text></Stack>}
+        right={<>
+          <Text size="sm" weight="medium" color={COLOR_HEX.amber.base}>🔥5</Text>
+          <div className="w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: `linear-gradient(135deg, ${COLOR_HEX.violet.base}40, ${COLOR_HEX.blue.base}30)`,
+              boxShadow: `0 0 8px 3px ${COLOR_HEX.violet.base}40`, border: `1.5px solid ${COLOR_HEX.violet.base}80` }}>
+            <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>👤</span>
+          </div>
+          <svg className="w-6 h-6" fill="none" stroke="var(--text-subtle)" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </>}
+        className="px-5 pt-4 pb-2"
+      />
+      <div className="flex-1 overflow-y-auto px-5 pt-3 pb-8 space-y-5">
+        <Card color="blue" shine glow className="text-center" style={{ padding: '20px 16px' }}>
+          <Text weight="medium" color={COLOR_HEX.blue.light} className="mb-2">🌀 Question of the Day</Text>
+          <Text heading={3} style={{ textWrap: 'balance' }}>Would you rather always know the truth or always be believed?</Text>
+        </Card>
+        <div className="grid grid-cols-2 gap-3">
+          {cats.map(cat => (
+            <CategoryCard key={cat.name} icon={cat.icon} name={cat.name} count={cat.remaining} color={cat.color} />
+          ))}
+        </div>
+        <Card color="violet" shine glow onClick={() => {}} style={{ padding: '16px' }}>
+          <Stack direction="row" gap={3}>
+            <span className="text-2xl">🪞</span>
+            <div className="flex-1">
+              <Text weight="semibold">Reveal Yourself</Text>
+              <Text size="sm" emphasis="muted">Personality assessments</Text>
+            </div>
+            <Text color={COLOR_HEX.violet.light}>→</Text>
+          </Stack>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// --- Question Flow ---
+const ScreenQuestionFlow = () => (
+  <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+    <TrackSelector
+      onBack={() => {}} onForward={() => {}}
+      tracks={[
+        { id: 'yn', label: 'Y/N', ringClass: 'q-circ-yn' },
+        { id: 'mc', label: 'ABC', ringClass: 'q-circ-mc' },
+        { id: 'mix', label: 'Mix', ringClass: 'q-circ-mix', active: true },
+      ]}
+    />
+    <div className="flex-1 flex flex-col justify-center px-6 relative">
+      <div className="breathe-glow" style={{ width: 420, height: 420, top: '50%', left: '50%', marginTop: -210, marginLeft: -210,
+        background: 'radial-gradient(circle, rgba(139,92,246,0.14) 0%, rgba(139,92,246,0.06) 35%, transparent 65%)' }} />
+      <div className="breathe-glow" style={{ width: 350, height: 350, top: '50%', left: '50%', marginTop: -175, marginLeft: -175,
+        background: 'radial-gradient(circle, rgba(244,63,94,0.10) 0%, rgba(244,63,94,0.04) 40%, transparent 65%)',
+        animationDelay: '1s', animationDuration: '6s' }} />
+      <Text size="2xl" weight="medium" className="text-center leading-relaxed relative z-10" style={{ textWrap: 'balance' }}>
+        Do you believe most people are fundamentally good?
+      </Text>
+    </div>
+    <Stack gap={3} className="flex-shrink-0 px-5 pb-6 relative z-10">
+      <AnswerButton label="Yes" color="emerald" />
+      <AnswerButton label="No" color="rose" />
+    </Stack>
+    <ActionBar actions={[{ label: "Can't answer" }, { label: 'Skip' }, { label: 'Save for later' }]} className="flex-shrink-0 pb-4 relative z-10" />
+  </div>
+);
+
+// --- Assessment Question ---
+const ScreenAssessQuestion = () => {
+  const scale = [
+    { v: 1, l: 'Strongly disagree', op: 0.06 },
+    { v: 2, l: 'Disagree', op: 0.08 },
+    { v: 3, l: 'Neutral', op: 0.10 },
+    { v: 4, l: 'Agree', op: 0.12 },
+    { v: 5, l: 'Strongly agree', op: 0.15 },
+  ];
+  return (
+    <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+      <NavBar
+        left={<Stack direction="row" gap={2}>
+          <Button variant="ghost" size="sm">Save</Button>
+          <Button variant="ghost" size="sm">◀</Button>
+        </Stack>}
+        title={<Text size="sm" weight="medium" className="text-center">8 / 20</Text>}
+        right={<Stack direction="row" gap={2}>
+          <Button variant="ghost" size="sm">▶</Button>
+          <Button variant="ghost" size="sm">Exit</Button>
+        </Stack>}
+      />
+      <SegmentBar total={20} completed={7} current={7} color="violet" />
+      <div className="flex-1 flex flex-col justify-center px-6 relative">
+        <div className="breathe-glow" style={{ width: 280, height: 280, top: '50%', left: '50%', marginTop: -140, marginLeft: -140,
+          background: `radial-gradient(circle, rgba(${colorOf('violet').rgb},0.08) 0%, rgba(${colorOf('violet').rgb},0.03) 40%, transparent 65%)`,
+          animationDuration: '10s' }} />
+        <Text size="2xl" weight="medium" className="text-center leading-relaxed relative z-10" style={{ textWrap: 'balance' }}>
+          I see myself as someone who is talkative
+        </Text>
+      </div>
+      <Stack gap={2} className="flex-shrink-0 px-4 pb-4 relative z-10">
+        {scale.map(option => (
+          <AnswerButton key={option.v} label={option.l} color="violet" variant="likert" value={option.v} intensity={option.op} />
+        ))}
+        <ActionBar actions={[{ label: "Doesn't apply to me" }]} className="pt-1" />
+      </Stack>
+    </div>
+  );
+};
+
+// --- Profile Screen ---
+const ScreenProfile = () => {
+  const cats = [
+    { icon: '⚡', name: 'Quick Profile', color: 'blue', done: true },
+    { icon: '🧠', name: 'Personality', color: 'violet', done: true },
+    { icon: '🌿', name: 'Character', color: 'emerald', done: false },
+    { icon: '🌑', name: 'Shadow Self', color: 'slate', done: false },
+    { icon: '💕', name: 'Relationships', color: 'pink', done: false },
+  ];
+  return (
+    <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+      <NavBar back title="Profile" />
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <AvatarRow name="Philip Silva" subtitle="The Architect"
+          action={<Button variant="secondary" size="sm" style={{ padding: '2px 6px', fontSize: 11 }}>Edit</Button>} />
+        <Card color="violet" padding={false} onClick={() => {}}>
+          <div className="flex items-stretch min-h-[100px]">
+            <div className="w-[100px] flex-shrink-0 flex items-center justify-center">
+              <div className="aura-orb" style={{ width: 80, height: 80 }} />
+            </div>
+            <Card.Body>
+              <Stack direction="row" className="justify-between mb-0.5">
+                <Text weight="semibold">The Architect</Text>
+                <Text size="sm" color={COLOR_HEX.violet.light}>→</Text>
+              </Stack>
+              <Text size="sm" emphasis="muted">Strategic mind, quiet intensity</Text>
+              <Text size="sm" emphasis="subtle" className="mt-2">2 assessments</Text>
+            </Card.Body>
+          </div>
+        </Card>
+        <Card color="emerald" onClick={() => {}}>
+          <Stack direction="row" gap={4}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ background: `rgba(${COLOR_HEX.emerald.rgb},0.15)` }}>
+              <span className="text-lg">🔗</span>
+            </div>
+            <div className="flex-1">
+              <Text size="sm" weight="semibold">Identity & Connections</Text>
+              <Text size="sm" emphasis="muted" className="mt-0.5">philip@example.com · 2 linked</Text>
+            </div>
+            <Text size="sm" weight="medium" color={COLOR_HEX.emerald.light}>→</Text>
+          </Stack>
+        </Card>
+        <Stack gap={2}>
+          <Text size="sm" weight="medium" emphasis="subtle" className="uppercase tracking-wide">Available</Text>
+          {cats.filter(c => !c.done).map(cat => (
+            <ListItem key={cat.name} icon={cat.icon} label={cat.name} color={cat.color} />
+          ))}
+          <Text size="sm" weight="medium" color="var(--text-faint)" className="uppercase tracking-wide mt-3">Completed</Text>
+          {cats.filter(c => c.done).map(cat => (
+            <ListItem key={cat.name} icon={cat.icon} label={cat.name} color={cat.color} completed />
+          ))}
+        </Stack>
+      </div>
+    </div>
+  );
+};
+
+// --- Assessment Results ---
+const ScreenResults = () => {
+  const traits = [
+    { key: 'E', left: '#6366f1', right: '#f59e0b', lbl: 'Reserved', rbl: 'Outgoing', val: 72 },
+    { key: 'A', left: '#3b82f6', right: '#ec4899', lbl: 'Direct', rbl: 'Empathetic', val: 35 },
+    { key: 'C', left: '#8b5cf6', right: '#10b981', lbl: 'Flexible', rbl: 'Organized', val: 88 },
+    { key: 'N', left: '#06b6d4', right: '#f97316', lbl: 'Steady', rbl: 'Sensitive', val: 20 },
+    { key: 'O', left: '#64748b', right: '#a855f7', lbl: 'Practical', rbl: 'Curious', val: 60 },
+  ];
+  return (
+    <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+      <NavBar back title="Your Results" />
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <Card padding={false}>
+          <Card.Header icon="🧠" title="Big Five Personality" subtitle="Assessment complete" color="violet" />
+          <Card.Body>
+            <Stack gap={4}>
+              <Text size="sm" emphasis="muted" style={{ fontStyle: 'italic', textAlign: 'center' }}>
+                "A strategic mind with quiet intensity — you see patterns others miss and hold your cards close."
+              </Text>
+              {traits.map(t => (
+                <SpectrumBar key={t.key} value={t.val} leftColor={t.left} rightColor={t.right}
+                  leftLabel={t.lbl} rightLabel={t.rbl} showLabels />
+              ))}
+            </Stack>
+          </Card.Body>
+        </Card>
+        <Stack direction="row" gap={2} className="justify-center">
+          <Button variant="secondary" size="sm">𝕏 Post</Button>
+          <Button variant="secondary" size="sm">💬 Text</Button>
+          <Button variant="secondary" size="sm">📋 Copy</Button>
+        </Stack>
+        <Card color="emerald" glow>
+          <Stack direction="row" gap={3}>
+            <span className="text-2xl">🌿</span>
+            <div className="flex-1">
+              <Text weight="semibold" size="sm">Character Assessment</Text>
+              <Text size="sm" emphasis="muted">Discover your values</Text>
+            </div>
+            <Button variant="primary" color="emerald" size="sm">Start →</Button>
+          </Stack>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// --- Analysis Screen ---
+const ScreenAnalysis = () => {
+  const traits = [
+    { key: 'E', left: '#6366f1', right: '#f59e0b', lbl: 'Reserved', rbl: 'Outgoing', val: 72 },
+    { key: 'A', left: '#3b82f6', right: '#ec4899', lbl: 'Direct', rbl: 'Empathetic', val: 35 },
+    { key: 'C', left: '#8b5cf6', right: '#10b981', lbl: 'Flexible', rbl: 'Organized', val: 88 },
+    { key: 'N', left: '#06b6d4', right: '#f97316', lbl: 'Steady', rbl: 'Sensitive', val: 20 },
+    { key: 'O', left: '#64748b', right: '#a855f7', lbl: 'Practical', rbl: 'Curious', val: 60 },
+  ];
+  return (
+    <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+      <NavBar back title="Your Analysis" />
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Share bar */}
+        <Stack direction="row" gap={2}>
+          <Button variant="outline" color="violet" size="sm" className="flex-1">🔗 Share & Compare</Button>
+        </Stack>
+        {/* Personality Summary */}
+        <Card>
+          <Text size="sm" emphasis="muted" style={{ fontStyle: 'italic', textAlign: 'center', marginBottom: 12 }}>
+            "You don't need everyone to like you — but you notice more than you let on."
+          </Text>
+          <Stack gap={3}>
+            {traits.map(t => (
+              <SpectrumBar key={t.key} value={t.val} leftColor={t.left} rightColor={t.right}
+                leftLabel={t.lbl} rightLabel={t.rbl} showLabels />
+            ))}
+          </Stack>
+        </Card>
+        {/* Insights */}
+        <Card>
+          <Text weight="semibold" size="sm" className="mb-3">Cross-Test Insights</Text>
+          <Stack gap={3}>
+            <Stack direction="row" gap={2} align="start">
+              <span className="text-sm">🔮</span>
+              <Text size="sm" emphasis="muted">High openness + low neuroticism suggests you explore freely without anxiety holding you back</Text>
+            </Stack>
+            <Stack direction="row" gap={2} align="start">
+              <span className="text-sm">⚡</span>
+              <Text size="sm" emphasis="muted">Your conscientiousness paired with moderate extraversion makes you a structured leader who listens</Text>
+            </Stack>
+            <Stack direction="row" gap={2} align="start">
+              <span className="text-sm">🌊</span>
+              <Text size="sm" emphasis="muted">Low agreeableness with high openness — you're diplomatic when it matters, direct when it counts</Text>
+            </Stack>
+          </Stack>
+        </Card>
+        {/* Assessment Rings */}
+        <Card>
+          <Text weight="semibold" size="sm" className="mb-3">Completed</Text>
+          <Stack direction="row" gap={4} className="justify-center">
+            {[
+              { icon: '⚡', color: 'blue', progress: 100 },
+              { icon: '🧠', color: 'violet', progress: 100 },
+              { icon: '🌿', color: 'emerald', progress: 40 },
+              { icon: '🌑', color: 'slate', progress: 0 },
+            ].map((a, i) => (
+              <div key={i} className="text-center">
+                <ProgressRing progress={a.progress} color={a.color} size={44} strokeWidth={3}>
+                  <span className="text-base">{a.icon}</span>
+                </ProgressRing>
+              </div>
+            ))}
+          </Stack>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+
+// --- Enhanced Question Flow (with confidence + undo + action bar) ---
+const ScreenQuestionFlowFull = () => {
+  const [tapped, setTapped] = useState(null);
+  const [tapCount, setTapCount] = useState(0);
+  const [pending, setPending] = useState(null);       // auto-submit mode: { answer, confidence }
+  const [awaitConfirm, setAwaitConfirm] = useState(false); // confirm mode: waiting for ✓/✕
+  const [confirmMode, setConfirmMode] = useState(true);    // true = confirm, false = auto-submit
+  const [undoDelay, setUndoDelay] = useState(1.5);
+  const tapRef = React.useRef(null);
+
+  const handleTap = (answer) => {
+    if (pending || awaitConfirm) return;
+    if (tapped === answer) {
+      const next = Math.min(tapCount + 1, 4);
+      setTapCount(next);
+      if (!confirmMode) {
+        clearTimeout(tapRef.current);
+        tapRef.current = setTimeout(() => setPending({ answer, confidence: next }), 400);
+      }
+    } else {
+      setTapped(answer);
+      setTapCount(1);
+      if (confirmMode) {
+        setAwaitConfirm(true);
+      } else {
+        clearTimeout(tapRef.current);
+        tapRef.current = setTimeout(() => setPending({ answer, confidence: 1 }), 400);
+      }
+    }
+  };
+  const handleConfirm = () => { setAwaitConfirm(false); setTapped(null); setTapCount(0); /* In prod: commit + next */ };
+  const handleCancel = () => { setAwaitConfirm(false); setTapped(null); setTapCount(0); };
+  const handleUndo = () => { setTapped(pending?.answer ?? null); setTapCount(pending?.confidence ?? 0); setPending(null); };
+  const handleExpire = () => { setPending(null); setTapped(null); setTapCount(0); /* In prod: commit + next */ };
+  const reset = () => { setTapped(null); setTapCount(0); setPending(null); setAwaitConfirm(false); };
+
+  const colors = [COLOR_HEX.emerald, COLOR_HEX.rose];
+  const labels = ['YES', 'NO'];
+
+  // Each answer is a fixed-height SLOT. The slot contains either:
+  // - the answer button (when not pending for this slot)
+  // - the undo overlay (when pending for this slot)
+  // They share the exact same container, so undo is always pixel-locked to the button.
+  const BTN_H = 56; // h-14 = 3.5rem = 56px
+  const BTN_GAP = 12; // space-y-3 = 0.75rem = 12px
+
+  return (
+    <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+      <TrackSelector onBack={() => {}} onForward={() => {}}
+        tracks={[
+          { id: 'yn', label: 'Y/N', ringClass: 'q-circ-yn', active: true },
+          { id: 'mc', label: 'ABC', ringClass: 'q-circ-mc' },
+          { id: 'mix', label: 'Mix', ringClass: 'q-circ-mix' },
+        ]}
+      />
+      {/* Question text — flex-1 with min-height:0 so it shrinks on SE */}
+      <div className="flex-1 flex flex-col justify-center px-6 relative" style={{ minHeight: 0 }}>
+        <div className="breathe-glow" style={{ width: 420, height: 420, top: '50%', left: '50%', marginTop: -210, marginLeft: -210,
+          background: 'radial-gradient(circle, rgba(139,92,246,0.14) 0%, rgba(139,92,246,0.06) 35%, transparent 65%)' }} />
+        <Text size="2xl" weight="medium" className="text-center leading-relaxed relative z-10" style={{ textWrap: 'balance' }}>
+          Do you believe most people are fundamentally good?
+        </Text>
+        {/* Confirm/Cancel overlay — appears in confirm mode after tapping an answer */}
+        {awaitConfirm && tapped !== null && (() => {
+          const cc = colors[tapped];
+          return (
+            <div className="absolute bottom-1 left-0 right-0 z-20 flex items-center justify-center gap-3">
+              <button onClick={handleCancel}
+                className="w-9 h-9 rounded-full btn-feedback flex items-center justify-center text-sm transition-all border"
+                style={{ color: 'var(--text-muted)', borderColor: 'var(--border-subtle)', background: 'var(--bg-surface)' }}>
+                ✕
+              </button>
+              <button onClick={handleConfirm}
+                className="w-11 h-11 rounded-full btn-feedback flex items-center justify-center text-lg transition-all"
+                style={{
+                  color: cc.light,
+                  background: `linear-gradient(135deg, rgba(${cc.rgb},0.30), rgba(${cc.rgb},0.15))`,
+                  border: `1px solid rgba(${cc.rgb}, 0.50)`,
+                  boxShadow: `0 0 18px rgba(${cc.rgb},0.25), 0 0 40px rgba(${cc.rgb},0.12)`,
+                }}>
+                ✓
+              </button>
+            </div>
+          );
+        })()}
+      </div>
+      {/* Answer zone — flex-shrink-0, always visible at bottom */}
+      <div className="flex-shrink-0 px-5 pb-2 relative z-10">
+        <div className="max-w-sm mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: BTN_GAP }}>
+          {[0, 1].map(answer => {
+            const c = colors[answer];
+            const isSelected = tapped === answer;
+            const isPending = pending?.answer === answer;
+            const otherSelected = tapped !== null && !isSelected;
+            const r = isSelected ? tapCount : (isPending ? pending.confidence : 0);
+            return (
+              <div key={answer} style={{ height: BTN_H }}>
+                {isPending ? (
+                  // UNDO fills this exact slot
+                  <UndoOverlay answerLabel={`${labels[answer]} ${'★'.repeat(pending.confidence)}`}
+                    color={answer === 0 ? 'emerald' : 'rose'} duration={undoDelay} onUndo={handleUndo} onExpire={handleExpire} />
+                ) : (
+                  // BUTTON fills this exact slot
+                  <button onClick={() => handleTap(answer)}
+                    disabled={!!pending || awaitConfirm}
+                    className="w-full h-full rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none"
+                    style={{
+                      '--accent-rgb': c.rgb,
+                      borderColor: isSelected ? `rgba(${c.rgb}, ${0.30 + r * 0.12})` : `rgba(${c.rgb}, 0.25)`,
+                      background: isSelected
+                        ? `linear-gradient(135deg, rgba(${c.rgb},${0.06 + r * 0.05}), rgba(${c.rgb},${0.02 + r * 0.03}))`
+                        : `linear-gradient(135deg, rgba(${c.rgb},0.08), rgba(${c.rgb},0.03))`,
+                      boxShadow: isSelected
+                        ? `0 0 ${12 + r * 4}px rgba(${c.rgb},${0.10 + r * 0.05})`
+                        : `0 0 12px rgba(${c.rgb},0.10)`,
+                      opacity: (otherSelected && !pending && !awaitConfirm) ? 0.45 : (pending && !isPending) ? 0.3 : (awaitConfirm && !isSelected) ? 0.3 : 1,
+                      color: c.light,
+                    }}>
+                    <span className="text-lg font-semibold">{labels[answer]}</span>
+                    {isSelected && tapCount >= 1 && (
+                      <Confidence value={tapCount} variant="inline" color={answer === 0 ? 'emerald' : 'rose'} className="absolute right-4 text-sm" />
+                    )}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <QuestionActions visible={!pending && !awaitConfirm} />
+      <div className="flex-shrink-0 pb-2 px-5">
+        <div className="max-w-sm mx-auto flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={reset}>Reset</Button>
+          <div className="flex items-center gap-3">
+            <Text size="xs" emphasis="subtle">{confirmMode ? 'Confirm ✓✕' : `Auto ${undoDelay}s`}</Text>
+            <div className="toggle-track" data-on={String(!confirmMode)} style={{ '--accent-rgb': '139, 92, 246', width: 36, height: 20 }}
+              onClick={() => { setConfirmMode(!confirmMode); reset(); }}>
+              <div className="toggle-thumb" style={{ width: 16, height: 16 }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Verify Hub Screen ---
+const ScreenVerifyHub = () => {
+  const subjects = [
+    { id: 1, name: 'Alex Rivera', location: 'Portland, OR', connections: 14, availability: { video: true, meet: true, vouch: true } },
+    { id: 2, name: 'Priya Sharma', location: 'Bangalore', connections: 8, availability: { video: true, meet: false, vouch: true } },
+    { id: 3, name: 'Marcus Chen', location: 'Toronto', connections: 0, availability: {} },
+    { id: 4, name: 'Sofia Andersson', location: 'Stockholm', connections: 22, availability: { video: true, meet: true, vouch: true } },
+  ];
+  return (
+    <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+      <NavBar back title="Evaluations" right={<Text size="sm" color={COLOR_HEX.emerald.light}>3 pending</Text>} />
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <Input placeholder="Search by name or city..." focusColor="emerald" />
+        <div>
+          <Text size="sm" weight="semibold" emphasis="subtle" className="mb-2 uppercase tracking-wide" style={{ fontSize: 11 }}>Pending</Text>
+          <Stack gap={2}>
+            {subjects.slice(0, 3).map(s => (
+              <SubjectBanner key={s.id} name={s.name} location={s.location} connections={s.connections} availability={s.availability} color="violet" />
+            ))}
+          </Stack>
+        </div>
+        <div>
+          <Text size="sm" weight="semibold" emphasis="subtle" className="mb-2 uppercase tracking-wide" style={{ fontSize: 11 }}>Completed</Text>
+          <SubjectBanner name={subjects[3].name} location={subjects[3].location} connections={subjects[3].connections} availability={subjects[3].availability} color="emerald" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Verify Evaluator Flow Screen ---
+const ScreenVerifyEvaluator = () => {
+  const [phase, setPhase] = useState('path'); // 'path' | 'questions' | 'verdict'
+  const [selectedPath, setSelectedPath] = useState(null);
+  const [confidence, setConfidence] = useState(0);
+  const [verdict, setVerdict] = useState(null);
+  const [flags, setFlags] = useState([]);
+  const [chipValues, setChipValues] = useState({});
+  const [checkValues, setCheckValues] = useState({});
+
+  const paths = [
+    { id: 'A', icon: '🤝', label: 'Vouching', description: 'You know this person personally', color: 'cyan' },
+    { id: 'B', icon: '🔍', label: 'Investigation', description: 'You met or investigated them', color: 'amber' },
+    { id: 'C', icon: '📋', label: 'Analysis', description: 'Working from their profile data', color: 'slate' },
+  ];
+
+  if (phase === 'path') {
+    return (
+      <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+        <NavBar back title="Evaluate" />
+        <SubjectBanner name="Alex Rivera" location="Portland, OR" connections={14}
+          availability={{ video: true, meet: true, vouch: true }} color="violet" className="mx-4 mt-2" />
+        <div className="flex-1 overflow-y-auto p-4">
+          <Text size="sm" emphasis="muted" className="mb-4 text-center">How do you know this person?</Text>
+          <PathSelector paths={paths} selected={selectedPath} onSelect={setSelectedPath} />
+          {selectedPath && (
+            <div className="mt-4" style={{ animation: 'fadeSlideIn 0.3s ease-out' }}>
+              <Button color={paths.find(p => p.id === selectedPath)?.color || 'violet'} size="full" onClick={() => setPhase('questions')}>
+                Begin Evaluation →
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'questions') {
+    const pathColor = paths.find(p => p.id === selectedPath)?.color || 'cyan';
+    return (
+      <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+        <NavBar back title={`${paths.find(p => p.id === selectedPath)?.label} — Alex`}
+          right={<Text size="sm" emphasis="subtle">1/3</Text>} />
+        <SegmentBar total={3} completed={0} current={0} color={pathColor} />
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {selectedPath === 'A' && (
+            <ChipFieldGroup color={pathColor} values={chipValues} onChange={setChipValues}
+              fields={[
+                { id: 'relationship', label: 'Relationship', columns: 2, options: ['Friend', 'Colleague', 'Family', 'Acquaintance', 'Online only', 'Other'] },
+                { id: 'duration', label: 'How long?', columns: 3, options: ['< 6 months', '6mo–2yr', '2–5 years', '5+ years'] },
+                { id: 'lastContact', label: 'Last interaction', columns: 2, options: ['This week', 'This month', 'This year', '1+ year ago'] },
+              ]} />
+          )}
+          {selectedPath === 'B' && (
+            <>
+              <Text weight="medium" className="text-center" style={{ textWrap: 'balance' }}>What evidence have you observed?</Text>
+              <ChecklistGroup color={pathColor} values={checkValues} onChange={setCheckValues}
+                sections={[
+                  { title: 'Directly Observed', items: ['Face matched photo ID', 'Confirmed real address', 'Verified phone number', 'Met in professional context'] },
+                  { title: 'Supporting Evidence', items: ['Active social media presence', 'Referenced by other members', 'Consistent story across sources'] },
+                ]} />
+            </>
+          )}
+          {selectedPath === 'C' && (
+            <>
+              <Text weight="medium" className="text-center" style={{ textWrap: 'balance' }}>Does this profile look like a real person?</Text>
+              <Confidence value={confidence} onChange={setConfidence} color={pathColor} labels={['Suspicious', 'Uncertain', 'Probably real', 'Definitely real']} />
+            </>
+          )}
+        </div>
+        <div className="flex-shrink-0 p-4">
+          <Button color={pathColor} size="full" onClick={() => setPhase('verdict')}>Continue →</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Verdict phase
+  return (
+    <div className="phone-content flex flex-col" style={{ background: 'var(--bg-main)' }}>
+      <NavBar back title="Final Verdict — Alex" />
+      <SegmentBar total={3} completed={2} current={2} color={paths.find(p => p.id === selectedPath)?.color || 'cyan'} />
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <Text weight="medium" size="lg" className="text-center">Is this a real, unique person?</Text>
+        <Verdict value={verdict} confidence={confidence} flags={flags}
+          onVerdict={setVerdict} onConfidence={setConfidence} onFlag={setFlags}
+          flagOptions={["Haven't seen them recently", 'Something feels off', 'Might have multiple accounts', 'Inconsistent information']} />
+        {verdict !== null && confidence > 0 && (
+          <Button color={verdict ? 'emerald' : 'rose'} size="full" onClick={() => setPhase('path')} style={{ animation: 'fadeSlideIn 0.3s ease-out' }}>
+            Submit Evaluation
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+// ============================================================
+// GALLERY APP
+// ============================================================
+
+const GallerySection = ({ title, description, children }) => (
+  <section className="gallery-section mb-12">
+    <div className="mb-4">
+      <Text heading={3}>{title}</Text>
+      {description && <Text size="sm" emphasis="muted" className="mt-1">{description}</Text>}
+    </div>
+    {children}
+  </section>
+);
+
+const DemoBox = ({ label, children, wide }) => (
+  <div className={`demo-box ${wide ? 'col-span-full' : ''}`}>
+    <div className="demo-label">{label}</div>
+    {children}
+  </div>
+);
+
+const App = () => {
+  const { isDark, toggle } = useTheme();
+  const [tab, setTab] = useState('screens');
+  const [deviceSize, setDeviceSize] = useState('lg');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [inputVal, setInputVal] = useState('');
+
+  const showToast = () => { setToastVisible(true); setTimeout(() => setToastVisible(false), 2500); };
+  const colors = Object.keys(COLOR_HEX);
+
+  // Render a screen at one or all device sizes
+  const renderScreen = (label, comp) => {
+    if (deviceSize === 'all') {
+      return (
+        <div key={label} className="mb-8">
+          <Text size="sm" weight="semibold" className="mb-3 text-center">{label}</Text>
+          <div className="screen-group justify-center">
+            {DEVICE_KEYS.map(k => {
+              const d = DEVICES[k];
+              return (
+                <PhoneFrame key={k} width={d.w} height={d.h} label={d.label} sublabel={`${d.pw}×${d.ph}`}>
+                  {comp}
+                </PhoneFrame>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    const d = DEVICES[deviceSize];
+    return (
+      <PhoneFrame key={label} width={d.w} height={d.h} label={label}>
+        {comp}
+      </PhoneFrame>
+    );
+  };
+
+  return (
+    <>
+      {/* Sticky toolbar */}
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
+        background: 'var(--bg-main)', borderBottom: '1px solid var(--border-base)',
+        backdropFilter: 'blur(12px)',
+      }}>
+        <Container maxWidth={1400} className="py-3">
+          <div className="flex items-center gap-4">
+            {/* Title */}
+            <Text heading={3} className="flex-shrink-0">Aura Lego Gallery</Text>
+
+            {/* Tab nav */}
+            <Stack direction="row" gap={2} className="flex-shrink-0">
+              {['screens', 'primitives'].map(t => (
+                <button key={t} className="tab-btn" onClick={() => setTab(t)}
+                  style={{
+                    background: tab === t ? 'var(--bg-elevated)' : 'transparent',
+                    color: tab === t ? 'var(--text-primary)' : 'var(--text-subtle)',
+                  }}>
+                  {t === 'screens' ? '📱 Screens' : '🧱 Primitives'}
+                </button>
+              ))}
+            </Stack>
+
+            {/* Device size toggle */}
+            <div className="flex items-center gap-3">
+              <div className="device-toggle">
+                {[...DEVICE_KEYS, 'all'].map(k => {
+                  const active = deviceSize === k;
+                  const d = DEVICES[k];
+                  return (
+                    <button key={k} className="device-btn" onClick={() => setDeviceSize(k)}
+                      style={{
+                        background: active ? 'var(--bg-card)' : 'transparent',
+                        color: active ? 'var(--text-primary)' : 'var(--text-subtle)',
+                        boxShadow: active ? 'var(--shadow-card)' : 'none',
+                      }}>
+                      {k === 'all' ? 'All' : d.label}
+                      {k !== 'all' && <span className="device-label">{d.pw}×{d.ph}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <Text size="sm" emphasis="muted" className="flex-shrink-0">
+                {deviceSize === 'all' ? 'All sizes' : DEVICES[deviceSize].name}
+              </Text>
+            </div>
+
+            {/* Spacer + theme toggle */}
+            <div className="flex-1" />
+            <Button variant="secondary" size="sm" onClick={toggle}>
+              {isDark ? '☀️ Light' : '🌙 Dark'}
+            </Button>
+          </div>
+        </Container>
+      </div>
+
+    <Container maxWidth={1400} className="pb-24" style={{ paddingTop: 72 }}>
+      {/* ============= SCREENS TAB ============= */}
+      {tab === 'screens' && (
+        <>
+
+          <GallerySection title="Main Screens" description="Every major screen rebuilt from legos. These are the real Aura layouts.">
+            <div className={deviceSize === 'all' ? '' : 'flex flex-wrap items-start gap-10'}>
+              {[
+                { label: 'Landing', comp: <ScreenLanding /> },
+                { label: 'Category Hub', comp: <ScreenCategoryHub /> },
+                { label: 'Question Flow', comp: <ScreenQuestionFlow /> },
+              ].map(s => renderScreen(s.label, s.comp))}
+            </div>
+          </GallerySection>
+
+          <GallerySection title="Assessment & Profile Screens" description="Assessment flow, results, profile, and analysis.">
+            <div className={deviceSize === 'all' ? '' : 'flex flex-wrap items-start gap-10'}>
+              {[
+                { label: 'Assessment Question', comp: <ScreenAssessQuestion /> },
+                { label: 'Profile', comp: <ScreenProfile /> },
+                { label: 'Results', comp: <ScreenResults /> },
+                { label: 'Analysis', comp: <ScreenAnalysis /> },
+              ].map(s => renderScreen(s.label, s.comp))}
+            </div>
+          </GallerySection>
+
+          <GallerySection title="Question Flow (Interactive)" description="Full answer flow with tap confidence, undo overlay, and action bar. Try tapping Yes/No!">
+            <div className={deviceSize === 'all' ? '' : 'flex flex-wrap items-start gap-10'}>
+              {renderScreen('Answer + Undo + Actions', <ScreenQuestionFlowFull />)}
+            </div>
+          </GallerySection>
+
+          <GallerySection title="Verify Screens" description="Human verification flow — evaluation hub, path selection, evidence collection, and verdict.">
+            <div className={deviceSize === 'all' ? '' : 'flex flex-wrap items-start gap-10'}>
+              {[
+                { label: 'Verify Hub', comp: <ScreenVerifyHub /> },
+                { label: 'Verify Evaluator', comp: <ScreenVerifyEvaluator /> },
+              ].map(s => renderScreen(s.label, s.comp))}
+            </div>
+          </GallerySection>
+        </>
+      )}
+
+      {/* ============= PRIMITIVES TAB ============= */}
+      {tab === 'primitives' && (
+        <>
+          {/* Color Palette — wide reference, stays outside phone frames */}
+          <GallerySection title="Color Palette" description="11 Aura colors. Reference chart — not phone-constrained.">
+            <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-card)' }}>
+              <div className="flex">
+                <div className="flex-shrink-0 flex flex-col" style={{ width: 52, paddingRight: 10 }}>
+                  <Text size="sm" weight="semibold" emphasis="subtle" className="uppercase tracking-wider" style={{ fontSize: 10, height: 20, lineHeight: '20px' }}>{ }</Text>
+                  <div style={{ height: 48, marginTop: 8 }} />
+                  <div style={{ height: 24 }} />
+                  <Text size="sm" weight="semibold" emphasis="subtle" className="uppercase tracking-wider" style={{ fontSize: 10, height: 20, lineHeight: '20px', marginTop: 12 }}>{ }</Text>
+                  <div className="flex flex-col gap-1" style={{ marginTop: 8 }}>
+                    {['100%', '50%', '25%', '10%', '5%'].map(label => (
+                      <div key={label} style={{ height: 18 }}>
+                        <Text size="sm" emphasis="subtle" style={{ fontSize: 10, lineHeight: '18px', textAlign: 'right' }}>{label}</Text>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-11 gap-3 flex-1">
+                  {colors.map(c => (
+                    <div key={c} className="flex flex-col">
+                      <Text size="sm" weight="semibold" emphasis="subtle" className="uppercase tracking-wider" style={{ fontSize: 10, height: 20, lineHeight: '20px' }}>
+                        {c === 'violet' ? 'Gradients' : '\u00A0'}
+                      </Text>
+                      <div className="rounded-xl" style={{ height: 48, marginTop: 8, background: `linear-gradient(135deg, ${COLOR_HEX[c].base}, ${COLOR_HEX[c].light})` }} />
+                      <Text size="sm" weight="medium" className="text-center" style={{ color: COLOR_HEX[c].light, height: 24, lineHeight: '24px' }}>{c}</Text>
+                      <Text size="sm" weight="semibold" emphasis="subtle" className="uppercase tracking-wider" style={{ fontSize: 10, height: 20, lineHeight: '20px', marginTop: 12 }}>
+                        {c === 'violet' ? 'Opacity' : '\u00A0'}
+                      </Text>
+                      <div className="flex flex-col gap-1" style={{ marginTop: 8 }}>
+                        {[1, 0.5, 0.25, 0.10, 0.05].map((op, i) => (
+                          <div key={i} className="rounded-md" style={{ height: 18, background: `rgba(${COLOR_HEX[c].rgb}, ${op})` }} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-x-6 gap-y-1 flex-wrap mt-5 pt-4" style={{ borderTop: '1px solid var(--border-base)' }}>
+                {[
+                  { op: 1, label: 'Buttons, strokes, icons' },
+                  { op: 0.5, label: 'Borders, status text' },
+                  { op: 0.25, label: 'Hover glows' },
+                  { op: 0.10, label: 'Card tints, shine' },
+                  { op: 0.05, label: 'Ambient washes' },
+                ].map(u => (
+                  <Stack direction="row" key={u.op} gap={2}>
+                    <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: `rgba(${COLOR_HEX.violet.rgb}, ${u.op})` }} />
+                    <Text size="sm" emphasis="muted">{u.label}</Text>
+                  </Stack>
+                ))}
+              </div>
+            </div>
+          </GallerySection>
+
+          {/* ===== TIER 1 — PRIMITIVES (15) ===== */}
+          {/* Stack, Container, Text, Button, Card (+Header/Body), Input, Field,
+              Modal, Toast, ProgressRing, SpectrumBar, SegmentBar, Screen (+Body),
+              Skeleton, Placeholder */}
+          <GallerySection title="Tier 1 — Primitives" description="Core building blocks. Every screen is composed from these.">
+            <div className="flex flex-wrap items-start gap-10">
+              {/* Typography + Text */}
+              {renderScreen('Typography', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">Headings</div>
+                    <Stack gap={2}><Text heading={1}>Heading 1</Text><Text heading={2}>Heading 2</Text><Text heading={3}>Heading 3</Text><Text heading={4}>Heading 4</Text></Stack>
+                  </div>
+                  <div><div className="demo-label">Text Variants</div>
+                    <Stack gap={3}><Text size="lg">Primary — default</Text><Text size="lg" emphasis="secondary">Secondary</Text><Text size="lg" emphasis="muted">Muted</Text><Text size="lg" emphasis="subtle">Subtle</Text><Text size="lg" weight="bold">Bold</Text><Text emphasis="muted">Small muted — captions</Text></Stack>
+                  </div>
+                  <div><div className="demo-label">Status Colors</div>
+                    <Stack gap={3}><Text size="lg" color="var(--status-violet)">Violet</Text><Text size="lg" color="var(--status-emerald)">Emerald</Text><Text size="lg" color="var(--status-rose)">Rose</Text><Text size="lg" color="var(--status-blue)">Blue</Text></Stack>
+                  </div>
+                </div>
+              ))}
+
+              {/* Buttons */}
+              {renderScreen('Buttons', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">Primary — All Colors</div>
+                    <div className="flex flex-wrap gap-2">{colors.map(c => <Button key={c} color={c} size="sm">{c}</Button>)}</div>
+                  </div>
+                  <div><div className="demo-label">Variants</div>
+                    <Stack gap={2}>
+                      <Button variant="primary" color="blue">Primary</Button>
+                      <Button variant="secondary">Secondary</Button>
+                      <Button variant="ghost">Ghost</Button>
+                      <Button variant="outline" color="emerald">Outline</Button>
+                      <Button color="violet" shine>Shine</Button>
+                      <Button color="violet" loading>Loading</Button>
+                      <Button color="violet" disabled>Disabled</Button>
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Sizes</div>
+                    <Stack gap={2}><Button color="violet" size="sm">Small</Button><Button color="violet" size="md">Medium</Button><Button color="violet" size="lg">Large</Button></Stack>
+                  </div>
+                </div>
+              ))}
+
+              {/* Cards */}
+              {renderScreen('Cards', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">Plain</div>
+                    <Card><Text weight="semibold" size="lg">Plain Card</Text><Text emphasis="muted" className="mt-1">Default container.</Text></Card>
+                  </div>
+                  <div><div className="demo-label">Elevated</div>
+                    <Card variant="elevated"><Text weight="semibold" size="lg">Elevated</Text><Text emphasis="muted" className="mt-1">Stronger shadow.</Text></Card>
+                  </div>
+                  <div><div className="demo-label">Glow + Shine</div>
+                    <Stack gap={3}>
+                      {['violet', 'blue', 'emerald', 'amber'].map(c => (
+                        <Card key={c} color={c} shine glow style={{ padding: '18px 16px' }}>
+                          <Text weight="semibold" size="lg">{c}</Text>
+                          <Text emphasis="muted" className="mt-1">Hover for shine</Text>
+                        </Card>
+                      ))}
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Gradient Header</div>
+                    <Stack gap={3}>
+                      {[{ icon: '🧠', title: 'Big Five', color: 'violet' }, { icon: '⚡', title: 'Quick Profile', color: 'blue' }, { icon: '🌿', title: 'Character', color: 'emerald' }].map(h => (
+                        <Card key={h.color} padding={false}>
+                          <Card.Header icon={h.icon} title={h.title} color={h.color} />
+                          <Card.Body><Text emphasis="muted">Content area</Text></Card.Body>
+                        </Card>
+                      ))}
+                    </Stack>
+                  </div>
+                </div>
+              ))}
+
+              {/* Inputs + Overlays */}
+              {renderScreen('Inputs & Overlays', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">Inputs</div>
+                    <Stack gap={3}>
+                      <Input label="Name" placeholder="Enter name..." value={inputVal} onChange={e => setInputVal(e.target.value)} focusColor="violet" />
+                      <Input type="textarea" label="Notes" placeholder="Write..." focusColor="emerald" />
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Modals & Toast</div>
+                    <Stack gap={2}>
+                      <Button variant="primary" color="violet" size="sm" onClick={() => setModalOpen(true)}>Open Modal</Button>
+                      <Button variant="outline" color="blue" size="sm" onClick={() => setSheetOpen(true)}>Bottom Sheet</Button>
+                      <Button variant="primary" color="emerald" size="sm" onClick={showToast}>Show Toast</Button>
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Progress Rings</div>
+                    <Stack direction="row" gap={4}>
+                      {[0, 25, 50, 75, 100].map(p => (
+                        <ProgressRing key={p} progress={p} color="violet" size={56}>
+                          <span className="text-sm font-bold" style={{ color: p > 0 ? COLOR_HEX.violet.light : 'var(--text-subtle)' }}>{p}</span>
+                        </ProgressRing>
+                      ))}
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Spectrum Bars</div>
+                    <Stack gap={4}>
+                      {[
+                        { left: '#6366f1', right: '#f59e0b', lbl: 'Reserved', rbl: 'Outgoing', val: 72 },
+                        { left: '#3b82f6', right: '#ec4899', lbl: 'Direct', rbl: 'Empathetic', val: 35 },
+                        { left: '#8b5cf6', right: '#10b981', lbl: 'Flexible', rbl: 'Organized', val: 88 },
+                      ].map((t, i) => (
+                        <SpectrumBar key={i} value={t.val} leftColor={t.left} rightColor={t.right} leftLabel={t.lbl} rightLabel={t.rbl} showLabels />
+                      ))}
+                    </Stack>
+                  </div>
+                </div>
+              ))}
+
+              {/* Fields, Skeletons, Placeholders */}
+              {renderScreen('Fields & States', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">Field (wraps Input)</div>
+                    <Stack gap={3}>
+                      <Field label="Email" required hint="We'll never share your email.">
+                        <Input placeholder="you@example.com" focusColor="violet" />
+                      </Field>
+                      <Field label="Username" error="Username is already taken">
+                        <Input placeholder="Choose a username" focusColor="rose" />
+                      </Field>
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Skeleton</div>
+                    <Stack gap={3}>
+                      <Stack direction="row" gap={3}>
+                        <Skeleton width={48} height={48} rounded="full" />
+                        <Stack gap={2} className="flex-1">
+                          <Skeleton width="60%" height={16} />
+                          <Skeleton width="40%" height={12} />
+                        </Stack>
+                      </Stack>
+                      <Skeleton width="100%" height={80} />
+                      <Stack direction="row" gap={2}>
+                        <Skeleton width="33%" height={32} />
+                        <Skeleton width="33%" height={32} />
+                        <Skeleton width="33%" height={32} />
+                      </Stack>
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Placeholder (empty state)</div>
+                    <Card>
+                      <Placeholder
+                        icon="🔍"
+                        title="No results yet"
+                        description="Complete an assessment to see your personality insights here."
+                        action={<Button variant="primary" color="violet" size="sm">Take Assessment</Button>}
+                      />
+                    </Card>
+                  </div>
+                  <div><div className="demo-label">Loading Button</div>
+                    <Stack gap={2}>
+                      <Button color="violet" loading>Save</Button>
+                      <Button variant="outline" color="emerald" size="sm" loading>Loading</Button>
+                    </Stack>
+                  </div>
+                </div>
+              ))}
+
+              {/* Theme Tokens */}
+              {renderScreen('Theme Tokens', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">Text Colors</div>
+                    <Stack gap={1}>
+                      {['primary', 'secondary', 'muted', 'subtle', 'faint', 'inverted'].map(t => (
+                        <Text key={t} size="sm" style={{ color: `var(--text-${t})` }}>--text-{t}</Text>
+                      ))}
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Surfaces</div>
+                    <Stack gap={2}>
+                      {[['--bg-main','Main'],['--bg-card','Card'],['--bg-elevated','Elevated'],['--bg-input','Input'],['--bg-surface','Surface']].map(([v,l]) => (
+                        <div key={v} className="px-3 py-2 rounded-lg border" style={{ background: `var(${v})`, borderColor: 'var(--border-base)' }}>
+                          <Text size="sm" weight="medium">{l}</Text>
+                          <Text size="sm" emphasis="subtle">{v}</Text>
+                        </div>
+                      ))}
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Status</div>
+                    <Stack gap={2}>
+                      {['emerald','rose','violet','blue','sky'].map(s => (
+                        <Stack direction="row" key={s} gap={2}>
+                          <div className="w-4 h-4 rounded-full" style={{ background: `var(--status-${s})` }} />
+                          <Text size="sm" style={{ color: `var(--status-${s})` }}>--status-{s}</Text>
+                        </Stack>
+                      ))}
+                    </Stack>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </GallerySection>
+
+          {/* ===== NEW TIER 1 — CONFIDENCE, CHIP, TOGGLE, CHECKBOX ===== */}
+          <GallerySection title="Tier 1 — Selection & Input Primitives" description="Confidence, chips, toggles, checkboxes. Used across questions, verify, and settings.">
+            <div className="flex flex-wrap items-start gap-10">
+              {renderScreen('Confidence', (() => {
+                const ConfidenceDemo = () => {
+                  const [val, setVal] = useState(2);
+                  return (
+                    <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                      <div><div className="demo-label">Stars — Interactive</div>
+                        <Confidence value={val} onChange={setVal} color="violet" />
+                      </div>
+                      <div><div className="demo-label">Stars — All Colors</div>
+                        <Stack gap={4}>
+                          {['emerald', 'cyan', 'amber', 'rose'].map((c, i) => (
+                            <Confidence key={c} value={i + 1} onChange={() => {}} color={c} />
+                          ))}
+                        </Stack>
+                      </div>
+                      <div><div className="demo-label">Inline (on buttons)</div>
+                        <Stack gap={2}>
+                          {[1, 2, 3, 4].map(n => (
+                            <div key={n} className="flex items-center gap-3 px-3 py-2 rounded-xl" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+                              <Text size="sm" emphasis="secondary" className="flex-1">Confidence {n}</Text>
+                              <Confidence value={n} variant="inline" color="violet" />
+                            </div>
+                          ))}
+                        </Stack>
+                      </div>
+                      <div><div className="demo-label">Long Labels</div>
+                        <Stack gap={1}>
+                          {CONFIDENCE_LONG_LABELS.map((l, i) => (
+                            <Text key={i} size="sm" emphasis="muted">{l}</Text>
+                          ))}
+                        </Stack>
+                      </div>
+                    </div>
+                  );
+                };
+                return <ConfidenceDemo />;
+              })())}
+
+              {renderScreen('Chips & Groups', (() => {
+                const ChipDemo = () => {
+                  const [sel, setSel] = useState(['Experience']);
+                  const [single, setSingle] = useState([]);
+                  return (
+                    <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                      <div><div className="demo-label">Single Chips</div>
+                        <div className="flex flex-wrap gap-2">
+                          {['violet', 'emerald', 'amber', 'rose', 'cyan'].map(c => (
+                            <Chip key={c} label={c} selected={false} color={c} />
+                          ))}
+                          <Chip label="Selected" selected={true} color="violet" />
+                        </div>
+                      </div>
+                      <div><div className="demo-label">Chip Sizes</div>
+                        <Stack gap={2}>
+                          <div className="flex gap-2"><Chip label="Small" selected size="sm" color="blue" /><Chip label="Medium" selected size="md" color="blue" /><Chip label="Large" selected size="lg" color="blue" /></div>
+                        </Stack>
+                      </div>
+                      <div><div className="demo-label">Multi-Select Group</div>
+                        <ChipGroup options={['Gut feel', 'Research', 'Experience', 'Logic']} selected={sel} onChange={setSel} color="amber" />
+                      </div>
+                      <div><div className="demo-label">Single-Select Group</div>
+                        <ChipGroup options={['Friend', 'Colleague', 'Family', 'Acquaintance']} selected={single} onChange={setSingle} color="cyan" multi={false} />
+                      </div>
+                    </div>
+                  );
+                };
+                return <ChipDemo />;
+              })())}
+
+              {renderScreen('Toggles & Checks', (() => {
+                const ToggleDemo = () => {
+                  const [t1, setT1] = useState(true);
+                  const [t2, setT2] = useState(false);
+                  const [c1, setC1] = useState(true);
+                  const [c2, setC2] = useState(false);
+                  const [c3, setC3] = useState(true);
+                  return (
+                    <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                      <div><div className="demo-label">Toggle Switches</div>
+                        <Stack gap={3}>
+                          <Toggle label="Dark Mode" checked={t1} onChange={setT1} color="violet" />
+                          <Toggle label="Notifications" checked={t2} onChange={setT2} color="emerald" />
+                          <Toggle label="Expert Mode" checked={false} color="amber" />
+                        </Stack>
+                      </div>
+                      <div><div className="demo-label">Checkboxes</div>
+                        <Stack gap={2}>
+                          <Checkbox label="Face matched photo ID" checked={c1} onChange={setC1} color="emerald" />
+                          <Checkbox label="Confirmed real address" checked={c2} onChange={setC2} color="emerald" />
+                          <Checkbox label="Active social presence" checked={c3} onChange={setC3} color="cyan" />
+                          <Checkbox label="Unchecked item" checked={false} color="violet" />
+                        </Stack>
+                      </div>
+                    </div>
+                  );
+                };
+                return <ToggleDemo />;
+              })())}
+            </div>
+          </GallerySection>
+
+          {/* ===== TIER 2 — EXISTING PATTERNS ===== */}
+          <GallerySection title="Tier 2 — Layout Patterns" description="NavBar, TrackSelector, ActionBar, CategoryCard, AnswerButton, AvatarRow, ListItem.">
+            <div className="flex flex-wrap items-start gap-10">
+              {/* Structural */}
+              {renderScreen('Structure', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">NavBar — Standard</div>
+                    <NavBar back title="Screen Title" right={<Button variant="ghost" size="sm">Edit</Button>} />
+                  </div>
+                  <div><div className="demo-label">SegmentBar</div>
+                    <Stack gap={3}><SegmentBar total={10} completed={3} current={3} color="violet" /><SegmentBar total={20} completed={15} current={15} color="blue" /></Stack>
+                  </div>
+                  <div><div className="demo-label">TrackSelector</div>
+                    <TrackSelector onBack={() => {}} onForward={() => {}} tracks={[{ id: 'yn', label: 'Y/N', ringClass: 'q-circ-yn' }, { id: 'mc', label: 'ABC', ringClass: 'q-circ-mc' }, { id: 'mix', label: 'Mix', ringClass: 'q-circ-mix', active: true }]} />
+                  </div>
+                  <div><div className="demo-label">ActionBar</div>
+                    <ActionBar actions={[{ label: "Can't answer" }, { label: 'Skip' }, { label: 'Save for later' }]} />
+                  </div>
+                  <div><div className="demo-label">AvatarRow</div>
+                    <AvatarRow name="Philip Silva" subtitle="The Architect" action={<Button variant="secondary" size="sm" style={{ padding: '2px 6px', fontSize: 11 }}>Edit</Button>} />
+                  </div>
+                </div>
+              ))}
+
+              {/* Answers + Lists */}
+              {renderScreen('Answers & Lists', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">Binary Answers</div>
+                    <Stack gap={3}><AnswerButton label="Yes" color="emerald" /><AnswerButton label="No" color="rose" /></Stack>
+                  </div>
+                  <div><div className="demo-label">Likert Scale</div>
+                    <Stack gap={2}>
+                      {[{ l: 'Strongly disagree', op: 0.06, v: 1 }, { l: 'Disagree', op: 0.08, v: 2 }, { l: 'Neutral', op: 0.10, v: 3 }, { l: 'Agree', op: 0.12, v: 4 }, { l: 'Strongly agree', op: 0.15, v: 5 }].map(o => (
+                        <AnswerButton key={o.v} label={o.l} color="violet" variant="likert" value={o.v} intensity={o.op} />
+                      ))}
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Category Cards</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <CategoryCard icon="☀️" name="Predict" count={23} color="amber" />
+                      <CategoryCard icon="🧠" name="Think" count={18} color="violet" />
+                      <CategoryCard icon="⚖️" name="Judge" count={31} color="teal" />
+                      <CategoryCard icon="🎲" name="Random" count={72} color="gray" />
+                    </div>
+                  </div>
+                  <div><div className="demo-label">List Items</div>
+                    <Stack gap={2}>
+                      <ListItem icon="🌿" label="Character" color="emerald" />
+                      <ListItem icon="🌑" label="Shadow Self" color="slate" />
+                      <ListItem icon="⚡" label="Quick Profile" color="blue" completed />
+                    </Stack>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </GallerySection>
+
+          {/* ===== TIER 2 — VERIFY & FLOW COMPOSITIONS ===== */}
+          <GallerySection title="Tier 2 — Verify & Flow Compositions" description="UndoOverlay, QuestionActions, Verdict, SubjectBanner, PathSelector, ChipFieldGroup, ChecklistGroup.">
+            <div className="flex flex-wrap items-start gap-10">
+              {renderScreen('Undo & Actions', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">Undo Overlay</div>
+                    <Stack gap={3}>
+                      <div style={{ height: 56 }}><UndoOverlay answerLabel="YES ★★★" color="emerald" onUndo={() => {}} /></div>
+                      <div style={{ height: 56 }}><UndoOverlay answerLabel="NO ★" color="rose" onUndo={() => {}} /></div>
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Question Actions</div>
+                    <QuestionActions />
+                  </div>
+                  <div><div className="demo-label">Actions — Active States</div>
+                    <QuestionActions actions={[
+                      { label: "Can't" },
+                      { label: 'Explain', color: COLOR_HEX.amber, active: true },
+                      { label: 'Skip' },
+                      { label: '✓ Saved', color: COLOR_HEX.violet, active: true },
+                    ]} />
+                  </div>
+                </div>
+              ))}
+
+              {renderScreen('Verdict', (() => {
+                const VerdictDemo = () => {
+                  const [v, setV] = useState(null);
+                  const [conf, setConf] = useState(0);
+                  const [fl, setFl] = useState([]);
+                  return (
+                    <div className="phone-content p-7 space-y-5" style={{ background: 'var(--bg-main)' }}>
+                      <div className="demo-label">Interactive Verdict</div>
+                      <Verdict value={v} confidence={conf} flags={fl}
+                        onVerdict={setV} onConfidence={setConf} onFlag={setFl}
+                        flagOptions={["Haven't seen them recently", 'Something feels off', 'Might have multiple accounts']} />
+                      <div className="mt-4"><Button variant="ghost" size="sm" onClick={() => { setV(null); setConf(0); setFl([]); }}>Reset</Button></div>
+                    </div>
+                  );
+                };
+                return <VerdictDemo />;
+              })())}
+
+              {renderScreen('Subject & Paths', (
+                <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                  <div><div className="demo-label">Subject Banner</div>
+                    <Stack gap={2}>
+                      <SubjectBanner name="Alex Rivera" location="Portland, OR" connections={14} availability={{ video: true, meet: true, vouch: true }} color="violet" />
+                      <SubjectBanner name="Marcus Chen" location="Toronto" connections={0} availability={{}} color="slate" />
+                    </Stack>
+                  </div>
+                  <div><div className="demo-label">Path Selector</div>
+                    <PathSelector paths={[
+                      { id: 'A', icon: '🤝', label: 'Vouching', description: 'You know them personally', color: 'cyan' },
+                      { id: 'B', icon: '🔍', label: 'Investigation', description: 'You met or investigated', color: 'amber' },
+                      { id: 'C', icon: '📋', label: 'Analysis', description: 'Working from data', color: 'slate' },
+                    ]} />
+                  </div>
+                </div>
+              ))}
+
+              {renderScreen('Field Groups', (() => {
+                const FieldDemo = () => {
+                  const [chips, setChips] = useState({});
+                  const [checks, setChecks] = useState({});
+                  return (
+                    <div className="phone-content p-7 space-y-7" style={{ background: 'var(--bg-main)' }}>
+                      <div><div className="demo-label">ChipFieldGroup</div>
+                        <ChipFieldGroup color="cyan" values={chips} onChange={setChips}
+                          fields={[
+                            { id: 'rel', label: 'Relationship', columns: 2, options: ['Friend', 'Colleague', 'Family', 'Other'] },
+                            { id: 'dur', label: 'How long?', columns: 3, options: ['< 6mo', '6mo–2yr', '2–5yr', '5yr+'] },
+                          ]} />
+                      </div>
+                      <div><div className="demo-label">ChecklistGroup</div>
+                        <ChecklistGroup color="emerald" values={checks} onChange={setChecks}
+                          sections={[
+                            { title: 'Directly Observed', items: ['Face matched ID', 'Confirmed address', 'Verified phone'] },
+                            { title: 'Supporting', items: ['Active social media', 'Referenced by others'] },
+                          ]} />
+                      </div>
+                    </div>
+                  );
+                };
+                return <FieldDemo />;
+              })())}
+            </div>
+          </GallerySection>
+        </>
+      )}
+
+      {/* Modals & Toast (always rendered) */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Centered Modal">
+        <Text emphasis="muted" className="mb-4">Click outside or X to close.</Text>
+        <Stack direction="row" gap={2}>
+          <Button color="violet" size="sm" onClick={() => setModalOpen(false)}>Got it</Button>
+          <Button variant="ghost" size="sm" onClick={() => setModalOpen(false)}>Cancel</Button>
+        </Stack>
+      </Modal>
+      <Modal open={sheetOpen} onClose={() => setSheetOpen(false)} variant="bottom-sheet" title="Bottom Sheet">
+        <Text emphasis="muted" className="mb-4">Slides up from bottom.</Text>
+        <Stack gap={2}>
+          <Button color="blue" onClick={() => setSheetOpen(false)}>Action</Button>
+          <Button variant="ghost" onClick={() => setSheetOpen(false)}>Cancel</Button>
+        </Stack>
+      </Modal>
+      <Toast visible={toastVisible} color="emerald">✓ Copied to clipboard!</Toast>
+    </Container>
+    </>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
