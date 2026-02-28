@@ -118,12 +118,9 @@
     /* Additional animations */
     @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    /* Global scrollbars — thin on intentionally scrollable areas, hidden elsewhere */
+    /* Global scrollbars */
     .dark * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
     html:not(.dark) * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.12) transparent; }
-    /* Hide scrollbars on overflow-hidden containers and transient scroll areas */
-    .overflow-hidden, .no-scrollbar { scrollbar-width: none !important; }
-    .overflow-hidden::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar { display: none !important; }
   </style>
 </head>
 <body style="background: var(--bg-main);">
@@ -1579,30 +1576,29 @@ const getConfidenceStyle = ({ c, isDark, tapCount, isSelected, isPending, wasAns
 };
 
 // — ANSWER BUTTONS — Binary, MC, UndoOverlay (production)
-// UndoSweep — transparent layer over the unchanged button.
-// The button stays pixel-identical. This adds: color sweep + small undo badge.
-const UndoSweep = ({ color, isDark, undoDelay, onUndo }) => (
-  <div onClick={onUndo} className="absolute inset-0 z-10 rounded-2xl cursor-pointer overflow-hidden">
-    {/* Color sweep — fills left-to-right over the button face */}
-    <div className="absolute inset-0 rounded-2xl pointer-events-none"
-      style={{ background: isDark ? `rgba(${color.rgb}, 0.12)` : `rgba(${color.rgb}, 0.10)`, animation: `sweepFill ${undoDelay}s linear forwards`, transformOrigin: 'left' }} />
-    {/* Undo badge — small pill, vertically centered right */}
-    <button onClick={(e) => { e.stopPropagation(); onUndo(); }}
-      className="absolute top-1/2 -translate-y-1/2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-colors"
-      style={{ background: isDark ? `rgba(${color.rgb}, 0.35)` : `rgba(${color.rgb}, 0.25)`, color: color.hex, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-      <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 -rotate-90" style={{ flexShrink: 0 }}>
-        <circle cx="10" cy="10" r="8" fill="none" stroke={isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.10)'} strokeWidth="2" />
-        <circle cx="10" cy="10" r="8" fill="none" stroke={color.hex} strokeWidth="2" strokeDasharray="50.3" strokeDashoffset="0" style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }} />
+// UndoFace — the undo state of any answer slot. Never a separate component from the button.
+// This renders INSIDE the same container as the button it replaces.
+const UndoFace = ({ label, color, isDark, undoDelay, onUndo }) => (
+  <div onClick={onUndo} className="cursor-pointer rounded-2xl h-full flex items-center gap-3 px-4 relative overflow-hidden"
+    style={{ background: isDark ? `rgba(${color.rgb}, 0.08)` : `rgba(${color.rgb}, 0.06)`, border: `1px solid ${isDark ? `rgba(${color.rgb}, 0.5)` : `rgba(${color.rgb}, 0.35)`}`, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+    {/* Sweep fill — left-to-right, synced to undoDelay */}
+    <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ background: isDark ? `rgba(${color.rgb}, 0.15)` : `rgba(${color.rgb}, 0.12)`, animation: `sweepFill ${undoDelay}s linear forwards`, transformOrigin: 'left' }} />
+    <div className="flex-shrink-0 w-7 h-7 relative z-10">
+      <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
+        <circle cx="14" cy="14" r="12" fill="none" stroke={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+        <circle cx="14" cy="14" r="12" fill="none" stroke={color.hex} strokeWidth="2.5" strokeDasharray="75.4" strokeDashoffset="0" style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }} />
       </svg>
-      Undo
-    </button>
+    </div>
+    <div className="flex-1 min-w-0 relative z-10"><Text size="xs" weight="semibold" className="truncate">{label}</Text></div>
+    <button onClick={(e) => { e.stopPropagation(); onUndo(); }} className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors cursor-pointer relative z-10" style={{ background: isDark ? `rgba(${color.rgb}, 0.3)` : `rgba(${color.rgb}, 0.2)`, color: color.hex }}>Undo</button>
   </div>
 );
-// AnswerSlot — always shows the button. Undo overlays on top without disrupting layout.
+// AnswerSlot — ONE element that shows either its button face or its undo face.
+// The slot is the truth. Undo alignment is impossible to break because there is no alignment —
+// the undo bar IS the button, just wearing a different face.
 const AnswerSlot = ({ heightClass, isUndoTarget, undoProps, children }) => (
-  <div className={`w-full ${heightClass} relative`}>
-    {children}
-    {isUndoTarget && <UndoSweep {...undoProps} />}
+  <div className={`w-full ${heightClass}`}>
+    {isUndoTarget ? <UndoFace {...undoProps} /> : children}
   </div>
 );
 
@@ -1618,9 +1614,9 @@ const BinaryButtons = ({ isDark, tappedAnswer, tapCount, isAnswered, currentResp
         const style = getConfidenceStyle({ c, isDark, tapCount, isSelected: tappedAnswer === answer, isPending: isUndoTarget, wasAnswered: currentResponse?.answer === answer, isAnswered, otherSelected: tappedAnswer !== null && tappedAnswer !== answer, confidence: tappedAnswer === answer ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2) });
         return (
           <AnswerSlot key={answer} heightClass="h-14 resp-h-lg" isUndoTarget={isUndoTarget}
-            undoProps={{ color: c, isDark, undoDelay, onUndo }}>
+            undoProps={{ label: labels[answer], color: c, isDark, undoDelay, onUndo }}>
             <button onClick={() => !isAnswered && !pendingSubmit && onTap(answer)} onContextMenu={(e) => onRightClick?.(e, answer)} disabled={isAnswered || !!pendingSubmit}
-              className="w-full h-full rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none cursor-pointer"
+              className={`w-full h-full rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none cursor-pointer ${pendingSubmit ? 'opacity-60 pointer-events-none' : ''}`}
               style={{ borderColor: style.borderColor, background: style.background, boxShadow: style.boxShadow, opacity: style.opacity, '--accent-rgb': c.rgb }}>
               <span className="resp-text-lg font-semibold" style={{ color: style.textColor }}>{labels[answer]}</span>
               {tappedAnswer === answer && tapCount >= 1 && <span className="absolute right-4 resp-text-sm font-medium opacity-60" style={{ color: isDark ? c.light : c.base }}>{getStars(tapCount)}</span>}
@@ -1643,9 +1639,9 @@ const MCButtons = ({ options, isDark, tappedAnswer, tapCount, isAnswered, curren
         const style = getConfidenceStyle({ c, isDark, tapCount, grayMode, isSelected: tappedAnswer === index, isPending: isUndoTarget, wasAnswered: currentResponse?.answer === index, isAnswered, otherSelected: tappedAnswer !== null && tappedAnswer !== index, confidence: tappedAnswer === index ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2) });
         return (
           <AnswerSlot key={option} heightClass="h-10 resp-h-sm" isUndoTarget={isUndoTarget}
-            undoProps={{ color: c, isDark, undoDelay, onUndo }}>
+            undoProps={{ label: `${String.fromCharCode(65 + index)}. ${option}`, color: c, isDark, undoDelay, onUndo }}>
             <button onClick={() => !isAnswered && !pendingSubmit && onTap(index)} onContextMenu={(e) => onRightClick?.(e, index)} disabled={isAnswered || !!pendingSubmit}
-              className="w-full h-full rounded-2xl flex items-center justify-center relative px-5 transition-all btn-feedback shine-card border select-none cursor-pointer"
+              className={`w-full h-full rounded-2xl flex items-center justify-center relative px-5 transition-all btn-feedback shine-card border select-none cursor-pointer ${pendingSubmit ? 'opacity-60 pointer-events-none' : ''}`}
               style={{ borderColor: style.borderColor, background: style.background, boxShadow: style.boxShadow, opacity: style.opacity || 1, '--accent-rgb': c.rgb }}>
               <span className="resp-text-md font-semibold text-center" style={{ color: style.textColor }}>{option}</span>
               {tappedAnswer === index && tapCount >= 1 && <span className="absolute right-4 resp-text-sm font-medium opacity-60" style={{ color: style.textColor }}>{getStars(tapCount)}</span>}
@@ -1937,7 +1933,7 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => 
   const hasNext = findNextUnanswered(currentIndex) !== null || currentIndex < questions.length - 1;
   const qMeta = questionMeta[currentQuestion.id] || {};
   return (
-    <div className="flex-1 flex flex-col overflow-hidden no-scrollbar relative">
+    <div className="flex-1 flex flex-col overflow-hidden relative">
       {/* Track Selector */}
       <div className="h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10" style={{ background: isDark ? 'rgba(17,24,39,0.5)' : 'rgba(255,255,255,0.9)', borderBottom: (() => { const c = colorOf(CAT_COLOR_MAP[currentQuestion?.category]); return `1px solid rgba(${c.rgb},${isDark?0.15:0.20})`; })() }}>
         <button onClick={goToPrev} disabled={currentIndex === 0} className="text-xl font-bold w-8 h-8 flex items-center justify-center cursor-pointer"><Text as="span" emphasis={currentIndex === 0 ? "faint" : "secondary"}>◀</Text></button>
@@ -1975,7 +1971,7 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => 
       ) : (
         <>
           {/* Question Area */}
-          <div className="flex-1 flex flex-col justify-center px-4 pb-2 overflow-y-auto no-scrollbar min-h-0 relative">
+          <div className="flex-1 flex flex-col justify-center px-4 pb-2 overflow-y-auto min-h-0 relative">
             <div className="flex-shrink-0">
               <QuestionCard question={currentQuestion} isDark={isDark} />
               {answeredCount < 3 && !isAnswered && <Text size="xxs" emphasis="faint" className="text-center mt-2">{answeredCount === 0 ? "we'll start easy — just tap what feels right" : 'tap more for higher confidence'}</Text>}
