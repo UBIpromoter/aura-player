@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture v6 — Implementation Notes</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0f;
+    color: #ddd;
+    line-height: 1.75;
+    padding: 48px;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  #content h1 { font-size: 22px; font-weight: 700; color: #fff; margin: 0 0 8px; }
+  #content h2 { font-size: 18px; font-weight: 700; color: #fff; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  #content h3 { font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.85); margin: 28px 0 10px; }
+  #content p { font-size: 14px; margin-bottom: 12px; color: rgba(220,220,235,0.88); }
+  #content ul, #content ol { padding-left: 22px; margin-bottom: 12px; }
+  #content li { font-size: 14px; margin-bottom: 6px; color: rgba(220,220,235,0.88); }
+  #content strong { color: #fff; }
+  #content em { color: rgba(255,255,255,0.55); }
+  #content a { color: #818cf8; text-decoration: none; }
+  #content a:hover { text-decoration: underline; }
+  #content code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12.5px;
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #c4b5fd;
+  }
+  #content pre {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 12px 0 16px;
+    overflow-x: auto;
+  }
+  #content pre code {
+    background: none;
+    padding: 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: rgba(220,220,235,0.8);
+  }
+  #content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 16px;
+    font-size: 13.5px;
+  }
+  #content th {
+    text-align: left;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.7);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  #content td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: rgba(220,220,235,0.85);
+  }
+  #content tr:hover td { background: rgba(255,255,255,0.02); }
+  #content hr {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin: 32px 0;
+  }
+  #content blockquote {
+    border-left: 3px solid rgba(99,102,241,0.3);
+    padding: 8px 16px;
+    margin: 12px 0;
+    background: rgba(99,102,241,0.04);
+    border-radius: 0 6px 6px 0;
+  }
+</style>
+</head>
+<body>
+<button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.22)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.7)'">&#8635; Refresh</button>
+<div id="content"></div>
+<script>
+fetch('architecture-v7.md')
+  .then(r => r.text())
+  .then(md => { document.getElementById('content').innerHTML = marked.parse(md); });
+</script>
+</body>
+</html>

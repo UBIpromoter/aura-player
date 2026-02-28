@@ -32,6 +32,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
   <!-- Extracted data + logic modules (order matters) -->
   <script src="../../aura-questions.js"></script>
   <script src="../../aura-assessments.js"></script>
@@ -138,7 +139,7 @@
   </script>
 
   <script type="text/babel">
-const { useState, useEffect, useRef, useCallback, useMemo } = React;
+const { useState, useEffect, useRef, useCallback, useMemo, useContext, createContext } = React;
 
 // — COLOR SYSTEM
 
@@ -227,6 +228,455 @@ const useSwipe = ({ onSwipeLeft, onSwipeRight, enabled = true }) => {
     }
   }, [enabled, onSwipeLeft, onSwipeRight]);
   return { handlers: { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } };
+};
+
+// — SUPABASE CLIENT (module-scoped, not a window global)
+const SUPABASE_URL = 'https://tzhmhlllblhfvtqmmsuu.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_5qNssH06WHWBYSKDVGGrHg_m4MOC7su';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Session ID for response capture (persisted to localStorage)
+const AURA_SESSION_ID = localStorage.getItem('aura_session_id') || (() => {
+  const id = 'anon_' + Math.random().toString(36).slice(2, 11);
+  localStorage.setItem('aura_session_id', id);
+  return id;
+})();
+
+// SHA-256 helper for claim dedup
+const sha256 = async (input) => {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// — STAMP PROVIDERS — config for linked accounts
+const STAMP_PROVIDERS = [
+  { id: 'email', name: 'Email', type: 'contact', color: '#6b7280', priority: 0, oauth: false,
+    svg: 'M0 2.5A1.5 1.5 0 011.5 1h13A1.5 1.5 0 0116 2.5v1.21L8 8.42.5 3.94A.5.5 0 010 3.71V2.5zM0 5.08v8.42A1.5 1.5 0 001.5 15h13a1.5 1.5 0 001.5-1.5V5.08L8.48 9.7a1 1 0 01-.96 0L0 5.08z',
+    prefix: '', placeholder: '' },
+  { id: 'twitter', name: 'X', type: 'account', color: '#f0f0f0', priority: 1, oauth: true, supabaseProvider: 'x',
+    svg: 'M12.6.75h2.45L9.94 6.62 16 15.25h-4.73l-3.7-4.83-4.23 4.83H.89l5.48-6.26L.58.75H5.4l3.34 4.42L12.6.75zm-.86 13.03h1.36L4.32 2.15H2.86l8.88 11.63z',
+    prefix: '@', placeholder: 'handle' },
+  { id: 'google', name: 'Google', type: 'account', color: '#4285f4', priority: 2, oauth: true, supabaseProvider: 'google',
+    svg: 'M15.5 8c0-.6-.1-1.2-.2-1.7H8v3.3h4.2a3.6 3.6 0 01-1.6 2.4v2h2.5A7.5 7.5 0 0015.5 8zM8 16c2.2 0 4-.7 5.3-1.9l-2.5-2A4.8 4.8 0 018 12.8a4.8 4.8 0 01-4.5-3.3H.9v2A8 8 0 008 16zM3.5 9.5a4.8 4.8 0 010-3l.1-.1V4.3H.9A8 8 0 000 8c0 1.3.3 2.5.9 3.6l2.6-2.1zM8 3.2c1.2 0 2.3.4 3.2 1.2l2.4-2.4A7.6 7.6 0 008 0 8 8 0 00.9 4.3l2.6 2A4.8 4.8 0 018 3.2z',
+    prefix: '', placeholder: 'email' },
+  { id: 'apple', name: 'Apple', type: 'account', color: '#ffffff', priority: 3, oauth: true, supabaseProvider: 'apple',
+    svg: 'M11.18 3.2c.7-.86 1.18-2.05 1.05-3.2-1.01.04-2.24.67-2.96 1.53-.65.75-1.22 1.96-1.07 3.11 1.13.09 2.28-.57 2.98-1.44zM12.2 8.1c-.03-2.76 2.25-4.09 2.35-4.15-1.28-1.87-3.27-2.13-3.98-2.16-1.69-.17-3.3 1-4.16 1-.86 0-2.18-.97-3.58-.95A5.28 5.28 0 00.39 4.17C-1.06 6.82.18 10.65 1.57 12.84c.69 1.06 1.51 2.26 2.6 2.22 1.04-.04 1.43-.67 2.69-.67 1.25 0 1.61.67 2.7.65 1.12-.02 1.83-1.09 2.51-2.15a8.8 8.8 0 001.14-2.33c-.02-.01-2.19-.84-2.21-3.34-.02-2.09 1.7-3.09 1.78-3.14z',
+    prefix: '', placeholder: '' },
+  { id: 'github', name: 'GitHub', type: 'account', color: '#f0f6fc', priority: 4, oauth: true, supabaseProvider: 'github',
+    svg: 'M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z',
+    prefix: '@', placeholder: 'username' },
+  { id: 'linkedin', name: 'LinkedIn', type: 'account', color: '#0a66c2', priority: 5, oauth: false,
+    svg: 'M0 1.15C0 .51.52 0 1.15 0h13.7C15.48 0 16 .52 16 1.15v13.7c0 .63-.52 1.15-1.15 1.15H1.15C.52 16 0 15.48 0 14.85V1.15zm4.94 13.17V6.17H2.54v8.15h2.4zM3.73 5.13c.84 0 1.36-.55 1.36-1.24-.02-.7-.52-1.24-1.34-1.24-.82 0-1.36.54-1.36 1.24 0 .69.52 1.24 1.32 1.24h.02zM6.16 14.32h2.4V9.84c0-.22.02-.43.08-.6.16-.43.54-.88 1.17-.88.82 0 1.15.63 1.15 1.55v4.41h2.4V9.63c0-2.51-1.34-3.68-3.13-3.68-1.47 0-2.11.82-2.47 1.38l.04-.08V6.17H6.16c.04.67 0 8.15 0 8.15z',
+    prefix: '/in/', placeholder: 'username' },
+  { id: 'instagram', name: 'Instagram', type: 'account', color: '#e4405f', priority: 6, oauth: false,
+    svg: 'M4.77 0h6.46C14.15 0 16 1.85 16 4.77v6.46A4.77 4.77 0 0111.23 16H4.77A4.77 4.77 0 010 11.23V4.77A4.77 4.77 0 014.77 0zm-.18 1.44A3.15 3.15 0 001.44 4.6v6.81a3.15 3.15 0 003.15 3.15h6.82a3.15 3.15 0 003.15-3.15V4.59a3.15 3.15 0 00-3.15-3.15H4.59zM12.35 2.9a.96.96 0 110 1.92.96.96 0 010-1.92zM8 3.89A4.11 4.11 0 1112.11 8 4.11 4.11 0 018 3.89zm0 1.44A2.67 2.67 0 1110.67 8 2.67 2.67 0 018 5.33z',
+    prefix: '@', placeholder: 'username' },
+  { id: 'facebook', name: 'Facebook', type: 'account', color: '#1877f2', priority: 7, oauth: false,
+    svg: 'M16 8a8 8 0 10-9.25 7.9v-5.59H4.72V8h2.03V6.24c0-2 1.19-3.11 3.02-3.11.87 0 1.79.16 1.79.16v1.97h-1.01c-.99 0-1.3.62-1.3 1.25V8h2.22l-.35 2.31H9.25v5.59A8 8 0 0016 8z',
+    prefix: '', placeholder: 'name or profile URL' },
+];
+
+const StampIcon = ({ provider, size = 16, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill={provider.color} className={className} style={{ flexShrink: 0 }}>
+    <path d={provider.svg} fillRule="evenodd" clipRule="evenodd" />
+  </svg>
+);
+
+const normalizeStampValue = (providerId, rawInput) => {
+  const provider = STAMP_PROVIDERS.find(p => p.id === providerId);
+  if (!provider) return rawInput.trim();
+  let val = rawInput.trim();
+  if (provider.prefix && val.startsWith(provider.prefix)) val = val.slice(provider.prefix.length).trim();
+  return val;
+};
+
+const formatStampDisplay = (providerId, storedValue) => {
+  if (!storedValue) return storedValue;
+  const provider = STAMP_PROVIDERS.find(p => p.id === providerId);
+  if (!provider || !provider.prefix) return storedValue;
+  if (providerId === 'linkedin') return storedValue.replace(/^\/in\//, '');
+  if (storedValue.startsWith(provider.prefix)) return storedValue;
+  return provider.prefix + storedValue;
+};
+
+// Extract username from OAuth identity data
+const getOAuthUsername = (identity) => {
+  if (!identity) return null;
+  const meta = identity.identity_data || {};
+  // Twitter/X: preferred_username or user_name
+  if (identity.provider === 'twitter' || identity.provider === 'x') return meta.preferred_username || meta.user_name || meta.name || null;
+  // GitHub: preferred_username or user_name
+  if (identity.provider === 'github') return meta.preferred_username || meta.user_name || null;
+  // Google: email
+  if (identity.provider === 'google') return meta.email || null;
+  // Apple: email (Apple hides real email behind relay)
+  if (identity.provider === 'apple') return meta.email || null;
+  return meta.preferred_username || meta.name || meta.email || null;
+};
+
+// — AUTH CONTEXT
+const AuthContext = createContext(null);
+const useAuth = () => useContext(AuthContext);
+
+const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [claims, setClaims] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // --- Profile functions ---
+  const loadProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (error) { console.error('[Aura] Profile load failed:', error); return null; }
+      return data;
+    } catch (err) { console.warn('[Aura] Profile load error:', err.message); return null; }
+  };
+
+  const updateDisplayName = async (name) => {
+    if (!user) return;
+    const { error } = await supabase.from('profiles').update({ display_name: name, updated_at: new Date().toISOString() }).eq('id', user.id);
+    if (!error) setProfile(p => p ? { ...p, display_name: name } : p);
+  };
+
+  const updateEntityType = async (entityType) => {
+    if (!user) return;
+    const { error } = await supabase.from('profiles').update({ entity_type: entityType, updated_at: new Date().toISOString() }).eq('id', user.id);
+    if (!error) setProfile(p => p ? { ...p, entity_type: entityType } : p);
+  };
+
+  const updateProfileSummary = async (assessCompleted, userClaims, entityType) => {
+    if (!user) return;
+    const summary = {
+      assessment_count: Object.keys(assessCompleted || {}).length,
+      stamp_count: (userClaims || claims).filter(c => c.visibility === 'public').length,
+      entity_type: entityType || 'human',
+      updated_at: new Date().toISOString()
+    };
+    await supabase.from('profiles').update({ profile_summary: summary, updated_at: new Date().toISOString() }).eq('id', user.id);
+  };
+
+  // --- Claims functions ---
+  const loadClaims = async (userId) => {
+    try {
+      const { data, error } = await supabase.from('claims').select('*').eq('user_id', userId).order('created_at', { ascending: true });
+      if (error) { console.error('[Aura] Claims load failed:', error); return []; }
+      return data || [];
+    } catch (err) { console.warn('[Aura] Claims load error:', err.message); return []; }
+  };
+
+  const createEmailClaim = async (userId, email) => {
+    const normalized = email.toLowerCase().trim();
+    const hash = await sha256('email:' + normalized);
+    await supabase.from('claims').upsert({
+      user_id: userId, type: 'contact', provider: 'email',
+      label: normalized, value: normalized,
+      proof_type: 'password', proof_status: 'verified',
+      visibility: 'private', hash, weight: 1
+    }, { onConflict: 'hash' });
+  };
+
+  const createClaim = async (provider, label, value) => {
+    if (!user) return null;
+    try {
+      const hash = await sha256(provider + ':' + value.toLowerCase().trim());
+      const { data, error } = await supabase.from('claims').upsert({
+        user_id: user.id, type: 'account', provider,
+        label: label.trim(), value: value.trim(),
+        proof_type: 'self_reported', proof_status: 'unverified',
+        visibility: 'public', hash, weight: 0
+      }, { onConflict: 'hash' }).select().single();
+      if (error) { console.error('[Aura] Claim create failed:', error); return null; }
+      setClaims(prev => [...prev.filter(c => c.hash !== hash), data]);
+      return data;
+    } catch (err) { console.warn('[Aura] Claim create error:', err.message); return null; }
+  };
+
+  const removeClaim = async (claimId) => {
+    if (!user) return false;
+    const { error } = await supabase.from('claims').delete().eq('id', claimId).eq('user_id', user.id);
+    if (!error) setClaims(prev => prev.filter(c => c.id !== claimId));
+    return !error;
+  };
+
+  const updateClaimVisibility = async (claimId, visibility) => {
+    if (!user) return false;
+    const { error } = await supabase.from('claims').update({ visibility }).eq('id', claimId).eq('user_id', user.id);
+    if (!error) setClaims(prev => prev.map(c => c.id === claimId ? { ...c, visibility } : c));
+    return !error;
+  };
+
+  const setPrimaryClaim = async (claimId) => {
+    if (!user) return false;
+    await supabase.from('claims').update({ weight: 0 }).eq('user_id', user.id);
+    const { error } = await supabase.from('claims').update({ weight: 1, visibility: 'public' }).eq('id', claimId).eq('user_id', user.id);
+    if (!error) setClaims(prev => prev.map(c => ({ ...c, weight: c.id === claimId ? 1 : 0, ...(c.id === claimId ? { visibility: 'public' } : {}) })));
+    return !error;
+  };
+
+  // --- Auth functions ---
+  const signUp = async (email, password) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    return data;
+  };
+
+  const signIn = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setClaims([]);
+  };
+
+  // --- OAuth identity linking ---
+  const linkProvider = async (providerName) => {
+    // providerName is the Supabase provider name (e.g. 'twitter', 'google', 'github', 'apple')
+    // Remember we were on settings so we come back here after OAuth redirect
+    sessionStorage.setItem('aura-return-screen', 'settings');
+    const { data, error } = await supabase.auth.linkIdentity({
+      provider: providerName,
+      options: { redirectTo: window.location.origin + window.location.pathname }
+    });
+    if (error) { console.error('[Aura] Link identity failed:', error); throw error; }
+    return data;
+  };
+
+  const unlinkProvider = async (providerName) => {
+    if (!user) return false;
+    // Find the identity to unlink
+    const identity = (user.identities || []).find(i => i.provider === providerName);
+    if (!identity) return false;
+    const { error } = await supabase.auth.unlinkIdentity(identity);
+    if (error) { console.error('[Aura] Unlink identity failed:', error); return false; }
+    // Also remove the corresponding claim
+    const providerConfig = STAMP_PROVIDERS.find(p => p.supabaseProvider === providerName);
+    if (providerConfig) {
+      const matchingClaim = claims.find(c => c.provider === providerConfig.id && c.proof_type === 'oauth');
+      if (matchingClaim) await removeClaim(matchingClaim.id);
+    }
+    // Refresh user to get updated identities
+    const { data: { user: freshUser } } = await supabase.auth.getUser();
+    if (freshUser) setUser(freshUser);
+    return true;
+  };
+
+  // Sync OAuth identities → verified claims
+  const syncIdentityClaims = async (authUser) => {
+    if (!authUser) return;
+    const identities = authUser.identities || [];
+    for (const identity of identities) {
+      if (identity.provider === 'email') continue; // email handled separately
+      const providerConfig = STAMP_PROVIDERS.find(p => p.supabaseProvider === identity.provider);
+      if (!providerConfig) continue;
+      const username = getOAuthUsername(identity);
+      if (!username) continue;
+      const hash = await sha256(providerConfig.id + ':oauth:' + identity.id);
+      await supabase.from('claims').upsert({
+        user_id: authUser.id, type: 'account', provider: providerConfig.id,
+        label: username, value: username,
+        proof_type: 'oauth', proof_status: 'verified',
+        visibility: 'public', hash, weight: 0
+      }, { onConflict: 'hash' });
+    }
+  };
+
+  // --- Auth state listener ---
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        // CRITICAL: setTimeout(0) to avoid Supabase deadlock (LESSONS.md)
+        setTimeout(async () => {
+          try {
+            if (event === 'SIGNED_IN') {
+              await createEmailClaim(session.user.id, session.user.email);
+            }
+            // Sync OAuth identities to verified claims
+            await syncIdentityClaims(session.user);
+            const prof = await loadProfile(session.user.id);
+            setProfile(prof);
+            const userClaims = await loadClaims(session.user.id);
+            setClaims(userClaims);
+          } catch (err) {
+            console.warn('[Aura] Post-auth sync error:', err.message);
+          }
+          setLoading(false);
+        }, 0);
+      } else {
+        setUser(null);
+        setProfile(null);
+        setClaims([]);
+        setLoading(false);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Helper: check if a provider is linked via OAuth
+  const isOAuthLinked = (supabaseProviderName) => {
+    return (user?.identities || []).some(i => i.provider === supabaseProviderName);
+  };
+
+  const value = useMemo(() => ({
+    user, profile, claims, loading,
+    signUp, signIn, signOut, linkProvider, unlinkProvider, isOAuthLinked,
+    updateDisplayName, updateEntityType, updateProfileSummary,
+    createClaim, removeClaim, updateClaimVisibility, setPrimaryClaim,
+    loadClaims,
+  }), [user, profile, claims, loading]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+// — CLOUD SYNC HOOK (assessment_results table)
+const useCloudSync = () => {
+  const auth = useAuth();
+
+  const saveCompleted = async (testId, answers, traits) => {
+    if (!auth?.user) return;
+    try {
+      const { error } = await supabase.from('assessment_results').upsert({
+        user_id: auth.user.id, category_id: testId, status: 'completed',
+        answers: answers || {}, traits: traits || {}, progress: null,
+        completed_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,category_id' });
+      if (error) console.error('[Aura] Assessment save failed:', error);
+    } catch (err) { console.warn('[Aura] Cloud save error:', err.message); }
+  };
+
+  const saveProgress = async (testId, progressObj) => {
+    if (!auth?.user) return;
+    try {
+      const { error } = await supabase.from('assessment_results').upsert({
+        user_id: auth.user.id, category_id: testId, status: 'in_progress',
+        answers: progressObj || {}, traits: null, progress: progressObj || {},
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,category_id' });
+      if (error) console.error('[Aura] Progress save failed:', error);
+    } catch (err) { console.warn('[Aura] Cloud progress save error:', err.message); }
+  };
+
+  const loadAll = async () => {
+    if (!auth?.user) return null;
+    const { data, error } = await supabase.from('assessment_results').select('*').eq('user_id', auth.user.id);
+    if (error) { console.error('[Aura] Cloud load failed:', error); return null; }
+    const completed = {}, inProgress = {};
+    for (const row of (data || [])) {
+      if (row.status === 'completed') completed[row.category_id] = row.traits || {};
+      else inProgress[row.category_id] = { index: row.progress?.index || 0, responses: row.progress?.responses || row.answers?.responses || {}, skipped: row.progress?.skipped || row.answers?.skipped || [] };
+    }
+    return { completed, inProgress };
+  };
+
+  const deleteAssessment = async (testId) => {
+    if (!auth?.user) return;
+    await supabase.from('assessment_results').delete().eq('user_id', auth.user.id).eq('category_id', testId);
+  };
+
+  const clearAll = async () => {
+    if (!auth?.user) return;
+    await supabase.from('assessment_results').delete().eq('user_id', auth.user.id);
+  };
+
+  const syncOnLogin = async (localCompleted, localInProgress) => {
+    if (!auth?.user) return null;
+    const cloud = await loadAll();
+    if (!cloud) {
+      // No cloud data — upload everything local
+      for (const [testId, traits] of Object.entries(localCompleted || {})) {
+        await saveCompleted(testId, {}, traits);
+      }
+      for (const [testId, progress] of Object.entries(localInProgress || {})) {
+        await saveProgress(testId, progress);
+      }
+      return { completed: localCompleted || {}, inProgress: localInProgress || {} };
+    }
+    // Merge: cloud wins completed, local wins in-progress
+    const mergedCompleted = { ...localCompleted, ...cloud.completed };
+    const mergedInProgress = { ...cloud.inProgress };
+    for (const [testId, progress] of Object.entries(localInProgress || {})) {
+      if (!mergedCompleted[testId]) {
+        // Local in-progress, not completed in cloud — local wins
+        mergedInProgress[testId] = progress;
+        await saveProgress(testId, progress);
+      }
+    }
+    // Upload local completed that cloud didn't have
+    for (const [testId, traits] of Object.entries(localCompleted || {})) {
+      if (!cloud.completed[testId]) await saveCompleted(testId, {}, traits);
+    }
+    return { completed: mergedCompleted, inProgress: mergedInProgress };
+  };
+
+  return { saveCompleted, saveProgress, loadAll, deleteAssessment, clearAll, syncOnLogin };
+};
+
+// — RESPONSE CAPTURE HOOK (responses table, auth-gated)
+const useResponses = () => {
+  const auth = useAuth();
+
+  const captureResponse = async (questionId, answer, confidence, snapshot) => {
+    if (!auth?.user) return;
+    try {
+      await supabase.from('responses').insert({
+        session_id: AURA_SESSION_ID, question_id: questionId,
+        answer: String(answer), confidence,
+        email: auth.user.email, snapshot
+      });
+    } catch (err) { console.warn('[Aura] Response capture error:', err.message); }
+  };
+
+  const captureAssessResponse = async (testId, questionIndex, answer, snapshot) => {
+    if (!auth?.user) return;
+    try {
+      await supabase.from('responses').insert({
+        session_id: AURA_SESSION_ID, question_id: -(questionIndex + 1),
+        answer: String(answer), confidence: 0,
+        email: auth.user.email, test_id: testId, snapshot
+      });
+    } catch (err) { console.warn('[Aura] Assess capture error:', err.message); }
+  };
+
+  return { captureResponse, captureAssessResponse };
+};
+
+// — COMPARE HOOK (comparisons table)
+const useCompare = () => {
+  const auth = useAuth();
+
+  const generateId = () => {
+    const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
+    let id = '';
+    for (let i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+    return id;
+  };
+
+  const createComparison = async (traits, name, entityType) => {
+    const id = generateId();
+    try {
+      const { error } = await supabase.from('comparisons').insert({ id, traits, name: name || null, entity_type: entityType || 'human' });
+      if (error) { console.warn('[Aura] Comparison save failed:', error.message); return null; }
+      return id;
+    } catch (err) { console.warn('[Aura] Comparison save error:', err.message); return null; }
+  };
+
+  const loadComparison = async (id) => {
+    try {
+      const { data, error } = await supabase.from('comparisons').select('traits, name, entity_type').eq('id', id).single();
+      if (error || !data) return null;
+      return { traits: data.traits, name: data.name, entity: data.entity_type };
+    } catch (err) { console.warn('[Aura] Comparison load error:', err.message); return null; }
+  };
+
+  const getCompareUrl = (shortId) => `${window.location.origin}${window.location.pathname}?c=${shortId}`;
+
+  return { createComparison, loadComparison, getCompareUrl };
 };
 
 // — LEGO PRIMITIVES — Tier 1
@@ -1294,19 +1744,28 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, onAI, isDark }) 
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  // Auth stubs (Phase 6 will wire Supabase)
+  const auth = useAuth();
   const handleSignIn = async () => {
     if (!email) { setError('Enter your email'); return; }
     if (!password) { setError('Enter your password'); return; }
     setLoading(true); setError('');
-    // Stub: simulate sign-in
-    setTimeout(() => { setLoading(false); onSignIn(email); }, 500);
+    try {
+      await auth.signIn(email, password);
+      onSignIn(email);
+    } catch (err) {
+      setError(err.message === 'Invalid login credentials' ? 'Wrong email or password' : err.message);
+    } finally { setLoading(false); }
   };
   const handleSignUp = async () => {
     if (!email) { setError('Enter your email'); return; }
     if (!password || password.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true); setError('');
-    setTimeout(() => { setLoading(false); onSignIn(email); }, 500);
+    try {
+      await auth.signUp(email, password);
+      onSignIn(email);
+    } catch (err) {
+      setError(err.message);
+    } finally { setLoading(false); }
   };
   const handleKeyDown = (e) => { if (e.key === 'Enter') { e.preventDefault(); mode === 'signup' ? handleSignUp() : handleSignIn(); } };
   if (mode === 'welcome') {
@@ -1359,7 +1818,7 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, onAI, isDark }) 
   );
 };
 
-const OnboardingFlow = ({ isDark, onComplete, onSkip, onSettings, onReset }) => {
+const OnboardingFlow = ({ isDark, onComplete, onSkip, onReset }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const question = ONBOARDING_QUESTIONS[currentIndex];
@@ -1377,7 +1836,6 @@ const OnboardingFlow = ({ isDark, onComplete, onSkip, onSettings, onReset }) => 
     <Screen className="overflow-hidden">
       <Stack direction="row" align="center" className="justify-between px-5 pt-4 pb-2">
         <VortexButton onSingleTap={onSkip} onDoubleTap={onReset} className="text-3xl btn-feedback cursor-pointer" />
-        <button onClick={onSettings} className="text-xl btn-feedback cursor-pointer"><Text as="span" emphasis="subtle">☰</Text></button>
       </Stack>
       <div className="flex-1 flex flex-col items-center justify-center px-6 relative">
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-8%' }}>
@@ -1413,11 +1871,10 @@ const OnboardingFlow = ({ isDark, onComplete, onSkip, onSettings, onReset }) => 
   );
 };
 
-const PathChoiceScreen = ({ isDark, entityType, onboardingAnswers, onReveal, onExplore, onSkip, onSettings, onReset }) => (
+const PathChoiceScreen = ({ isDark, entityType, onboardingAnswers, onReveal, onExplore, onSkip, onReset }) => (
   <Screen className="overflow-hidden">
     <Stack direction="row" align="center" className="justify-between px-5 pt-4 pb-2">
       <VortexButton onSingleTap={onSkip} onDoubleTap={onReset} className="text-3xl btn-feedback cursor-pointer" />
-      <button onClick={onSettings} className="text-xl btn-feedback cursor-pointer"><Text as="span" emphasis="subtle">☰</Text></button>
     </Stack>
     <div className="flex-1 flex flex-col items-center px-6 relative">
       <div style={{ flex: '2 1 0' }} />
@@ -1551,9 +2008,23 @@ const IS_DEV = ['localhost', '127.0.0.1', ''].includes(location.hostname) || loc
 const getInitialScreen = () => {
   try {
     const params = new URLSearchParams(window.location.search);
+    // Handle OAuth error redirect
+    const oauthError = params.get('error_description') || new URLSearchParams(window.location.hash.slice(1)).get('error_description');
+    if (oauthError) {
+      const msg = oauthError.includes('identity_already_exists')
+        ? 'That account is already linked to a different user.'
+        : `Link failed: ${oauthError.replace(/\+/g, ' ')}`;
+      setTimeout(() => window.__auraToast?.(msg), 500);
+      window.history.replaceState({}, '', window.location.pathname);
+      const returnScreen = sessionStorage.getItem('aura-return-screen');
+      if (returnScreen) { sessionStorage.removeItem('aura-return-screen'); return returnScreen; }
+    }
     if (params.get('c') || params.get('compare')) return 'compare';
     if (params.get('p')) return 'public-profile';
   } catch {}
+  // Return to settings after OAuth redirect
+  const returnScreen = sessionStorage.getItem('aura-return-screen');
+  if (returnScreen) { sessionStorage.removeItem('aura-return-screen'); return returnScreen; }
   const onboarded = localStorage.getItem(ONBOARD_STORAGE_KEY);
   if (onboarded) return 'question';
   return 'landing';
@@ -1721,7 +2192,7 @@ const ProgressCircle = ({ progress = 0, size = 48, strokeWidth = 3, color = 'vio
 };
 
 // — useAssessment HOOK
-const useAssessment = ({ setScreen, isDark, entityType }) => {
+const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCapture }) => {
   const [assessCurrentTestId, setAssessCurrentTestId] = useState(null);
   const [assessCurrentIndex, setAssessCurrentIndex] = useState(0);
   const [assessEntering, setAssessEntering] = useState(false);
@@ -1791,6 +2262,8 @@ const useAssessment = ({ setScreen, isDark, entityType }) => {
     const { [assessCurrentTestId]: _, ...remainingProgress } = assessInProgress;
     setAssessInProgress(remainingProgress);
     assessSaveToStorage(newCompleted, remainingProgress);
+    // Cloud sync (fire-and-forget)
+    cloudSync?.saveCompleted(assessCurrentTestId, resp, results);
     const prevTier = calculateAssessTier(assessCompleted);
     const newTier = calculateAssessTier(newCompleted);
     if (newTier > prevTier) {
@@ -1827,9 +2300,11 @@ const useAssessment = ({ setScreen, isDark, entityType }) => {
   };
   const assessSaveAndExit = () => {
     clearTimeout(assessTimeoutRef.current);
-    const newProgress = { ...assessInProgress, [assessCurrentTestId]: { index: assessCurrentIndex, responses: assessResponses, skipped: assessSkipped } };
+    const progressObj = { index: assessCurrentIndex, responses: assessResponses, skipped: assessSkipped };
+    const newProgress = { ...assessInProgress, [assessCurrentTestId]: progressObj };
     setAssessInProgress(newProgress);
     assessSaveToStorage(assessCompleted, newProgress);
+    cloudSync?.saveProgress(assessCurrentTestId, progressObj);
     setScreen('assess-picker');
   };
   const assessFinalizeSubmit = (value) => {
@@ -1840,6 +2315,10 @@ const useAssessment = ({ setScreen, isDark, entityType }) => {
     const newSkipped = assessSkipped.filter(i => i !== rawIdx);
     setAssessSkipped(newSkipped);
     setAssessPending(null);
+    // Cloud response capture (fire-and-forget)
+    const test = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
+    const item = test?.items?.[rawIdx];
+    responseCapture?.captureAssessResponse(assessCurrentTestId, rawIdx, value, test && item ? { test: assessCurrentTestId, name: test.name, q: item.q, idx: rawIdx } : null);
     assessAdvanceToNext(newResponses, newSkipped);
   };
   const assessHandleAnswerTap = (value) => { assessFinalizeSubmit(value); };
@@ -1878,6 +2357,7 @@ const useAssessment = ({ setScreen, isDark, entityType }) => {
   const assessClearAll = () => {
     setAssessCompleted({}); setAssessInProgress({}); setAssessDemoActive(false); setAssessSavedUserData(null);
     assessSaveToStorage({}, {}, false, null); setAssessShowDemoMenu(false);
+    cloudSync?.clearAll();
   };
 
   return {
@@ -2247,8 +2727,7 @@ const ProfileScreen = ({ isDark, assess, entityType, onboardingAnswers, response
   };
 
   return (
-    <Screen header={<NavBar back title="Profile" onBack={() => onNavigate('assess-picker')}
-      right={<Button variant="ghost" size="sm" onClick={() => onNavigate('settings')}>⚙</Button>} />}>
+    <Screen header={<NavBar back title="Profile" onBack={() => onNavigate('assess-picker')} />}>
       <Screen.Body>
         <Stack gap={4}>
           {/* Avatar + Name */}
@@ -2723,12 +3202,15 @@ const HistoryScreen = ({ isDark, questions, responses, onNavigate }) => {
   );
 };
 
-// — SETTINGS SCREEN — Phase 5
-const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityType, onBack, onReset, hasAssessmentData, onResetAssessments }) => {
+// — SETTINGS SCREEN — Phase 5 + Phase 6 auth
+const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityType, onBack, onReset, hasAssessmentData, onResetAssessments, displayName, setDisplayName }) => {
   const { undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak } = settings;
+  const auth = useAuth();
   const [devTapCount, setDevTapCount] = useState(0);
   const devTapTimer = useRef(null);
   const [kbOpen, setKbOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(displayName || '');
   const handleVersionTap = () => {
     setDevTapCount(c => {
       const next = c + 1;
@@ -2738,10 +3220,71 @@ const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityTy
     });
   };
 
+  const handleNameSave = () => {
+    const trimmed = nameInput.trim();
+    setDisplayName(trimmed);
+    localStorage.setItem('aura-display-name', trimmed);
+    auth.updateDisplayName(trimmed);
+    setEditingName(false);
+  };
+
   return (
     <Screen header={<NavBar back title="Settings" onBack={onBack} />}>
       <div className="flex-1 overflow-y-auto p-4">
         <Stack gap={3}>
+          {/* Account section */}
+          {auth.user ? (
+            <Card>
+              <Text size="xs" weight="semibold" emphasis="subtle" className="uppercase tracking-wide mb-2">Account</Text>
+              <Stack direction="row" align="center" className="justify-between mb-2">
+                <Text size="sm" emphasis="secondary">{auth.user.email}</Text>
+                <Button variant="ghost" size="sm" onClick={auth.signOut}>Sign Out</Button>
+              </Stack>
+              <Stack direction="row" align="center" className="justify-between">
+                <Text size="sm" weight="medium">Display Name</Text>
+                {editingName ? (
+                  <Stack direction="row" gap={1}>
+                    <input value={nameInput} onChange={e => setNameInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleNameSave(); if (e.key === 'Escape') setEditingName(false); }}
+                      onFocus={e => e.target.select()}
+                      className="px-2 py-1 rounded text-sm" style={{ background: 'var(--bg-input)', color: 'var(--input-text)', border: '1px solid var(--border-base)', width: '120px' }} autoFocus />
+                    <Button variant="ghost" size="sm" onClick={handleNameSave}>Save</Button>
+                  </Stack>
+                ) : (
+                  <button onClick={() => { setNameInput(displayName || ''); setEditingName(true); }} className="cursor-pointer">
+                    <Text size="sm" emphasis="subtle">{displayName || 'Set name'} ✎</Text>
+                  </button>
+                )}
+              </Stack>
+              {/* Linked Accounts / Stamps */}
+              <div className="border-t mt-3 pt-3" style={{ borderColor: 'var(--border-base)' }}>
+                <Text size="xs" weight="semibold" emphasis="subtle" className="uppercase tracking-wide mb-1">Linked Accounts</Text>
+                <Stack gap={1}>
+                  {STAMP_PROVIDERS.filter(p => p.id !== 'email').map(providerConfig => {
+                    const claim = (auth.claims || []).find(c => c.provider === providerConfig.id);
+                    return <StampRow key={providerConfig.id}
+                      providerConfig={providerConfig}
+                      claim={claim}
+                      isOAuthLinked={providerConfig.oauth && auth.isOAuthLinked(providerConfig.supabaseProvider)}
+                      onOAuthLink={auth.linkProvider}
+                      onOAuthUnlink={auth.unlinkProvider}
+                      onSelfReportLink={auth.createClaim}
+                      onRemoveClaim={auth.removeClaim} />;
+                  })}
+                </Stack>
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <Stack direction="row" align="center" className="justify-between">
+                <div>
+                  <Text size="sm" weight="medium">Sign In</Text>
+                  <Text size="xxs" emphasis="subtle">Sync across devices, never lose data</Text>
+                </div>
+                <Button variant="outline" color="violet" size="sm" onClick={onBack}>Sign In</Button>
+              </Stack>
+            </Card>
+          )}
           <SettingItem label="Theme">
             <Toggle checked={isDark} onChange={toggleTheme} />
           </SettingItem>
@@ -2765,7 +3308,7 @@ const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityTy
             <Toggle checked={showStreak} onChange={() => setShowStreak(v => !v)} />
           </SettingItem>
           <SettingItem label="I am a..." subtitle={entityType === 'ai' ? 'AI or non-biological entity' : 'Human'}>
-            <Toggle checked={entityType === 'ai'} onChange={() => setEntityType(entityType === 'human' ? 'ai' : 'human')} color="cyan" />
+            <Toggle checked={entityType === 'ai'} onChange={() => { const next = entityType === 'human' ? 'ai' : 'human'; setEntityType(next); auth.updateEntityType(next); }} color="cyan" />
           </SettingItem>
           {/* Keyboard Shortcuts — collapsible */}
           <Card onClick={() => setKbOpen(!kbOpen)} style={{ cursor: 'pointer' }}>
@@ -2934,11 +3477,14 @@ const CompareScreen = ({ isDark, assess, entityType, displayName, compareData, c
   const myName = displayName || 'You';
   const theirInitial = theirName[0]?.toUpperCase() || 'F';
   const myInitial = myName === 'You' ? 'Y' : myName[0].toUpperCase();
-  // Share URL — placeholder until Supabase wired (Phase 6)
+  const compareHook = useCompare();
   const compareIdRef = useRef(null);
   const getShareUrl = async () => {
-    // Phase 6: createComparison(myTraits, displayName, entityType) → getCompareUrl(id)
-    // Fallback: base64 encoded
+    // Try Supabase short link first, fallback to base64
+    if (!compareIdRef.current && myTraits) {
+      compareIdRef.current = await compareHook.createComparison(myTraits, displayName, entityType);
+    }
+    if (compareIdRef.current) return compareHook.getCompareUrl(compareIdRef.current);
     return `${window.location.origin}${window.location.pathname}?compare=${btoa(JSON.stringify({ traits: myTraits, entity: entityType, name: displayName || undefined }))}`;
   };
   const shareText = `${displayName ? displayName + "'s" : 'My'} Aura — compare yours`;
@@ -3013,18 +3559,24 @@ const CompareScreen = ({ isDark, assess, entityType, displayName, compareData, c
   );
 };
 
-// — PUBLIC PROFILE SCREEN — Phase 5: Read-only public view
+// — PUBLIC PROFILE SCREEN — Phase 5 + Phase 6: Read-only public view
 const PublicProfileScreen = ({ isDark, profileId, onNavigate }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    // Phase 6: loadPublicProfile(profileId) from Supabase
-    // For now, show placeholder
-    setTimeout(() => {
+    if (!profileId) { setLoading(false); return; }
+    (async () => {
+      try {
+        const [profileRes, claimsRes] = await Promise.all([
+          supabase.from('profiles').select('id, display_name, profile_summary').eq('id', profileId).single(),
+          supabase.from('claims').select('*').eq('user_id', profileId).eq('visibility', 'public')
+        ]);
+        if (profileRes.data) {
+          setProfile({ name: profileRes.data.display_name, assessmentCount: profileRes.data.profile_summary?.assessment_count, claims: claimsRes.data || [] });
+        }
+      } catch (err) { console.warn('[Aura] Public profile error:', err.message); }
       setLoading(false);
-      // Simulate: no real profile available without Supabase
-      setProfile(null);
-    }, 500);
+    })();
   }, [profileId]);
   return (
     <Screen header={<NavBar back title="Profile" onBack={() => { window.history.replaceState({}, '', window.location.pathname); onNavigate('landing'); }} />}>
@@ -3051,25 +3603,84 @@ const PublicProfileScreen = ({ isDark, profileId, onNavigate }) => {
 };
 
 // — STAMP ROW — Phase 5: Account linking (placeholder until Supabase)
-const StampRow = ({ provider, claimed, onClaim, onRemove }) => {
-  const providerIcons = { email: '✉️', google: 'G', github: '⌨', x: '𝕏', linkedin: 'in', facebook: 'f', instagram: '📷' };
-  const providerNames = { email: 'Email', google: 'Google', github: 'GitHub', x: 'X / Twitter', linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram' };
+// StampRow — linked account with OAuth verification support
+const StampRow = ({ providerConfig, claim, isOAuthLinked, onOAuthLink, onOAuthUnlink, onSelfReportLink, onRemoveClaim }) => {
+  const [editing, setEditing] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [linking, setLinking] = useState(false);
+  const isLinked = !!claim;
+  const isVerified = claim?.proof_type === 'oauth' || claim?.proof_type === 'password';
+  const displayValue = claim ? (formatStampDisplay(providerConfig.id, claim.value) || claim.label) : null;
+
+  const handleOAuthLink = async () => {
+    setLinking(true);
+    try { await onOAuthLink(providerConfig.supabaseProvider); }
+    catch (err) { console.warn('[Aura] OAuth link error:', err.message); setLinking(false); }
+  };
+
+  const handleSelfReportSave = async () => {
+    const normalized = normalizeStampValue(providerConfig.id, inputValue);
+    if (!normalized) return;
+    await onSelfReportLink(providerConfig.id, normalized, normalized);
+    setEditing(false);
+    setInputValue('');
+  };
+
+  const handleRemove = async () => {
+    if (providerConfig.oauth && isOAuthLinked) {
+      await onOAuthUnlink(providerConfig.supabaseProvider);
+    } else if (claim) {
+      await onRemoveClaim(claim.id);
+    }
+  };
+
+  // Editing state for self-reported linking
+  if (editing) {
+    return (
+      <div className="rounded-xl px-3 py-3 space-y-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <Stack direction="row" align="center" gap={2}>
+          <StampIcon provider={providerConfig} size={16} />
+          <Text size="sm" weight="medium">{providerConfig.name}</Text>
+        </Stack>
+        <div className="flex items-center rounded-lg" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          {providerConfig.prefix && <span className="text-sm pl-2.5 select-none" style={{ color: 'var(--text-faint)' }}>{providerConfig.prefix}</span>}
+          <input value={inputValue} onChange={e => setInputValue(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSelfReportSave(); if (e.key === 'Escape') setEditing(false); }}
+            placeholder={providerConfig.placeholder || 'username'} autoFocus
+            className="text-sm flex-1 min-w-0 px-2 py-2 bg-transparent outline-none" style={{ color: 'var(--text-primary)' }} />
+        </div>
+        <Stack direction="row" gap={2}>
+          <Button variant="secondary" color="emerald" size="sm" onClick={handleSelfReportSave}>Save</Button>
+          <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
+        </Stack>
+      </div>
+    );
+  }
+
   return (
-    <Stack direction="row" align="center" className="justify-between py-2">
+    <Stack direction="row" align="center" className="justify-between py-2.5">
       <Stack direction="row" align="center" gap={3}>
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-          style={{ background: claimed ? 'rgba(139, 92, 246, 0.2)' : 'var(--bg-elevated)', color: claimed ? '#a78bfa' : 'var(--text-subtle)' }}>
-          {providerIcons[provider] || '?'}
+        <div className="w-8 h-8 rounded-full flex items-center justify-center"
+          style={{ background: isLinked ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-elevated)' }}>
+          <StampIcon provider={providerConfig} size={16} />
         </div>
         <div>
-          <Text size="sm" weight="medium">{providerNames[provider] || provider}</Text>
-          {claimed && <Text size="xs" emphasis="subtle">{claimed}</Text>}
+          <Stack direction="row" align="center" gap={1}>
+            <Text size="sm" weight="medium">{providerConfig.name}</Text>
+            {isLinked && isVerified && <Text as="span" size="xs" style={{ color: '#10b981' }}>✓</Text>}
+            {isLinked && !isVerified && <Text as="span" size="xxs" emphasis="faint">unverified</Text>}
+          </Stack>
+          {displayValue && <Text size="xs" emphasis="subtle">{displayValue}</Text>}
         </div>
       </Stack>
-      {claimed ? (
-        <Button variant="ghost" size="sm" onClick={onRemove}><Text as="span" size="xxs" emphasis="subtle">Remove</Text></Button>
+      {isLinked ? (
+        <Button variant="ghost" size="sm" onClick={handleRemove}><Text as="span" size="xxs" emphasis="subtle">Remove</Text></Button>
+      ) : providerConfig.oauth ? (
+        <Button variant="outline" color="violet" size="sm" onClick={handleOAuthLink} disabled={linking}>
+          {linking ? '...' : 'Verify'}
+        </Button>
       ) : (
-        <Button variant="outline" color="violet" size="sm" onClick={onClaim}>Link</Button>
+        <Button variant="outline" color="slate" size="sm" onClick={() => { setEditing(true); setInputValue(''); }}>Link</Button>
       )}
     </Stack>
   );
@@ -3079,6 +3690,10 @@ const StampRow = ({ provider, claimed, onClaim, onRemove }) => {
 function App() {
   const { isDark, toggle: toggleTheme } = useTheme();
   const displayMode = useDisplayMode();
+  const auth = useAuth();
+  const cloudSync = useCloudSync();
+  const responseCapture = useResponses();
+  const compare = useCompare();
   const [questions] = useState(() => shuffleArray(QUESTIONS));
   const [screen, setScreen] = useState(getInitialScreen);
   const [previousScreen, setPreviousScreen] = useState(null);
@@ -3101,19 +3716,49 @@ function App() {
   const [savedQuestions, setSavedQuestions] = useState(() => new Set(stored.current.saved || []));
   const [showGestureHint, setShowGestureHint] = useState(() => !localStorage.getItem('aura-hint-confidence-dismissed'));
   // Assessment hook
-  const assess = useAssessment({ setScreen, isDark, entityType });
+  const assess = useAssessment({ setScreen, isDark, entityType, cloudSync, responseCapture });
   // Onboarding
   const [onboardingComplete, setOnboardingComplete] = useState(() => !!localStorage.getItem(ONBOARD_STORAGE_KEY));
   const [onboardingAnswers, setOnboardingAnswers] = useState(() => {
     try { return JSON.parse(localStorage.getItem(ONBOARD_STORAGE_KEY)) || {}; } catch { return {}; }
   });
-  // Compare / Public Profile (Phase 5 — Supabase wiring in Phase 6)
+  // Compare / Public Profile
   const [displayName, setDisplayName] = useState(() => localStorage.getItem('aura-display-name') || '');
   const [compareData, setCompareData] = useState(null);
   const [compareLoading, setCompareLoading] = useState(false);
   const [publicProfileId, setPublicProfileId] = useState(() => {
     try { return new URLSearchParams(window.location.search).get('p'); } catch { return null; }
   });
+  // Sync display name from profile on auth
+  useEffect(() => {
+    if (auth.profile?.display_name && !displayName) {
+      setDisplayName(auth.profile.display_name);
+      localStorage.setItem('aura-display-name', auth.profile.display_name);
+    }
+  }, [auth.profile]);
+  // Cloud sync on sign-in
+  const syncDoneRef = useRef(false);
+  useEffect(() => {
+    if (auth.user && !auth.loading && !syncDoneRef.current) {
+      syncDoneRef.current = true;
+      cloudSync.syncOnLogin(assess.assessCompleted, assess.assessInProgress).then(merged => {
+        if (merged) {
+          assess.setAssessCompleted(merged.completed);
+          assess.setAssessInProgress(merged.inProgress);
+        }
+      });
+    }
+    if (!auth.user) syncDoneRef.current = false;
+  }, [auth.user, auth.loading]);
+  // Update profile summary when assessments change
+  const prevCompletedCountRef = useRef(Object.keys(assess.assessCompleted || {}).length);
+  useEffect(() => {
+    const count = Object.keys(assess.assessCompleted || {}).length;
+    if (auth.user && count !== prevCompletedCountRef.current) {
+      prevCompletedCountRef.current = count;
+      auth.updateProfileSummary(assess.assessCompleted, auth.claims, entityType);
+    }
+  }, [assess.assessCompleted, auth.user]);
   // Parse compare URL params on mount
   useEffect(() => {
     try {
@@ -3121,9 +3766,12 @@ function App() {
       const shortId = params.get('c');
       const legacyCompare = params.get('compare');
       if (shortId) {
-        // Phase 6: loadComparison(shortId).then(data => setCompareData(data))
         setCompareLoading(true);
-        setTimeout(() => { setCompareLoading(false); }, 500); // placeholder
+        compare.loadComparison(shortId).then(data => {
+          setCompareData(data);
+          setCompareLoading(false);
+          if (data) setScreen('compare');
+        });
       } else if (legacyCompare) {
         try {
           const data = JSON.parse(atob(legacyCompare));
@@ -3131,6 +3779,33 @@ function App() {
         } catch {}
       }
     } catch {}
+  }, []);
+  // Sign-out redirect — return to landing when user signs out
+  const wasSignedInRef = useRef(!!auth.user);
+  useEffect(() => {
+    if (wasSignedInRef.current && !auth.user && !auth.loading) {
+      setScreen('landing');
+    }
+    wasSignedInRef.current = !!auth.user;
+  }, [auth.user, auth.loading]);
+
+  // Sign-in nudge — show after 3+ completed assessments when not signed in
+  const [showSignInNudge, setShowSignInNudge] = useState(false);
+  const nudgeDismissedRef = useRef(false);
+  useEffect(() => {
+    const completedCount = Object.keys(assess.assessCompleted || {}).length;
+    if (completedCount >= 3 && !auth.user && !nudgeDismissedRef.current && !localStorage.getItem('aura-nudge-dismissed')) {
+      setShowSignInNudge(true);
+      setTimeout(() => setShowSignInNudge(false), 6000);
+      nudgeDismissedRef.current = true;
+      localStorage.setItem('aura-nudge-dismissed', '1');
+    }
+  }, [assess.assessCompleted, auth.user]);
+  // Global toast (for OAuth errors that fire before React mounts)
+  const [globalToast, setGlobalToast] = useState(null);
+  useEffect(() => {
+    window.__auraToast = (msg) => { setGlobalToast(msg); setTimeout(() => setGlobalToast(null), 4000); };
+    return () => { delete window.__auraToast; };
   }, []);
   // Dev panel
   const [showDevPanel, setShowDevPanel] = useState(IS_DEV);
@@ -3164,6 +3839,11 @@ function App() {
       setStats(newStats);
       // Persist
       demoStorage.set({ answers: newResponses, skipped: [], saved: [...savedQuestions], viewed: [], settings: { darkMode: isDark, undoDelay, showStreak, requireConfirmation, showTips }, stats: newStats, entityType });
+      // Cloud response capture (auth-gated, fire-and-forget)
+      responseCapture.captureResponse(q.id, answer, confidence, {
+        q: q.text, a: q.type === 'binary' ? (answer ? 'Yes' : 'No') : (q.options?.[answer] || String(answer)),
+        t: q.type, c: q.category, v: q._v
+      });
       // Advance to next
       setTimeout(() => {
         mainFlow.reset();
@@ -3242,10 +3922,10 @@ function App() {
 
   // Screen router
   const renderContent = () => {
-    if (screen === 'landing' || screen === 'welcome') return <WelcomeScreen isDark={isDark} onSignIn={() => setScreen('question')} onCreateAccount={() => {}} onTryFirst={handleTryFirst} onAI={() => { setEntityType('ai'); handleTryFirst(); }} />;
-    if (screen === 'onboarding') return <OnboardingFlow isDark={isDark} onComplete={handleOnboardingComplete} onSkip={() => setScreen('question')} onSettings={goToSettings} onReset={resetDemo} />;
-    if (screen === 'path-choice') return <PathChoiceScreen isDark={isDark} entityType={entityType} onboardingAnswers={onboardingAnswers} onReveal={handleChooseReveal} onExplore={handleChooseExplore} onSkip={() => setScreen('question')} onSettings={goToSettings} onReset={resetDemo} />;
-    if (screen === 'settings') return <SettingsScreen isDark={isDark} toggleTheme={toggleTheme} settings={{ undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak }} entityType={entityType} setEntityType={setEntityType} onBack={() => setScreen(previousScreen || 'question')} onReset={resetDemo} hasAssessmentData={Object.keys(assess.assessCompleted || {}).length > 0} onResetAssessments={assess.assessClearAll} />;
+    if (screen === 'landing' || screen === 'welcome') return <WelcomeScreen isDark={isDark} onSignIn={() => { if (onboardingComplete) setScreen('question'); else setScreen('onboarding'); }} onCreateAccount={() => {}} onTryFirst={handleTryFirst} onAI={() => { setEntityType('ai'); handleTryFirst(); }} />;
+    if (screen === 'onboarding') return <OnboardingFlow isDark={isDark} onComplete={handleOnboardingComplete} onSkip={() => setScreen('question')} onReset={resetDemo} />;
+    if (screen === 'path-choice') return <PathChoiceScreen isDark={isDark} entityType={entityType} onboardingAnswers={onboardingAnswers} onReveal={handleChooseReveal} onExplore={handleChooseExplore} onSkip={() => setScreen('question')} onReset={resetDemo} />;
+    if (screen === 'settings') return <SettingsScreen isDark={isDark} toggleTheme={toggleTheme} settings={{ undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak }} entityType={entityType} setEntityType={setEntityType} onBack={() => setScreen(previousScreen || 'question')} onReset={resetDemo} hasAssessmentData={Object.keys(assess.assessCompleted || {}).length > 0} onResetAssessments={assess.assessClearAll} displayName={displayName} setDisplayName={setDisplayName} />;
     if (screen === 'compare') return <CompareScreen isDark={isDark} assess={assess} entityType={entityType} displayName={displayName} compareData={compareData} compareLoading={compareLoading} onNavigate={setScreen} />;
     if (screen === 'public-profile') return <PublicProfileScreen isDark={isDark} profileId={publicProfileId} onNavigate={setScreen} />;
     if (screen === 'assess-picker') return <AssessPickerScreen isDark={isDark} entityType={entityType} assess={assess} onNavigate={setScreen} />;
@@ -3316,24 +3996,68 @@ function App() {
       </div>
     );
   })() : null;
+  const globalToastEl = globalToast ? (
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-xl shadow-lg" style={{ background: 'rgba(239,68,68,0.9)', backdropFilter: 'blur(8px)', animation: 'slideUp 0.3s ease-out both', maxWidth: '340px' }}>
+      <Text size="sm" color="white" weight="medium">{globalToast}</Text>
+    </div>
+  ) : null;
+  const nudgeEl = showSignInNudge ? (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9998] px-4 py-2.5 rounded-xl shadow-lg" style={{ background: 'rgba(139,92,246,0.9)', backdropFilter: 'blur(8px)', animation: 'slideUp 0.3s ease-out both', maxWidth: '320px' }}>
+      <button onClick={() => { setShowSignInNudge(false); setPreviousScreen(screen); setScreen('settings'); }} className="cursor-pointer flex items-center gap-2">
+        <Text size="sm" color="white" weight="medium">Sign in to save your progress across devices</Text>
+        <Text size="xs" color="rgba(255,255,255,0.7)">→</Text>
+      </button>
+    </div>
+  ) : null;
+
+  // Persistent settings gear — shows on all screens except settings
+  const settingsGearEl = screen !== 'settings' ? (
+    <button onClick={goToSettings} className="absolute top-3 right-3 z-40 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all"
+      style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
+      <Text as="span" size="sm" emphasis="subtle">⚙</Text>
+    </button>
+  ) : null;
+
   // Final render
-  if (displayMode === 'desktop') {
+  if (displayMode === 'desktop' && IS_DEV) {
     const phoneSize = PHONE_SIZES.find(p => p.id === devPhoneSize) || PHONE_SIZES[2];
     return (
       <>
         {pendingSubmit && <div className="fixed inset-0 z-[9999] bg-transparent" onClick={mainFlow.handleUndo} onMouseDown={mainFlow.handleUndo} style={{ cursor: 'pointer' }} />}
         <PhoneFrame isDark={isDark} width={phoneSize.w} height={phoneSize.h} devOffset={IS_DEV && showDevPanel && !devMinimized}>
-          <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
+          <div className="flex-1 flex flex-col overflow-hidden relative">
+            {settingsGearEl}
+            {renderContent()}
+          </div>
+          {nudgeEl}
+          {globalToastEl}
         </PhoneFrame>
         {devPanelEl}
       </>
     );
   }
+  if (displayMode === 'desktop') {
+    // Non-dev desktop: centered app container, no phone frame
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: isDark ? '#030712' : '#f3f4f6' }}>
+        <div className="relative flex flex-col overflow-hidden" style={{ width: 440, height: '100vh', maxHeight: 956, background: 'var(--bg-main)', borderRadius: 16, boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}
+          onClickCapture={(e) => { if (pendingSubmit) { e.stopPropagation(); mainFlow.handleUndo(); } }}>
+          {settingsGearEl}
+          <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
+          {nudgeEl}
+          {globalToastEl}
+        </div>
+      </div>
+    );
+  }
   return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: 'var(--bg-main)' }}
+    <div className="h-full flex flex-col overflow-hidden relative" style={{ background: 'var(--bg-main)' }}
       onClickCapture={(e) => { if (pendingSubmit) { e.stopPropagation(); mainFlow.handleUndo(); } }}>
+      {settingsGearEl}
       <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
       <div className="safe-bottom" />
+      {nudgeEl}
+          {globalToastEl}
       {devPanelEl}
     </div>
   );
@@ -3342,7 +4066,9 @@ function App() {
 // — MOUNT
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ErrorBoundary>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </ErrorBoundary>
 );
   </script>

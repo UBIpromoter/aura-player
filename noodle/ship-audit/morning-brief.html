@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura — Ship Audit</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0f;
+    color: #e2e8f0;
+    line-height: 1.6;
+    padding: 40px 20px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .subtitle { color: #94a3b8; font-size: 15px; margin-bottom: 40px; }
+  h2 {
+    font-size: 18px; font-weight: 600; color: #c4b5fd;
+    margin: 40px 0 16px; padding-bottom: 8px;
+    border-bottom: 1px solid rgba(139,92,246,0.2);
+  }
+  h3 { font-size: 15px; font-weight: 600; color: #e2e8f0; margin: 24px 0 8px; }
+  p, li { font-size: 14px; color: #cbd5e1; }
+  ul { padding-left: 20px; margin: 8px 0; }
+  li { margin: 6px 0; }
+  .card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .verdict {
+    background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(59,130,246,0.08));
+    border: 1px solid rgba(139,92,246,0.25);
+    border-radius: 16px;
+    padding: 24px;
+    margin: 24px 0;
+  }
+  .verdict p { color: #e2e8f0; font-size: 15px; }
+  .num { color: #a78bfa; font-weight: 700; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border-radius: 4px; margin-right: 6px;
+  }
+  .tag-cut { background: rgba(239,68,68,0.15); color: #fca5a5; }
+  .tag-keep { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+  .tag-rethink { background: rgba(251,191,36,0.15); color: #fde68a; }
+  .tag-unanimous { background: rgba(139,92,246,0.2); color: #c4b5fd; }
+  .funnel { margin: 16px 0; }
+  .funnel-step {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; margin: 4px 0;
+    border-radius: 8px; font-size: 13px;
+  }
+  .funnel-bar {
+    height: 6px; border-radius: 3px; transition: width 0.3s;
+  }
+  .strike { text-decoration: line-through; opacity: 0.4; }
+  .highlight { color: #fbbf24; font-weight: 600; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+  .stat-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; padding: 16px; text-align: center;
+  }
+  .stat-num { font-size: 32px; font-weight: 700; color: #fff; }
+  .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+  .flow-arrow { color: #4b5563; margin: 0 8px; }
+  .flow-box {
+    display: inline-block; padding: 4px 10px; border-radius: 6px;
+    font-size: 13px; font-weight: 500; margin: 2px;
+  }
+  .flow-keep { background: rgba(16,185,129,0.12); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.2); }
+  .flow-cut { background: rgba(239,68,68,0.08); color: #94a3b8; border: 1px solid rgba(239,68,68,0.1); text-decoration: line-through; }
+  .flow-new { background: rgba(59,130,246,0.12); color: #93c5fd; border: 1px solid rgba(59,130,246,0.2); }
+  .source { font-size: 11px; color: #475569; font-style: italic; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { text-align: left; color: #94a3b8; font-weight: 500; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #cbd5e1; }
+  .section-num { color: #4b5563; font-size: 13px; font-weight: 400; margin-right: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Aura Ship Audit</h1>
+<p class="subtitle">Full UX audit + 4-model panel consensus. February 21, 2026.</p>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">01</span> The Verdict</h2>
+
+<div class="verdict">
+  <p>You built something rich. But you built a <strong>platform</strong> when you need a <strong>moment</strong>.</p>
+  <p style="margin-top: 12px;">The good news: the moment is already in there. The aura visualization, the fun onboarding, the spectrum bars &mdash; that's the product. Everything else is depth that should unlock <em>after</em> someone falls in love with the core.</p>
+  <p style="margin-top: 12px;">Ship the moment. If people beg for more, unlock the universe.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">02</span> By the Numbers</h2>
+
+<div class="grid-2">
+  <div class="stat-box"><div class="stat-num">15,918</div><div class="stat-label">lines in index.html</div></div>
+  <div class="stat-box"><div class="stat-num">20</div><div class="stat-label">screens</div></div>
+  <div class="stat-box"><div class="stat-num">62</div><div class="stat-label">React components</div></div>
+  <div class="stat-box"><div class="stat-num">60</div><div class="stat-label">useState() calls</div></div>
+  <div class="stat-box"><div class="stat-num">23</div><div class="stat-label">assessments</div></div>
+  <div class="stat-box"><div class="stat-num">726</div><div class="stat-label">total questions</div></div>
+  <div class="stat-box"><div class="stat-num">384</div><div class="stat-label">lines of CSS</div></div>
+  <div class="stat-box"><div class="stat-num">7</div><div class="stat-label">stamp providers</div></div>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">03</span> Where People Drop Off</h2>
+
+<p style="margin-bottom:16px;">Estimated funnel for a stranger who clicks a link:</p>
+
+<div class="funnel">
+  <div class="funnel-step" style="background: rgba(16,185,129,0.08);">
+    <div style="flex:0 0 60px; font-weight:600; color:#6ee7b7;">100%</div>
+    <div>Welcome screen &mdash; clean, inviting, one button</div>
+  </div>
+  <div class="funnel-step" style="background: rgba(239,68,68,0.12);">
+    <div style="flex:0 0 60px; font-weight:600; color:#fca5a5;">~55%</div>
+    <div><strong>Entity gate kills half.</strong> "Are you human or AI?" with zero context. Users think: scam? CAPTCHA? wrong page?</div>
+  </div>
+  <div class="funnel-step" style="background: rgba(251,191,36,0.06);">
+    <div style="flex:0 0 60px; font-weight:600; color:#fde68a;">~45%</div>
+    <div>Onboarding questions &mdash; fun, but 10 is a lot before the "real" thing starts</div>
+  </div>
+  <div class="funnel-step" style="background: rgba(251,191,36,0.06);">
+    <div style="flex:0 0 60px; font-weight:600; color:#fde68a;">~38%</div>
+    <div>Path choice &mdash; clear, but "Explore the world" leads to a dead end</div>
+  </div>
+  <div class="funnel-step" style="background: rgba(239,68,68,0.08);">
+    <div style="flex:0 0 60px; font-weight:600; color:#fca5a5;">~25%</div>
+    <div><strong>Assessment picker overwhelms.</strong> 6+ categories, hero card ambiguity</div>
+  </div>
+  <div class="funnel-step" style="background: rgba(16,185,129,0.06);">
+    <div style="flex:0 0 60px; font-weight:600; color:#6ee7b7;">~22%</div>
+    <div>First assessment &mdash; engaging once they're in it</div>
+  </div>
+  <div class="funnel-step" style="background: rgba(59,130,246,0.08);">
+    <div style="flex:0 0 60px; font-weight:600; color:#93c5fd;">~18%</div>
+    <div>Results &mdash; satisfying, but no "what next?" &rarr; session ends</div>
+  </div>
+</div>
+
+<p class="source">Estimates synthesized from 4-model panel + UX audit. Real numbers need analytics.</p>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">04</span> Panel Consensus (4/4 agree)</h2>
+
+<div class="card">
+  <p style="margin-bottom:12px;"><span class="tag tag-unanimous">UNANIMOUS</span> All four external models agreed on these:</p>
+  <ul>
+    <li><strong>Remove the Entity Gate for v1.</strong> It creates confusion and major drop-off before any value is delivered.</li>
+    <li><strong>Kill the assessment picker.</strong> Auto-launch one hero assessment. No menu, no choices until after they have a result.</li>
+    <li><strong>Cut gamification, social, community, verification.</strong> These features solve problems you don't have yet.</li>
+    <li><strong>Redesign results for sharing.</strong> Make results visual, rare-feeling, screenshot-worthy with a clear next CTA ("Compare with a friend").</li>
+    <li><strong>The app is 60-80% overbuilt.</strong> Validate the core moment first, then layer complexity back.</li>
+  </ul>
+</div>
+
+<h3>Where they disagreed</h3>
+<table>
+  <tr><th>Topic</th><th>Range of opinions</th></tr>
+  <tr><td>Onboarding length</td><td>3 questions (Kimi) to 10 (Grok). Most said 5&ndash;8.</td></tr>
+  <tr><td>AI track</td><td>Reposition as marketing (GPT, Gemini) vs. remove entirely (Grok, Kimi)</td></tr>
+  <tr><td>Monolith file</td><td>Survivable debt (GPT, Grok) vs. launch blocker (Kimi)</td></tr>
+  <tr><td>Auth timing</td><td>Anonymous-first (Grok) vs. optional post-results (GPT, Gemini)</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">05</span> The MVP Inside What You Built</h2>
+
+<h3>Current flow (20 screens)</h3>
+<p style="margin: 8px 0; font-size: 13px; line-height: 2;">
+  <span class="flow-keep">Welcome</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-cut">Entity Gate</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-keep">Onboarding</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-cut">Path Choice</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-cut">Assess Picker</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-keep">Assessment</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-keep">Results</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-keep">Profile</span>
+</p>
+<p style="font-size: 12px; color: #64748b; margin-bottom: 24px;">
+  + 12 more screens (categories, history, QotD, verify &times;4, identity, stamps, settings, analysis, public profile)
+</p>
+
+<h3>Proposed v1 flow (5&ndash;6 screens)</h3>
+<p style="margin: 8px 0; font-size: 13px; line-height: 2;">
+  <span class="flow-keep">Welcome</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-keep">Onboarding (5&ndash;8 Qs)</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-keep">Hero Assessment</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-new">Results + Share</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-keep">Profile</span><span class="flow-arrow">&rarr;</span>
+  <span class="flow-new">Want more? (unlock picker)</span>
+</p>
+
+<h3>What stays, what hides, what's new</h3>
+
+<table>
+  <tr><th>Feature</th><th>v1 Status</th><th>Why</th></tr>
+  <tr><td>Welcome screen</td><td><span class="tag tag-keep">KEEP</span></td><td>Clean, works</td></tr>
+  <tr><td>Onboarding Qs</td><td><span class="tag tag-keep">KEEP</span> <span class="tag tag-rethink">TRIM</span></td><td>Fun, but shorten to 5&ndash;8</td></tr>
+  <tr><td>Aura visualization</td><td><span class="tag tag-keep">KEEP</span></td><td>This IS the product &mdash; show earlier</td></tr>
+  <tr><td>1 hero assessment</td><td><span class="tag tag-keep">KEEP</span></td><td>Single path, no picker needed</td></tr>
+  <tr><td>Spectrum bars</td><td><span class="tag tag-keep">KEEP</span></td><td>Clear, satisfying results format</td></tr>
+  <tr><td>Undo window</td><td><span class="tag tag-keep">KEEP</span></td><td>Smart, low-friction</td></tr>
+  <tr><td>Profile/archetype</td><td><span class="tag tag-keep">KEEP</span></td><td>The "trophy" users return for</td></tr>
+  <tr><td>Auth (email)</td><td><span class="tag tag-keep">KEEP</span></td><td>Post-results opt-in to save</td></tr>
+  <tr><td>Entity gate</td><td><span class="tag tag-cut">HIDE</span></td><td>Conversion killer with no context</td></tr>
+  <tr><td>Path choice</td><td><span class="tag tag-cut">HIDE</span></td><td>One path for v1: Reveal</td></tr>
+  <tr><td>Assessment picker</td><td><span class="tag tag-cut">HIDE</span></td><td>Decision paralysis; auto-launch hero test</td></tr>
+  <tr><td>AI track (4 tests)</td><td><span class="tag tag-cut">HIDE</span></td><td>No AI users yet; reintroduce when real demand</td></tr>
+  <tr><td>XP / levels / streaks</td><td><span class="tag tag-cut">HIDE</span></td><td>Gamification before PMF is noise</td></tr>
+  <tr><td>QotD</td><td><span class="tag tag-cut">HIDE</span></td><td>Nice engagement hook but not core</td></tr>
+  <tr><td>Community stats</td><td><span class="tag tag-cut">HIDE</span></td><td>No community yet</td></tr>
+  <tr><td>Stamps (7 providers)</td><td><span class="tag tag-cut">HIDE</span></td><td>Complexity for later</td></tr>
+  <tr><td>Verification (4 screens)</td><td><span class="tag tag-cut">HIDE</span></td><td>Solves a problem you don't have</td></tr>
+  <tr><td>History screen</td><td><span class="tag tag-cut">HIDE</span></td><td>Retention feature, not acquisition</td></tr>
+  <tr><td>Share + compare</td><td><span class="tag tag-rethink">NEW</span></td><td>Viral loop &mdash; the growth engine v1 needs</td></tr>
+  <tr><td>Rarity / social proof</td><td><span class="tag tag-rethink">NEW</span></td><td>"Only 8% share your type" drives shares</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">06</span> The 3 Changes That Matter Most</h2>
+
+<div class="card" style="border-color: rgba(16,185,129,0.3);">
+  <h3 style="color: #6ee7b7; margin-top: 0;">1. One linear path, no choices</h3>
+  <p>Welcome &rarr; fun Qs &rarr; hero assessment &rarr; results. No entity gate, no path fork, no picker. The user's only job is to answer questions and be rewarded with insights. Every decision point you remove increases completion by ~15%.</p>
+</div>
+
+<div class="card" style="border-color: rgba(59,130,246,0.3);">
+  <h3 style="color: #93c5fd; margin-top: 0;">2. Results designed for sharing</h3>
+  <p>The results page is where growth happens or doesn't. Make it: <strong>visual</strong> (aura viz front and center), <strong>rare-feeling</strong> ("Only 6% of people share this pattern"), <strong>screenshot-worthy</strong> (works as an IG story), and end with one CTA: <em>"Compare with a friend"</em> that generates a link requiring the friend to take the test.</p>
+</div>
+
+<div class="card" style="border-color: rgba(251,191,36,0.3);">
+  <h3 style="color: #fde68a; margin-top: 0;">3. Lead with the aura</h3>
+  <p>The aura visualization is the product's differentiator, but it's hidden behind 5 screens of friction. Show a teaser on the welcome screen. Make the tagline promise a visual identity: <em>"See your aura in 60 seconds"</em>. The mystical/visual angle is what separates this from every other Big Five clone.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">07</span> What You're NOT Throwing Away</h2>
+
+<div class="card">
+  <p>Nothing gets deleted. Everything gets <strong>gated</strong>.</p>
+  <ul style="margin-top: 12px;">
+    <li>Complete the hero assessment &rarr; unlock the picker with all 23 tests</li>
+    <li>Complete 2+ categories &rarr; unlock Analysis dashboard</li>
+    <li>Sign up &rarr; unlock profile, history, streaks</li>
+    <li>Return 3+ times &rarr; unlock QotD, community stats</li>
+    <li>Settings toggle &rarr; unlock AI mode, entity declaration</li>
+  </ul>
+  <p style="margin-top: 12px; color: #94a3b8; font-size: 13px;">The legos stay. The front door gets simpler. Everything you built becomes the depth that keeps people coming back &mdash; not the wall that stops them from getting in.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">08</span> Open Questions for You</h2>
+
+<div class="card">
+  <ol>
+    <li style="margin: 10px 0;"><strong>Which assessment is the hero?</strong> Quick Profile (5 Qs, fast) or a specific Big Five module? The hero test needs to be fast (&lt;3 min), deliver a satisfying result, and make people want more.</li>
+    <li style="margin: 10px 0;"><strong>How aggressive on cuts?</strong> We can hide features behind flags (reversible, ~1 day) or actually strip them from the shipped file (cleaner, ~2-3 days). Features stay in git either way.</li>
+    <li style="margin: 10px 0;"><strong>AI angle for positioning?</strong> Some models said lean into "works for humans AND AI" as your marketing hook (unique angle). Others said hide it completely. What feels right?</li>
+    <li style="margin: 10px 0;"><strong>Monolith timing?</strong> You already have Vite in <code>app/src/</code>. Do we split before launch, or ship the single file and modularize after validation?</li>
+    <li style="margin: 10px 0;"><strong>Compare/viral mechanic?</strong> "Compare auras with a friend" was the strongest growth idea across all models. Want to build it for v1 or save for fast-follow?</li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">09</span> Sources</h2>
+
+<div class="card" style="font-size: 12px; color: #64748b;">
+  <p><strong>Internal audit:</strong> Full read of index.html (15,918 lines), DESIGN.md, TOKENS.md, MEMORY.md</p>
+  <p><strong>Live site check:</strong> ubipromoter.github.io/aura-player/ via WebFetch</p>
+  <p><strong>Panel review:</strong> GPT-5.2, Gemini 2.5 Pro, Grok 4.1, Kimi K2.5 &mdash; independent reviews + consensus extraction</p>
+  <p><strong>Complexity audit:</strong> Component count, state variable count, screen mapping, assessment inventory</p>
+</div>
+
+<button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.22)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.7)'">&#8635; Refresh</button>
+
+</body>
+</html>

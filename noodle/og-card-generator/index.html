@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OG Card Generator — Aura</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    color: #e2e8f0;
+    gap: 24px;
+    padding: 40px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .controls button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.1);
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .controls button:hover {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+  }
+  .controls .label {
+    font-size: 13px;
+    opacity: 0.6;
+  }
+
+  /* The card itself — exactly 1200×630 */
+  .og-card {
+    width: 1200px;
+    height: 630px;
+    position: relative;
+    overflow: hidden;
+    background: #030712;
+    border-radius: 0;
+    flex-shrink: 0;
+  }
+
+  /* Preview mode scales it down */
+  .og-card.preview {
+    transform: scale(0.55);
+    transform-origin: top center;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  /* Ambient aura glow — layered radials */
+  .og-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 500px 400px at 35% 50%, rgba(139, 92, 246, 0.25), transparent 70%),
+      radial-gradient(ellipse 400px 350px at 65% 45%, rgba(59, 130, 246, 0.18), transparent 70%),
+      radial-gradient(ellipse 300px 280px at 50% 55%, rgba(217, 70, 239, 0.12), transparent 70%),
+      radial-gradient(ellipse 200px 200px at 42% 48%, rgba(16, 185, 129, 0.08), transparent 60%);
+    z-index: 1;
+  }
+
+  /* Subtle organic nodes */
+  .nodes {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    opacity: 0.4;
+  }
+  .node {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(1px);
+  }
+
+  /* Content layer */
+  .og-content {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px;
+  }
+
+  .og-title {
+    font-size: 72px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    line-height: 1;
+    background: linear-gradient(135deg, #e2e8f0 0%, #f8fafc 40%, #c4b5fd 70%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 20px;
+  }
+
+  .og-tagline {
+    font-size: 28px;
+    font-weight: 400;
+    color: rgba(226, 232, 240, 0.7);
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+    max-width: 700px;
+  }
+
+  .og-badge {
+    margin-top: 36px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .og-badge-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #8b5cf6;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+  }
+  .og-badge-text {
+    font-size: 16px;
+    font-weight: 500;
+    color: rgba(226, 232, 240, 0.45);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* Subtle edge vignette */
+  .og-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 50%, rgba(3, 7, 18, 0.4) 100%);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <span class="label">1200 × 630px</span>
+  <button onclick="downloadCard()">⬇ Download PNG</button>
+  <button onclick="togglePreview()">Toggle Scale</button>
+</div>
+
+<div class="og-card preview" id="ogCard">
+  <!-- Organic nodes -->
+  <div class="nodes" id="nodes"></div>
+
+  <!-- Content -->
+  <div class="og-content">
+    <div class="og-title">Aura</div>
+    <div class="og-tagline">Discover yourself, one question at a time</div>
+    <div class="og-badge">
+      <div class="og-badge-dot"></div>
+      <div class="og-badge-text">Personality Assessment</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Generate organic scatter nodes
+  const nodesEl = document.getElementById('nodes');
+  const colors = [
+    { color: 'rgba(139, 92, 246, 0.6)', size: [4, 8] },   // violet
+    { color: 'rgba(59, 130, 246, 0.5)', size: [3, 7] },    // blue
+    { color: 'rgba(217, 70, 239, 0.4)', size: [3, 6] },    // fuchsia
+    { color: 'rgba(16, 185, 129, 0.35)', size: [3, 5] },   // emerald
+    { color: 'rgba(99, 102, 241, 0.4)', size: [3, 6] },    // indigo
+  ];
+
+  // Place nodes in the glow region (center-ish)
+  for (let i = 0; i < 35; i++) {
+    const c = colors[Math.floor(Math.random() * colors.length)];
+    const size = c.size[0] + Math.random() * (c.size[1] - c.size[0]);
+    const node = document.createElement('div');
+    node.className = 'node';
+    // Cluster toward center with gaussian-ish distribution
+    const cx = 50 + (Math.random() - 0.5) * 50;
+    const cy = 50 + (Math.random() - 0.5) * 40;
+    node.style.cssText = `
+      left: ${cx}%;
+      top: ${cy}%;
+      width: ${size}px;
+      height: ${size}px;
+      background: ${c.color};
+      box-shadow: 0 0 ${size * 2}px ${c.color};
+    `;
+    nodesEl.appendChild(node);
+  }
+
+  function togglePreview() {
+    document.getElementById('ogCard').classList.toggle('preview');
+  }
+
+  async function downloadCard() {
+    // Use html2canvas if available, otherwise prompt manual screenshot
+    if (typeof html2canvas !== 'undefined') {
+      const card = document.getElementById('ogCard');
+      card.classList.remove('preview');
+      const canvas = await html2canvas(card, {
+        width: 1200,
+        height: 630,
+        scale: 1,
+        backgroundColor: '#030712',
+        useCORS: true,
+      });
+      card.classList.add('preview');
+      const link = document.createElement('a');
+      link.download = 'og-card.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } else {
+      // Fallback: load html2canvas dynamically
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      script.onload = () => downloadCard();
+      document.head.appendChild(script);
+    }
+  }
+</script>
+
+<button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.22)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.7)'">↻ Refresh</button>
+</body>
+</html>

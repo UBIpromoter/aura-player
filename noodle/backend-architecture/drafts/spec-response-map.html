@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adam's Vision ↔ How We Built It</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    line-height: 1.7;
+  }
+
+  .container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 100vh;
+  }
+
+  .side {
+    padding: 40px 48px 80px;
+    overflow-y: auto;
+  }
+
+  .side-left {
+    background: #0d0d14;
+    border-right: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .side-right { background: #0a0a0f; }
+
+  .side-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 32px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .side-left .side-label { color: rgba(99, 102, 241, 0.6); }
+  .side-right .side-label { color: rgba(16, 185, 129, 0.6); }
+
+  .adam h1 { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 24px; }
+  .adam h2 { font-size: 16px; font-weight: 700; color: rgba(255,255,255,0.9); margin: 36px 0 14px; }
+  .adam h2:first-of-type { margin-top: 0; }
+  .adam h3 { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.7); margin: 20px 0 10px; }
+  .adam p { font-size: 14px; color: rgba(220, 220, 235, 0.85); margin-bottom: 12px; }
+  .adam ul { list-style: disc; padding-left: 20px; margin-bottom: 12px; }
+  .adam ul li { font-size: 14px; color: rgba(220, 220, 235, 0.85); margin-bottom: 6px; }
+  .adam a { color: #818cf8; text-decoration: none; }
+
+  .adam-section {
+    padding-bottom: 28px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .adam-section:last-child { border-bottom: none; }
+
+  .response-section {
+    padding-bottom: 28px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .response-section:last-child { border-bottom: none; }
+
+  .response-section h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 18px;
+  }
+
+  .block {
+    font-size: 14px;
+    color: rgba(210, 210, 225, 0.88);
+    margin-bottom: 18px;
+    padding: 16px 18px;
+    border-radius: 8px;
+  }
+
+  .block p { margin-bottom: 10px; }
+  .block p:last-child { margin-bottom: 0; }
+  .block strong { color: #fff; }
+
+  .block-nailed {
+    background: rgba(16, 185, 129, 0.05);
+    border-left: 3px solid rgba(16, 185, 129, 0.4);
+  }
+
+  .block-talk {
+    background: rgba(255,255,255,0.02);
+    border-left: 3px solid rgba(255,255,255,0.1);
+  }
+
+  .block-simpler {
+    background: rgba(56, 189, 248, 0.05);
+    border-left: 3px solid rgba(56, 189, 248, 0.35);
+  }
+
+  .block-discovery {
+    background: rgba(239, 68, 68, 0.05);
+    border-left: 3px solid rgba(239, 68, 68, 0.4);
+  }
+
+  .block-question {
+    background: rgba(99, 102, 241, 0.06);
+    border-left: 3px solid rgba(99, 102, 241, 0.4);
+  }
+
+  .block-future {
+    background: rgba(168, 85, 247, 0.05);
+    border-left: 3px solid rgba(168, 85, 247, 0.35);
+  }
+
+  .block-phase {
+    background: rgba(245, 158, 11, 0.05);
+    border-left: 3px solid rgba(245, 158, 11, 0.35);
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+  }
+
+  .tag-nailed { background: rgba(16,185,129,0.15); color: #10b981; }
+  .tag-simpler { background: rgba(56,189,248,0.15); color: #38bdf8; }
+  .tag-discovery { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .tag-question { background: rgba(99,102,241,0.15); color: #818cf8; }
+  .tag-future { background: rgba(168,85,247,0.15); color: #a855f7; }
+  .tag-phase { background: rgba(245,158,11,0.15); color: #f59e0b; }
+
+  .io-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 8px;
+    align-items: start;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+
+  .io-box {
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .io-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .io-in .io-label { color: rgba(99, 102, 241, 0.6); }
+  .io-out .io-label { color: rgba(16, 185, 129, 0.6); }
+  .io-arrow { color: rgba(255,255,255,0.15); font-size: 18px; padding-top: 14px; }
+
+  .phase-box {
+    margin: 14px 0;
+    padding: 14px 16px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    font-size: 13px;
+  }
+
+  .phase-box strong { color: #fff; }
+  .phase-box p { margin-bottom: 6px; }
+  .phase-box p:last-child { margin-bottom: 0; }
+
+  .check { color: #10b981; }
+</style>
+</head>
+<body>
+
+<button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.22)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.7)'">&#8635; Refresh</button>
+
+<div class="container">
+
+<!-- ════════════ LEFT ════════════ -->
+
+<div class="side side-left">
+  <div class="side-label">Adam's Spec &mdash; His Words</div>
+
+  <div class="adam">
+    <h1>Architectural goals for the Aura Player App</h1>
+
+    <div class="adam-section">
+      <h2>Privacy</h2>
+      <p>As users answer questions, they generate local facts about themselves. Some of these facts could be useful to Aura players in evaluating them in domains such as human uniqueness.</p>
+      <p>We want to help users understand which facts they might want to selectively share.</p>
+      <p>Those that might be selectively shared can be approved by a user in the following ways:</p>
+      <ul>
+        <li>The user approves that anyone can see that a user has a certain fact (e.g. twitter account), but not see the details of the fact (e.g. the twitter account identifier), only check that they already know it. We can offer to combine facts into bundles to discourage guessing or griefing. (E.g. you must check the email address AND the phone number together.)</li>
+        <li>They can choose to share facts directly with players they select.</li>
+      </ul>
+      <h3>Goals</h3>
+      <ul>
+        <li>Share just the facts or parts of facts a user chooses.</li>
+        <li>Plausible deniability: a user proves a fact, but the player (verifier) can't share it further.</li>
+        <li>Allow a player to verify they know approved facts, but they can't learn anything new.</li>
+      </ul>
+      <h3>Tools</h3>
+      <ul>
+        <li>Off the record protocol</li>
+        <li>Socialist millionaire protocol</li>
+        <li>BBS+</li>
+      </ul>
+    </div>
+
+    <div class="adam-section">
+      <h2>Evaluation</h2>
+      <p>Most players will evaluate subjects using information they already know (share nothing architecture).</p>
+      <p>In some domains, players must corroborate to ensure they're talking about the same subject without publicly revealing information about the subject.</p>
+      <p>In some domains, (such as proving human uniqueness), players want to know that a subject isn't getting verified multiple times as different subjects using the same proofs. When looking at the shared proofs for a subject, they'll want to ensure that a different subject didn't use some or all of the same proofs to get verified, but this needs to be done in a way that doesn't violate the privacy goals stated above.</p>
+    </div>
+
+    <div class="adam-section">
+      <h2>Scalability</h2>
+      <p>The architecture must be scalable to billions of participants.</p>
+      <p>You can assume a working network of BrightID (Aura) nodes and choose to deploy protocols as part of the node software.</p>
+    </div>
+
+    <div class="adam-section">
+      <h2>Decentralization</h2>
+      <p>No centralized actor should be able to block operations or decrypt private data.</p>
+      <p>Any protocols used in any of the goals described must conform to this.</p>
+      <p><a href="https://hackmd.io/xKEcuzstQp2o8XIvve6KtA">Read this article</a> to see how BrightID/Aura/Updraft work together to achieve decentralization.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ RIGHT ════════════ -->
+
+<div class="side side-right">
+  <div class="side-label">How We Owned It — v6</div>
+
+  <!-- ═══ PRIVACY ═══ -->
+  <div class="response-section">
+    <h2>Privacy</h2>
+
+    <div class="block block-talk">
+      <p>Adam designed two approval methods. We built to both, using all three tools he specified. The user-facing distinction: <strong>"Show a player" vs "Share with a player."</strong> Showing = private verification, nothing changes hands. Sharing = handing someone a portable credential. The user's choice of mode IS the privacy decision.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Check that they already know it."</strong> Mode 1 (SMP). Four messages, two round trips, neither party transmits the fact. Subject controls participation.</p>
+      <div class="io-row">
+        <div class="io-box io-in"><div class="io-label">In</div>Player's existing knowledge + subject's local facts</div>
+        <div class="io-arrow">&rarr;</div>
+        <div class="io-box io-out"><div class="io-label">Out</div>Yes or no. Nothing else. No data transmitted.</div>
+      </div>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Share facts directly with players they select."</strong> Mode 2 (BBS+). Each assessment fact = one credential slot. User picks which to reveal. Everything else is mathematically hidden.</p>
+      <div class="io-row">
+        <div class="io-box io-in"><div class="io-label">In</div>User's signed credential + their choice of what to reveal</div>
+        <div class="io-arrow">&rarr;</div>
+        <div class="io-box io-out"><div class="io-label">Out</div>Verifiable proof of chosen facts. All others invisible.</div>
+      </div>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Bundle to discourage guessing."</strong> Every Aura fact type mapped with entropy analysis. Low-entropy facts (attachment style: 4 values, chronotype: 3) never exposed alone — must be bundled with high-entropy facts (Big Five: ~10 billion combinations). System enforces minimum entropy per bundle.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Plausible deniability."</strong> Mode 1: fully deniable. After the session, neither side holds evidence. The verifier knows but can't prove it. Just their word.</p>
+      <p>Mode 2: not deniable — a signed proof is portable. But that's the whole point of choosing to <em>share</em> rather than <em>show</em>. Your spec already separates these into two methods. The deniability property follows the mode the user picks.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Verify they know approved facts, can't learn anything new."</strong> SMP. Zero information leakage beyond the boolean match.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>Credential signing — blind issuance.</strong> The signing node never sees assessment scores. Signs a sealed commitment. This is the only approach where no centralized actor ever sees a user's data, honoring the decentralization rule.</p>
+      <p><strong>And the fabrication concern doesn't exist.</strong> Assessment scores are self-reported. People can already lie on personality tests, have AI coach them, or not even realize their self-perception is inaccurate. Verifying scores at signing time doesn't solve dishonesty. <strong>The Aura trust graph is where reliability lives.</strong> A credential is only as meaningful as the Aura-verified trust behind the identity that holds it. Over time, through evaluations, the network develops a sense of who's reliable and in what context.</p>
+    </div>
+
+    <div class="block block-simpler">
+      <span class="tag tag-simpler">Simpler option</span>
+      <p><strong>Blind signing is a draft IETF spec, implemented by one library.</strong> Standard signing — where the issuer sees the scores — is how every certificate authority in the world works. Well-understood, every library supports it.</p>
+      <p><strong>Possible path:</strong> Start with standard issuance for Mode 2. The privacy cost is limited to the signing moment, mitigated by only allowing high-trust nodes to issue. Upgrade to blind issuance when the spec matures. Adam may already have a strong opinion here — if blind issuance is a day-one principle, we're ready for it. If not, the simpler path gets Mode 2 shipping sooner.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>Griefing — full picture.</strong> Bundling prevents information extraction. Rate limiting + subject veto handle harassment. $1 BrightID sponsorship cost prevents mass spam. Bot armies can inflate their own graph corners but can't fake connections into the verified core. The defenses compound: structural, economic, and social.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>All three tools used as specified.</strong> Encrypted session layer wraps both modes. Adam and Ali have already picked the specific OTR variant.</p>
+    </div>
+
+    <div class="block block-simpler">
+      <span class="tag tag-simpler">Simpler option</span>
+      <p><strong>On the session layer:</strong> Existing OTR JavaScript libraries are dead. Custom implementation means constant-time requirements and security audits. Battle-tested alternatives (Noise Protocol, libsodium) provide encrypted sessions with forward secrecy out of the box. What they don't provide is OTR's specific post-session deniability.</p>
+      <p>If post-session deniability is essential for Mode 1, OTR is the right tool and the custom work is worth it. If the primary need is encrypted forward-secret sessions, a proven library gets there faster and more safely. Deniability can be added as an upgrade. Adam and Ali have almost certainly thought about this — we just don't want to overlook a simpler path.</p>
+    </div>
+  </div>
+
+  <!-- ═══ EVALUATION ═══ -->
+  <div class="response-section">
+    <h2>Evaluation</h2>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Share nothing architecture."</strong> Mode 1 is primary. No credential infrastructure needed — two parties and a relay. Works before any signing, issuance, or node changes exist. Mode 2 is the opt-in layer on top.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Corroborate without publicly revealing."</strong> SMP between players. Both hash canonical subject info. Confirms same person without revealing identifiers. Different domains need different corroboration evidence — maps to the node domain architecture.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Not getting verified multiple times."</strong> The gate isn't BrightID creation — anyone can spin up as many as they want. <strong>The gate is Aura verification.</strong> Getting a BrightID verified through the player network is the hard part. Bot armies can inflate their own corners but can't penetrate the verified core. $1 sponsorship prevents mass spam. The scoring algorithm catches structural anomalies.</p>
+      <p>For credentials: if issuance requires Aura verification, uniqueness is built in. Additional mechanisms possible but likely not needed.</p>
+    </div>
+
+    <div class="block block-question">
+      <span class="tag tag-question">Question for Adam</span>
+      <p><strong>Domain scoping for assessments.</strong> Beyond human uniqueness, do personality assessments become their own domain with their own node trust and Updraft campaign? Or does everything ride on the BrightID domain for now?</p>
+    </div>
+
+    <div class="block block-future">
+      <span class="tag tag-future">Future direction</span>
+      <p><strong>Third-party assessments.</strong> Right now assessments are self-reported mirrors. But the most valuable data may be the view from the outside — your spouse's assessment of your personality, your colleagues' read on your work style. The gap between self-perception and external perception is maybe the most interesting signal.</p>
+      <p>Mode 1 already supports this: if two people take assessments about the same subject, a player can verify whether their views align — without seeing any scores. One outside perspective is an opinion. A hundred start to approach truth. This is where Aura's evaluation system points naturally.</p>
+    </div>
+
+    <div class="block block-question">
+      <span class="tag tag-question">Question for Adam</span>
+      <p><strong>AI entity uniqueness.</strong> For humans, Aura verification is the gate — one body, one verified identity. For AI, there's no equivalent anchor. A persistent AI with memory and ongoing relationships is fundamentally different from an ephemeral agent. Is AI uniqueness an extension of what Aura already does, or a different problem needing its own domain?</p>
+    </div>
+  </div>
+
+  <!-- ═══ SCALABILITY ═══ -->
+  <div class="response-section">
+    <h2>Scalability</h2>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Scalable to billions."</strong> Both modes are private conversations between two parties. No global consensus, no bottleneck. A billion simultaneous verifications don't interfere with each other.</p>
+      <p>Real bottlenecks at scale: relay capacity (distributable) and the scoring algorithm on a billion-node graph (may need distributed computation). Engineering problems, not architectural limits.</p>
+    </div>
+
+    <div class="block block-discovery">
+      <span class="tag tag-discovery">Discovery</span>
+      <p><strong>"Deploy as node software" — the runtime can't handle it.</strong> Foxx (ArangoDB's embedded V8) is synchronous-only. The BBS+ signing library is a multi-megabyte WASM module — likely beyond V8's sync compilation limit.</p>
+      <p><strong>Proposed:</strong> Helper service alongside each node. Node handles graph/scores. Helper handles signing/sessions. One more container in the existing cluster.</p>
+      <p>Adam's already evolving this infrastructure. He may have a better shape. We framed it as a proposal.</p>
+    </div>
+
+    <div class="block block-phase">
+      <span class="tag tag-phase">Key insight</span>
+      <p><strong>The sidecar is only needed for Mode 2.</strong> Mode 1 runs client-to-client via relay. No node changes, no new containers, no signing keys. If Mode 1 ships first, the sidecar comes later when it's actually needed.</p>
+    </div>
+  </div>
+
+  <!-- ═══ DECENTRALIZATION ═══ -->
+  <div class="response-section">
+    <h2>Decentralization</h2>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Can't block operations."</strong> Issuance authority from the scoring system — many independent nodes, deterministic. No single node can block. Majority collusion is what the scoring algorithm, random walk auditing, and Updraft public ratification are designed to catch.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>"Can't decrypt private data."</strong> In Mode 1, no data leaves the client. In Mode 2 with blind issuance, the signer sees nothing. Conversations encrypted end-to-end. Relays see metadata only. No point in the chain where a single actor reads a user's data.</p>
+    </div>
+
+    <div class="block block-nailed">
+      <span class="tag tag-nailed">Nailed</span>
+      <p><strong>Decentralization article — fully integrated.</strong></p>
+      <p><strong>Node domains:</strong> Different credential types &rarr; different issuer trust sets. Domain-specific, not global.</p>
+      <p><strong>Scoring:</strong> Architecture doesn't couple to a specific algorithm. Changeable without breaking credentials.</p>
+      <p><strong>Updraft:</strong> Prediction market incentives determine per-domain node trust. Early accurate opinions rewarded.</p>
+      <p><strong>Auditing:</strong> Public graph structure (IDChain) + private session content. No conflict.</p>
+      <p><strong>Teams:</strong> Independent energy flows = resilience. One compromised team doesn't poison the rest.</p>
+    </div>
+
+    <div class="block block-question">
+      <span class="tag tag-question">Question for Adam</span>
+      <p><strong>Team credential scoping.</strong> If Team A's nodes sign a credential and a verifier only trusts Team B — is that credential worthless? Or does the Updraft-weighted overall score bridge across teams?</p>
+    </div>
+  </div>
+
+  <!-- ═══ PHASED DELIVERY ═══ -->
+  <div class="response-section">
+    <h2>Phased Delivery</h2>
+
+    <div class="block block-phase">
+      <span class="tag tag-phase">The big picture</span>
+      <p>The architecture phases naturally. Mode 1 delivers most of the spec with none of the hardest infrastructure. BrightID's history has shown that reaching for everything at once — cutting-edge tooling, full decentralization, all features — slows things down. This phasing lets us ship something real while the harder pieces mature.</p>
+    </div>
+
+    <div class="phase-box">
+      <p><strong>Phase 1 — Mode 1: "Show a Player"</strong></p>
+      <p>"Verify they know approved facts, can't learn anything new" <span class="check">✓</span></p>
+      <p>"Plausible deniability" <span class="check">✓</span></p>
+      <p>"Bundle to discourage guessing" <span class="check">✓</span></p>
+      <p>"Most players evaluate using information they already know" <span class="check">✓</span></p>
+      <p>"Corroborate without publicly revealing" <span class="check">✓</span></p>
+      <p>Scalable (pairwise, no global state) <span class="check">✓</span></p>
+      <p><strong>No credentials, no signing, no sidecar, no node changes.</strong></p>
+    </div>
+
+    <div class="phase-box">
+      <p><strong>Phase 2 — Mode 2: "Share with a Player"</strong></p>
+      <p>"Share just the facts or parts of facts a user chooses" <span class="check">✓</span></p>
+      <p>Portable, verifiable credentials <span class="check">✓</span></p>
+      <p>Credential-layer duplicate detection <span class="check">✓</span></p>
+      <p><strong>Adds:</strong> BBS+ library, sidecar on nodes, signing key management, credential schemas.</p>
+      <p><strong>Simpler start:</strong> Standard issuance → blind issuance upgrade. Single-signer → threshold upgrade.</p>
+    </div>
+
+    <div class="block block-talk">
+      <p>By the time Phase 2 ships, the blind signing spec may be finalized, OTR libraries may have improved, and Phase 1 will have provided real production experience with sessions and relay infrastructure. <strong>Every cutting-edge choice becomes "use the best available tool when we actually need it" instead of "get everything perfect before anything ships."</strong></p>
+    </div>
+
+    <div class="block block-question">
+      <span class="tag tag-question">Question for Adam</span>
+      <p><strong>How soon does Mode 2 matter?</strong> Mode 1 covers the primary use case — "most players evaluate using information they already know." Is credential issuance needed at launch, or is Mode 1 the MVP with Mode 2 on the roadmap?</p>
+    </div>
+  </div>
+
+</div>
+</div>
+
+</body>
+</html>

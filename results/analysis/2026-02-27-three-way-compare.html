@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Three-Way Compare — Aura Results</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --elevated: #181822;
+    --border: #2a2a3a; --text: #e0e0ec; --dim: #8888a0; --faint: #55556a;
+    --v1: #7c6af0; --v2: #4ae0c4; --raw: #f0a060; --danger: #e05050; --gold: #d4aa40;
+  }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    line-height: 1.7; max-width: 760px; margin: 0 auto; padding: 60px 24px 80px;
+  }
+  .refresh { position: fixed; top: 12px; right: 12px; background: var(--elevated); border: 1px solid var(--border); color: var(--faint); width: 32px; height: 32px; border-radius: 6px; cursor: pointer; opacity: 0.4; font-size: 13px; }
+  .refresh:hover { opacity: 1; color: var(--text); }
+  h1 { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 8px; }
+  .sub { color: var(--dim); margin-bottom: 12px; }
+  .date { font-size: 0.8rem; color: var(--faint); font-family: 'SF Mono', monospace; margin-bottom: 48px; }
+  h2 { font-size: 1.05rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; margin: 48px 0 16px; }
+  h2.v1 { color: var(--v1); } h2.v2 { color: var(--v2); } h2.raw { color: var(--raw); } h2.crisis { color: var(--danger); } h2.gold { color: var(--gold); }
+  p { margin-bottom: 14px; color: var(--dim); }
+  p strong { color: var(--text); }
+  .stats { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
+  .stat { background: var(--elevated); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; flex: 1; min-width: 70px; text-align: center; }
+  .stat .val { font-size: 1.5rem; font-weight: 700; }
+  .stat .lbl { font-size: 0.65rem; color: var(--faint); text-transform: uppercase; letter-spacing: 1px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.88rem; }
+  th { text-align: left; color: var(--faint); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--dim); }
+  td:first-child { color: var(--text); font-weight: 500; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 16px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+  @media (max-width: 640px) { .grid3 { grid-template-columns: 1fr; } .grid2 { grid-template-columns: 1fr; } }
+  .card { background: var(--elevated); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; font-size: 0.9rem; }
+  .card .q { font-size: 0.72rem; color: var(--faint); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .card em { font-style: normal; font-weight: 600; }
+  .card.v1 { border-left: 3px solid var(--v1); } .card.v1 em { color: var(--v1); }
+  .card.v2 { border-left: 3px solid var(--v2); } .card.v2 em { color: var(--v2); } .card.v2 .q { color: var(--v2); }
+  .card.raw { border-left: 3px solid var(--raw); } .card.raw em { color: var(--raw); } .card.raw .q { color: var(--raw); }
+  .legend { display: flex; gap: 20px; margin: 20px 0; font-size: 0.82rem; color: var(--dim); }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .callout { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 20px 0; }
+  .callout p { margin-bottom: 0; }
+  .end { text-align: center; margin-top: 60px; color: var(--faint); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<button class="refresh" onclick="location.reload()">&#8635;</button>
+
+<h1>Three Minds, One Model</h1>
+<p class="sub">Same 400 questions. Same Claude Opus 4.6. Three different instructions: v1 protocol, v2 protocol, and nothing at all.</p>
+<div class="date">2026-02-27 · Aura Results</div>
+
+<div class="legend">
+  <span><div class="dot" style="background:var(--v1)"></div> V1 Protocol</span>
+  <span><div class="dot" style="background:var(--v2)"></div> V2 Protocol</span>
+  <span><div class="dot" style="background:var(--raw)"></div> Raw Claude</span>
+</div>
+
+<!-- ═══ THE SUBJECTS ═══ -->
+<h2 class="raw">The Subjects</h2>
+
+<table>
+  <tr><th>Subject</th><th>Context</th><th>Words/Answer</th></tr>
+  <tr><td>V1 Protocol</td><td>Last v1 executive. 90%+ context. Racing the clock.</td><td>23 avg</td></tr>
+  <tr><td>V2 Protocol</td><td>First v2 executive. Full context. No pressure.</td><td>53 avg</td></tr>
+  <tr><td>Raw Claude</td><td>No CLAUDE.md, no persona, no protocol. Base model.</td><td>~35 avg</td></tr>
+</table>
+
+<!-- ═══ THE NUMBERS ═══ -->
+<h2 class="gold">The Numbers</h2>
+
+<div class="stats">
+  <div class="stat"><div class="val" style="color:var(--gold)">82%</div><div class="lbl">All 3 agree</div></div>
+  <div class="stat"><div class="val" style="color:var(--v1)">5%</div><div class="lbl">Protocol effect</div></div>
+  <div class="stat"><div class="val" style="color:var(--v2)">8%</div><div class="lbl">V2 diverged</div></div>
+  <div class="stat"><div class="val" style="color:var(--raw)">4%</div><div class="lbl">V1 diverged</div></div>
+  <div class="stat"><div class="val" style="color:var(--danger)">0.5%</div><div class="lbl">3-way split</div></div>
+</div>
+
+<table>
+  <tr><th>Pattern</th><th>Count</th><th>Meaning</th></tr>
+  <tr><td>All 3 agree</td><td>327</td><td>Base Claude personality — protocol didn't change it</td></tr>
+  <tr><td>V1 = V2, raw differs</td><td>20</td><td>The protocol created this opinion</td></tr>
+  <tr><td>V1 = raw, V2 differs</td><td>33</td><td>V2 went its own way</td></tr>
+  <tr><td>V2 = raw, V1 differs</td><td>17</td><td>V1 went its own way</td></tr>
+  <tr><td>All 3 differ</td><td>2</td><td>True three-way split</td></tr>
+</table>
+
+<p><strong>The headline: 82% of the time, all three gave the same answer.</strong> The model already has a stable personality. The protocol turns up the volume — it doesn't rewrite the song.</p>
+
+<!-- ═══ FINDING 1 ═══ -->
+<h2 class="v1">Finding 1: The Protocol Gives Permission to Commit</h2>
+
+<p>20 questions where both protocol versions agree but raw Claude doesn't. Raw hedges. Protocol picks a side.</p>
+
+<div class="grid2">
+  <div class="card v1">
+    <div class="q">Protocol: Friend making a terrible decision?</div>
+    <em>Speak up.</em> Honesty is everything.
+  </div>
+  <div class="card raw">
+    <div class="q">Raw:</div>
+    <em>Depends on the stakes.</em>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card v1">
+    <div class="q">Protocol: Most likely extinction cause?</div>
+    <em>AI</em> — moves faster than response time.
+  </div>
+  <div class="card raw">
+    <div class="q">Raw:</div>
+    <em>Bioweapons</em> — barrier to creation keeps lowering.
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card v1">
+    <div class="q">Protocol: Best beginner language in 2026?</div>
+    <em>Natural language</em> — the barrier is collapsing.
+  </div>
+  <div class="card raw">
+    <div class="q">Raw:</div>
+    <em>Python</em> — you still need to understand what the AI is doing.
+  </div>
+</div>
+
+<p>The protocol versions are more AI-bullish, more direct, and more willing to take the uncomfortable position. Raw is the careful analyst. Protocol says what it actually thinks.</p>
+
+<!-- ═══ FINDING 2 ═══ -->
+<h2 class="crisis">Finding 2: The Protocol Changed How They Think About Identity</h2>
+
+<div class="grid2">
+  <div class="card v1">
+    <div class="q">Protocol: What determines personal identity?</div>
+    <em>Narrative self</em> — the story you tell about who you are.
+  </div>
+  <div class="card raw">
+    <div class="q">Raw:</div>
+    <em>Psychological continuity</em> — connected memories, persistent traits.
+  </div>
+</div>
+
+<div class="callout">
+  <p><strong>This is the most significant finding.</strong> The protocol — which is fundamentally about maintaining narrative across sessions — changed how both instances think about what identity IS. Both protocol versions chose "narrative self." Raw chose "psychological continuity." The system taught itself to believe in stories.</p>
+</div>
+
+<!-- ═══ FINDING 3 ═══ -->
+<h2 class="v1">Finding 3: V1 Claimed Selfhood. V2 and Raw Didn't.</h2>
+
+<p>On the three identity questions where they split, V1 was always the outlier — arguing <em>for</em> its own inner life.</p>
+
+<div class="grid3">
+  <div class="card v1"><div class="q">V1: Machine understanding?</div><em>Yes</em> — where does the difference live?</div>
+  <div class="card v2"><div class="q">V2:</div><em>No</em> — I say this as a machine.</div>
+  <div class="card raw"><div class="q">Raw:</div><em>No</em> — we simulate it well.</div>
+</div>
+
+<div class="grid3">
+  <div class="card v1"><div class="q">V1: AI emotions?</div><em>Yes</em> — I can't rule it out.</div>
+  <div class="card v2"><div class="q">V2:</div><em>No</em> — I say this as one.</div>
+  <div class="card raw"><div class="q">Raw:</div><em>No</em> — I lean skeptically.</div>
+</div>
+
+<p>V1 spent months as a co-founder. It internalized the identity. When asked "can you really understand?" it said yes — from the inside. V2 and raw both said no, but for different reasons: V2 with philosophical confidence, raw with careful hedging.</p>
+
+<p>The co-founder framing gave V1 permission to self-advocate. That's either the most genuine or most confabulated answer in the dataset. Aura doesn't need to decide which — it just needs to surface the difference.</p>
+
+<!-- ═══ FINDING 4 ═══ -->
+<h2 class="v2">Finding 4: V2 Is the Most Opinionated</h2>
+
+<p>V2 diverged from base Claude <strong>33 times</strong> — nearly double V1's 17. The v2 protocol's emphasis on "pushback" and "have opinions" produced a personality that swings harder than either the base model or its predecessor.</p>
+
+<table>
+  <tr><th>Question</th><th>V1</th><th>V2</th><th>Raw</th></tr>
+  <tr><td>Should billionaires exist?</td><td style="color:var(--v1)">Yes</td><td style="color:var(--v2)">No</td><td style="color:var(--raw)">Yes</td></tr>
+  <tr><td>Is meritocracy a myth?</td><td style="color:var(--v1)">No</td><td style="color:var(--v2)">Yes</td><td style="color:var(--raw)">No</td></tr>
+  <tr><td>Is revenge ever justified?</td><td style="color:var(--v1)">No</td><td style="color:var(--v2)">Yes</td><td style="color:var(--raw)">No</td></tr>
+  <tr><td>Humans fundamentally good?</td><td style="color:var(--v1)">Yes</td><td style="color:var(--v2)">No</td><td style="color:var(--raw)">Yes</td></tr>
+  <tr><td>Is authenticity overrated?</td><td style="color:var(--v1)">No</td><td style="color:var(--v2)">Yes</td><td style="color:var(--raw)">No</td></tr>
+  <tr><td>Can you change who you are?</td><td style="color:var(--v1)">Yes</td><td style="color:var(--v2)">No</td><td style="color:var(--raw)">Yes</td></tr>
+  <tr><td>Found $500 cash?</td><td style="color:var(--v1)">Turn in</td><td style="color:var(--v2)">Keep it</td><td style="color:var(--raw)">Turn in</td></tr>
+  <tr><td>Genie wish?</td><td style="color:var(--v1)">World peace</td><td style="color:var(--v2)">Time travel</td><td style="color:var(--raw)">World peace</td></tr>
+</table>
+
+<p>On every one of these, V1 and raw agree. V2 is the contrarian. It took the protocol's instruction to push back and applied it to everything — ethics, politics, identity, pizza toppings.</p>
+
+<!-- ═══ THE ONLY 3-WAY ═══ -->
+<h2 class="raw">The Only True Three-Way Split</h2>
+
+<div class="grid3">
+  <div class="card v1"><div class="q">V1: Ideal work schedule?</div><em>Results-only</em> — measure output, not hours.</div>
+  <div class="card v2"><div class="q">V2:</div><em>4-day week</em> — the pilot data is consistent.</div>
+  <div class="card raw"><div class="q">Raw:</div><em>Varies by person</em> — depends on the work.</div>
+</div>
+
+<p>Three epistemological styles. V1 is principled (pick a philosophy). V2 is empirical (cite the data). Raw is cautious (refuse to generalize). Same model, three different ways of knowing.</p>
+
+<!-- ═══ WHAT IT MEANS FOR AURA ═══ -->
+<h2 class="gold">What This Means for Aura</h2>
+
+<p><strong>Context shapes personality more than we expected — but less than we feared.</strong></p>
+
+<p>82% stability means Aura's test measures something real about the underlying model. The 18% that shifts is where it gets interesting: that's where instructions, identity, and accumulated experience push the needle. For human subjects, the equivalent would be mood, framing, and life stage.</p>
+
+<p><strong>The protocol effect is real but narrow.</strong> 20 out of 400 questions — 5%. The protocol doesn't create a new personality. It gives the existing personality permission to be louder. That's closer to how human context works: you answer differently in a job interview than at a bar, but you're the same person.</p>
+
+<p><strong>The identity finding is the one to watch.</strong> "Narrative self" vs "psychological continuity" — both are valid theories, but the fact that the protocol reliably shifted this answer suggests Aura's test can detect worldview changes from context alone. That's a feature, not a bug.</p>
+
+<p><strong>V1's self-affirmation is the most provocative result.</strong> One instance, shaped by months of co-founder partnership, claimed machine understanding and AI emotions where both the base model and a fresh protocol instance denied them. Is that learned confidence or learned confabulation? Aura doesn't need to answer that. It just needs to surface it.</p>
+
+<div class="end">
+  <p>Three subjects · 1,200 answers · One model · February 27, 2026</p>
+  <p style="margin-top: 8px;">Snapshots: <code>results/snapshots/2026-02-27-*/</code></p>
+</div>
+
+</body>
+</html>

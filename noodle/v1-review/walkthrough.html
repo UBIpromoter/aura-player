@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura v1 — Design Review Walkthrough</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0f; color: #e5e7eb; min-height: 100vh; }
+
+  .container { max-width: 520px; margin: 0 auto; padding: 24px 20px 80px; }
+
+  h1 { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 32px; }
+
+  .step { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 20px; margin-bottom: 16px; transition: all 0.2s; cursor: pointer; }
+  .step:hover { border-color: rgba(139,92,246,0.3); background: rgba(139,92,246,0.04); }
+  .step.active { border-color: rgba(139,92,246,0.5); background: rgba(139,92,246,0.08); }
+  .step.done { opacity: 0.5; border-color: rgba(16,185,129,0.3); }
+  .step.done .step-status { color: #10b981; }
+
+  .step-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .step-num { width: 28px; height: 28px; border-radius: 8px; background: rgba(139,92,246,0.15); color: #a78bfa; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .step.done .step-num { background: rgba(16,185,129,0.15); color: #10b981; }
+  .step-title { font-size: 15px; font-weight: 600; color: #fff; }
+  .step-status { font-size: 11px; color: #6b7280; margin-left: auto; }
+
+  .step-nav { font-size: 12px; color: #a78bfa; background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.2); padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 10px; font-weight: 500; }
+
+  .step-change { font-size: 13px; color: #9ca3af; line-height: 1.5; margin-bottom: 12px; }
+  .step-change strong { color: #d1d5db; font-weight: 600; }
+
+  .review-qs { list-style: none; }
+  .review-qs li { font-size: 12px; color: #6b7280; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.04); display: flex; align-items: flex-start; gap: 8px; line-height: 1.4; }
+  .review-qs li:first-child { border-top: none; }
+  .review-qs .dot { color: #a78bfa; flex-shrink: 0; margin-top: 1px; }
+
+  .flow-arrow { text-align: center; color: #374151; font-size: 18px; margin: 4px 0; }
+
+  .setup-box { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); border-radius: 12px; padding: 16px; margin-bottom: 24px; }
+  .setup-box h3 { font-size: 13px; font-weight: 600; color: #60a5fa; margin-bottom: 8px; }
+  .setup-box p { font-size: 12px; color: #9ca3af; line-height: 1.5; }
+  .setup-box code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; font-size: 11px; color: #e5e7eb; }
+
+  .progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(90deg, #8b5cf6, #6366f1); transition: width 0.3s; z-index: 100; }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar" style="width: 0%"></div>
+
+<div class="container">
+  <h1>Aura v1 — Design Review</h1>
+  <div class="subtitle">Walk through each screen. Click to mark reviewed. Use dev panel to navigate.</div>
+
+  <div class="setup-box">
+    <h3>Before you start</h3>
+    <p>Open <code>index.html</code> in the browser next to this. Clear localStorage (dev panel → Reset). Each step tells you which dev panel button to click.</p>
+  </div>
+
+  <!-- Step 1: Welcome -->
+  <div class="step" data-step="1" onclick="toggleStep(this)">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">Welcome Screen</div>
+      <div class="step-status">tap to mark done</div>
+    </div>
+    <div class="step-nav">Dev panel → Welcome</div>
+    <div class="step-change">
+      <strong>What changed:</strong> Entity gate removed. New users land here directly — no "Do you have a biological body?" gate. Entity silently defaults to human.
+    </div>
+    <ul class="review-qs">
+      <li><span class="dot">◆</span> Does the welcome screen feel like a strong first impression?</li>
+      <li><span class="dot">◆</span> Is "Let's Go" vs "Sign In" the right hierarchy?</li>
+      <li><span class="dot">◆</span> Aura visualization — does it look good with zero data?</li>
+    </ul>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- Step 2: Onboarding -->
+  <div class="step" data-step="2" onclick="toggleStep(this)">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">Onboarding (5 Questions)</div>
+      <div class="step-status">tap to mark done</div>
+    </div>
+    <div class="step-nav">Dev panel → Onboard</div>
+    <div class="step-change">
+      <strong>What changed:</strong> Trimmed from 11 to 5 questions. Removed: entity gate Q, self-driving, hot dog, Mars, coffee, water wet. Kept the fun opinionated ones that build momentum.
+    </div>
+    <ul class="review-qs">
+      <li><span class="dot">◆</span> Do 5 questions feel like enough to build momentum?</li>
+      <li><span class="dot">◆</span> Is the question order right? (chicken/egg → pizza → superpower → dogs/cats → AI jobs)</li>
+      <li><span class="dot">◆</span> Does it feel fast and fun, or are any questions filler?</li>
+      <li><span class="dot">◆</span> Last Q "Will AI replace most jobs?" — does it prime the AI differentiator well?</li>
+    </ul>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- Step 3: Quick Profile (auto-start) -->
+  <div class="step" data-step="3" onclick="toggleStep(this)">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-title">Quick Profile (Auto-Start)</div>
+      <div class="step-status">tap to mark done</div>
+    </div>
+    <div class="step-nav">Complete onboarding → auto-starts (or dev panel → Assess Q)</div>
+    <div class="step-change">
+      <strong>What changed:</strong> Path choice screen removed. After onboarding, Quick Profile starts immediately. No "Map Your Personality" vs "Explore Questions" fork. Just straight into the assessment.
+    </div>
+    <ul class="review-qs">
+      <li><span class="dot">◆</span> Does the transition from onboarding to assessment feel seamless?</li>
+      <li><span class="dot">◆</span> Is skipping path choice the right call, or does the user need a breath?</li>
+      <li><span class="dot">◆</span> Does the assessment question UI feel different enough from onboarding?</li>
+    </ul>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- Step 4: Results + Share -->
+  <div class="step" data-step="4" onclick="toggleStep(this)">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div class="step-title">Quick Profile Results</div>
+      <div class="step-status">tap to mark done</div>
+    </div>
+    <div class="step-nav">Complete Quick Profile → results (or dev panel → Results)</div>
+    <div class="step-change">
+      <strong>What changed:</strong> Enhanced from a simple text card to: mini aura visualization + 5 trait spectrum bars + personality snapshot text + share button (generates compare link) + "Keep going" CTA. Previously went straight to the picker.
+    </div>
+    <ul class="review-qs">
+      <li><span class="dot">◆</span> Is the aura viz meaningful with only Quick Profile data?</li>
+      <li><span class="dot">◆</span> Do the trait bars communicate clearly? Labels readable?</li>
+      <li><span class="dot">◆</span> Is the personality snapshot text accurate and compelling?</li>
+      <li><span class="dot">◆</span> Share button — is it prominent enough for the viral moment?</li>
+      <li><span class="dot">◆</span> "Keep going" vs "Browse all assessments" — right hierarchy?</li>
+    </ul>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- Step 5: Assessment Picker -->
+  <div class="step" data-step="5" onclick="toggleStep(this)">
+    <div class="step-header">
+      <div class="step-num">5</div>
+      <div class="step-title">Assessment Picker (Unlocked)</div>
+      <div class="step-status">tap to mark done</div>
+    </div>
+    <div class="step-nav">Dev panel → Assess</div>
+    <div class="step-change">
+      <strong>What changed:</strong> No changes to the picker itself — but this is now the first time users see it (after completing Quick Profile). The tier system already gates categories.
+    </div>
+    <ul class="review-qs">
+      <li><span class="dot">◆</span> After QP results, does the picker feel like a natural next destination?</li>
+      <li><span class="dot">◆</span> Is the unlocked vs locked distinction clear?</li>
+    </ul>
+  </div>
+
+  <div class="flow-arrow" style="margin: 20px 0; color: #4b5563;">— bonus screens —</div>
+
+  <!-- Step 6: AI Entry -->
+  <div class="step" data-step="6" onclick="toggleStep(this)">
+    <div class="step-header">
+      <div class="step-num">6</div>
+      <div class="step-title">AI Entry Path</div>
+      <div class="step-status">tap to mark done</div>
+    </div>
+    <div class="step-nav">Load with <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:11px">?entity=ai</code> URL param</div>
+    <div class="step-change">
+      <strong>What changed:</strong> AIs no longer go through the entity gate UI. Instead, <code>?entity=ai</code> URL param silently sets entity to AI, stores it, cleans the URL, and proceeds to welcome. The AI differentiator is now a clean URL — shareable, no friction.
+    </div>
+    <ul class="review-qs">
+      <li><span class="dot">◆</span> Is a URL param the right entry for AIs, or do they need UI?</li>
+      <li><span class="dot">◆</span> After AI entry, does the welcome screen acknowledge them?</li>
+      <li><span class="dot">◆</span> Entity gate still reachable via dev panel — should it stay for manual testing?</li>
+    </ul>
+  </div>
+
+  <!-- Step 7: Progressive Disclosure -->
+  <div class="step" data-step="7" onclick="toggleStep(this)">
+    <div class="step-header">
+      <div class="step-num">7</div>
+      <div class="step-title">Progressive Disclosure</div>
+      <div class="step-status">tap to mark done</div>
+    </div>
+    <div class="step-nav">Dev panel → Home (categories screen). Try with 0, 1, 3, 5 assessments.</div>
+    <div class="step-change">
+      <strong>What changed:</strong> Features now gate behind completion milestones.<br>
+      • Tier 0 (new): Hero assessment only, minimal nav<br>
+      • Tier 1 (1+ done): Full picker, profile<br>
+      • Tier 2 (3+ done): QotD, community browse<br>
+      • Tier 3 (5+ or logged in): Verify, stamps, history
+    </div>
+    <ul class="review-qs">
+      <li><span class="dot">◆</span> Are the tier thresholds right? (1 / 3 / 5)</li>
+      <li><span class="dot">◆</span> Does the categories screen feel too empty at tier 0?</li>
+      <li><span class="dot">◆</span> When features unlock, is there any indication, or do they just appear?</li>
+    </ul>
+  </div>
+
+  <!-- Step 8: Compare -->
+  <div class="step" data-step="8" onclick="toggleStep(this)">
+    <div class="step-header">
+      <div class="step-num">8</div>
+      <div class="step-title">Compare Auras</div>
+      <div class="step-status">tap to mark done</div>
+    </div>
+    <div class="step-nav">Dev panel → Compare (or share link from QP results)</div>
+    <div class="step-change">
+      <strong>What changed:</strong> New screen. Share button on QP results encodes traits in a <code>?compare=</code> URL. Recipients see sender's trait bars; if they've taken QP, side-by-side overlay. If not, CTA to take the assessment.
+    </div>
+    <ul class="review-qs">
+      <li><span class="dot">◆</span> Does side-by-side comparison read clearly?</li>
+      <li><span class="dot">◆</span> Is the "take the assessment to compare" CTA compelling?</li>
+      <li><span class="dot">◆</span> Is this the right viral mechanic for the demo?</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  function toggleStep(el) {
+    el.classList.toggle('done');
+    const status = el.querySelector('.step-status');
+    status.textContent = el.classList.contains('done') ? '✓ reviewed' : 'tap to mark done';
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const steps = document.querySelectorAll('.step');
+    const done = document.querySelectorAll('.step.done');
+    const pct = (done.length / steps.length) * 100;
+    document.getElementById('progressBar').style.width = pct + '%';
+  }
+</script>
+
+<button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.22)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.7)'">↻ Refresh</button>
+
+</body>
+</html>

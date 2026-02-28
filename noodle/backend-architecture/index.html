@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Credentials — Team Overview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    line-height: 1.7;
+    padding: 48px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 48px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #64748b;
+    margin-bottom: 16px;
+  }
+  .card {
+    display: block;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+  }
+  .card:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.15);
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .card-desc {
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.5;
+  }
+  .card-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .tag-primary { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+  .tag-build { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+  .tag-ref { background: rgba(255,255,255,0.06); color: #94a3b8; }
+
+  .divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin: 36px 0;
+  }
+
+  .context {
+    font-size: 14px;
+    color: rgba(220,220,235,0.75);
+    margin-bottom: 32px;
+    line-height: 1.8;
+  }
+  .context strong { color: #fff; }
+
+  .questions {
+    background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.06));
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-top: 32px;
+  }
+  .questions h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #c4b5fd;
+    margin-bottom: 12px;
+  }
+  .questions ol {
+    padding-left: 20px;
+    font-size: 13px;
+    color: rgba(220,220,235,0.8);
+  }
+  .questions li { margin-bottom: 6px; }
+  .questions li strong { color: #fff; }
+</style>
+</head>
+<body>
+<button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.22)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.7)'">&#8635; Refresh</button>
+
+<h1>Aura Assessment Credentials</h1>
+<p class="subtitle">Architecture &amp; implementation materials for team review</p>
+
+<div class="context">
+  We've been building Aura's assessment engine — 20+ personality assessments producing deterministic scores across Big Five, Shadow, Risk, Attachment, Chronotype, and more. These docs describe how those scores connect to <strong>Adam's credential architecture</strong>: SMP verification (Mode 1) and BBS+ selective disclosure (Mode 2), wrapped in encrypted sessions.
+  <br><br>
+  Two key findings: <strong>Foxx can't run BLS12-381 WASM synchronously</strong> (sidecar needed for Mode 2), and the architecture <strong>phases naturally</strong> — Mode 1 delivers most of the spec without any credential infrastructure.
+</div>
+
+<div class="section-label">Start here</div>
+
+<a class="card" href="implementation-notes-v1.html">
+  <span class="card-tag tag-primary">Primary</span>
+  <div class="card-title">Implementation Notes</div>
+  <div class="card-desc">Follows Adam's spec section by section — Privacy, Evaluation, Scalability, Decentralization. What we've built, what we hit, where we'd suggest a simpler path, where we need input.</div>
+</a>
+
+<a class="card" href="build-plan-v1.html">
+  <span class="card-tag tag-build">Build Plan</span>
+  <div class="card-title">Phased Build Plan</div>
+  <div class="card-desc">Concrete delivery order. Phase 1: SMP module → bundle serialization → session layer → relay integration. Phase 2: credential schemas → sidecar → BBS+ → selective disclosure.</div>
+</a>
+
+<hr class="divider">
+
+<div class="section-label">Reference</div>
+
+<a class="card" href="drafts/architecture-v6.html">
+  <span class="card-tag tag-ref">Visual</span>
+  <div class="card-title">Spec ↔ Response Map</div>
+  <div class="card-desc">Side-by-side: Adam's architecture goals on the left, our implementation approach on the right.</div>
+</a>
+
+<a class="card" href="https://hackmd.io/7OUrHXl8Tau5urjHYtUa3g" target="_blank">
+  <span class="card-tag tag-ref">Source</span>
+  <div class="card-title">Adam's Architecture Spec</div>
+  <div class="card-desc">Architectural goals for the Aura Player App — the document this work builds from.</div>
+</a>
+
+<a class="card" href="https://hackmd.io/xKEcuzstQp2o8XIvve6KtA" target="_blank">
+  <span class="card-tag tag-ref">Source</span>
+  <div class="card-title">Decentralizing BrightID with Aura</div>
+  <div class="card-desc">Node domains, SybilRank, Updraft, teams, random walk auditing — the decentralization layer.</div>
+</a>
+
+<div class="questions">
+  <h3>Decisions we need from you</h3>
+  <ol>
+    <li><strong>Relay architecture</strong> — Nodes as relays? WebRTC direct? Hybrid?</li>
+    <li><strong>Session layer</strong> — Is post-session deniability essential for Phase 1, or can we ship with libsodium and add OTR later?</li>
+    <li><strong>Blind issuance timing</strong> — Day-one for Mode 2, or acceptable as an upgrade from standard issuance?</li>
+    <li><strong>Team credential scoping</strong> — Team-scoped or system-wide via Updraft weighting?</li>
+    <li><strong>Pseudonym derivation</strong> — BrightID-derived (stronger) or separate secret (decoupled)?</li>
+    <li><strong>Domain scoping</strong> — Do personality assessments get their own Updraft campaign?</li>
+    <li><strong>AI entity uniqueness</strong> — Extension of Aura verification, or a fundamentally different domain?</li>
+    <li><strong>Credential lifecycle</strong> — Revocation mechanism? TTL? What happens when a node loses trust?</li>
+  </ol>
+</div>
+
+</body>
+</html>
