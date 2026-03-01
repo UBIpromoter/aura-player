@@ -34,10 +34,12 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
   <!-- Extracted data + logic modules (order matters) -->
+  <!-- Paths: ../../aura-*.js for noodle/rebuild/, aura-*.js for root -->
   <script src="../../aura-questions.js"></script>
   <script src="../../aura-assessments.js"></script>
   <script src="../../aura-scoring.js"></script>
   <script src="../../aura-organism.js"></script>
+  <!-- SWAP NOTE: Change ../../aura-*.js to aura-*.js when moving to root -->
   <link rel="stylesheet" href="../../theme.css" />
   <style>
     :root {
@@ -118,9 +120,13 @@
     /* Additional animations */
     @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    /* Global scrollbars */
+    @keyframes verdict-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.06); } 100% { transform: scale(1.03); } }
+    /* Global scrollbars — thin on intentionally scrollable areas, hidden elsewhere */
     .dark * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
     html:not(.dark) * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.12) transparent; }
+    /* Hide scrollbars on overflow-hidden containers and transient scroll areas */
+    .overflow-hidden, .no-scrollbar { scrollbar-width: none !important; }
+    .overflow-hidden::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar { display: none !important; }
   </style>
 </head>
 <body style="background: var(--bg-main);">
@@ -535,32 +541,102 @@ const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// — TOAST CONTEXT (replaces window.__auraToast)
+const ToastContext = createContext(null);
+const useToast = () => useContext(ToastContext);
+const ToastProvider = ({ children }) => {
+  const [msg, setMsg] = useState(null);
+  const timerRef = useRef(null);
+  const toast = useCallback((text, duration = 4000) => {
+    clearTimeout(timerRef.current);
+    setMsg(text);
+    timerRef.current = setTimeout(() => setMsg(null), duration);
+  }, []);
+  const dismiss = useCallback(() => { clearTimeout(timerRef.current); setMsg(null); }, []);
+  // Expose globally for pre-React code (OAuth redirects)
+  useEffect(() => {
+    window.__auraToast = toast;
+    return () => { delete window.__auraToast; };
+  }, [toast]);
+  return (
+    <ToastContext.Provider value={{ toast, dismiss, msg }}>
+      {children}
+    </ToastContext.Provider>
+  );
+};
+
 // — CLOUD SYNC HOOK (assessment_results table)
+// Retry queue for failed cloud operations
+const RETRY_QUEUE_KEY = 'aura-sync-retry-queue';
+const getRetryQueue = () => { try { return JSON.parse(localStorage.getItem(RETRY_QUEUE_KEY) || '[]'); } catch { return []; } };
+const setRetryQueue = (q) => localStorage.setItem(RETRY_QUEUE_KEY, JSON.stringify(q));
+const addToRetryQueue = (op) => { const q = getRetryQueue(); q.push(op); setRetryQueue(q); };
+
 const useCloudSync = () => {
   const auth = useAuth();
+  const [syncStatus, setSyncStatus] = useState('idle'); // idle | syncing | synced | failed
+
+  const withRetry = async (fn, retryOp) => {
+    setSyncStatus('syncing');
+    try {
+      await fn();
+      setSyncStatus('synced');
+      setTimeout(() => setSyncStatus(s => s === 'synced' ? 'idle' : s), 3000);
+    } catch (err1) {
+      // Retry once
+      try { await fn(); setSyncStatus('synced'); setTimeout(() => setSyncStatus(s => s === 'synced' ? 'idle' : s), 3000); }
+      catch (err2) { setSyncStatus('failed'); if (retryOp) addToRetryQueue(retryOp); console.warn('[Aura] Cloud op failed after retry:', err2.message); }
+    }
+  };
+
+  // Process retry queue on mount / auth change
+  useEffect(() => {
+    if (!auth?.user) return;
+    const queue = getRetryQueue();
+    if (queue.length === 0) return;
+    setRetryQueue([]);
+    (async () => {
+      for (const op of queue) {
+        try {
+          if (op.type === 'completed') {
+            await supabase.from('assessment_results').upsert({ user_id: auth.user.id, category_id: op.testId, status: 'completed', answers: op.answers || {}, traits: op.traits || {}, progress: null, completed_at: op.completedAt, updated_at: new Date().toISOString() }, { onConflict: 'user_id,category_id' });
+          } else if (op.type === 'progress') {
+            await supabase.from('assessment_results').upsert({ user_id: auth.user.id, category_id: op.testId, status: 'in_progress', answers: op.progress || {}, traits: null, progress: op.progress || {}, updated_at: new Date().toISOString() }, { onConflict: 'user_id,category_id' });
+          }
+        } catch { addToRetryQueue(op); }
+      }
+    })();
+  }, [auth?.user?.id]);
 
   const saveCompleted = async (testId, answers, traits) => {
     if (!auth?.user) return;
-    try {
-      const { error } = await supabase.from('assessment_results').upsert({
-        user_id: auth.user.id, category_id: testId, status: 'completed',
-        answers: answers || {}, traits: traits || {}, progress: null,
-        completed_at: new Date().toISOString(), updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id,category_id' });
-      if (error) console.error('[Aura] Assessment save failed:', error);
-    } catch (err) { console.warn('[Aura] Cloud save error:', err.message); }
+    const now = new Date().toISOString();
+    await withRetry(
+      async () => {
+        const { error } = await supabase.from('assessment_results').upsert({
+          user_id: auth.user.id, category_id: testId, status: 'completed',
+          answers: answers || {}, traits: traits || {}, progress: null,
+          completed_at: now, updated_at: now
+        }, { onConflict: 'user_id,category_id' });
+        if (error) throw error;
+      },
+      { type: 'completed', testId, answers, traits, completedAt: now }
+    );
   };
 
   const saveProgress = async (testId, progressObj) => {
     if (!auth?.user) return;
-    try {
-      const { error } = await supabase.from('assessment_results').upsert({
-        user_id: auth.user.id, category_id: testId, status: 'in_progress',
-        answers: progressObj || {}, traits: null, progress: progressObj || {},
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id,category_id' });
-      if (error) console.error('[Aura] Progress save failed:', error);
-    } catch (err) { console.warn('[Aura] Cloud progress save error:', err.message); }
+    await withRetry(
+      async () => {
+        const { error } = await supabase.from('assessment_results').upsert({
+          user_id: auth.user.id, category_id: testId, status: 'in_progress',
+          answers: progressObj || {}, traits: null, progress: progressObj || {},
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,category_id' });
+        if (error) throw error;
+      },
+      { type: 'progress', testId, progress: progressObj }
+    );
   };
 
   const loadAll = async () => {
@@ -615,7 +691,7 @@ const useCloudSync = () => {
     return { completed: mergedCompleted, inProgress: mergedInProgress };
   };
 
-  return { saveCompleted, saveProgress, loadAll, deleteAssessment, clearAll, syncOnLogin };
+  return { saveCompleted, saveProgress, loadAll, deleteAssessment, clearAll, syncOnLogin, syncStatus, setSyncStatus };
 };
 
 // — RESPONSE CAPTURE HOOK (responses table, auth-gated)
@@ -788,16 +864,43 @@ Card.Header = ({ icon, title, subtitle, color = 'violet', children, className = 
 Card.Body = ({ children, className = '' }) => <div className={`p-4 ${className}`}>{children}</div>;
 // --- Screen ---
 
-const Screen = ({ header, footer, children, className = '', style }) => (
-  <div className={`h-full flex flex-col ${className}`} style={{ background: 'var(--bg-main)', ...style }}>
-    {header}
-    {children}
-    {footer}
-  </div>
-);
-Screen.Body = ({ children, className = '', padding = true }) => (
-  <div className={`flex-1 overflow-y-auto ${padding ? 'p-4' : ''} ${className}`}>{children}</div>
-);
+// Scroll position cache — preserves scroll when navigating away and back
+const _scrollCache = {};
+const useScrollRestore = (screenId) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !screenId) return;
+    if (_scrollCache[screenId]) el.scrollTop = _scrollCache[screenId];
+    const onScroll = () => { _scrollCache[screenId] = el.scrollTop; };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => { el.removeEventListener('scroll', onScroll); };
+  }, [screenId]);
+  return ref;
+};
+
+const Screen = ({ header, footer, children, className = '', style }) => {
+  const screenRef = useRef(null);
+  useEffect(() => {
+    if (!screenRef.current) return;
+    const heading = screenRef.current.querySelector('h1, h2, h3, [role="heading"]');
+    if (heading && !document.querySelector('[role="dialog"]')) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+  }, []);
+  return (
+    <div ref={screenRef} className={`h-full flex flex-col ${className}`} style={{ background: 'var(--bg-main)', ...style }}>
+      {header}
+      {children}
+      {footer}
+    </div>
+  );
+};
+Screen.Body = ({ children, className = '', padding = true, screenId }) => {
+  const scrollRef = useScrollRestore(screenId);
+  return <div ref={scrollRef} className={`flex-1 overflow-y-auto ${padding ? 'p-4' : ''} ${className}`}>{children}</div>;
+};
 // --- Input ---
 
 const Input = ({ type = 'text', value, onChange, placeholder, label, focusColor = 'violet', className = '', style, ...props }) => {
@@ -1244,6 +1347,19 @@ const QuestionActions = ({ actions, visible = true, className = '' }) => {
   );
 };
 
+// — LOADING OVERLAY (for async ops) — uses useTheme() like all other primitives
+const LoadingOverlay = ({ message = 'Syncing…' }) => {
+  const { isDark } = useTheme();
+  return (
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center" style={{ background: isDark ? 'rgba(3,7,18,0.7)' : 'rgba(255,255,255,0.7)', backdropFilter: 'blur(4px)' }}>
+      <div className="flex flex-col items-center gap-3" style={{ animation: 'fadeSlideIn 0.3s ease-out both' }}>
+        <div className="w-8 h-8 rounded-full border-2" style={{ borderColor: `${COLOR_HEX.violet.base} transparent transparent transparent`, animation: 'spin 0.8s linear infinite' }} />
+        <Text size="sm" emphasis="faint">{message}</Text>
+      </div>
+    </div>
+  );
+};
+
 const ActionSheet = ({ title, icon, reasons = [], color = 'violet', allowCustom = true, onSubmit, onClose, onClear, existing }) => {
   const c = colorOf(color);
   const [selected, setSelected] = useState(existing ? existing.split(', ').filter(r => reasons.includes(r)) : []);
@@ -1303,19 +1419,42 @@ const PathSelector = ({ paths = [], selected, onSelect, className = '' }) => (
 );
 
 // — ERROR BOUNDARY
+// Haptic feedback — no-ops on unsupported devices
+const haptic = (ms) => navigator.vibrate?.(ms);
+const HAPTIC = { tap: 10, confidence: 15, verdict: 20, complete: [10, 50, 10], undo: 5 };
+
+// Sync status indicator — subtle dot in header area
+const SyncIndicator = ({ status, onRetry }) => {
+  if (status === 'idle') return null;
+  const colors = { syncing: 'var(--text-muted)', synced: '#4ade80', failed: '#fbbf24' };
+  const labels = { syncing: 'Syncing…', synced: 'Synced', failed: 'Sync failed' };
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+      <span className="w-2 h-2 rounded-full" style={{ background: colors[status], animation: status === 'syncing' ? 'pulse 1.5s ease-in-out infinite' : 'none' }} />
+      <Text size="xs" emphasis="faint">{labels[status]}</Text>
+      {status === 'failed' && onRetry && <button onClick={onRetry} className="text-xs cursor-pointer" style={{ color: '#fbbf24' }}>↻</button>}
+    </div>
+  );
+};
+
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error(`[ErrorBoundary:${this.props.feature || 'app'}]`, error, info); }
   render() {
     if (this.state.hasError) {
+      const feature = this.props.feature;
+      const isFeature = !!feature;
       return (
-        <div className="h-full flex flex-col items-center justify-center p-8" style={{ background: 'var(--bg-main)' }}>
-          <Text heading={2} className="mb-4">Something went wrong</Text>
-          <Text emphasis="muted" className="mb-6 text-center">{this.state.error?.message || 'An unexpected error occurred'}</Text>
-          <Button onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}>
-            Reload
-          </Button>
-        </div>
+        <Card variant="plain" className={isFeature ? 'my-4 mx-4' : 'h-full flex flex-col items-center justify-center p-8'} style={!isFeature ? { background: 'var(--bg-main)' } : {}}>
+          <Stack align="center" gap={3} className={isFeature ? 'py-6' : ''}>
+            <Text size={isFeature ? 'sm' : 'xl'} weight="semibold">{isFeature ? `${feature} unavailable` : 'Something went wrong'}</Text>
+            <Text size="xs" emphasis="muted" className="text-center">{this.state.error?.message || 'An unexpected error occurred'}</Text>
+            <Button size="sm" variant={isFeature ? 'secondary' : 'primary'} onClick={() => this.setState({ hasError: false, error: null })}>
+              Try Again
+            </Button>
+          </Stack>
+        </Card>
       );
     }
     return this.props.children;
@@ -1576,29 +1715,30 @@ const getConfidenceStyle = ({ c, isDark, tapCount, isSelected, isPending, wasAns
 };
 
 // — ANSWER BUTTONS — Binary, MC, UndoOverlay (production)
-// UndoFace — the undo state of any answer slot. Never a separate component from the button.
-// This renders INSIDE the same container as the button it replaces.
-const UndoFace = ({ label, color, isDark, undoDelay, onUndo }) => (
-  <div onClick={onUndo} className="cursor-pointer rounded-2xl h-full flex items-center gap-3 px-4 relative overflow-hidden"
-    style={{ background: isDark ? `rgba(${color.rgb}, 0.08)` : `rgba(${color.rgb}, 0.06)`, border: `1px solid ${isDark ? `rgba(${color.rgb}, 0.5)` : `rgba(${color.rgb}, 0.35)`}`, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-    {/* Sweep fill — left-to-right, synced to undoDelay */}
-    <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ background: isDark ? `rgba(${color.rgb}, 0.15)` : `rgba(${color.rgb}, 0.12)`, animation: `sweepFill ${undoDelay}s linear forwards`, transformOrigin: 'left' }} />
-    <div className="flex-shrink-0 w-7 h-7 relative z-10">
-      <svg viewBox="0 0 28 28" className="w-7 h-7 -rotate-90">
-        <circle cx="14" cy="14" r="12" fill="none" stroke={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
-        <circle cx="14" cy="14" r="12" fill="none" stroke={color.hex} strokeWidth="2.5" strokeDasharray="75.4" strokeDashoffset="0" style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }} />
+// UndoSweep — transparent layer over the unchanged button.
+// The button stays pixel-identical. This adds: color sweep + small undo badge.
+const UndoSweep = ({ color, isDark, undoDelay, onUndo }) => (
+  <div onClick={onUndo} className="absolute inset-0 z-10 rounded-2xl cursor-pointer overflow-hidden">
+    {/* Color sweep — fills left-to-right over the button face */}
+    <div className="absolute inset-0 rounded-2xl pointer-events-none"
+      style={{ background: isDark ? `rgba(${color.rgb}, 0.12)` : `rgba(${color.rgb}, 0.10)`, animation: `sweepFill ${undoDelay}s linear forwards`, transformOrigin: 'left' }} />
+    {/* Undo badge — small pill, vertically centered right */}
+    <button onClick={(e) => { e.stopPropagation(); onUndo(); }}
+      className="absolute top-1/2 -translate-y-1/2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-colors"
+      style={{ background: isDark ? `rgba(${color.rgb}, 0.35)` : `rgba(${color.rgb}, 0.25)`, color: color.hex, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+      <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 -rotate-90" style={{ flexShrink: 0 }}>
+        <circle cx="10" cy="10" r="8" fill="none" stroke={isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.10)'} strokeWidth="2" />
+        <circle cx="10" cy="10" r="8" fill="none" stroke={color.hex} strokeWidth="2" strokeDasharray="50.3" strokeDashoffset="0" style={{ animation: `ringCountdown ${undoDelay}s linear forwards` }} />
       </svg>
-    </div>
-    <div className="flex-1 min-w-0 relative z-10"><Text size="xs" weight="semibold" className="truncate">{label}</Text></div>
-    <button onClick={(e) => { e.stopPropagation(); onUndo(); }} className="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors cursor-pointer relative z-10" style={{ background: isDark ? `rgba(${color.rgb}, 0.3)` : `rgba(${color.rgb}, 0.2)`, color: color.hex }}>Undo</button>
+      Undo
+    </button>
   </div>
 );
-// AnswerSlot — ONE element that shows either its button face or its undo face.
-// The slot is the truth. Undo alignment is impossible to break because there is no alignment —
-// the undo bar IS the button, just wearing a different face.
+// AnswerSlot — always shows the button. Undo overlays on top without disrupting layout.
 const AnswerSlot = ({ heightClass, isUndoTarget, undoProps, children }) => (
-  <div className={`w-full ${heightClass}`}>
-    {isUndoTarget ? <UndoFace {...undoProps} /> : children}
+  <div className={`w-full ${heightClass} relative`}>
+    {children}
+    {isUndoTarget && <UndoSweep {...undoProps} />}
   </div>
 );
 
@@ -1614,9 +1754,9 @@ const BinaryButtons = ({ isDark, tappedAnswer, tapCount, isAnswered, currentResp
         const style = getConfidenceStyle({ c, isDark, tapCount, isSelected: tappedAnswer === answer, isPending: isUndoTarget, wasAnswered: currentResponse?.answer === answer, isAnswered, otherSelected: tappedAnswer !== null && tappedAnswer !== answer, confidence: tappedAnswer === answer ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2) });
         return (
           <AnswerSlot key={answer} heightClass="h-14 resp-h-lg" isUndoTarget={isUndoTarget}
-            undoProps={{ label: labels[answer], color: c, isDark, undoDelay, onUndo }}>
+            undoProps={{ color: c, isDark, undoDelay, onUndo }}>
             <button onClick={() => !isAnswered && !pendingSubmit && onTap(answer)} onContextMenu={(e) => onRightClick?.(e, answer)} disabled={isAnswered || !!pendingSubmit}
-              className={`w-full h-full rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none cursor-pointer ${pendingSubmit ? 'opacity-60 pointer-events-none' : ''}`}
+              className="w-full h-full rounded-2xl flex items-center justify-center relative transition-all btn-feedback shine-card border select-none cursor-pointer"
               style={{ borderColor: style.borderColor, background: style.background, boxShadow: style.boxShadow, opacity: style.opacity, '--accent-rgb': c.rgb }}>
               <span className="resp-text-lg font-semibold" style={{ color: style.textColor }}>{labels[answer]}</span>
               {tappedAnswer === answer && tapCount >= 1 && <span className="absolute right-4 resp-text-sm font-medium opacity-60" style={{ color: isDark ? c.light : c.base }}>{getStars(tapCount)}</span>}
@@ -1639,9 +1779,9 @@ const MCButtons = ({ options, isDark, tappedAnswer, tapCount, isAnswered, curren
         const style = getConfidenceStyle({ c, isDark, tapCount, grayMode, isSelected: tappedAnswer === index, isPending: isUndoTarget, wasAnswered: currentResponse?.answer === index, isAnswered, otherSelected: tappedAnswer !== null && tappedAnswer !== index, confidence: tappedAnswer === index ? tapCount : (currentResponse?.confidence || pendingSubmit?.confidence || 2) });
         return (
           <AnswerSlot key={option} heightClass="h-10 resp-h-sm" isUndoTarget={isUndoTarget}
-            undoProps={{ label: `${String.fromCharCode(65 + index)}. ${option}`, color: c, isDark, undoDelay, onUndo }}>
+            undoProps={{ color: c, isDark, undoDelay, onUndo }}>
             <button onClick={() => !isAnswered && !pendingSubmit && onTap(index)} onContextMenu={(e) => onRightClick?.(e, index)} disabled={isAnswered || !!pendingSubmit}
-              className={`w-full h-full rounded-2xl flex items-center justify-center relative px-5 transition-all btn-feedback shine-card border select-none cursor-pointer ${pendingSubmit ? 'opacity-60 pointer-events-none' : ''}`}
+              className="w-full h-full rounded-2xl flex items-center justify-center relative px-5 transition-all btn-feedback shine-card border select-none cursor-pointer"
               style={{ borderColor: style.borderColor, background: style.background, boxShadow: style.boxShadow, opacity: style.opacity || 1, '--accent-rgb': c.rgb }}>
               <span className="resp-text-md font-semibold text-center" style={{ color: style.textColor }}>{option}</span>
               {tappedAnswer === index && tapCount >= 1 && <span className="absolute right-4 resp-text-sm font-medium opacity-60" style={{ color: style.textColor }}>{getStars(tapCount)}</span>}
@@ -1654,12 +1794,13 @@ const MCButtons = ({ options, isDark, tappedAnswer, tapCount, isAnswered, curren
 };
 
 // — QUESTION CARD + TIP BANNER
-const QuestionCard = ({ question, isDark }) => {
+const QuestionCard = ({ question, isDark, evidenceExpanded, onToggleEvidence }) => {
   const category = CATEGORIES.find(c => c.id === question.category);
   const categoryColors = { prediction: getCatTextColor('prediction', isDark), reasoning: getCatTextColor('reasoning', isDark), judgment: getCatTextColor('judgment', isDark) };
   const catSecondary = { prediction: 'rose', reasoning: 'blue', judgment: 'cyan' };
   const c0 = colorOf(CAT_COLOR_MAP[question?.category]);
   const c1 = colorOf(catSecondary[question?.category], 'blue');
+  const hasEvidence = question.preEvidence && question.preEvidence.length > 0;
   return (
     <div className="space-y-2 relative">
       {/* Breathing glow — centered on the question text, not the screen */}
@@ -1669,6 +1810,33 @@ const QuestionCard = ({ question, isDark }) => {
       </div>
       {category && <div className="flex justify-center relative z-10"><span className={`text-sm font-medium ${categoryColors[question.category]}`}>{category.icon} {category.name}</span></div>}
       <Text as="h2" weight="medium" className="question-text text-center relative z-10">{question.text}</Text>
+      {hasEvidence && (
+        <div className="relative z-10 mt-1">
+          <button onClick={onToggleEvidence} className="w-full px-3 py-2 flex items-center justify-center gap-2 rounded-lg transition-colors cursor-pointer" style={{ color: 'var(--text-muted)', background: 'transparent' }}>
+            <span className="text-xs">📊</span>
+            <Text size="xs" emphasis="secondary" weight="medium">{evidenceExpanded ? 'Hide' : 'Evidence'} ({question.preEvidence.length})</Text>
+            <span className="text-[10px] transition-transform duration-200" style={{ display: 'inline-block', transform: evidenceExpanded ? 'rotate(180deg)' : 'none', color: 'var(--text-muted)' }}>▼</span>
+          </button>
+          {evidenceExpanded && (
+            <Stack gap={2} className="mt-2" style={{ animation: 'fadeSlideIn 0.3s ease-out both' }}>
+              {question.preEvidence.map((item, i) => (
+                <Card key={i} variant="plain" padding={false}>
+                  <div className="px-3 py-2.5">
+                    {item.type === 'stat' ? (
+                      <div className="flex items-center justify-between">
+                        <Text size="sm" emphasis="secondary">{item.label}</Text>
+                        <Text size="sm" weight="semibold" style={{ color: isDark ? '#34d399' : '#059669' }}>{item.value}</Text>
+                      </div>
+                    ) : (
+                      <Text size="sm" emphasis="secondary" className="italic leading-relaxed">"{item.text}"</Text>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </Stack>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1713,6 +1881,7 @@ const useAnswerFlow = ({ undoDelay = 1, tapDelay = 400, graceEnabled = false, gr
     if (pendingSubmit && inGracePeriod && graceEnabled) {
       if (answer === pendingSubmit.answer && pendingSubmit.confidence < 4) {
         const newConf = pendingSubmit.confidence + 1;
+        haptic(HAPTIC.confidence);
         setPendingSubmit({ ...pendingSubmit, confidence: newConf });
         if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
         graceTimeoutRef.current = setTimeout(() => setInGracePeriod(false), graceDuration);
@@ -1722,14 +1891,16 @@ const useAnswerFlow = ({ undoDelay = 1, tapDelay = 400, graceEnabled = false, gr
       return;
     }
     if (pendingSubmit) return;
+    haptic(HAPTIC.tap);
     if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     let newCount;
-    if (tappedAnswer === answer) { newCount = Math.min(tapCount + 1, 4); setTapCount(newCount); }
+    if (tappedAnswer === answer) { newCount = Math.min(tapCount + 1, 4); setTapCount(newCount); haptic(HAPTIC.confidence); }
     else { newCount = 1; setTappedAnswer(answer); setTapCount(1); }
     if (!requireConfirmation) tapTimeoutRef.current = setTimeout(() => doPend(answer, newCount), tapDelay);
   };
   const handleRightClick = (e, answer) => { e.preventDefault(); if (pendingSubmit || tappedAnswer !== answer) return; if (tapCount > 1) setTapCount(tapCount - 1); };
   const handleUndo = () => {
+    haptic(HAPTIC.undo);
     if (submitTimeoutRef.current) clearTimeout(submitTimeoutRef.current);
     if (graceTimeoutRef.current) clearTimeout(graceTimeoutRef.current);
     setInGracePeriod(false);
@@ -1922,18 +2093,40 @@ const Q_MODAL_EXPLAIN = { title: 'Why did you answer this way?', icon: '💬', c
 const Q_MODAL_CANT = { title: "Can't answer", icon: '🤷', color: 'slate', reasons: ['Need more context', 'Question is unclear', 'Conflicting feelings', 'Not my area', 'Too personal'] };
 
 const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => {
-  const { currentQuestion, currentIndex, questions, responses, communityResults, isAnswered, isBinary, answeredCount, totalQuestions, currentResponse, mcColorMode, sessionAnsweredIds, savedQuestions, selectedTrack } = questionState;
+  const { currentQuestion, currentIndex, questions, responses, communityResults, isAnswered, isBinary, answeredCount, totalQuestions, currentResponse, mcColorMode, sessionAnsweredIds, savedQuestions, selectedTrack, questionMeta, setQuestionMeta } = questionState;
   const { setCommunityResults, handleUndo, goToPrev, goToNext, findNextUnanswered, setCurrentIndex, handleAnswerTap, handleAnswerRightClick, submitAnswer, saveForLater, skipQuestion, clearUndoneState, setSelectedTrack } = flowActions;
   const { pendingSubmit, undoDelay, justUndone, showTips, showGestureHint, setShowGestureHint, showConfirmOverlay, confirmColor, tappedAnswer, setTappedAnswer, tapCount, setTapCount } = uiState;
   const [activeModal, setActiveModal] = useState(null);
-  const [questionMeta, setQuestionMeta] = useState({});
+  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
+  // Reset evidence panel when question changes
+  const prevQIdRef = useRef(currentQuestion?.id);
+  if (currentQuestion?.id !== prevQIdRef.current) { prevQIdRef.current = currentQuestion?.id; if (evidenceExpanded) setEvidenceExpanded(false); }
   if (!currentQuestion) return (
     <Placeholder icon="🎉" title="All done!" />
   );
   const hasNext = findNextUnanswered(currentIndex) !== null || currentIndex < questions.length - 1;
   const qMeta = questionMeta[currentQuestion.id] || {};
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (activeModal) return; // Don't intercept when modal is open
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      switch (e.key) {
+        case 'ArrowLeft': e.preventDefault(); goToPrev(); break;
+        case 'ArrowRight': case ' ': e.preventDefault(); goToNext(); break;
+        case 'y': case 'Y': case '1': if (!isAnswered && !pendingSubmit) handleAnswerTap(0); break;
+        case 'n': case 'N': case '2': if (!isAnswered && !pendingSubmit) handleAnswerTap(1); break;
+        case '3': if (!isAnswered && !pendingSubmit && !isBinary) handleAnswerTap(2); break;
+        case '4': if (!isAnswered && !pendingSubmit && !isBinary) handleAnswerTap(3); break;
+        case '5': if (!isAnswered && !pendingSubmit && !isBinary) handleAnswerTap(4); break;
+        case 'Escape': if (pendingSubmit) { e.preventDefault(); handleUndo(); } break;
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [activeModal, isAnswered, pendingSubmit, isBinary, currentIndex]);
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
+    <div className="flex-1 flex flex-col overflow-hidden no-scrollbar relative">
       {/* Track Selector */}
       <div className="h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10" style={{ background: isDark ? 'rgba(17,24,39,0.5)' : 'rgba(255,255,255,0.9)', borderBottom: (() => { const c = colorOf(CAT_COLOR_MAP[currentQuestion?.category]); return `1px solid rgba(${c.rgb},${isDark?0.15:0.20})`; })() }}>
         <button onClick={goToPrev} disabled={currentIndex === 0} className="text-xl font-bold w-8 h-8 flex items-center justify-center cursor-pointer"><Text as="span" emphasis={currentIndex === 0 ? "faint" : "secondary"}>◀</Text></button>
@@ -1963,7 +2156,7 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => 
       </div>
       {isAnswered && !pendingSubmit ? (
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 flex flex-col justify-center px-4"><QuestionCard question={currentQuestion} isDark={isDark} /></div>
+          <div className="flex-1 flex flex-col justify-center px-4"><QuestionCard question={currentQuestion} isDark={isDark} evidenceExpanded={evidenceExpanded} onToggleEvidence={() => setEvidenceExpanded(!evidenceExpanded)} /></div>
           <div className="flex-shrink-0 px-4 py-6" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}>
             <Text size="xs" emphasis="faint" className="text-center">Already answered · Use arrows to navigate</Text>
           </div>
@@ -1971,9 +2164,9 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => 
       ) : (
         <>
           {/* Question Area */}
-          <div className="flex-1 flex flex-col justify-center px-4 pb-2 overflow-y-auto min-h-0 relative">
+          <div className="flex-1 flex flex-col justify-center px-4 pb-2 overflow-y-auto no-scrollbar min-h-0 relative">
             <div className="flex-shrink-0">
-              <QuestionCard question={currentQuestion} isDark={isDark} />
+              <QuestionCard question={currentQuestion} isDark={isDark} evidenceExpanded={evidenceExpanded} onToggleEvidence={() => setEvidenceExpanded(!evidenceExpanded)} />
               {answeredCount < 3 && !isAnswered && <Text size="xxs" emphasis="faint" className="text-center mt-2">{answeredCount === 0 ? "we'll start easy — just tap what feels right" : 'tap more for higher confidence'}</Text>}
               {justUndone && (
                 <div className="mt-2">
@@ -2302,6 +2495,7 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
       setAssessUnlockMessage(msgs[newTier]);
     }
     setAssessShowCompletion(true);
+    haptic(HAPTIC.complete);
     setAssessNudgeData(getAssessNudge(assessCurrentTestId, newCompleted, entityType));
     setTimeout(() => { setAssessShowCompletion(false); setAssessUnlockMessage(null); setScreen('assess-results'); }, assessCurrentTestId === 'quick-profile' ? 1400 : 900);
   };
@@ -2770,7 +2964,7 @@ const ProfileScreen = ({ isDark, assess, entityType, onboardingAnswers, response
 
   return (
     <Screen header={<NavBar back title="Profile" onBack={() => onNavigate('categories')} />}>
-      <Screen.Body>
+      <Screen.Body screenId="profile">
         <Stack gap={4}>
           {/* Avatar + Name */}
           <Stack direction="row" align="center" gap={4}>
@@ -2825,6 +3019,16 @@ const ProfileScreen = ({ isDark, assess, entityType, onboardingAnswers, response
                 <Text size="sm" emphasis="muted" className="mt-0.5">{Object.keys(responses).length} questions answered</Text>
               </div>
               <Text size="sm" color={COLOR_HEX.blue.light}>→</Text>
+            </Stack>
+          </Card>
+          <Card color="emerald" onClick={() => onNavigate('identity')}>
+            <Stack direction="row" gap={3}>
+              <span className="text-xl">🪪</span>
+              <div className="flex-1">
+                <Text size="sm" weight="semibold">Manage Identity</Text>
+                <Text size="sm" emphasis="muted" className="mt-0.5">Linked accounts & connections</Text>
+              </div>
+              <Text size="sm" color={COLOR_HEX.emerald.light}>→</Text>
             </Stack>
           </Card>
         </Stack>
@@ -3192,16 +3396,60 @@ const AnalysisScreen = ({ isDark, assess, entityType, onboardingAnswers, onNavig
 };
 
 // — HISTORY SCREEN — Phase 4
-const HistoryScreen = ({ isDark, questions, responses, onNavigate }) => {
+const CommunityBar = ({ question, community, isDark }) => {
+  if (!community?.evaluators?.length) return null;
+  const evals = community.evaluators;
+  const total = evals.length;
+  if (question.type === 'binary') {
+    const yesCount = evals.filter(e => e.answer === 0).length;
+    const yesPct = Math.round((yesCount / total) * 100);
+    return (
+      <div className="mt-2 space-y-1" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
+        <div className="flex justify-between"><Text size="xs" emphasis="secondary">Yes {yesPct}%</Text><Text size="xs" emphasis="secondary">No {100 - yesPct}%</Text></div>
+        <div className="h-2 rounded-full overflow-hidden flex" style={{ background: 'var(--bg-elevated)' }}>
+          <div className="h-full rounded-l-full" style={{ width: `${yesPct}%`, background: isDark ? '#4ade80' : '#16a34a' }} />
+          <div className="h-full rounded-r-full flex-1" style={{ background: isDark ? '#f87171' : '#dc2626' }} />
+        </div>
+        <Text size="xs" emphasis="faint" className="text-center">{total} responses</Text>
+      </div>
+    );
+  }
+  // Multiple choice — horizontal stacked bar
+  const opts = question.options || [];
+  const counts = opts.map((_, oi) => evals.filter(e => e.answer === oi).length);
+  const mcColors = ['#a78bfa', '#60a5fa', '#34d399', '#fbbf24'];
+  return (
+    <div className="mt-2 space-y-1" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
+      {opts.map((opt, oi) => {
+        const pct = Math.round((counts[oi] / total) * 100);
+        return (
+          <div key={oi} className="flex items-center gap-2">
+            <Text size="xs" emphasis="secondary" className="w-20 truncate">{opt}</Text>
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: mcColors[oi % mcColors.length] }} />
+            </div>
+            <Text size="xs" emphasis="faint" className="w-8 text-right">{pct}%</Text>
+          </div>
+        );
+      })}
+      <Text size="xs" emphasis="faint" className="text-center">{total} responses</Text>
+    </div>
+  );
+};
+
+const HistoryScreen = ({ isDark, questions, responses, questionMeta, communityResults, onNavigate }) => {
   const [historyFilter, setHistoryFilter] = useState('all');
+  const [expandedId, setExpandedId] = useState(null);
+  const scrollRef = useScrollRestore('history');
   const answeredQuestions = questions
     .filter(q => responses[q.id])
-    .map(q => ({ ...q, response: responses[q.id] }))
+    .map(q => ({ ...q, response: responses[q.id], community: communityResults?.[q.id], meta: questionMeta?.[q.id] }))
     .sort((a, b) => (b.response.timestamp || 0) - (a.response.timestamp || 0));
   const filteredQuestions = answeredQuestions.filter(q => {
     if (historyFilter === 'all') return true;
     if (historyFilter === 'binary') return q.type === 'binary';
     if (historyFilter === 'multiple') return q.type === 'multiple';
+    if (historyFilter === 'flagged') return q.meta?.flag || q.meta?.explain;
     return q.category === historyFilter;
   });
   const getAnswerLabel = (q) => {
@@ -3210,42 +3458,153 @@ const HistoryScreen = ({ isDark, questions, responses, onNavigate }) => {
   };
 
   const filterOptions = [
-    { value: 'all', label: 'All' }, { value: 'binary', label: 'Y/N' }, { value: 'multiple', label: 'MC' },
+    { value: 'all', label: 'All' }, { value: 'binary', label: 'Y/N' }, { value: 'multiple', label: 'MC' }, { value: 'flagged', label: '⚑' },
   ];
   return (
     <Screen header={<NavBar back title="History" onBack={() => onNavigate('profile')}
       right={<Text size="xs" emphasis="subtle">{answeredQuestions.length} answered</Text>} />}>
       <ChipGroup options={filterOptions} selected={[historyFilter]} onChange={(sel) => setHistoryFilter(sel[0] || 'all')} multi={false} color="violet" size="sm" className="p-2" />
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 space-y-1">
         {filteredQuestions.length === 0 ? (
           <Placeholder icon="📋" title="No questions match" description={historyFilter === 'all' ? 'Answer some questions to see them here' : 'Try a different filter'} />
-        ) : filteredQuestions.map(q => (
-          <Card key={q.id} className="rounded-lg">
-            <Stack direction="row" align="start" gap={2}>
-              <Text as="span" size="xs">★</Text>
-              <div className="flex-1 min-w-0">
-                <Text size="xs" className="leading-snug line-clamp-2">{q.text}</Text>
-                <Stack direction="row" align="center" gap={2} className="mt-1.5">
-                  <Text as="span" size="xs" weight="medium" color={
-                    q.type === 'binary' ? (q.response.answer === 0 ? '#4ade80' : '#f87171') : COLOR_HEX.violet.light
-                  }>{getAnswerLabel(q)}</Text>
-                  <span className="flex gap-0.5">
-                    {[1,2,3,4].map(i => <span key={i} className="w-1.5 h-1.5 rounded-full"
-                      style={{ background: i <= q.response.confidence ? COLOR_HEX.violet.light : 'var(--bg-elevated)' }} />)}
-                  </span>
-                  <Text as="span" size="xs" emphasis="subtle">{CONFIDENCE_LABELS[q.response.confidence]}</Text>
-                </Stack>
-              </div>
-            </Stack>
-          </Card>
-        ))}
+        ) : filteredQuestions.map(q => {
+          const isExpanded = expandedId === q.id;
+          return (
+            <Card key={q.id} className="rounded-lg">
+              <Stack direction="row" align="start" gap={2}>
+                <Text as="span" size="xs">{CATEGORIES.find(c => c.id === q.category)?.icon || '★'}</Text>
+                <div className="flex-1 min-w-0">
+                  <Text size="xs" className="leading-snug line-clamp-2">{q.text}</Text>
+                  <Stack direction="row" align="center" gap={2} className="mt-1.5">
+                    <Text as="span" size="xs" weight="medium" color={
+                      q.type === 'binary' ? (q.response.answer === 0 ? '#4ade80' : '#f87171') : COLOR_HEX.violet.light
+                    }>{getAnswerLabel(q)}</Text>
+                    <span className="flex gap-0.5">
+                      {[1,2,3,4].map(i => <span key={i} className="w-1.5 h-1.5 rounded-full"
+                        style={{ background: i <= q.response.confidence ? COLOR_HEX.violet.light : 'var(--bg-elevated)' }} />)}
+                    </span>
+                    <Text as="span" size="xs" emphasis="subtle">{CONFIDENCE_LABELS[q.response.confidence]}</Text>
+                    {q.meta?.flag && <Text as="span" size="xs" style={{ color: isDark ? '#fb7185' : '#e11d48' }}>⚑</Text>}
+                    {q.meta?.explain && <Text as="span" size="xs" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>✎</Text>}
+                  </Stack>
+                  {q.community && (
+                    <button onClick={() => setExpandedId(isExpanded ? null : q.id)} className="w-full mt-1.5 flex items-center justify-between cursor-pointer" style={{ background: 'none', border: 'none', padding: 0 }}>
+                      <Text size="xs" emphasis="faint">{q.community.evaluators?.length || 0} responses</Text>
+                      <Text size="xs" emphasis="faint">{isExpanded ? '▲' : '▼'}</Text>
+                    </button>
+                  )}
+                  {isExpanded && q.community && <CommunityBar question={q} community={q.community} isDark={isDark} />}
+                </div>
+              </Stack>
+            </Card>
+          );
+        })}
       </div>
     </Screen>
   );
 };
 
+// — IDENTITY SCREEN — Lightweight onboarding + stamp management
+const IDENTITY_ONBOARD_KEY = 'aura-identity-onboard-v1';
+const IDENTITY_QUESTIONS = [
+  { id: 'source', text: 'How did you find Aura?', options: ['A friend told me', 'Exploring on my own', 'Someone sent me a link', 'Proving my identity'] },
+  { id: 'know-anyone', text: 'Know anyone already using Aura?', options: ['Yeah, I think so', 'Maybe — not sure', "Nope, I'm new here"] },
+  { id: 'location', text: 'Where are you based?', placeholder: 'City, Country', isText: true },
+];
+
+const IdentityOnboardingFlow = ({ isDark, onComplete }) => {
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const q = IDENTITY_QUESTIONS[step];
+  const handleSelect = (val) => {
+    const next = { ...answers, [q.id]: val };
+    setAnswers(next);
+    setTimeout(() => {
+      if (step + 1 < IDENTITY_QUESTIONS.length) setStep(step + 1);
+      else { localStorage.setItem(IDENTITY_ONBOARD_KEY, JSON.stringify(next)); onComplete(next); }
+    }, 300);
+  };
+  const handleTextSubmit = () => {
+    if (step + 1 < IDENTITY_QUESTIONS.length) setStep(step + 1);
+    else { localStorage.setItem(IDENTITY_ONBOARD_KEY, JSON.stringify(answers)); onComplete(answers); }
+  };
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      <Text size="xs" emphasis="faint">{step + 1} of {IDENTITY_QUESTIONS.length}</Text>
+      <Text as="h2" weight="semibold" className="text-center">{q.text}</Text>
+      {q.isText ? (
+        <Stack gap={3} className="w-full max-w-xs">
+          <input value={answers[q.id] || ''} onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))} placeholder={q.placeholder}
+            onKeyDown={e => { if (e.key === 'Enter') handleTextSubmit(); }}
+            className="w-full px-4 py-3 rounded-xl text-center" style={{ background: 'var(--bg-input)', color: 'var(--input-text)', border: '1px solid var(--border-base)' }} autoFocus />
+          <Stack direction="row" gap={2} className="justify-center">
+            <Button variant="ghost" size="sm" onClick={handleTextSubmit}>Skip</Button>
+            <Button variant="primary" size="sm" color="emerald" onClick={handleTextSubmit} disabled={!(answers[q.id] || '').trim()}>Continue</Button>
+          </Stack>
+        </Stack>
+      ) : (
+        <Stack gap={2} className="w-full max-w-xs">
+          {q.options.map(opt => (
+            <button key={opt} onClick={() => handleSelect(opt)}
+              className="w-full px-4 py-3 rounded-xl text-left transition-all btn-feedback cursor-pointer"
+              style={{ background: answers[q.id] === opt ? 'rgba(52,211,153,0.15)' : 'var(--bg-card)', border: `1px solid ${answers[q.id] === opt ? 'rgba(52,211,153,0.4)' : 'var(--border-card)'}`, color: 'var(--text-primary)' }}>
+              <Text size="sm">{opt}</Text>
+            </button>
+          ))}
+        </Stack>
+      )}
+    </div>
+  );
+};
+
+const IdentityScreen = ({ isDark, onNavigate }) => {
+  const [onboardingDone, setOnboardingDone] = useState(() => !!localStorage.getItem(IDENTITY_ONBOARD_KEY));
+  const auth = useAuth();
+  if (!onboardingDone) {
+    return (
+      <Screen header={<NavBar back title="Identity" onBack={() => onNavigate('profile')} />}>
+        <IdentityOnboardingFlow isDark={isDark} onComplete={() => setOnboardingDone(true)} />
+      </Screen>
+    );
+  }
+  return (
+    <Screen header={<NavBar back title="Identity" onBack={() => onNavigate('profile')} />}>
+      <Screen.Body>
+        <Stack gap={4}>
+          <Card>
+            <Text size="xs" weight="semibold" emphasis="subtle" className="uppercase tracking-wide mb-2">Linked Accounts</Text>
+            <Stack gap={1}>
+              {STAMP_PROVIDERS.filter(p => p.id !== 'email').map(pc => {
+                const claim = (auth.claims || []).find(c => c.provider === pc.id);
+                return <StampRow key={pc.id} providerConfig={pc} claim={claim}
+                  isOAuthLinked={pc.oauth && auth.isOAuthLinked(pc.supabaseProvider)}
+                  onOAuthLink={auth.linkProvider} onOAuthUnlink={auth.unlinkProvider}
+                  onSelfReportLink={auth.createClaim} onRemoveClaim={auth.removeClaim} />;
+              })}
+            </Stack>
+          </Card>
+          <Card>
+            <Text size="xs" weight="semibold" emphasis="subtle" className="uppercase tracking-wide mb-2">About You</Text>
+            {(() => {
+              try { const ob = JSON.parse(localStorage.getItem(IDENTITY_ONBOARD_KEY) || '{}');
+                return (
+                  <Stack gap={2}>
+                    {ob.source && <Stack direction="row" className="justify-between"><Text size="sm" emphasis="secondary">Found Aura</Text><Text size="sm" emphasis="muted">{ob.source}</Text></Stack>}
+                    {ob['know-anyone'] && <Stack direction="row" className="justify-between"><Text size="sm" emphasis="secondary">Connections</Text><Text size="sm" emphasis="muted">{ob['know-anyone']}</Text></Stack>}
+                    {ob.location && <Stack direction="row" className="justify-between"><Text size="sm" emphasis="secondary">Location</Text><Text size="sm" emphasis="muted">{ob.location}</Text></Stack>}
+                  </Stack>
+                );
+              } catch { return <Text size="sm" emphasis="muted">No info yet</Text>; }
+            })()}
+          </Card>
+        </Stack>
+      </Screen.Body>
+    </Screen>
+  );
+};
+
 // — SETTINGS SCREEN — Phase 5 + Phase 6 auth
-const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityType, onBack, onReset, hasAssessmentData, onResetAssessments, displayName, setDisplayName }) => {
+const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityType, onBack, onReset, hasAssessmentData, onResetAssessments, displayName, setDisplayName, hasVerificationData, onResetVerification }) => {
   const { undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak } = settings;
   const auth = useAuth();
   const [devTapCount, setDevTapCount] = useState(0);
@@ -3325,6 +3684,7 @@ const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityTy
                 </div>
                 <Button variant="outline" color="violet" size="sm" onClick={onBack}>Sign In</Button>
               </Stack>
+              <Text size="xxs" emphasis="faint" className="mt-2 text-center">Sign in to link accounts and earn stamps</Text>
             </Card>
           )}
           <SettingItem label="Theme">
@@ -3383,11 +3743,29 @@ const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityTy
           <Card>
             <Text size="sm" weight="medium" className="mb-2">Your Data</Text>
             <Stack direction="row" gap={2}>
-              <Button variant="secondary" color="emerald" size="full" onClick={() => {
+              <Button variant="secondary" color="emerald" size="sm" onClick={() => {
                 const data = { responses: JSON.parse(localStorage.getItem('aura-responses') || '{}'), stats: JSON.parse(localStorage.getItem('aura-stats') || '{}'), timestamp: new Date().toISOString() };
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `aura-export-${Date.now()}.json`; a.click();
-              }}>Export JSON</Button>
+              }}>JSON</Button>
+              <Button variant="secondary" color="blue" size="sm" onClick={() => {
+                const resp = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')?.answers || {};
+                const lines = ['# Aura Export', `*${new Date().toLocaleDateString()}*`, ''];
+                const grouped = {};
+                QUESTIONS.forEach(q => {
+                  const r = resp[q.id]; if (!r) return;
+                  const cat = q.category || 'other';
+                  if (!grouped[cat]) grouped[cat] = [];
+                  const answer = q.type === 'binary' ? (r.answer === 0 ? 'Yes' : 'No') : (q.options?.[r.answer] || '?');
+                  grouped[cat].push(`- **${q.text}**  \n  ${answer} (confidence: ${'●'.repeat(r.confidence)}${'○'.repeat(4 - r.confidence)})`);
+                });
+                Object.entries(grouped).forEach(([cat, items]) => {
+                  const catInfo = CATEGORIES.find(c => c.id === cat);
+                  lines.push(`## ${catInfo?.icon || '★'} ${catInfo?.name || cat}`, '', ...items, '');
+                });
+                const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `aura-export-${Date.now()}.md`; a.click();
+              }}>Markdown</Button>
             </Stack>
           </Card>
           {/* Reset buttons */}
@@ -3395,7 +3773,10 @@ const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityTy
             {hasAssessmentData && (
               <Button variant="outline" color="amber" size="full" className="flex-1" onClick={onResetAssessments}>Clear Assessments</Button>
             )}
-            <Button variant="outline" color="rose" size={hasAssessmentData ? 'full' : 'full'} className={hasAssessmentData ? 'flex-1' : ''} onClick={onReset}>Reset All Data</Button>
+            {hasVerificationData && (
+              <Button variant="outline" color="teal" size="full" className="flex-1" onClick={onResetVerification}>Clear Verification</Button>
+            )}
+            <Button variant="outline" color="rose" size="full" className={(hasAssessmentData || hasVerificationData) ? 'flex-1' : ''} onClick={onReset}>Reset All Data</Button>
           </Stack>
           <div className="text-center" onClick={handleVersionTap}>
             <Text size="xxs" emphasis="faint">Aura Player vR5</Text>
@@ -3730,9 +4111,10 @@ const StampRow = ({ providerConfig, claim, isOAuthLinked, onOAuthLink, onOAuthUn
 };
 
 // — CATEGORY SCREEN — Hub/Home (ported from production, rebuilt with Legos)
-const CategoryScreen = ({ isDark, questions, responses, stats, assess, entityType, qotdData, qotdResponse, onNavigate, onSelectCategory, onAssessSurprise }) => {
+const CategoryScreen = ({ isDark, questions, responses, stats, assess, entityType, qotdData, qotdResponse, syncStatus, onNavigate, onSelectCategory, onAssessSurprise }) => {
   const auth = useAuth();
   const isLoggedIn = !!auth.user;
+  const catScrollRef = useScrollRestore('categories');
   const tier = getFeatureTier(assess.assessCompleted, isLoggedIn);
   const hasAnsweredQotd = qotdResponse !== null;
   const qotdColor = colorOf('blue');
@@ -3751,6 +4133,7 @@ const CategoryScreen = ({ isDark, questions, responses, stats, assess, entityTyp
   const selfConfig = [
     { id: 'reveal', icon: '🪞', name: 'Reveal', color: 'blue', onClick: () => onNavigate('assess-picker') },
     { id: 'surprise-assess', icon: '🎲', name: 'Surprise me', color: 'violet', onClick: onAssessSurprise },
+    { id: 'verify', icon: '✅', name: 'Verify', color: 'emerald', onClick: () => onNavigate('verify-hub') },
   ];
 
   return (
@@ -3766,6 +4149,7 @@ const CategoryScreen = ({ isDark, questions, responses, stats, assess, entityTyp
           <Text as="span" size="sm" weight="bold" color={isDark ? COLOR_HEX.violet.light : COLOR_HEX.violet.base}>Lv.{stats.level || 1}</Text>
         </Stack>
         <Stack direction="row" align="center" gap={3}>
+          {syncStatus && syncStatus !== 'idle' && <SyncIndicator status={syncStatus} />}
           {stats.streak > 0 && <Text as="span" size="sm" weight="medium" color={COLOR_HEX.amber.light}>🔥{stats.streak}</Text>}
           <button onClick={() => onNavigate('profile')} className="btn-feedback">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm relative"
@@ -3783,7 +4167,7 @@ const CategoryScreen = ({ isDark, questions, responses, stats, assess, entityTyp
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-5 pt-2 pb-8 space-y-4 scroll-smooth">
+      <div ref={catScrollRef} className="flex-1 overflow-y-auto px-5 pt-2 pb-8 space-y-4 scroll-smooth">
         {/* QotD Card — gated at tier 2 */}
         {qotdData && tier >= 2 && (
           <button onClick={() => onNavigate('qotd')}
@@ -3961,7 +4345,961 @@ const QotdScreen = ({ isDark, qotdData, qotdResponse, setQotdResponse, onNavigat
   );
 };
 
-// — APP — Phase 2+3+4+5: Core Loop + Assessments + Profile/Analysis + Social/Settings
+// ==================== VERIFICATION DATA LAYER ====================
+
+const VERIFY_STORAGE_KEY = 'aura-verification-v1';
+const verifySave = (evaluations) => {
+  try { localStorage.setItem(VERIFY_STORAGE_KEY, JSON.stringify({ evaluations, savedAt: Date.now() })); } catch {}
+};
+const verifyLoad = () => {
+  try { const s = localStorage.getItem(VERIFY_STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; }
+};
+
+const VERIFY_CONFIDENCE_LABELS = [
+  '1 — Notable gaps in my knowledge',
+  '2 — Fairly confident, some uncertainty',
+  '3 — Very confident, no reason to doubt',
+  "4 — Certain, I'd stake my reputation",
+];
+
+const VERIFY_IDENTITY_CHECK = {
+  type: 'identity-check',
+  text: 'Identity check',
+  fields: [
+    { id: 'double-life', label: 'Could they game the system?', subtitle: 'Ability to pass off a sybil',
+      options: ['Unlikely', 'Maybe', 'Likely'] },
+    { id: 'only-account', label: 'Do you believe they only have one account?',
+      options: ['Yes', 'Unsure', 'Doubt it'] },
+  ],
+};
+
+const VERIFY_PATH_A_QUESTIONS = [
+  { id: 'a1-connection', text: 'Tell us about your connection', type: 'compact-connection',
+    fields: [
+      { id: 'a1-relationship', label: 'Relationship', options: ['Family', 'Friend', 'Colleague', 'Neighbor', 'Community', 'Other'] },
+      { id: 'a1-duration', label: 'How long', options: ['< 1 year', '1–5 years', '5+ years'] },
+      { id: 'a1-last-interact', label: 'Last contact', options: ['Recently', 'This year', 'Longer'] },
+    ]},
+  { id: 'a2-identity', ...VERIFY_IDENTITY_CHECK },
+  { id: 'a3-verdict', text: 'Is this a real person with\njust one account?', type: 'verdict',
+    verdictOptions: ['Yes', 'No'],
+    flags: ["Haven't seen them in a while", 'Only know one context', 'Something feels off', 'Other'] },
+];
+
+const VERIFY_PATH_B_QUESTIONS = [
+  { id: 'b1-how-meet', text: 'How did you meet?', type: 'single', options: ['In person', 'Video call', 'Text-chat only'] },
+  { id: 'b1-who-init', text: 'Who initiated?', type: 'single', options: ['They came to me', 'I reached out', 'Mutual'] },
+  { id: 'b1-context', text: 'Brief context — where and when?', type: 'text', placeholder: 'e.g. Coffee shop downtown, last Tuesday' },
+  { id: 'b2-evidence', text: 'What evidence do you have?', type: 'evidence-combined',
+    sections: [
+      { label: 'Directly observed', options: ['Physically present — clearly a real person', 'Specific details — talked about their life naturally', 'Recognized — others at the scene knew them', 'Hard to fake — showed something convincing', 'Nothing direct'] },
+      { label: 'Supporting evidence', options: ['Social graph — looks authentic', 'Connections — already in Aura', 'Referral — from someone I trust', 'Profile — matches what I observed', 'Nothing supporting'] },
+    ]},
+  { id: 'b3-identity', ...VERIFY_IDENTITY_CHECK },
+  { id: 'b4-verdict', text: 'Is this a real person with\njust one account?', type: 'verdict',
+    verdictOptions: ['Yes', 'No'],
+    flags: ['Only met once', 'One context only', 'Kept things guarded', 'Could game the system', 'Something feels off', 'Other'] },
+];
+
+const VERIFY_PATH_C_QUESTIONS = [
+  { id: 'c1-sources', text: 'What are you working from?', type: 'multi', subtitle: 'Toggle all that apply.',
+    options: ['Self-attestation', 'Connections — social graph imports', "Evaluators — other people's assessments", 'Referral chain', 'Activity history', 'Other'] },
+  { id: 'c2-looks-real', text: 'Does this profile look like a real, unique person?', type: 'star-confidence' },
+  { id: 'c3-strongest', text: 'Strongest signals?', type: 'multi', subtitle: 'Pick up to two.', maxSelect: 2,
+    options: ['Connections — rich, verified network', 'Self-attestation — believable story', 'Evaluators — multiple already confident', 'Referral chain — strong and traceable', 'Other'] },
+  { id: 'c3-weakest', text: 'Biggest gaps?', type: 'multi', subtitle: 'Pick up to two.', maxSelect: 2,
+    options: ['Connections — thin network', 'Verification — no in-person check', 'History — new profile, little activity', 'Attestation — generic, nothing specific', 'Other'] },
+  { id: 'c4-verdict', text: 'Is this a real person with\njust one account?', type: 'verdict',
+    verdictOptions: ['Yes', 'No'],
+    flags: ['Thin profile', 'Looks like other fakes', 'Something feels off', 'Other'] },
+];
+
+const VERIFY_PATH_CONFIG = {
+  A: { label: 'Vouching', color: 'cyan', questions: VERIFY_PATH_A_QUESTIONS },
+  B: { label: 'Investigation', color: 'amber', questions: VERIFY_PATH_B_QUESTIONS },
+  C: { label: 'Analysis', color: 'slate', questions: VERIFY_PATH_C_QUESTIONS },
+};
+
+const VERIFY_MOCK_SUBJECTS = [
+  { id: 'mock-1', name: 'Alex Rivera', city: 'Portland, OR', connections: 14, evaluations: 3,
+    joined: '2025-08', availability: { video: true, meet: true, vouch: true } },
+  { id: 'mock-2', name: 'Priya Sharma', city: 'Bangalore', connections: 8, evaluations: 1,
+    joined: '2025-11', availability: { video: true, meet: false, vouch: true } },
+  { id: 'mock-3', name: 'Marcus Chen', city: 'Toronto', connections: 0, evaluations: 0,
+    joined: '2026-01', availability: null },
+  { id: 'mock-4', name: 'Sofia Andersson', city: 'Stockholm', connections: 22, evaluations: 7,
+    joined: '2025-06', availability: { video: true, meet: true, vouch: true } },
+  { id: 'mock-5', name: 'Jordan Lee', city: 'Austin, TX', connections: 5, evaluations: 2,
+    joined: '2025-09', availability: { video: true, meet: false, vouch: false } },
+  { id: 'mock-6', name: 'Aisha Okafor', city: 'Lagos', connections: 31, evaluations: 9,
+    joined: '2025-04', availability: { video: true, meet: true, vouch: true } },
+  { id: 'mock-7', name: 'David Kowalski', city: 'Berlin', connections: 11, evaluations: 4,
+    joined: '2025-07', availability: { video: true, meet: true, vouch: false } },
+  { id: 'mock-8', name: 'Luna Martinez', city: 'Mexico City', connections: 3, evaluations: 0,
+    joined: '2026-02', availability: { video: false, meet: false, vouch: true } },
+];
+
+// ==================== VERIFICATION COMPONENTS ====================
+
+// Shared: VerifyChip — reusable selectable chip
+const VerifyChip = ({ label, selected, color = 'emerald', onClick, stretch }) => {
+  const { isDark } = useTheme();
+  const c = colorOf(color);
+  return (
+    <button onClick={onClick}
+      className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-center`}
+      style={{
+        width: stretch ? '100%' : undefined,
+        background: selected
+          ? `linear-gradient(135deg, rgba(${c.rgb}, 0.25), rgba(${c.rgb}, 0.12))`
+          : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'),
+        border: selected
+          ? `1px solid rgba(${c.rgb}, 0.45)`
+          : (isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)'),
+        color: selected ? (isDark ? '#fff' : c.base) : (isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)'),
+      }}>
+      {label}
+    </button>
+  );
+};
+
+// Shared: VerifyToggle — pill toggle for evidence checklists
+const VerifyToggle = ({ label, color = 'emerald', isOn, onToggle }) => {
+  const { isDark } = useTheme();
+  const c = colorOf(color);
+  return (
+    <button onClick={onToggle}
+      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left"
+      style={{
+        background: isOn
+          ? (isDark ? `rgba(${c.rgb}, 0.12)` : `rgba(${c.rgb}, 0.08)`)
+          : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
+        border: isOn
+          ? `1px solid rgba(${c.rgb}, 0.3)`
+          : (isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'),
+        color: isOn ? (isDark ? '#fff' : c.base) : (isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)'),
+      }}>
+      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all" style={{
+        background: isOn ? `rgba(${c.rgb}, 0.3)` : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+        border: isOn ? `1px solid rgba(${c.rgb}, 0.5)` : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)'),
+      }}>
+        {isOn && <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 5L4.5 7.5L8 3" /></svg>}
+      </div>
+      <span className="flex-1">{label}</span>
+    </button>
+  );
+};
+
+// Subject banner — expanded version with more context
+const VerifySubjectBanner = ({ subject, color = 'emerald' }) => {
+  const { isDark } = useTheme();
+  const [expanded, setExpanded] = useState(false);
+  if (!subject) return null;
+  const c = colorOf(color);
+  const availTags = subject.availability ? [
+    subject.availability.video && 'Video',
+    subject.availability.meet && 'In-person',
+    subject.availability.vouch && 'Has voucher',
+  ].filter(Boolean) : [];
+  const joinedLabel = subject.joined ? new Date(subject.joined + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null;
+  return (
+    <div className="w-full mb-3">
+      <button onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-200"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+          border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+        }}>
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+          style={{ background: `rgba(${c.rgb}, 0.2)`, color: isDark ? c.light : c.base }}>
+          {subject.name[0]}
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <Text size="sm" weight="semibold" className="truncate">{subject.name}</Text>
+          <Text size="xs" emphasis="faint" className="truncate">
+            {subject.city}{subject.connections > 0 ? ` · ${subject.connections} connections` : ''}
+          </Text>
+        </div>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+          className={`flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          style={{ color: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)' }}>
+          <path d="M3 4.5L6 7.5L9 4.5" />
+        </svg>
+      </button>
+      {expanded && (
+        <div className="flex flex-wrap gap-1.5 mt-1.5 px-1" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
+          {availTags.map(t => (
+            <span key={t} className="text-xs px-2 py-0.5 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.45)' }}>{t}</span>
+          ))}
+          {joinedLabel && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.45)' }}>Joined {joinedLabel}</span>}
+          {subject.evaluations > 0 && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.45)' }}>{subject.evaluations} eval{subject.evaluations !== 1 ? 's' : ''}</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// VerifyScreenLayout — ambient glow + content top + buttons bottom
+const VerifyScreenLayout = ({ color = 'emerald', sectionLabel, progress, total, onBack, children, buttons, subject }) => {
+  const { isDark } = useTheme();
+  const c = colorOf(color);
+  return (
+    <Screen>
+      {/* Ambient glow */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-8%' }}>
+        <div style={{
+          position: 'absolute', width: 420, height: 420, borderRadius: '50%',
+          background: isDark
+            ? `radial-gradient(circle, rgba(${c.rgb}, 0.14) 0%, rgba(${c.rgb}, 0.06) 35%, transparent 65%)`
+            : `radial-gradient(circle, rgba(${c.rgb}, 0.10) 0%, rgba(${c.rgb}, 0.04) 35%, transparent 65%)`,
+          animation: 'aura-breathe 8s ease-in-out infinite',
+        }} />
+      </div>
+      {/* Back button */}
+      {onBack && (
+        <button onClick={onBack}
+          className="absolute top-4 left-4 z-50 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200"
+          style={{
+            background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+            color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)',
+          }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 2L4 7L9 12" /></svg>
+        </button>
+      )}
+      {/* Content area */}
+      <div className="relative z-10 flex flex-col h-full w-full">
+        <div className="flex-1 overflow-y-auto flex flex-col items-center w-full">
+          <div className="w-full max-w-sm mx-auto px-5 pt-12 pb-4 flex flex-col items-center">
+            {subject && <VerifySubjectBanner subject={subject} color={color} />}
+            {/* Progress bar */}
+            {total > 0 && (
+              <div className="w-full mb-3">
+                {sectionLabel && <Text size="xxs" emphasis="faint" weight="semibold" className="uppercase tracking-wide mb-1.5">{sectionLabel}</Text>}
+                <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+                  <div className="h-full rounded-full transition-all duration-300" style={{
+                    width: `${((progress || 0) / total) * 100}%`,
+                    background: `linear-gradient(90deg, rgba(${c.rgb}, 0.6), rgba(${c.rgb}, 0.3))`,
+                  }} />
+                </div>
+              </div>
+            )}
+            {children}
+          </div>
+        </div>
+        {/* Fixed bottom buttons */}
+        {buttons && (
+          <div className="flex-shrink-0 w-full max-w-sm mx-auto px-5 pb-5 pt-2">
+            {buttons}
+          </div>
+        )}
+      </div>
+    </Screen>
+  );
+};
+
+// VerifyActionButton — primary/secondary action
+const VerifyActionButton = ({ label, color = 'emerald', onClick, disabled, secondary }) => {
+  const { isDark } = useTheme();
+  const c = colorOf(color);
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className="w-full h-14 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-30"
+      style={secondary ? {
+        background: isDark ? `rgba(${c.rgb}, 0.08)` : `rgba(${c.rgb}, 0.06)`,
+        border: `1px solid ${isDark ? `rgba(${c.rgb}, 0.25)` : `rgba(${c.rgb}, 0.2)`}`,
+        color: isDark ? c.light : c.base,
+      } : {
+        background: isDark
+          ? `linear-gradient(135deg, rgba(${c.rgb}, 0.3), rgba(${c.rgb}, 0.15))`
+          : `linear-gradient(135deg, rgba(${c.rgb}, 0.85), rgba(${c.rgb}, 0.65))`,
+        border: `1px solid rgba(${c.rgb}, ${isDark ? 0.35 : 0.5})`,
+        color: '#fff',
+      }}>
+      {label}
+    </button>
+  );
+};
+
+// VerifyStarConfidence — 1-4 confidence selector
+const VerifyStarConfidence = ({ color = 'emerald', value, onChange }) => {
+  const { isDark } = useTheme();
+  const c = colorOf(color);
+  const labels = ['Gaps', 'Fair', 'Confident', 'Certain'];
+  return (
+    <div className="flex flex-col items-center gap-4 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      <div className="flex items-start justify-center gap-5">
+        {[1, 2, 3, 4].map(level => {
+          const isSelected = value !== undefined && level <= value;
+          const isCurrent = value === level;
+          const intensity = [0.25, 0.4, 0.55, 0.75][level - 1];
+          return (
+            <button key={level} onClick={() => onChange(level)} className="flex flex-col items-center gap-2 transition-all duration-200">
+              <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300"
+                style={{
+                  background: isSelected
+                    ? `linear-gradient(135deg, rgba(${c.rgb}, ${intensity}), rgba(${c.rgb}, ${intensity * 0.5}))`
+                    : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                  border: isSelected
+                    ? `1.5px solid rgba(${c.rgb}, ${intensity + 0.1})`
+                    : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)'),
+                  color: isSelected ? '#fff' : (isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'),
+                }}>
+                {level}
+              </div>
+              <Text size="xs" weight="medium" style={{ color: isSelected ? (isDark ? c.light : c.base) : (isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)') }}>
+                {labels[level - 1]}
+              </Text>
+            </button>
+          );
+        })}
+      </div>
+      {value !== undefined && (
+        <div className="text-center text-sm font-medium px-4 py-2.5 rounded-xl" style={{
+          animation: 'fadeSlideIn 0.3s ease-out both',
+          background: isDark ? `rgba(${c.rgb}, 0.1)` : `rgba(${c.rgb}, 0.08)`,
+          color: isDark ? c.light : c.base,
+          border: `1px solid ${isDark ? `rgba(${c.rgb}, 0.15)` : `rgba(${c.rgb}, 0.12)`}`,
+        }}>
+          {VERIFY_CONFIDENCE_LABELS[value - 1]}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// VerifyVerdict — yes/no + confidence + expandable flags
+const VerifyVerdict = ({ question, color = 'emerald', answer, onAnswer }) => {
+  const { isDark } = useTheme();
+  const val = answer || {};
+  const verdict = val.verdict;
+  const flags = val.flags || [];
+  const [showFlags, setShowFlags] = useState(false);
+  const setField = (field, v) => onAnswer({ ...val, [field]: v });
+  const toggleFlag = (flag) => {
+    const next = flags.includes(flag) ? flags.filter(f => f !== flag) : [...flags, flag];
+    onAnswer({ ...val, flags: next });
+  };
+  return (
+    <div className="flex flex-col items-center gap-5 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      <div className="flex gap-3 w-full">
+        {(question.verdictOptions || ['Yes', 'No']).map((opt, i) => {
+          const isYes = i === 0;
+          const sel = verdict === opt;
+          const vc = isYes ? COLOR_HEX.emerald : COLOR_HEX.rose;
+          return (
+            <button key={opt} onClick={() => setField('verdict', opt)}
+              className="flex-1 py-4 rounded-2xl font-semibold text-base transition-all duration-200"
+              style={{
+                background: sel
+                  ? `linear-gradient(135deg, rgba(${vc.rgb}, 0.25), rgba(${vc.rgb}, 0.1))`
+                  : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+                border: sel
+                  ? `1.5px solid rgba(${vc.rgb}, 0.5)`
+                  : (isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'),
+                color: sel ? (isDark ? '#fff' : vc.base) : (isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'),
+                transform: sel ? 'scale(1.03)' : 'scale(1)',
+                animation: sel ? 'verdict-pulse 0.3s ease-out' : 'none',
+              }}>
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+      {verdict && (
+        <div className="w-full" style={{ animation: 'fadeSlideIn 0.3s ease-out both' }}>
+          <Text size="xs" emphasis="faint" className="text-center mb-4">How sure are you?</Text>
+          <VerifyStarConfidence color={color} value={val.confidence} onChange={v => setField('confidence', v)} />
+        </div>
+      )}
+      {verdict && question.flags && (
+        <div className="w-full" style={{ animation: 'fadeSlideIn 0.3s ease-out both 0.1s' }}>
+          <button onClick={() => setShowFlags(!showFlags)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-200"
+            style={{
+              background: (showFlags || flags.length > 0)
+                ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)')
+                : (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)'),
+              border: flags.length > 0
+                ? `1px solid rgba(${COLOR_HEX.amber.rgb}, 0.3)`
+                : (isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'),
+            }}>
+            <Text size="sm" weight="medium" style={{ color: flags.length > 0 ? (isDark ? '#fbbf24' : '#d97706') : undefined }} emphasis={flags.length > 0 ? undefined : 'faint'}>
+              {flags.length > 0 ? `${flags.length} concern${flags.length > 1 ? 's' : ''} flagged` : 'Anything feel off?'}
+            </Text>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+              className={`transition-transform duration-200 ${showFlags ? 'rotate-180' : ''}`}
+              style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>
+              <path d="M3 4.5L6 7.5L9 4.5" />
+            </svg>
+          </button>
+          {showFlags && (
+            <div className="mt-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', animation: 'fadeSlideIn 0.2s ease-out both' }}>
+              {question.flags.map(flag => (
+                <VerifyChip key={flag} label={flag} selected={flags.includes(flag)} color="amber" onClick={() => toggleFlag(flag)} stretch />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Question-type renderers for the evaluator flow
+// VerifyFieldGroup — unified component for compact-connection + identity-check
+const VerifyFieldGroup = ({ question, color, answer, onAnswer }) => {
+  const { isDark } = useTheme();
+  const c = colorOf(color);
+  const val = answer || {};
+  const setField = (fieldId, v) => onAnswer({ ...val, [fieldId]: v });
+  return (
+    <div className="flex flex-col gap-3 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      {question.fields.map(field => {
+        const cols = field.options.length <= 4 ? field.options.length : 3;
+        return (
+          <div key={field.id} className="rounded-2xl px-4 py-3" style={{
+            background: val[field.id]
+              ? (isDark ? `rgba(${c.rgb}, 0.04)` : `rgba(${c.rgb}, 0.02)`)
+              : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
+            border: val[field.id]
+              ? `1px solid rgba(${c.rgb}, 0.15)`
+              : (isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'),
+            transition: 'all 0.2s',
+          }}>
+            <Text size="sm" weight="semibold" className={field.subtitle ? 'mb-0.5' : 'mb-2'}>{field.label}</Text>
+            {field.subtitle && <Text size="xs" emphasis="faint" className="mb-2">{field.subtitle}</Text>}
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '8px' }}>
+              {field.options.map(opt => (
+                <VerifyChip key={opt} label={opt} selected={val[field.id] === opt} color={color} onClick={() => setField(field.id, opt)} stretch />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const VerifyEvidenceCombined = ({ question, color, answer, onAnswer }) => {
+  const val = answer || {};
+  const toggleItem = (sectionIdx, opt) => {
+    const key = `s${sectionIdx}`;
+    const current = val[key] || [];
+    const next = current.includes(opt) ? current.filter(x => x !== opt) : [...current, opt];
+    onAnswer({ ...val, [key]: next });
+  };
+  return (
+    <div className="flex flex-col gap-4 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      {question.sections.map((section, si) => (
+        <div key={si}>
+          <Text size="xs" weight="semibold" emphasis="faint" className="uppercase tracking-wide mb-2">{section.label}</Text>
+          <div className="flex flex-col gap-2">
+            {section.options.map(opt => (
+              <VerifyToggle key={opt} label={opt} color={color} isOn={(val[`s${si}`] || []).includes(opt)} onToggle={() => toggleItem(si, opt)} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const VerifySingleSelect = ({ question, color, answer, onAnswer }) => {
+  const { isDark } = useTheme();
+  const c = colorOf(color);
+  const options = question.dynamicOptions ? question.dynamicOptions({}) : question.options;
+  return (
+    <div className="flex flex-col gap-2.5 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      {options.map(opt => (
+        <button key={opt} onClick={() => { haptic(HAPTIC.verdict); onAnswer(opt); }}
+          className="w-full rounded-2xl text-left px-4 h-14 font-medium text-sm transition-all duration-200"
+          style={{
+            background: answer === opt
+              ? `linear-gradient(135deg, rgba(${c.rgb}, 0.25), rgba(${c.rgb}, 0.12))`
+              : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+            border: answer === opt
+              ? `1px solid rgba(${c.rgb}, 0.45)`
+              : (isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'),
+            color: answer === opt ? (isDark ? '#fff' : c.base) : (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)'),
+          }}>
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+const VerifyMultiToggle = ({ question, color, answer, onAnswer }) => {
+  const selected = Array.isArray(answer) ? answer : [];
+  const toggle = (opt) => {
+    const next = selected.includes(opt) ? selected.filter(x => x !== opt) : [...selected, opt];
+    if (question.maxSelect && next.length > question.maxSelect) return;
+    onAnswer(next);
+  };
+  return (
+    <div className="flex flex-col gap-2 w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      {question.options.map(opt => (
+        <VerifyToggle key={opt} label={opt} color={color} isOn={selected.includes(opt)} onToggle={() => toggle(opt)} />
+      ))}
+    </div>
+  );
+};
+
+const VerifyTextInput = ({ question, color, answer, onAnswer, onContinue }) => {
+  const { isDark } = useTheme();
+  const c = colorOf(color);
+  return (
+    <div className="w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      <input type="text" value={answer || ''} onChange={e => onAnswer(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && (answer || '').trim()) onContinue?.(); }}
+        placeholder={question.placeholder || ''}
+        className="w-full text-sm px-4 py-3.5 rounded-xl bg-transparent outline-none transition-all"
+        style={{
+          border: (answer || '').trim()
+            ? `1px solid rgba(${c.rgb}, 0.3)`
+            : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)'),
+          color: isDark ? '#fff' : '#111',
+        }} />
+    </div>
+  );
+};
+
+// ==================== VERIFY HUB ====================
+
+// Subject card — module-scope, uses useTheme
+const VerifySubjectCard = ({ subject, isDone, onSelect }) => {
+  const { isDark } = useTheme();
+  const sc = isDone ? COLOR_HEX.emerald : COLOR_HEX.violet;
+  const availTags = subject.availability ? [
+    subject.availability.video && '📹',
+    subject.availability.meet && '🤝',
+    subject.availability.vouch && '✋',
+  ].filter(Boolean) : [];
+  return (
+    <button onClick={onSelect}
+      className="w-full rounded-2xl p-3.5 text-left transition-all duration-200"
+      style={{
+        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+        border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+      }}>
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+          style={{ background: `rgba(${sc.rgb}, 0.2)`, color: isDark ? sc.light : sc.base }}>
+          {subject.name[0]}
+        </div>
+        <div className="flex-1 min-w-0">
+          <Text size="sm" weight="semibold">{subject.name}</Text>
+          <div className="flex items-center gap-1.5">
+            <Text size="xs" emphasis="faint">
+              {subject.city}{subject.connections > 0 ? ` · ${subject.connections} conn` : ''}
+              {subject.evaluations > 0 ? ` · ${subject.evaluations} eval${subject.evaluations !== 1 ? 's' : ''}` : ''}
+            </Text>
+            {availTags.length > 0 && <span className="text-xs opacity-40">{availTags.join('')}</span>}
+          </div>
+        </div>
+        {isDone ? (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0" style={{
+            background: isDark ? 'rgba(16,185,129,0.2)' : 'rgba(16,185,129,0.1)',
+            color: isDark ? '#34d399' : '#059669',
+          }}>Done</span>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+            className="flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)' }}>
+            <path d="M5 2L10 7L5 12" />
+          </svg>
+        )}
+      </div>
+    </button>
+  );
+};
+
+const VerifyHub = ({ isDark, subjects, evaluations, onSelect, onViewCompleted, onBack }) => {
+  const c = COLOR_HEX.emerald;
+  const [search, setSearch] = useState('');
+  const [showAllCompleted, setShowAllCompleted] = useState(false);
+  const [showAllPending, setShowAllPending] = useState(false);
+  const PENDING_COLLAPSE = 3;
+  const completedCount = Object.keys(evaluations).length;
+
+  const pending = subjects.filter(s => !evaluations[s.id])
+    .sort((a, b) => {
+      const avail = s => (s.availability ? [s.availability.video, s.availability.meet, s.availability.vouch].filter(Boolean).length : 0);
+      return ((b.connections || 0) + avail(b) * 10) - ((a.connections || 0) + avail(a) * 10);
+    });
+  const completed = subjects.filter(s => !!evaluations[s.id]);
+  const filtered = search.trim()
+    ? subjects.filter(s => s.name.toLowerCase().includes(search.toLowerCase()) || s.city.toLowerCase().includes(search.toLowerCase()))
+    : null;
+  const showList = filtered || (showAllPending ? pending : pending.slice(0, PENDING_COLLAPSE));
+
+  return (
+    <VerifyScreenLayout color="emerald" onBack={onBack}>
+      <Text heading size="xl" weight="bold" className="mb-1">Verify</Text>
+      {/* Stats bar */}
+      {completedCount > 0 && (
+        <div className="flex items-center gap-3 mb-3 px-3 py-1.5 rounded-full" style={{
+          background: isDark ? 'rgba(16,185,129,0.08)' : 'rgba(16,185,129,0.06)',
+          border: `1px solid rgba(${c.rgb}, 0.15)`,
+        }}>
+          <Text size="xs" weight="medium" style={{ color: isDark ? c.light : c.base }}>
+            {completedCount} evaluated
+          </Text>
+          <Text size="xs" emphasis="faint">·</Text>
+          <Text size="xs" emphasis="faint">{pending.length} pending</Text>
+        </div>
+      )}
+      {/* Search */}
+      <div className="w-full relative mb-3">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+          className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>
+          <circle cx="7" cy="7" r="5" /><path d="M11 11L14 14" />
+        </svg>
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or city..."
+          className="w-full h-11 rounded-xl pl-10 pr-4 text-sm font-medium outline-none transition-all duration-200"
+          style={{
+            background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            border: search ? `1px solid rgba(${c.rgb}, 0.3)` : (isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)'),
+            color: isDark ? '#fff' : '#111',
+          }} />
+      </div>
+      {/* Count */}
+      <div className="w-full flex items-center justify-between mb-2">
+        <Text size="xs" weight="medium" emphasis="faint">
+          {filtered ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''}` : `${pending.length} pending`}
+        </Text>
+      </div>
+      {/* Pending / search results */}
+      <div className="w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+        {!filtered && pending.length > 0 && (
+          <button onClick={() => pending.length > PENDING_COLLAPSE && setShowAllPending(!showAllPending)}
+            className="w-full flex items-center justify-between mb-2"
+            style={{ cursor: pending.length > PENDING_COLLAPSE ? 'pointer' : 'default' }}>
+            <Text size="xs" weight="semibold" emphasis="faint" className="uppercase tracking-wide">Up next</Text>
+            {pending.length > PENDING_COLLAPSE && (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                className={`transition-transform duration-200 ${showAllPending ? 'rotate-180' : ''}`}
+                style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>
+                <path d="M3 5L7 9L11 5" />
+              </svg>
+            )}
+          </button>
+        )}
+        <div className="flex flex-col gap-2">
+          {showList.length === 0 && (
+            <Placeholder icon={search ? '🔍' : '✅'} title={search ? 'No matches found' : 'All caught up!'} description={search ? 'Try a different name or city' : 'Check back for new evaluations'} />
+          )}
+          {showList.map(subject => (
+            <VerifySubjectCard key={subject.id} subject={subject} isDone={!!evaluations[subject.id]}
+              onSelect={() => evaluations[subject.id] ? onViewCompleted?.(subject.id) : onSelect(subject.id)} />
+          ))}
+        </div>
+      </div>
+      {/* Completed history */}
+      {!filtered && completed.length > 0 && (
+        <div className="mt-6 w-full">
+          <button onClick={() => setShowAllCompleted(!showAllCompleted)}
+            className="w-full flex items-center justify-between mb-2 cursor-pointer">
+            <Text size="xs" weight="semibold" emphasis="faint" className="uppercase tracking-wide">
+              Recently evaluated ({completed.length})
+            </Text>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+              className={`transition-transform duration-200 ${showAllCompleted ? 'rotate-180' : ''}`}
+              style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>
+              <path d="M3 5L7 9L11 5" />
+            </svg>
+          </button>
+          {showAllCompleted && (
+            <div className="flex flex-col gap-2" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
+              {completed.map(subject => (
+                <VerifySubjectCard key={subject.id} subject={subject} isDone={true}
+                  onSelect={() => onViewCompleted?.(subject.id)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </VerifyScreenLayout>
+  );
+};
+
+// ==================== VERIFY EVALUATOR FLOW ====================
+
+const VerifyEvaluatorFlow = ({ isDark, subject, onComplete, onBack, sharedPath, setSharedPath, sharedAnswers, setSharedAnswers }) => {
+  const path = sharedPath;
+  const setPath = setSharedPath;
+  const answers = sharedAnswers;
+  const setAnswers = setSharedAnswers;
+  const [phase, setPhase] = useState(path ? 'path' : 'route');
+  const [questionIdx, setQuestionIdx] = useState(0);
+  const [animKey, setAnimKey] = useState(0);
+
+  const getActiveQuestions = (p, ans) => {
+    if (!p || !VERIFY_PATH_CONFIG[p]) return [];
+    return VERIFY_PATH_CONFIG[p].questions.filter(q => !q.conditional || q.conditional(ans));
+  };
+
+  // Route screen — "How do you know them?"
+  if (phase === 'route') {
+    // Smart path suggestion based on subject connections
+    const suggestedPath = subject?.connections >= 5 ? 'A' : subject?.connections === 0 ? 'C' : null;
+    return (
+      <VerifyScreenLayout color="emerald" onBack={onBack} subject={subject}>
+        <div className="flex flex-col items-center gap-4 w-full mt-1" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+          <Text heading size="lg" weight="semibold" className="text-center px-2">
+            How do you know them?
+          </Text>
+          <div className="flex flex-col gap-3 w-full">
+            {[
+              { key: 'A', label: 'I know them personally', sub: 'I can vouch for their identity', color: 'cyan', icon: '🤝' },
+              { key: 'B', label: 'I met them for verification', sub: 'I investigated and have evidence', color: 'amber', icon: '🔍' },
+              { key: 'C', label: "I'm reviewing their profile", sub: "Analyzing what's available", color: 'slate', icon: '📋' },
+            ].map(opt => {
+              const oc = COLOR_HEX[opt.color];
+              const isSuggested = suggestedPath === opt.key;
+              return (
+                <button key={opt.key} onClick={() => {
+                  setPath(opt.key);
+                  setAnswers(prev => ({ ...prev, gate: opt.label }));
+                  setPhase('path');
+                  setQuestionIdx(0);
+                  setAnimKey(k => k + 1);
+                }}
+                  className="w-full rounded-2xl px-4 py-3.5 text-left transition-all duration-200"
+                  style={{
+                    background: `linear-gradient(135deg, rgba(${oc.rgb}, 0.12), rgba(${oc.rgb}, 0.04))`,
+                    border: isSuggested ? `1.5px solid rgba(${oc.rgb}, 0.4)` : `1px solid rgba(${oc.rgb}, 0.2)`,
+                  }}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{opt.icon}</span>
+                    <div className="flex-1">
+                      <Text size="sm" weight="semibold">{opt.label}</Text>
+                      <Text size="xs" className="mt-0.5" style={{ color: isDark ? `rgba(${oc.rgb}, 0.7)` : oc.base + '99' }}>{opt.sub}</Text>
+                    </div>
+                    {isSuggested && (
+                      <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0" style={{
+                        background: `rgba(${oc.rgb}, 0.15)`, color: isDark ? oc.light : oc.base,
+                      }}>Likely</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </VerifyScreenLayout>
+    );
+  }
+
+  // Path questions
+  const config = VERIFY_PATH_CONFIG[path];
+  const color = config.color;
+  const activePathQuestions = getActiveQuestions(path, answers);
+  const question = activePathQuestions[questionIdx];
+
+  if (!question) {
+    onComplete({ path, pathLabel: config.label, answers });
+    return null;
+  }
+
+  const handleAnswer = (val) => setAnswers(prev => ({ ...prev, [question.id]: val }));
+  const advance = () => {
+    setAnimKey(k => k + 1);
+    // Validation checks
+    if (question.type === 'star-confidence' && answers[question.id] === undefined) return;
+    if (question.type === 'verdict' && !(answers[question.id]?.verdict && answers[question.id]?.confidence)) return;
+    if (question.type === 'compact-connection') {
+      const val = answers[question.id] || {};
+      if (!question.fields.every(f => val[f.id])) return;
+    }
+    if (question.type === 'evidence-combined') {
+      const val = answers[question.id] || {};
+      if (!question.sections.some((_, si) => (val[`s${si}`] || []).length > 0)) return;
+    }
+    if (question.type === 'identity-check') {
+      const val = answers[question.id] || {};
+      if (!question.fields.every(f => val[f.id])) return;
+    }
+    const nextQuestions = getActiveQuestions(path, answers);
+    const currentFilteredIdx = nextQuestions.findIndex(q => q.id === question.id);
+    if (currentFilteredIdx + 1 < nextQuestions.length) setQuestionIdx(currentFilteredIdx + 1);
+    else onComplete({ path, pathLabel: config.label, answers });
+  };
+  const goBack = () => {
+    if (questionIdx > 0) { setAnimKey(k => k + 1); setQuestionIdx(questionIdx - 1); }
+    else { setPhase('route'); setPath(null); setAnswers({}); }
+  };
+  const handleSingleAnswer = (val) => { handleAnswer(val); setTimeout(advance, 300); };
+
+  const isSingle = question.type === 'single';
+  const isMulti = question.type === 'multi';
+  const isText = question.type === 'text';
+  const isStar = question.type === 'star-confidence';
+  const isVerdict = question.type === 'verdict';
+  const isCompactConnection = question.type === 'compact-connection';
+  const isEvidenceCombined = question.type === 'evidence-combined';
+  const isIdentityCheck = question.type === 'identity-check';
+  const needsContinueButton = isMulti || isText || isStar || isVerdict || isCompactConnection || isEvidenceCombined || isIdentityCheck;
+
+  const continueDisabled = isText ? !(answers[question.id] || '').trim()
+    : isMulti ? !(Array.isArray(answers[question.id]) ? answers[question.id].length : 0)
+    : isStar ? answers[question.id] === undefined
+    : isVerdict ? !(answers[question.id]?.verdict && answers[question.id]?.confidence)
+    : isCompactConnection ? !question.fields.every(f => (answers[question.id] || {})[f.id])
+    : isEvidenceCombined ? !question.sections.some((_, si) => ((answers[question.id] || {})[`s${si}`] || []).length > 0)
+    : isIdentityCheck ? !question.fields.every(f => (answers[question.id] || {})[f.id])
+    : false;
+
+  // Progress counter for compact/identity fields
+  // Field progress for compact-connection / identity-check
+  const fieldVal = (isCompactConnection || isIdentityCheck) ? (answers[question.id] || {}) : null;
+  const fieldTotal = fieldVal ? question.fields.length : 0;
+  const fieldFilled = fieldVal ? question.fields.filter(f => fieldVal[f.id]).length : 0;
+  const showFieldProgress = fieldVal && fieldFilled < fieldTotal;
+  const fieldColor = colorOf(color);
+
+  return (
+    <VerifyScreenLayout color={color} subject={subject}
+      sectionLabel={isVerdict ? 'Your Verdict' : config.label}
+      progress={questionIdx} total={activePathQuestions.length} onBack={goBack}
+      buttons={needsContinueButton ? (showFieldProgress ? (
+        <div className="w-full h-14 rounded-2xl font-medium text-sm flex items-center justify-center transition-all duration-300"
+          style={{
+            background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+            border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+            color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
+          }}>
+          <span>Select one from each</span>
+          <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold" style={{
+            background: `rgba(${fieldColor.rgb}, 0.15)`, color: isDark ? fieldColor.light : fieldColor.base,
+          }}>{fieldFilled} of {fieldTotal}</span>
+        </div>
+      ) : <VerifyActionButton label="Continue" color={color} onClick={advance} disabled={continueDisabled} />) : null}>
+      <div key={`eq-${question.id}-${animKey}`} className="flex flex-col items-center gap-4 w-full mt-2" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+        {isVerdict && question.text.includes('\n') ? (<>
+          <Text size="sm" weight="medium" emphasis="faint" className="uppercase tracking-wide">{question.text.split('\n')[0]}</Text>
+          <Text heading size="lg" weight="semibold" className="text-center px-2 -mt-3">{question.text.split('\n')[1]}</Text>
+        </>) : (
+          <Text heading size="lg" weight="semibold" className="text-center px-2">{question.text}</Text>
+        )}
+        {question.subtitle && <Text size="xs" emphasis="faint" className="text-center -mt-2 px-4">{question.subtitle}</Text>}
+        {isSingle && <VerifySingleSelect question={question} color={color} answer={answers[question.id]} onAnswer={handleSingleAnswer} />}
+        {isMulti && <VerifyMultiToggle question={question} color={color} answer={answers[question.id]} onAnswer={handleAnswer} />}
+        {isText && <VerifyTextInput question={question} color={color} answer={answers[question.id]} onAnswer={handleAnswer} onContinue={advance} />}
+        {isStar && <VerifyStarConfidence color={color} value={answers[question.id]} onChange={handleAnswer} />}
+        {isVerdict && <VerifyVerdict question={question} color={color} answer={answers[question.id]} onAnswer={handleAnswer} />}
+        {(isCompactConnection || isIdentityCheck) && <VerifyFieldGroup question={question} color={color} answer={answers[question.id]} onAnswer={handleAnswer} />}
+        {isEvidenceCombined && <VerifyEvidenceCombined question={question} color={color} answer={answers[question.id]} onAnswer={handleAnswer} />}
+      </div>
+    </VerifyScreenLayout>
+  );
+};
+
+// ==================== VERIFY EVAL SUMMARY ====================
+
+const VerifyEvalSummary = ({ isDark, data, subject, onSubmit, onBack, readOnly }) => {
+  const { path, pathLabel, answers } = data;
+  const config = VERIFY_PATH_CONFIG[path];
+  const color = config.color;
+  const c = COLOR_HEX[color];
+  const verdictKey = config.questions.find(q => q.type === 'verdict')?.id;
+  const verdictData = answers[verdictKey] || {};
+  const verdict = verdictData.verdict;
+  const isPositive = verdict === 'Yes';
+  const confidence = verdictData.confidence || '--';
+  const confLabels = { 1: 'Some confidence, notable gaps', 2: 'Fairly confident, minor uncertainty', 3: 'Very confident', 4: 'Certain' };
+  const rows = config.questions.filter(q => answers[q.id] !== undefined && q.type !== 'verdict').flatMap(q => {
+    const a = answers[q.id];
+    if (q.type === 'compact-connection') return (q.fields || []).filter(f => a?.[f.id]).map(f => ({ label: f.label, value: a[f.id] }));
+    if (q.type === 'evidence-combined') return (q.sections || []).map((s, si) => ({ label: s.label, value: (a?.[`s${si}`] || []).join(', ') || 'None' }));
+    if (q.type === 'identity-check') return (q.fields || []).filter(f => a?.[f.id]).map(f => ({ label: f.label, value: a[f.id] }));
+    return [{ label: q.text, value: Array.isArray(a) ? a.join(', ') : String(a) }];
+  });
+
+  return (
+    <VerifyScreenLayout color={color} onBack={onBack}>
+      <div className="w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium mb-2"
+            style={{ background: `rgba(${c.rgb}, 0.12)`, color: isDark ? c.light : c.base, border: `1px solid rgba(${c.rgb}, 0.2)` }}>
+            Path {path}: {pathLabel}
+          </div>
+          <Text heading size="xl" weight="bold" className="mt-2">Evaluation Summary</Text>
+          {subject && <Text size="sm" emphasis="faint" className="mt-1">for {subject.name}</Text>}
+        </div>
+        {/* Verdict card */}
+        <div className="rounded-2xl p-5 mb-4 text-center"
+          style={{ background: `linear-gradient(135deg, rgba(${c.rgb}, 0.15), rgba(${c.rgb}, 0.05))`, border: `1px solid rgba(${c.rgb}, 0.25)` }}>
+          {verdict && (
+            <div className={`text-lg font-bold mb-3`} style={{ color: isPositive ? '#34d399' : '#fb7185' }}>
+              {isPositive ? 'Yes' : 'No'}
+            </div>
+          )}
+          <div className="flex justify-center gap-3 mb-3">
+            {[1, 2, 3, 4].map(level => {
+              const isSelected = typeof confidence === 'number' && level <= confidence;
+              return (
+                <div key={level} className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
+                  style={{
+                    background: isSelected ? `linear-gradient(135deg, rgba(${c.rgb}, 0.5), rgba(${c.rgb}, 0.25))` : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                    border: isSelected ? `1px solid rgba(${c.rgb}, 0.6)` : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)'),
+                    color: isSelected ? '#fff' : (isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'),
+                  }}>
+                  {level}
+                </div>
+              );
+            })}
+          </div>
+          <Text size="xs" emphasis="faint">{confLabels[confidence] || 'Confidence'}</Text>
+          {verdictData.flags && verdictData.flags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 justify-center mt-3 pt-3" style={{ borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)' }}>
+              {verdictData.flags.map(f => (
+                <span key={f} className="px-2.5 py-1 rounded-full text-xs font-medium"
+                  style={{ background: isDark ? 'rgba(251,191,36,0.15)' : 'rgba(217,119,6,0.1)', color: isDark ? '#fbbf24' : '#d97706' }}>
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Responses */}
+        <Card variant="plain" className="mb-4">
+          <Text size="xs" weight="semibold" emphasis="faint" className="uppercase tracking-wider mb-4">Responses</Text>
+          <div className="flex flex-col gap-4">
+            {rows.map((row, i) => (
+              <div key={i}>
+                <Text size="xs" emphasis="faint" className="mb-1">{row.label}</Text>
+                <Text size="sm">{row.value}</Text>
+              </div>
+            ))}
+          </div>
+        </Card>
+        {answers['gate'] && (
+          <Card variant="plain" className="mb-4">
+            <Text size="xs" emphasis="faint" className="mb-1">Relationship</Text>
+            <Text size="sm">{answers['gate']}</Text>
+          </Card>
+        )}
+        {readOnly ? (
+          <Text size="sm" emphasis="faint" className="text-center mb-6 px-4">
+            Submitted {data.completedAt ? new Date(data.completedAt).toLocaleDateString() : ''}
+          </Text>
+        ) : (<>
+          <Text size="xs" emphasis="faint" className="text-center mb-6 px-4">
+            This evaluation will be weighted by your path ({pathLabel}), your confidence level, and your reputation in the network.
+          </Text>
+          <VerifyActionButton label="Submit Evaluation" color={color} onClick={onSubmit} />
+          <div className="mt-3">
+            <VerifyActionButton label="Start Over" color="gray" onClick={onBack} secondary />
+          </div>
+        </>)}
+      </div>
+    </VerifyScreenLayout>
+  );
+};
+
+// — APP — Phase 2+3+4+5+8: Core Loop + Assessments + Profile/Analysis + Social/Settings + Verification
 function App() {
   const { isDark, toggle: toggleTheme } = useTheme();
   const displayMode = useDisplayMode();
@@ -3970,8 +5308,28 @@ function App() {
   const responseCapture = useResponses();
   const compare = useCompare();
   const [questions] = useState(() => shuffleArray(QUESTIONS));
-  const [screen, setScreen] = useState(getInitialScreen);
+  const [screen, setScreenRaw] = useState(getInitialScreen);
   const [previousScreen, setPreviousScreen] = useState(null);
+  // pushState routing — major screens push browser history
+  const HISTORY_SCREENS = new Set(['landing', 'categories', 'settings', 'question', 'assess-picker', 'assess-results', 'compare', 'public-profile', 'verify-hub', 'verify-eval-summary', 'profile', 'assess-analysis', 'history', 'identity']);
+  const setScreen = useCallback((next) => {
+    setScreenRaw(prev => {
+      if (next !== prev && HISTORY_SCREENS.has(next)) {
+        window.history.pushState({ screen: next }, '', '');
+      }
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    // Seed initial history entry
+    window.history.replaceState({ screen }, '', '');
+    const onPop = (e) => {
+      const target = e.state?.screen;
+      if (target) setScreenRaw(target);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   // Storage state
   const stored = useRef(demoStorage.get());
   const [responses, setResponses] = useState(stored.current.answers);
@@ -3990,6 +5348,11 @@ function App() {
   const [sessionAnsweredIds] = useState(() => new Set());
   const [savedQuestions, setSavedQuestions] = useState(() => new Set(stored.current.saved || []));
   const [showGestureHint, setShowGestureHint] = useState(() => !localStorage.getItem('aura-hint-confidence-dismissed'));
+  // Question meta (flags, explanations) — persisted so HistoryScreen can read them
+  const [questionMeta, setQuestionMeta] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('aura-question-meta')) || {}; } catch { return {}; }
+  });
+  useEffect(() => { localStorage.setItem('aura-question-meta', JSON.stringify(questionMeta)); }, [questionMeta]);
   // QotD state
   const [qotdData] = useState(() => getRandomQOTD());
   const [qotdResponse, setQotdResponse] = useState(null);
@@ -4000,10 +5363,17 @@ function App() {
   const [onboardingAnswers, setOnboardingAnswers] = useState(() => {
     try { return JSON.parse(localStorage.getItem(ONBOARD_STORAGE_KEY)) || {}; } catch { return {}; }
   });
+  // Verification state
+  const [verifyEvaluations, setVerifyEvaluations] = useState(() => verifyLoad()?.evaluations || {});
+  const [verifyCurrentSubjectId, setVerifyCurrentSubjectId] = useState(null);
+  const [verifyEvaluatorData, setVerifyEvaluatorData] = useState(null);
+  const [verifyFlowPath, setVerifyFlowPath] = useState(null);
+  const [verifyFlowAnswers, setVerifyFlowAnswers] = useState({});
   // Compare / Public Profile
   const [displayName, setDisplayName] = useState(() => localStorage.getItem('aura-display-name') || '');
   const [compareData, setCompareData] = useState(null);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
   const [publicProfileId, setPublicProfileId] = useState(() => {
     try { return new URLSearchParams(window.location.search).get('p'); } catch { return null; }
   });
@@ -4019,6 +5389,7 @@ function App() {
   useEffect(() => {
     if (auth.user && !auth.loading && !syncDoneRef.current) {
       syncDoneRef.current = true;
+      setSyncLoading(true);
       cloudSync.syncOnLogin(assess.assessCompleted, assess.assessInProgress).then(merged => {
         if (merged) {
           assess.setAssessCompleted(merged.completed);
@@ -4026,7 +5397,7 @@ function App() {
         }
         // Backfill any localStorage responses captured before sign-in
         responseCapture.backfillResponses(responses);
-      });
+      }).finally(() => setSyncLoading(false));
     }
     if (!auth.user) syncDoneRef.current = false;
   }, [auth.user, auth.loading]);
@@ -4081,12 +5452,8 @@ function App() {
       localStorage.setItem('aura-nudge-dismissed', '1');
     }
   }, [assess.assessCompleted, auth.user]);
-  // Global toast (for OAuth errors that fire before React mounts)
-  const [globalToast, setGlobalToast] = useState(null);
-  useEffect(() => {
-    window.__auraToast = (msg) => { setGlobalToast(msg); setTimeout(() => setGlobalToast(null), 4000); };
-    return () => { delete window.__auraToast; };
-  }, []);
+  // Toast (via context — replaces window.__auraToast)
+  const { msg: globalToast } = useToast();
   // Dev panel
   const [showDevPanel, setShowDevPanel] = useState(IS_DEV);
   const [devMinimized, setDevMinimized] = useState(false);
@@ -4142,12 +5509,21 @@ function App() {
   }, [tapCount]);
   // Auto-start quick-profile from onboarding bridge after delay (guard prevents double-fire)
   const bridgeStarted = useRef(false);
+  const bridgeShownAt = useRef(0);
+  const [bridgeFading, setBridgeFading] = useState(false);
+  const launchFromBridge = useCallback(() => {
+    if (bridgeStarted.current) return;
+    bridgeStarted.current = true;
+    setBridgeFading(true);
+    setTimeout(() => { assess.assessStartTest(entityType === 'ai' ? 'ai-style' : 'quick-profile'); }, 350);
+  }, [entityType]);
   useEffect(() => {
-    if (screen !== 'onboarding-bridge') { bridgeStarted.current = false; return; }
-    const t = setTimeout(() => { if (!bridgeStarted.current) { bridgeStarted.current = true; assess.assessStartTest(entityType === 'ai' ? 'ai-style' : 'quick-profile'); } }, 1800);
+    if (screen !== 'onboarding-bridge') { bridgeStarted.current = false; setBridgeFading(false); return; }
+    bridgeShownAt.current = Date.now();
+    const t = setTimeout(launchFromBridge, 1800);
     return () => clearTimeout(t);
   }, [screen]);
-  const handleBridgeTap = () => { if (!bridgeStarted.current) { bridgeStarted.current = true; assess.assessStartTest(entityType === 'ai' ? 'ai-style' : 'quick-profile'); } };
+  const handleBridgeTap = () => { if (Date.now() - bridgeShownAt.current < 800) return; launchFromBridge(); };
   // Navigation helpers
   const findNextUnanswered = (fromIndex, resp = responses) => {
     const trackFilter = selectedTrack ? (q) => q.type === selectedTrack : () => true;
@@ -4234,15 +5610,25 @@ function App() {
   const resetDemo = () => {
     demoStorage.markReset();
     localStorage.removeItem(ONBOARD_STORAGE_KEY);
+    localStorage.removeItem(VERIFY_STORAGE_KEY);
     setResponses(getEmptyState().answers);
     setStats(getEmptyState().stats);
     setOnboardingComplete(false);
     setOnboardingAnswers({});
     setCommunityResults({});
+    setVerifyEvaluations({});
     sessionAnsweredIds.clear();
     mainFlow.reset();
     setCurrentIndex(0);
     setScreen('landing');
+  };
+  const resetVerification = () => {
+    localStorage.removeItem(VERIFY_STORAGE_KEY);
+    setVerifyEvaluations({});
+    setVerifyCurrentSubjectId(null);
+    setVerifyEvaluatorData(null);
+    setVerifyFlowPath(null);
+    setVerifyFlowAnswers({});
   };
 
   // Screen router
@@ -4251,7 +5637,8 @@ function App() {
     if (screen === 'onboarding') return <OnboardingFlow isDark={isDark} onComplete={handleOnboardingComplete} onSkip={() => setScreen('categories')} onReset={resetDemo} />;
     if (screen === 'onboarding-bridge') return (
       <div className={`h-full flex items-center justify-center cursor-pointer ${isDark ? 'bg-[#030712]' : 'bg-gray-50'}`}
-        onClick={handleBridgeTap}>
+        onClick={handleBridgeTap}
+        style={bridgeFading ? { opacity: 0, transition: 'opacity 0.35s ease-out' } : undefined}>
         <div className="text-center px-8" style={{ animation: 'fadeSlideIn 0.5s ease-out both' }}>
           <div className="text-3xl mb-4">✨</div>
           <Text size="xl" weight="semibold">Good taste.</Text>
@@ -4260,20 +5647,57 @@ function App() {
       </div>
     );
     if (screen === 'path-choice') return <PathChoiceScreen isDark={isDark} entityType={entityType} onboardingAnswers={onboardingAnswers} onReveal={handleChooseReveal} onExplore={handleChooseExplore} onSkip={() => setScreen('categories')} onReset={resetDemo} />;
-    if (screen === 'categories') return <CategoryScreen isDark={isDark} questions={questions} responses={responses} stats={stats} assess={assess} entityType={entityType} qotdData={qotdData} qotdResponse={qotdResponse} onNavigate={setScreen} onSelectCategory={handleSelectCategory} onAssessSurprise={handleAssessSurprise} />;
+    if (screen === 'categories') return <CategoryScreen isDark={isDark} questions={questions} responses={responses} stats={stats} assess={assess} entityType={entityType} qotdData={qotdData} qotdResponse={qotdResponse} syncStatus={cloudSync.syncStatus} onNavigate={setScreen} onSelectCategory={handleSelectCategory} onAssessSurprise={handleAssessSurprise} />;
     if (screen === 'qotd') return <QotdScreen isDark={isDark} qotdData={qotdData} qotdResponse={qotdResponse} setQotdResponse={setQotdResponse} onNavigate={setScreen} />;
-    if (screen === 'settings') return <SettingsScreen isDark={isDark} toggleTheme={toggleTheme} settings={{ undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak }} entityType={entityType} setEntityType={setEntityType} onBack={() => setScreen(previousScreen || 'categories')} onReset={resetDemo} hasAssessmentData={Object.keys(assess.assessCompleted || {}).length > 0} onResetAssessments={assess.assessClearAll} displayName={displayName} setDisplayName={setDisplayName} />;
-    if (screen === 'compare') return <CompareScreen isDark={isDark} assess={assess} entityType={entityType} displayName={displayName} compareData={compareData} compareLoading={compareLoading} onNavigate={setScreen} />;
+    if (screen === 'settings') return <SettingsScreen isDark={isDark} toggleTheme={toggleTheme} settings={{ undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak }} entityType={entityType} setEntityType={setEntityType} onBack={() => setScreen(previousScreen || 'categories')} onReset={resetDemo} hasAssessmentData={Object.keys(assess.assessCompleted || {}).length > 0} onResetAssessments={assess.assessClearAll} displayName={displayName} setDisplayName={setDisplayName} hasVerificationData={Object.keys(verifyEvaluations).length > 0} onResetVerification={resetVerification} />;
+    if (screen === 'compare') return <ErrorBoundary feature="Compare"><CompareScreen isDark={isDark} assess={assess} entityType={entityType} displayName={displayName} compareData={compareData} compareLoading={compareLoading} onNavigate={setScreen} /></ErrorBoundary>;
     if (screen === 'public-profile') return <PublicProfileScreen isDark={isDark} profileId={publicProfileId} onNavigate={setScreen} />;
     if (screen === 'assess-picker') return <AssessPickerScreen isDark={isDark} entityType={entityType} assess={assess} onNavigate={setScreen} />;
-    if (screen === 'assess-question') return <AssessQuestionScreen isDark={isDark} assess={assess} undoDelay={undoDelay} />;
+    if (screen === 'assess-question') return <ErrorBoundary feature="Assessment"><AssessQuestionScreen isDark={isDark} assess={assess} undoDelay={undoDelay} /></ErrorBoundary>;
     if (screen === 'assess-results') return <AssessResultsScreen isDark={isDark} assess={assess} entityType={entityType} onNavigate={setScreen} />;
     if (screen === 'profile') return <ProfileScreen isDark={isDark} assess={assess} entityType={entityType} onboardingAnswers={onboardingAnswers} responses={responses} onNavigate={setScreen} />;
     if (screen === 'assess-analysis') return <AnalysisScreen isDark={isDark} assess={assess} entityType={entityType} onboardingAnswers={onboardingAnswers} onNavigate={setScreen} />;
-    if (screen === 'history') return <HistoryScreen isDark={isDark} questions={questions} responses={responses} onNavigate={setScreen} />;
+    if (screen === 'history') return <HistoryScreen isDark={isDark} questions={questions} responses={responses} questionMeta={questionMeta} communityResults={communityResults} onNavigate={setScreen} />;
+    if (screen === 'identity') return <ErrorBoundary feature="Identity"><IdentityScreen isDark={isDark} onNavigate={setScreen} /></ErrorBoundary>;
+    // Verification screens
+    if (screen === 'verify-hub') {
+      return <VerifyHub isDark={isDark} subjects={VERIFY_MOCK_SUBJECTS} evaluations={verifyEvaluations}
+        onSelect={(id) => { setVerifyCurrentSubjectId(id); setScreen('verify-evaluator'); }}
+        onViewCompleted={(id) => { setVerifyCurrentSubjectId(id); setVerifyEvaluatorData(verifyEvaluations[id]); setScreen('verify-eval-summary-readonly'); }}
+        onBack={() => setScreen('categories')} />;
+    }
+    if (screen === 'verify-evaluator') {
+      const subj = VERIFY_MOCK_SUBJECTS.find(s => s.id === verifyCurrentSubjectId);
+      if (!subj) { setScreen('verify-hub'); return null; }
+      const handleBack = () => { setVerifyFlowPath(null); setVerifyFlowAnswers({}); setScreen('verify-hub'); };
+      return <ErrorBoundary feature="Verification"><VerifyEvaluatorFlow isDark={isDark} subject={subj}
+        sharedPath={verifyFlowPath} setSharedPath={setVerifyFlowPath}
+        sharedAnswers={verifyFlowAnswers} setSharedAnswers={setVerifyFlowAnswers}
+        onComplete={(data) => { setVerifyEvaluatorData(data); setScreen('verify-eval-summary'); }}
+        onBack={handleBack} /></ErrorBoundary>;
+    }
+    if (screen === 'verify-eval-summary') {
+      if (!verifyEvaluatorData || !verifyCurrentSubjectId) { setScreen('verify-hub'); return null; }
+      const subj = VERIFY_MOCK_SUBJECTS.find(s => s.id === verifyCurrentSubjectId);
+      return <VerifyEvalSummary isDark={isDark} data={verifyEvaluatorData} subject={subj}
+        onSubmit={() => {
+          const newEvals = { ...verifyEvaluations, [verifyCurrentSubjectId]: { ...verifyEvaluatorData, completedAt: Date.now() } };
+          setVerifyEvaluations(newEvals);
+          verifySave(newEvals);
+          setVerifyEvaluatorData(null); setVerifyFlowPath(null); setVerifyFlowAnswers({});
+          setScreen('verify-hub');
+        }}
+        onBack={() => setScreen('verify-evaluator')} />;
+    }
+    if (screen === 'verify-eval-summary-readonly') {
+      if (!verifyCurrentSubjectId || !verifyEvaluatorData) { setScreen('verify-hub'); return null; }
+      const subj = VERIFY_MOCK_SUBJECTS.find(s => s.id === verifyCurrentSubjectId);
+      return <VerifyEvalSummary isDark={isDark} data={verifyEvaluatorData} subject={subj} readOnly
+        onBack={() => { setVerifyEvaluatorData(null); setVerifyCurrentSubjectId(null); setScreen('verify-hub'); }} />;
+    }
     // Default: Question Flow
     return <QuestionFlowScreen isDark={isDark}
-      questionState={{ currentQuestion, currentIndex, questions, responses, communityResults, isAnswered, isBinary, answeredCount, totalQuestions, currentResponse, mcColorMode, sessionAnsweredIds, savedQuestions, selectedTrack }}
+      questionState={{ currentQuestion, currentIndex, questions, responses, communityResults, isAnswered, isBinary, answeredCount, totalQuestions, currentResponse, mcColorMode, sessionAnsweredIds, savedQuestions, selectedTrack, questionMeta, setQuestionMeta }}
       flowActions={{ setCommunityResults, handleUndo: mainFlow.handleUndo, goToPrev, goToNext, findNextUnanswered, setCurrentIndex: (i) => { mainFlow.reset(); setCurrentIndex(i); }, handleAnswerTap: mainFlow.handleTap, handleAnswerRightClick: mainFlow.handleRightClick, submitAnswer: mainFlow.submit, saveForLater, skipQuestion, clearUndoneState: mainFlow.clearUndone, setSelectedTrack }}
       uiState={{ pendingSubmit, undoDelay, justUndone, showTips, showGestureHint, setShowGestureHint, showConfirmOverlay, confirmColor, tappedAnswer, setTappedAnswer: mainFlow.setTappedAnswer, tapCount, setTapCount: mainFlow.setTapCount }} />;
   };
@@ -4285,6 +5709,7 @@ function App() {
     { id: 'assess-picker', label: 'Assess' }, { id: 'assess-question', label: 'AssessQ' }, { id: 'assess-results', label: 'Results' },
     { id: 'profile', label: 'Profile' }, { id: 'assess-analysis', label: 'Analysis' }, { id: 'history', label: 'History' },
     { id: 'compare', label: 'Compare' }, { id: 'public-profile', label: 'PubProf' },
+    { id: 'verify-hub', label: 'Verify' }, { id: 'verify-evaluator', label: 'VEval' },
   ];
   const devPanelEl = IS_DEV && showDevPanel ? (() => {
     if (devMinimized) return <button onClick={() => setDevMinimized(false)} className="fixed bottom-4 right-4 z-[10000] w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center shadow-lg hover:bg-violet-500 cursor-pointer text-sm font-bold">D</button>;
@@ -4347,6 +5772,8 @@ function App() {
     </div>
   ) : null;
 
+  const syncOverlay = syncLoading ? <LoadingOverlay message="Syncing your data…" /> : null;
+
   // Persistent settings gear — shows on all screens except settings
   const settingsGearEl = screen !== 'settings' ? (
     <button onClick={goToSettings} className="absolute top-3 right-3 z-40 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all"
@@ -4368,6 +5795,7 @@ function App() {
           </div>
           {nudgeEl}
           {globalToastEl}
+          {syncOverlay}
         </PhoneFrame>
         {devPanelEl}
       </>
@@ -4383,6 +5811,7 @@ function App() {
           <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
           {nudgeEl}
           {globalToastEl}
+          {syncOverlay}
         </div>
       </div>
     );
@@ -4394,7 +5823,8 @@ function App() {
       <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
       <div className="safe-bottom" />
       {nudgeEl}
-          {globalToastEl}
+      {globalToastEl}
+      {syncOverlay}
       {devPanelEl}
     </div>
   );
@@ -4404,7 +5834,9 @@ function App() {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ErrorBoundary>
     <AuthProvider>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </AuthProvider>
   </ErrorBoundary>
 );
