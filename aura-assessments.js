@@ -27,6 +27,7 @@
     ],
     iq: null, // Custom options per question - handled in UI
     gateway: null, // Custom branching options per question - handled in UI
+    'love-language': null, // Forced-choice pairs - handled in UI (A vs B cards)
   };
 
   // ==================== ASSESSMENTS (V2) ====================
@@ -945,6 +946,105 @@
         { q: "I like to collect information about categories of things", k: '+' },
         { q: "I find social situations easy", k: '-' },
         { q: "New situations make me anxious", k: '+' },
+      ]
+    },
+
+    // ==================== NEW V2 TESTS ====================
+
+    'love-language': {
+      name: 'Love Language', icon: '\u{1F49D}', color: 'pink', scale: 'love-language',
+      description: "How you give and receive love — they're not always the same.",
+      framing: 'For each pair, pick the one that means MORE to you. No wrong answers — just preferences.',
+      items: [
+        // Receiving (0-7)
+        { q: "What means more to you?", mode: 'receive', a: { l: "A heartfelt compliment out of nowhere", d: 'words' }, b: { l: "Someone doing a chore you hate without being asked", d: 'service' } },
+        { q: "What means more to you?", mode: 'receive', a: { l: "Undivided attention for a whole evening", d: 'time' }, b: { l: "A surprise gift that shows they were thinking of you", d: 'gifts' } },
+        { q: "What means more to you?", mode: 'receive', a: { l: "A long, tight hug after a hard day", d: 'touch' }, b: { l: "Hearing \"I'm proud of you\" when you least expect it", d: 'words' } },
+        { q: "What means more to you?", mode: 'receive', a: { l: "Someone canceling their plans to spend time with you", d: 'time' }, b: { l: "Someone fixing something that's been bothering you", d: 'service' } },
+        { q: "What means more to you?", mode: 'receive', a: { l: "A meaningful birthday present they clearly thought about", d: 'gifts' }, b: { l: "Physical comfort when you're stressed", d: 'touch' } },
+        { q: "What means more to you?", mode: 'receive', a: { l: "A handwritten note saying what you mean to them", d: 'words' }, b: { l: "An entire day with no distractions — just you two", d: 'time' } },
+        { q: "What means more to you?", mode: 'receive', a: { l: "They bring you your favorite snack without you asking", d: 'gifts' }, b: { l: "They take over when they see you're overwhelmed", d: 'service' } },
+        { q: "What means more to you?", mode: 'receive', a: { l: "A spontaneous back rub while you're working", d: 'touch' }, b: { l: "Sitting next to each other, doing nothing, perfectly content", d: 'time' } },
+        // Giving (8-15)
+        { q: "How do you naturally show someone you care?", mode: 'give', a: { l: "I tell them — directly, with words", d: 'words' }, b: { l: "I do things for them without being asked", d: 'service' } },
+        { q: "How do you naturally show someone you care?", mode: 'give', a: { l: "I make time to be fully present with them", d: 'time' }, b: { l: "I find the perfect gift — something that says 'I know you'", d: 'gifts' } },
+        { q: "How do you naturally show someone you care?", mode: 'give', a: { l: "I reach out physically — hug, hand-hold, lean in", d: 'touch' }, b: { l: "I drop everything when they need me", d: 'service' } },
+        { q: "How do you naturally show someone you care?", mode: 'give', a: { l: "I write them a message telling them what they mean to me", d: 'words' }, b: { l: "I plan quality time — just us, no phones", d: 'time' } },
+        { q: "How do you naturally show someone you care?", mode: 'give', a: { l: "I pick out something I know they'll love", d: 'gifts' }, b: { l: "I hold them close, no words needed", d: 'touch' } },
+        { q: "How do you naturally show someone you care?", mode: 'give', a: { l: "I clear my whole schedule so we can hang out properly", d: 'time' }, b: { l: "I squeeze their hand, touch their shoulder, stay physically close", d: 'touch' } },
+        { q: "How do you naturally show someone you care?", mode: 'give', a: { l: "I leave little notes or send random texts saying what I appreciate", d: 'words' }, b: { l: "I surprise them with something thoughtful I spotted", d: 'gifts' } },
+        { q: "How do you naturally show someone you care?", mode: 'give', a: { l: "I handle the hard stuff so they don't have to", d: 'service' }, b: { l: "I set aside uninterrupted time just for us", d: 'time' } },
+      ]
+    },
+
+    'humor-style': {
+      name: 'Humor Style', icon: '\u{1F602}', color: 'amber', scale: 'agreement',
+      description: "Everyone's funny differently. This tells you how.",
+      framing: "Not whether you're funny — but what kind of funny you are.",
+      items: [
+        { q: "I usually have a funny story or joke for any situation", k: '+', sub: 'aff' },
+        { q: "My humor brings people together — I love making a group laugh", k: '+', sub: 'aff' },
+        { q: "I like to lighten the mood when things get tense between people", k: '+', sub: 'aff' },
+        { q: "If I'm feeling down, I can usually cheer myself up with humor", k: '+', sub: 'enh' },
+        { q: "I use humor to cope with stressful situations", k: '+', sub: 'enh' },
+        { q: "I crack jokes even when I'm genuinely upset", k: '+', sub: 'enh' },
+        { q: "If someone makes a mistake, I can't resist pointing it out in a funny way", k: '+', sub: 'agg' },
+        { q: "I sometimes use humor to criticize or put people down", k: '+', sub: 'agg' },
+        { q: "I enjoy teasing people even when they seem a little uncomfortable", k: '+', sub: 'agg' },
+        { q: "I let people laugh at me more than I probably should", k: '+', sub: 'def' },
+        { q: "I often go overboard in making fun of myself to get a laugh", k: '+', sub: 'def' },
+        { q: "I'm usually the butt of my own jokes", k: '+', sub: 'def' },
+        { q: "I rarely try to be the funny one in a group", k: '-', sub: 'aff' },
+        { q: "Humor isn't really how I deal with hard times", k: '-', sub: 'enh' },
+      ]
+    },
+
+    'communication-style': {
+      name: 'Communication Style', icon: '\u{1F4AC}', color: 'cyan', scale: 'agreement',
+      description: "How you get through to people — and where it breaks down.",
+      items: [
+        { q: "When I'm upset with someone, I tell them straight", k: '+', sub: 'dir' },
+        { q: "In arguments, I lead with how I feel, not what I think", k: '+', sub: 'emo' },
+        { q: "I hint at what I want rather than asking directly", k: '-', sub: 'dir' },
+        { q: "I tend to keep my emotions out of important conversations", k: '-', sub: 'emo' },
+        { q: "I use a lot of exclamation marks, emojis, and \"haha\"s in my messages", k: '+', sub: 'emo' },
+        { q: "If someone misunderstands me, I assume I wasn't clear enough", k: '+', sub: 'dir' },
+        { q: "I soften what I really mean so it lands easier", k: '-', sub: 'dir' },
+        { q: "I say what I think, even if I know it won't be popular", k: '+', sub: 'dir' },
+        { q: "When I disagree, I lead with logic and evidence", k: '-', sub: 'emo' },
+        { q: "My emotions come through in my voice and face whether I want them to or not", k: '+', sub: 'emo' },
+      ]
+    },
+
+    'decision-style': {
+      name: 'Decision Style', icon: '\u{1F3AF}', color: 'blue', scale: 'agreement',
+      description: "How you make choices — and whether you regret them.",
+      items: [
+        { q: "When shopping, I have a hard time settling for 'good enough'", k: '+', sub: 'max' },
+        { q: "I usually go with my first instinct on important decisions", k: '-', sub: 'del' },
+        { q: "I often wonder if I could have made a better choice", k: '+', sub: 'max' },
+        { q: "Before a big decision, I gather as much information as possible", k: '+', sub: 'del' },
+        { q: "No matter what I decide, I rarely second-guess myself", k: '-', sub: 'max' },
+        { q: "I trust my feelings more than logic when making a tough call", k: '-', sub: 'del' },
+        { q: "I have a hard time making even small decisions like what to order", k: '+', sub: 'max' },
+        { q: "I spend very little time deliberating — I just decide", k: '-', sub: 'del' },
+      ]
+    },
+
+    'self-monitoring': {
+      name: 'Self-Monitoring', icon: '\u{1F3AD}', color: 'indigo', scale: 'agreement',
+      description: "How many versions of you are there?",
+      framing: "No judgment — adapting and staying consistent both have real strengths.",
+      items: [
+        { q: "In different situations and with different people, I act like very different people", k: '+' },
+        { q: "I find it hard to change my behavior to suit different people or situations", k: '-' },
+        { q: "I deliberately control the impression I make on people", k: '+' },
+        { q: "I notice myself switching how I talk and act depending on who I'm with", k: '+' },
+        { q: "I'm not always the person I appear to be on the surface", k: '+' },
+        { q: "I rarely change how I act based on who I'm talking to", k: '-' },
+        { q: "When I'm uncertain how to act socially, I watch what others do first", k: '+' },
+        { q: "People who know me in different contexts would describe me very differently", k: '+' },
+        { q: "I'd rather be genuine than make a good impression", k: '-' },
       ]
     }
   };

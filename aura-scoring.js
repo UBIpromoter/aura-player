@@ -490,8 +490,128 @@
       const styleNames = { comp: 'Competing', collab: 'Collaborating', compr: 'Compromising', avoid: 'Avoiding', accom: 'Accommodating' };
       results.primaryStyle = sorted.length > 0 ? styleNames[sorted[0][0]] || sorted[0][0] : 'Unknown';
       results.score = sorted.length > 0 ? sorted[0][1] : 0;
+    // ==================== NEW V2 TESTS ====================
+    // Love Language — ipsative forced-choice (0=A, 1=B)
+    } else if (testId === 'love-language') {
+      const receive = { words: 0, time: 0, gifts: 0, service: 0, touch: 0 };
+      const give = { words: 0, time: 0, gifts: 0, service: 0, touch: 0 };
+      test.items.forEach((item, i) => {
+        if (resp[i] === undefined || resp[i] === null) return;
+        const chosen = resp[i] === 0 ? item.a : item.b;
+        const profile = item.mode === 'give' ? give : receive;
+        profile[chosen.d] = (profile[chosen.d] || 0) + 1;
+      });
+      results.receive = receive;
+      results.give = give;
+      const topReceive = Object.entries(receive).sort((a, b) => b[1] - a[1]);
+      const topGive = Object.entries(give).sort((a, b) => b[1] - a[1]);
+      const langNames = { words: 'Words of Affirmation', time: 'Quality Time', gifts: 'Gifts', service: 'Acts of Service', touch: 'Physical Touch' };
+      results.primaryReceive = topReceive.length > 0 ? langNames[topReceive[0][0]] : 'Unknown';
+      results.primaryGive = topGive.length > 0 ? langNames[topGive[0][0]] : 'Unknown';
+      results.score = 0; // Ipsative — no single score
+    // Humor Style — 4 independent dimension scores
+    } else if (testId === 'humor-style') {
+      const subSums = {}, subCounts = {};
+      test.items.forEach((item, i) => {
+        if (resp[i] !== undefined && resp[i] !== null && item.sub) {
+          let value = resp[i];
+          if (item.k === '-') value = 6 - value;
+          subSums[item.sub] = (subSums[item.sub] || 0) + value;
+          subCounts[item.sub] = (subCounts[item.sub] || 0) + 1;
+        }
+      });
+      results.dimensions = {};
+      for (const s in subSums) { results.dimensions[s] = Math.round((subSums[s] / (subCounts[s] * 5)) * 100); }
+      const dimNames = { aff: 'Affiliative', enh: 'Self-Enhancing', agg: 'Aggressive', def: 'Self-Defeating' };
+      const sorted2 = Object.entries(results.dimensions).sort((a, b) => b[1] - a[1]);
+      results.primaryStyle = sorted2.length > 0 ? dimNames[sorted2[0][0]] || sorted2[0][0] : 'Unknown';
+      results.score = sorted2.length > 0 ? sorted2[0][1] : 0;
+    // Communication Style — 2 axes → 2x2 quadrant
+    } else if (testId === 'communication-style') {
+      const axisSums = { dir: 0, emo: 0 };
+      const axisCounts = { dir: 0, emo: 0 };
+      test.items.forEach((item, i) => {
+        if (resp[i] !== undefined && resp[i] !== null && item.sub) {
+          let value = resp[i];
+          if (item.k === '-') value = 6 - value;
+          axisSums[item.sub] = (axisSums[item.sub] || 0) + value;
+          axisCounts[item.sub] = (axisCounts[item.sub] || 0) + 1;
+        }
+      });
+      const dir = axisCounts.dir ? Math.round((axisSums.dir / (axisCounts.dir * 5)) * 100) : 50;
+      const emo = axisCounts.emo ? Math.round((axisSums.emo / (axisCounts.emo * 5)) * 100) : 50;
+      results.axes = { directness: dir, emotionality: emo };
+      results.quadrant = dir >= 50 ? (emo >= 50 ? 'Passionate Advocate' : 'Straight Shooter') : (emo >= 50 ? 'Diplomat' : 'Strategist');
+      results.score = Math.round((dir + emo) / 2);
+    // Decision Style — 2 axes → 2x2 quadrant
+    } else if (testId === 'decision-style') {
+      const axisSums = { max: 0, del: 0 };
+      const axisCounts = { max: 0, del: 0 };
+      test.items.forEach((item, i) => {
+        if (resp[i] !== undefined && resp[i] !== null && item.sub) {
+          let value = resp[i];
+          if (item.k === '-') value = 6 - value;
+          axisSums[item.sub] = (axisSums[item.sub] || 0) + value;
+          axisCounts[item.sub] = (axisCounts[item.sub] || 0) + 1;
+        }
+      });
+      const max = axisCounts.max ? Math.round((axisSums.max / (axisCounts.max * 5)) * 100) : 50;
+      const del = axisCounts.del ? Math.round((axisSums.del / (axisCounts.del * 5)) * 100) : 50;
+      results.axes = { maximizing: max, deliberation: del };
+      results.quadrant = max >= 50 ? (del >= 50 ? 'Optimizer' : 'Instinct Hunter') : (del >= 50 ? 'Pragmatist' : 'Snap Judge');
+      results.score = Math.round((max + del) / 2);
+    // Self-Monitoring — single 0-100 score → tier label
+    } else if (testId === 'self-monitoring') {
+      results.score = calculateScaleScore(test.items, resp);
+      results.tier = results.score >= 75 ? 'High Self-Monitor (Chameleon)' : results.score >= 50 ? 'Moderate-High (Adaptive)' : results.score >= 25 ? 'Moderate-Low (Consistent)' : 'Low Self-Monitor (Authentic)';
     }
     return results;
+  };
+
+  // ==================== AURA TYPE (MBTI-equivalent from Big Five) ====================
+  const AURA_TYPE_LABELS = {
+    'INTJ': { name: 'The Architect', tagline: 'Strategic mind, independent vision' },
+    'INTP': { name: 'The Theorist', tagline: 'Curious mind, unconventional approach' },
+    'ENTJ': { name: 'The Commander', tagline: 'Bold leader, natural authority' },
+    'ENTP': { name: 'The Inventor', tagline: 'Quick thinker, loves a debate' },
+    'INFJ': { name: 'The Sage', tagline: 'Quiet depth, strong convictions' },
+    'INFP': { name: 'The Idealist', tagline: 'Authentic soul, rich inner world' },
+    'ENFJ': { name: 'The Catalyst', tagline: 'Inspiring leader, people-first' },
+    'ENFP': { name: 'The Spark', tagline: 'Infectious energy, endless curiosity' },
+    'ISTJ': { name: 'The Sentinel', tagline: 'Reliable backbone, quiet strength' },
+    'ISFJ': { name: 'The Guardian', tagline: 'Loyal protector, steady warmth' },
+    'ESTJ': { name: 'The Director', tagline: 'Takes charge, gets it done' },
+    'ESFJ': { name: 'The Host', tagline: 'Brings people together, remembers everything' },
+    'ISTP': { name: 'The Mechanic', tagline: 'Cool under pressure, hands-on solver' },
+    'ISFP': { name: 'The Artist', tagline: 'Gentle spirit, creative eye' },
+    'ESTP': { name: 'The Dynamo', tagline: 'Action-first, thinks on their feet' },
+    'ESFP': { name: 'The Performer', tagline: 'Life of the party, lives in the moment' },
+  };
+
+  const getAuraType = (bigFiveScores) => {
+    if (!bigFiveScores || bigFiveScores.E == null || bigFiveScores.O == null || bigFiveScores.A == null || bigFiveScores.C == null) return null;
+    const { E, O, A, C } = bigFiveScores;
+    const letter1 = E >= 50 ? 'E' : 'I';
+    const letter2 = O >= 50 ? 'N' : 'S';
+    const letter3 = A >= 50 ? 'F' : 'T'; // Weakest mapping — flag in results
+    const letter4 = C >= 50 ? 'J' : 'P';
+    const code = letter1 + letter2 + letter3 + letter4;
+    const strengths = { [letter1]: Math.abs(E - 50), [letter2]: Math.abs(O - 50), [letter3]: Math.abs(A - 50), [letter4]: Math.abs(C - 50) };
+    const borderline = [];
+    if (Math.abs(E - 50) <= 5) borderline.push('E/I');
+    if (Math.abs(O - 50) <= 5) borderline.push('N/S');
+    if (Math.abs(A - 50) <= 5) borderline.push('F/T');
+    if (Math.abs(C - 50) <= 5) borderline.push('J/P');
+    const type = AURA_TYPE_LABELS[code] || { name: 'Unique Configuration', tagline: 'Beyond the types' };
+    return {
+      code, name: type.name, tagline: type.tagline, strengths, borderline,
+      spectrums: [
+        { left: 'I', right: 'E', value: E, label: E >= 50 ? 'Extraversion' : 'Introversion' },
+        { left: 'S', right: 'N', value: O, label: O >= 50 ? 'Intuition' : 'Sensing' },
+        { left: 'T', right: 'F', value: A, label: A >= 50 ? 'Feeling' : 'Thinking' },
+        { left: 'J', right: 'P', value: 100 - C, label: C >= 50 ? 'Judging' : 'Perceiving' },
+      ],
+    };
   };
 
   // ==================== GAMIFICATION SYSTEM ====================
@@ -533,6 +653,8 @@
   window.ASSESS_SHADOW_TRAITS = ASSESS_SHADOW_TRAITS;
   window.calculateScaleScore = calculateScaleScore;
   window.calculateAssessResults = calculateAssessResults;
+  window.getAuraType = getAuraType;
+  window.AURA_TYPE_LABELS = AURA_TYPE_LABELS;
   window.XP_RATES = XP_RATES;
   window.calculateLevel = calculateLevel;
   window.LEVEL_TITLES = LEVEL_TITLES;

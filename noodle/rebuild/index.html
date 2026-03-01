@@ -2294,37 +2294,67 @@ const ASSESS_STYLES = (() => {
 })();
 
 const ASSESS_CATEGORIES = {
+  // Tier 0: Gateway (always available)
   'ai-identity': { name: 'AI Identity', icon: '🤖', color: 'cyan', tests: ['ai-style', 'ai-self', 'ai-values', 'ai-vision'], tier: 0, entityHint: 'ai' },
   quickstart: { name: 'Quick Profile', icon: '✨', color: 'blue', tests: ['quick-profile'], tier: 0, entityHint: 'human' },
-  starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], tier: 1 },
-  personality: { name: 'Personality', icon: '🎭', color: 'rose', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], tier: 2 },
-  character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'], tier: 2 },
-  shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'], tier: 2 },
-  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['reasoning', 'cognitive', 'chronotype', 'reasoning-2', 'reasoning-3', 'adhd'], tier: 2 },
-  relationships: { name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'], tier: 2 },
-  behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], tier: 2 },
+  // Tier 1: Starter Pack (unlocked by Quick Profile)
+  starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy', 'starter-wellbeing'], tier: 1 },
+  // Tier 2: Branching — each starter module unlocks its branch
+  personality: { name: 'Personality', icon: '🎭', color: 'rose', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O', 'self-monitoring'], tier: 2, branch: 'personality' },
+  shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P', 'humor-style'], tier: 2, branch: 'shadow' },
+  drive: { name: 'Drive & Values', icon: '🔥', color: 'orange', tests: ['grit', 'growth-mindset', 'locus-of-control', 'values', 'decision-style'], tier: 2, branch: 'drive' },
+  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['reasoning', 'cognitive', 'chronotype', 'reasoning-2', 'reasoning-3', 'adhd', 'creativity'], tier: 2, branch: 'cognition' },
+  relationships: { name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment', 'conflict-style', 'emotional-intelligence', 'love-language', 'communication-style'], tier: 2, branch: 'social' },
+  character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity', 'impostor'], tier: 2, branch: 'action' },
+  behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], tier: 2, branch: 'action' },
+  wellbeing: { name: 'Wellbeing', icon: '🌿', color: 'emerald', tests: ['life-satisfaction', 'resilience'], tier: 2, branch: 'wellness' },
+  // Clinical (opt-in, always available behind consent gate)
+  clinical: { name: 'Clinical Screens', icon: '📊', color: 'blue', tests: ['phq9', 'gad7'], tier: 0, clinical: true, requiresConsent: true },
 };
-const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow'];
+const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'shadow', 'drive', 'mind', 'relationships', 'character', 'behavior', 'wellbeing', 'clinical'];
 const ASSESS_TEST_TO_CATEGORY = {};
 Object.entries(ASSESS_CATEGORIES).forEach(([catId, cat]) => { cat.tests.forEach(testId => { ASSESS_TEST_TO_CATEGORY[testId] = catId; }); });
+const ASSESS_VERSION = 2;
 const ASSESS_STORAGE_KEY = 'aura-assessments-v1';
 
-const calculateAssessTier = (completed) => {
-  if (!completed) return 0;
-  const starterModules = ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'];
-  if (starterModules.every(id => completed[id])) return 2;
-  if (completed['quick-profile'] || completed['ai-style'] || completed['ai-self'] || completed['ai-values'] || completed['ai-vision']) return 1;
-  return 0;
+// Branch unlock mapping: starter module → branch it unlocks
+const ASSESS_BRANCH_MAP = {
+  'starter-personality': 'personality',
+  'starter-motivation': 'drive',
+  'starter-thinking': 'cognition',
+  'starter-connection': 'social',
+  'starter-strategy': 'action',
+  'starter-wellbeing': 'wellness',
 };
+
+const calculateAssessUnlocks = (completed) => {
+  const unlocks = { tier: 0, branches: {} };
+  if (!completed) return unlocks;
+  if (completed['quick-profile'] || completed['ai-style'] || completed['ai-self'] || completed['ai-values'] || completed['ai-vision']) unlocks.tier = 1;
+  for (const [starterId, branchId] of Object.entries(ASSESS_BRANCH_MAP)) {
+    if (completed[starterId]) { unlocks.branches[branchId] = true; unlocks.tier = Math.max(unlocks.tier, 2); }
+  }
+  // Shadow requires 3+ of 5 Big Five completed
+  const bigFiveCount = ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'].filter(id => completed[id]).length;
+  if (bigFiveCount >= 3) unlocks.branches.shadow = true;
+  return unlocks;
+};
+// Backward-compatible wrapper
+const calculateAssessTier = (completed) => calculateAssessUnlocks(completed).tier;
+
 const getFeatureTier = (assessCompleted, isLoggedIn) => {
   const c = Object.keys(assessCompleted || {}).length;
   if (c >= 5 || isLoggedIn) return 3; if (c >= 3) return 2; if (c >= 1) return 1; return 0;
 };
-const getCategoryStatus = (catId, assessCompleted, assessInProgress, tier) => {
+// Category status — branch-aware
+const getCategoryStatus = (catId, assessCompleted, assessInProgress, tier, unlocks) => {
   const cat = ASSESS_CATEGORIES[catId];
   if (!cat) return 'locked';
   if ((cat.tier || 0) > tier) return 'locked';
-  const catTests = cat.tests.filter(id => ASSESS_TESTS[id]);
+  // Branch gate — use pre-computed unlocks if provided
+  if (cat.branch) { const u = unlocks || calculateAssessUnlocks(assessCompleted); if (!u.branches[cat.branch]) return 'locked'; }
+  if (cat.requires && !cat.requires.every(id => assessCompleted[id])) return 'locked';
+  const catTests = cat.tests.filter(id => ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
   if (catTests.every(id => assessCompleted[id])) return 'done';
   if (catTests.some(id => assessCompleted[id] || assessInProgress?.[id])) return 'in-progress';
   return 'available';
@@ -2333,7 +2363,7 @@ const getCompletedCategoryCount = (assessCompleted, entityType) => {
   let count = 0;
   for (const [_, cat] of Object.entries(ASSESS_CATEGORIES)) {
     if (cat.entityHint && cat.entityHint !== entityType) continue;
-    const ct = cat.tests.filter(id => ASSESS_TESTS[id]);
+    const ct = cat.tests.filter(id => ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
     if (ct.length > 0 && ct.every(id => assessCompleted[id])) count++;
   }
   return count;
@@ -2351,12 +2381,15 @@ const ASSESS_NUDGE_COPY = {
   _behavior: "Explore how your personality shows up in action.",
   _mind: "See how you think, learn, and process.",
   _shadow: "One last layer — the parts you don't show everyone.",
+  _drive: "Explore what fuels your ambition and values.",
+  _wellbeing: "Check in on how you're doing.",
+  _clinical: "Validated screening tools — not diagnoses.",
 };
 const getAssessNudge = (completedTestId, newCompleted, entityType) => {
   const fromCatId = ASSESS_TEST_TO_CATEGORY[completedTestId];
   if (!fromCatId) return null;
   const fromCat = ASSESS_CATEGORIES[fromCatId];
-  const nextInCategory = fromCat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id]);
+  const nextInCategory = fromCat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
   if (nextInCategory) return { type: 'same-category', toCatId: fromCatId, toCategory: fromCat, nextTestId: nextInCategory };
   const tier = calculateAssessTier(newCompleted);
   const recommendations = [];
@@ -2365,7 +2398,7 @@ const getAssessNudge = (completedTestId, newCompleted, entityType) => {
     const cat = ASSESS_CATEGORIES[catId];
     if (!cat || (cat.tier || 0) > tier) continue;
     if (cat.entityHint && cat.entityHint !== entityType) continue;
-    const nextTestId = cat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id]);
+    const nextTestId = cat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
     if (!nextTestId) continue;
     const message = ASSESS_NUDGE_COPY[`${fromCatId}-${catId}`] || ASSESS_NUDGE_COPY[`_${catId}`] || "Continue your journey.";
     recommendations.push({ toCatId: catId, toCategory: cat, nextTestId, message });
@@ -2427,8 +2460,9 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
   const [assessEntering, setAssessEntering] = useState(false);
   const [assessResponses, setAssessResponses] = useState({});
   const [assessSkipped, setAssessSkipped] = useState([]);
-  const [assessCompleted, setAssessCompleted] = useState(() => { try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).completed || {} : {}; } catch { return {}; } });
-  const [assessInProgress, setAssessInProgress] = useState(() => { try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).inProgress || {} : {}; } catch { return {}; } });
+  const [assessInitData] = useState(() => { try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); if (!s) return { completed: {}, inProgress: {}, migrated: false }; const d = JSON.parse(s); if (d.assessVersion !== ASSESS_VERSION) { localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ assessVersion: ASSESS_VERSION, completed: {}, inProgress: {} })); return { completed: {}, inProgress: {}, migrated: !!Object.keys(d.completed || {}).length }; } return { completed: d.completed || {}, inProgress: d.inProgress || {}, migrated: false }; } catch { return { completed: {}, inProgress: {}, migrated: false }; } });
+  const [assessCompleted, setAssessCompleted] = useState(assessInitData.completed);
+  const [assessInProgress, setAssessInProgress] = useState(assessInitData.inProgress);
   const [assessPending, setAssessPending] = useState(null);
   const [assessShowCompletion, setAssessShowCompletion] = useState(false);
   const [assessShowDemoMenu, setAssessShowDemoMenu] = useState(false);
@@ -2444,8 +2478,12 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
   const [assessShowUndoToast, setAssessShowUndoToast] = useState(false);
   const [assessUnlockMessage, setAssessUnlockMessage] = useState(null);
   const [assessNudgeData, setAssessNudgeData] = useState(null);
+  const [assessShowCrisisResources, setAssessShowCrisisResources] = useState(false);
+  const [assessClinicalConsent, setAssessClinicalConsent] = useState(() => { try { return localStorage.getItem('aura-clinical-consent') === 'true'; } catch { return false; } });
+  // V2 migration toast
+  useEffect(() => { if (assessInitData.migrated) { setAssessUnlockMessage('Assessment system updated — your progress has been reset'); setTimeout(() => setAssessUnlockMessage(null), 4000); } }, []);
   const assessSaveToStorage = (completed, progress, demoActive = assessDemoActive, savedUserData = assessSavedUserData, demoProfile = assessDemoProfile, demoControls = showDemoControls) => {
-    localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed, inProgress: progress, demoActive, savedUserData, demoProfile, showDemoControls: demoControls }));
+    localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ assessVersion: ASSESS_VERSION, completed, inProgress: progress, demoActive, savedUserData, demoProfile, showDemoControls: demoControls }));
   };
 
   const assessCurrentTest = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
@@ -2495,9 +2533,16 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     cloudSync?.saveCompleted(assessCurrentTestId, resp, results);
     const prevTier = calculateAssessTier(assessCompleted);
     const newTier = calculateAssessTier(newCompleted);
-    if (newTier > prevTier) {
-      const msgs = { 1: { title: "Starter Pack Unlocked!", subtitle: "Begin your deep dive into self-discovery" }, 2: { title: "All Branches Unlocked!", subtitle: "Explore Personality, Mind, Shadow & more" } };
-      setAssessUnlockMessage(msgs[newTier]);
+    if (newTier > prevTier && newTier === 1) {
+      setAssessUnlockMessage({ title: "Starter Pack Unlocked!", subtitle: "Begin your deep dive into self-discovery" });
+    }
+    // Branch unlock — name the specific branch, not "all"
+    const prevUnlocks = calculateAssessUnlocks(assessCompleted);
+    const newUnlocks = calculateAssessUnlocks(newCompleted);
+    const newBranches = Object.keys(newUnlocks.branches).filter(b => newUnlocks.branches[b] && !prevUnlocks.branches[b]);
+    if (newBranches.length > 0) {
+      const branchInfo = ASSESS_BRANCHES.find(b => b.id === newBranches[0]);
+      setAssessUnlockMessage({ title: `${branchInfo?.icon || '🔓'} ${branchInfo?.name || 'New Branch'} Unlocked!`, subtitle: `You can now explore ${branchInfo?.name || 'new assessments'}` });
     }
     setAssessShowCompletion(true);
     haptic(HAPTIC.complete);
@@ -2519,14 +2564,34 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     for (let i = 0; i < assessCurrentIndex; i++) { if (resp[i] === undefined) { assessGoToQuestion(i); return; } }
   };
 
+  const [assessPendingClinicalTest, setAssessPendingClinicalTest] = useState(null);
   const assessStartTest = (testId) => {
+    const catId = ASSESS_TEST_TO_CATEGORY[testId];
+    const cat = catId ? ASSESS_CATEGORIES[catId] : null;
+    // Branch lock enforcement — silently refuse if branch not unlocked
+    if (cat?.branch) {
+      const u = calculateAssessUnlocks(assessCompleted);
+      if (!u.branches[cat.branch]) return;
+    }
+    // Clinical consent gate
+    if (cat?.requiresConsent && !assessClinicalConsent) {
+      setAssessPendingClinicalTest(testId);
+      setScreen('clinical-consent');
+      return;
+    }
     setAssessCurrentTestId(testId);
     const progress = assessInProgress[testId];
     setAssessCurrentIndex(progress?.index || 0);
     setAssessResponses(progress?.responses || {});
     setAssessSkipped(progress?.skipped || []);
     setAssessPending(null);
+    setAssessShowCrisisResources(false);
     setScreen('assess-question');
+  };
+  const assessConfirmClinicalConsent = () => {
+    setAssessClinicalConsent(true);
+    try { localStorage.setItem('aura-clinical-consent', 'true'); } catch {}
+    if (assessPendingClinicalTest) { assessStartTest(assessPendingClinicalTest); setAssessPendingClinicalTest(null); }
   };
   const assessSaveAndExit = () => {
     clearTimeout(assessTimeoutRef.current);
@@ -2535,6 +2600,10 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     setAssessInProgress(newProgress);
     assessSaveToStorage(assessCompleted, newProgress);
     cloudSync?.saveProgress(assessCurrentTestId, progressObj);
+    setScreen('assess-picker');
+  };
+  const assessDiscardAndExit = () => {
+    clearTimeout(assessTimeoutRef.current);
     setScreen('assess-picker');
   };
   const assessFinalizeSubmit = (value) => {
@@ -2549,6 +2618,10 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     const test = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
     const item = test?.items?.[rawIdx];
     responseCapture?.captureAssessResponse(assessCurrentTestId, rawIdx, value, test && item ? { test: assessCurrentTestId, name: test.name, q: item.q, idx: rawIdx } : null);
+    // PHQ-9 safety: show crisis resources if suicidality item (index 8) endorsed
+    // PHQ-9 safety: one-way trigger — once shown, persists until dismissed or test exits.
+    // Intentionally does not re-evaluate on answer change (safe default).
+    if (assessCurrentTestId === 'phq9' && rawIdx === 8 && value > 1) setAssessShowCrisisResources(true);
     assessAdvanceToNext(newResponses, newSkipped);
   };
   const assessHandleAnswerTap = (value) => { assessFinalizeSubmit(value); };
@@ -2597,35 +2670,37 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     assessShowExitConfirm, setAssessShowExitConfirm, assessExpandedCategory, setAssessExpandedCategory,
     assessDemoActive, assessDemoProfile, showDemoControls, setShowDemoControls,
     assessSavedUserData, assessShowDemoInfo, setAssessShowDemoInfo, assessProfileSwitching,
-    assessShowUndoToast, assessUnlockMessage, assessNudgeData,
+    assessShowUndoToast, assessUnlockMessage, assessNudgeData, assessShowCrisisResources, setAssessShowCrisisResources, assessClinicalConsent, assessConfirmClinicalConsent, assessPendingClinicalTest,
     assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions, assessGatewayActiveItems,
-    assessStartTest, assessSaveAndExit, assessGoToQuestion, assessHandleAnswerTap, assessHandleUndo,
+    assessStartTest, assessSaveAndExit, assessDiscardAndExit, assessGoToQuestion, assessHandleAnswerTap, assessHandleUndo,
     assessFinalizeSubmit, assessCanFinish, assessFinishAssessment,
     assessLoadDemoProfile, assessClearDemo, assessClearAll,
   };
 };
 
 // — ASSESSMENT PICKER SCREEN
-const AssessCategoryCard = ({ catId, cat, catTests, isDark, assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, assessStartTest }) => {
+const AssessCategoryCard = ({ catId, cat, catTests, isDark, assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, assessStartTest, status }) => {
+  const isLocked = status === 'locked';
   const totalQ = catTests.reduce((s, [_, t]) => s + (t.questionCount || t.items.length), 0);
   const answeredQ = catTests.reduce((s, [id, t]) => { if (assessCompleted[id]) return s + (t.questionCount || t.items.length); const p = assessInProgress[id]; return s + (p ? Object.keys(p.responses || {}).length : 0); }, 0);
-  const pct = (answeredQ / totalQ) * 100;
+  const pct = isLocked ? 0 : (answeredQ / totalQ) * 100;
   const t = twColor(cat.color);
-  const isExpanded = assessExpandedCategory === catId;
+  const isExpanded = !isLocked && assessExpandedCategory === catId;
   const hasModules = catTests.length > 1;
   const handleClick = () => {
+    if (isLocked) return;
     if (hasModules) { setAssessExpandedCategory(isExpanded ? null : catId); }
     else if (catTests[0]) { assessStartTest(catTests[0][0]); }
   };
   return (
     <div>
-      <button onClick={handleClick} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all border ${isDark ? 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06]' : 'border-black/[0.06] bg-white hover:bg-gray-50'}`}>
-        <ProgressCircle progress={pct} size={40} strokeWidth={3} color={cat.color} text={pct > 0 ? `${Math.round(pct)}%` : cat.icon} gradientId={`cat-${catId}`} isDark={isDark} textSize="text-[10px]" iconSize="text-sm" />
+      <button onClick={handleClick} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all border ${isLocked ? 'opacity-50 cursor-not-allowed' : ''} ${isDark ? 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06]' : 'border-black/[0.06] bg-white hover:bg-gray-50'}`}>
+        <ProgressCircle progress={pct} size={40} strokeWidth={3} color={cat.color} text={isLocked ? '🔒' : (pct > 0 ? `${Math.round(pct)}%` : cat.icon)} gradientId={`cat-${catId}`} isDark={isDark} textSize="text-[10px]" iconSize="text-sm" />
         <div className="flex-1 min-w-0">
           <Text weight="medium">{cat.name}</Text>
-          <Text size="xxs" emphasis="subtle">{catTests.length} module{catTests.length > 1 ? 's' : ''} · {totalQ} questions</Text>
+          {isLocked ? <Text size="xxs" emphasis="faint">Complete the starter to unlock</Text> : <Text size="xxs" emphasis="subtle">{catTests.length} module{catTests.length > 1 ? 's' : ''} · {totalQ} questions</Text>}
         </div>
-        {hasModules && <Text as="span" size="xxs" emphasis="faint">{isExpanded ? '▾' : '▸'}</Text>}
+        {!isLocked && hasModules && <Text as="span" size="xxs" emphasis="faint">{isExpanded ? '▾' : '▸'}</Text>}
       </button>
       {isExpanded && hasModules && (
         <div className="ml-6 mt-1 space-y-1">
@@ -2652,26 +2727,37 @@ const AssessCategoryCard = ({ catId, cat, catTests, isDark, assessCompleted, ass
   );
 };
 
+// Branch section definitions for grouped picker
+const ASSESS_BRANCHES = [
+  { id: 'personality', name: 'Personality', icon: '🎭', categories: ['personality', 'shadow'], starter: 'starter-personality' },
+  { id: 'drive', name: 'Drive & Values', icon: '🔥', categories: ['drive'], starter: 'starter-motivation' },
+  { id: 'cognition', name: 'Mind', icon: '🧠', categories: ['mind'], starter: 'starter-thinking' },
+  { id: 'social', name: 'Relationships', icon: '💚', categories: ['relationships'], starter: 'starter-connection' },
+  { id: 'action', name: 'Character & Behavior', icon: '💎', categories: ['character', 'behavior'], starter: 'starter-strategy' },
+  { id: 'wellness', name: 'Wellbeing', icon: '🌿', categories: ['wellbeing'], starter: 'starter-wellbeing' },
+];
+
 const AssessPickerScreen = ({ isDark, entityType, assess, onNavigate }) => {
-  const { assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, showDemoControls, assessDemoActive, assessDemoProfile, assessSavedUserData, assessShowDemoMenu, setAssessShowDemoMenu, assessShowDemoInfo, setAssessShowDemoInfo, assessProfileSwitching, assessStartTest, assessLoadDemoProfile, assessClearDemo, assessClearAll } = assess;
+  const { assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, showDemoControls, assessDemoActive, assessDemoProfile, assessStartTest, assessLoadDemoProfile, assessClearDemo } = assess;
   const currentTier = calculateAssessTier(assessCompleted);
-  const visibleCategories = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= currentTier && (!cat.entityHint || cat.entityHint === entityType));
+  const unlocks = calculateAssessUnlocks(assessCompleted);
   const isFirstTimeUser = currentTier === 0 && !assessCompleted['quick-profile'] && !assessCompleted['ai-style'];
-  const categoriesWithStatus = visibleCategories.map(([catId, cat]) => {
-    const catTests = cat.tests.map(id => [id, ASSESS_TESTS[id]]).filter(([_, t]) => t);
-    const status = getCategoryStatus(catId, assessCompleted, assessInProgress, currentTier);
+
+  const makeCatStatus = (catId) => {
+    const cat = ASSESS_CATEGORIES[catId];
+    if (!cat) return null;
+    const catTests = cat.tests.map(id => [id, ASSESS_TESTS[id]]).filter(([_, t]) => t && !t.archived);
+    const status = getCategoryStatus(catId, assessCompleted, assessInProgress, currentTier, unlocks);
     return { catId, cat, catTests, allComplete: status === 'done', hasProgress: status === 'in-progress', status };
-  });
-  const heroPriority = entityType === 'ai' ? ['ai-identity','quickstart','starter','personality','relationships','character','behavior','mind','shadow'] : ['quickstart','starter','personality','relationships','character','behavior','mind','shadow'];
-  const allIncomplete = categoriesWithStatus.filter(c => !c.allComplete);
-  const inProgressItems = allIncomplete.filter(c => c.hasProgress);
-  const heroCategory = inProgressItems.length > 0 ? inProgressItems[0] : heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
-  const incompleteCategories = allIncomplete.filter(c => c !== heroCategory).sort((a, b) => {
-    if (a.hasProgress && !b.hasProgress) return -1; if (!a.hasProgress && b.hasProgress) return 1;
-    const ai = heroPriority.indexOf(a.catId), bi = heroPriority.indexOf(b.catId);
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
-  const completedCategories = categoriesWithStatus.filter(c => c.allComplete);
+  };
+
+  // Gateway categories
+  const gatewayCats = (entityType === 'ai' ? ['ai-identity', 'quickstart'] : ['quickstart']).map(makeCatStatus).filter(Boolean);
+  // Starter
+  const starterCat = makeCatStatus('starter');
+  // Clinical
+  const clinicalCat = makeCatStatus('clinical');
+
   return (
     <Screen>
       <NavBar back onBack={() => onNavigate('categories')}
@@ -2703,33 +2789,52 @@ const AssessPickerScreen = ({ isDark, entityType, assess, onNavigate }) => {
             <Button color="violet" className="mt-6" onClick={() => assessStartTest(entityType === 'ai' ? 'ai-style' : 'quick-profile')}>Start →</Button>
           </div>
         )}
-        {!isFirstTimeUser && heroCategory && (() => {
-          const { catId, cat, catTests } = heroCategory;
-          const totalQ = catTests.reduce((s, [_, t]) => s + (t.questionCount || t.items.length), 0);
-          const answeredQ = catTests.reduce((s, [id, t]) => { if (assessCompleted[id]) return s + (t.questionCount || t.items.length); const p = assessInProgress[id]; return s + (p ? Object.keys(p.responses || {}).length : 0); }, 0);
-          const pct = (answeredQ / totalQ) * 100;
-          const hex = colorOf(cat.color);
-          const t = twColor(cat.color);
-          const firstIncomplete = catTests.filter(([id]) => !assessCompleted[id])[0];
-          return (
-            <div className="mb-3">
-              <button onClick={() => firstIncomplete ? assessStartTest(firstIncomplete[0]) : catTests[0] && assessStartTest(catTests[0][0])} className={`w-full relative rounded-2xl overflow-hidden text-left border ${isDark ? 'border-white/[0.06]' : 'border-black/[0.10] shadow-sm'}`}>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 240, height: 240, background: `radial-gradient(ellipse at center, rgba(${hex.rgb}, ${isDark ? 0.12 : 0.08}) 0%, transparent 70%)` }} /></div>
-                <div className={`relative z-10 p-3.5 ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
-                  <Stack direction="row" align="center" gap={3}>
-                    <ProgressCircle progress={pct} size={44} strokeWidth={3} color={cat.color} text={pct > 0 ? `${Math.round(pct)}%` : cat.icon} gradientId={`hero-${catId}`} isDark={isDark} textSize="text-xs" />
-                    <Text weight="semibold" className="flex-1">{cat.name}</Text>
-                    <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${isDark ? `bg-${t}-500/25 text-${t}-300 border border-${t}-500/30` : `bg-${t}-100 text-${t}-600`}`}>{pct > 0 ? 'Continue →' : 'Start →'}</span>
-                  </Stack>
-                </div>
-              </button>
+        {!isFirstTimeUser && (<Stack gap={4}>
+          {/* Gateway */}
+          {gatewayCats.some(c => !c.allComplete) && <div className="space-y-2">{gatewayCats.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>}
+          {/* Starter Pack */}
+          {currentTier >= 1 && starterCat && !starterCat.allComplete && (
+            <div>
+              <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">🚀 Starter Pack</Text>
+              <AssessCategoryCard {...starterCat} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />
             </div>
-          );
-        })()}
-        {!isFirstTimeUser && incompleteCategories.length > 0 && <div className="space-y-2 mb-4">{incompleteCategories.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>}
-        {!isFirstTimeUser && completedCategories.length > 0 && (
-          <div className="mt-4"><Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">Completed</Text><div className="space-y-2">{completedCategories.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div></div>
-        )}
+          )}
+          {/* Branch sections */}
+          {currentTier >= 1 && ASSESS_BRANCHES.map(branch => {
+            const isUnlocked = !!unlocks.branches[branch.id];
+            const branchCats = branch.categories.map(makeCatStatus).filter(Boolean);
+            const allDone = branchCats.every(c => c.allComplete);
+            if (allDone && branchCats.length > 0) return null; // shown in completed section
+            const starterTest = ASSESS_TESTS[branch.starter];
+            const starterName = starterTest?.name || branch.name;
+            return (
+              <div key={branch.id} style={!isUnlocked ? { opacity: 0.5 } : undefined}>
+                <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">{branch.icon} {branch.name}</Text>
+                {!isUnlocked ? (
+                  <Card variant="plain" className="py-3 px-4">
+                    <Text size="xs" emphasis="subtle">Complete <strong>{starterName}</strong> to unlock</Text>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">{branchCats.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>
+                )}
+              </div>
+            );
+          })}
+          {/* Clinical */}
+          {clinicalCat && (
+            <div>
+              <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">📋 Clinical Screens</Text>
+              <AssessCategoryCard {...clinicalCat} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />
+            </div>
+          )}
+          {/* Completed */}
+          {(() => {
+            const done = [...gatewayCats, starterCat, ...ASSESS_BRANCHES.flatMap(b => b.categories.map(makeCatStatus)), clinicalCat].filter(c => c && c.allComplete);
+            return done.length > 0 ? (
+              <div><Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">✅ Completed</Text><div className="space-y-2">{done.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div></div>
+            ) : null;
+          })()}
+        </Stack>)}
       </div>
     </Screen>
   );
@@ -2737,7 +2842,7 @@ const AssessPickerScreen = ({ isDark, entityType, assess, onNavigate }) => {
 
 // — ASSESSMENT QUESTION SCREEN
 const AssessQuestionScreen = ({ isDark, assess, undoDelay }) => {
-  const { assessCurrentTest, assessCurrentIndex, assessTotalQuestions, assessGatewayActiveItems, assessResponses, assessSkipped, assessCurrentScale, assessShowCompletion, assessUnlockMessage, assessShowUndoToast, assessShowExitConfirm, setAssessShowExitConfirm, assessPending, assessEntering, assessTestColor, assessCanFinish, assessFinishAssessment, assessSaveAndExit, assessGoToQuestion, assessHandleAnswerTap, assessHandleUndo, assessFinalizeSubmit } = assess;
+  const { assessCurrentTest, assessCurrentIndex, assessTotalQuestions, assessGatewayActiveItems, assessResponses, assessSkipped, assessCurrentScale, assessShowCompletion, assessUnlockMessage, assessShowUndoToast, assessShowExitConfirm, setAssessShowExitConfirm, assessPending, assessEntering, assessTestColor, assessCanFinish, assessFinishAssessment, assessSaveAndExit, assessDiscardAndExit, assessGoToQuestion, assessHandleAnswerTap, assessHandleUndo, assessFinalizeSubmit, assessShowCrisisResources, setAssessShowCrisisResources } = assess;
   if (!assessCurrentTest) return null;
   const gwMap = assessGatewayActiveItems || null;
   const rawIdx = gwMap ? gwMap[assessCurrentIndex] : assessCurrentIndex;
@@ -2764,12 +2869,31 @@ const AssessQuestionScreen = ({ isDark, assess, undoDelay }) => {
         );
       })()}
       {assessShowUndoToast && <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg animate-pulse ${isDark ? 'bg-white/[0.08] border border-white/[0.12] text-white' : 'bg-gray-900/[0.08] border border-gray-900/[0.12] text-gray-900'}`}>↩ Undone</div>}
+      {/* PHQ-9 Crisis Resources — non-blocking, compassionate */}
+      {assessShowCrisisResources && (
+        <div className="absolute inset-x-0 top-[48px] z-40 mx-3" style={{ animation: 'fadeSlideIn 0.3s ease-out both' }}>
+          <Card style={{ background: isDark ? `rgba(${colorOf('blue').rgb},0.12)` : `rgba(${colorOf('blue').rgb},0.06)`, backdropFilter: 'blur(12px)', border: `1px solid ${isDark ? `rgba(${colorOf('blue').rgb},0.3)` : `rgba(${colorOf('blue').rgb},0.2)`}` }}>
+            <Stack gap={2}>
+              <Stack direction="row" className="justify-between items-start">
+                <Text size="sm" weight="semibold" style={{ color: isDark ? COLOR_HEX.blue.light : COLOR_HEX.blue.base }}>You're not alone</Text>
+                <button onClick={() => setAssessShowCrisisResources(false)} className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full cursor-pointer" style={{ color: isDark ? `rgba(${colorOf('blue').rgb},0.6)` : `rgba(${colorOf('blue').rgb},0.5)` }}>✕</button>
+              </Stack>
+              <Text size="xs" emphasis="subtle">If you're going through a difficult time, support is available right now.</Text>
+              <Stack gap={1}>
+                <Text size="xs" weight="medium">📞 <strong>988 Suicide & Crisis Lifeline</strong> — call or text <strong>988</strong></Text>
+                <Text size="xs" weight="medium">💬 <strong>Crisis Text Line</strong> — text <strong>HOME</strong> to <strong>741741</strong></Text>
+                <Text size="xs" emphasis="subtle">If you're in immediate danger, call <strong>911</strong></Text>
+              </Stack>
+            </Stack>
+          </Card>
+        </div>
+      )}
       {assessShowExitConfirm && (
         <Modal open onClose={() => setAssessShowExitConfirm(false)} title="Exit Assessment?">
-          <Text size="xs" emphasis="subtle" className="mb-4">Your answers will not be saved.</Text>
+          <Text size="xs" emphasis="subtle" className="mb-4">Save your progress or discard and exit?</Text>
           <Stack direction="row" gap={3}>
-            <Button color="violet" size="full" onClick={() => { setAssessShowExitConfirm(false); assessSaveAndExit(); }}>Save</Button>
-            <Button color="rose" variant="primary" size="full" onClick={() => { setAssessShowExitConfirm(false); assessSaveAndExit(); }}>Exit</Button>
+            <Button color="violet" size="full" onClick={() => { setAssessShowExitConfirm(false); assessSaveAndExit(); }}>Save & Exit</Button>
+            <Button color="rose" variant="primary" size="full" onClick={() => { setAssessShowExitConfirm(false); assessDiscardAndExit(); }}>Discard</Button>
           </Stack>
         </Modal>
       )}
@@ -2796,7 +2920,17 @@ const AssessQuestionScreen = ({ isDark, assess, undoDelay }) => {
           </div>
         </div>
         <div className="flex-shrink-0 px-4 pb-4 space-y-2">
-          {(currentItem.o ? currentItem.o.map((label, i) => ({ v: i + 1, l: label })) : assessCurrentScale || []).map((option, i) => {
+          {currentItem.a && currentItem.b ? /* Love Language forced-choice pairs */
+            (() => {
+              const selStyle = selectedStyles[assessCurrentTest.color] || '';
+              const makeCard = (v, opt) => { const isSelected = assessResponses[rawIdx] === v; const colorTint = gradientStyles[assessCurrentTest.color]?.[v * 2] || ''; return (
+                <button key={v} onClick={(e) => { e.stopPropagation(); assessHandleAnswerTap(v); }}
+                  className={`w-full py-4 px-5 rounded-xl text-left transition-all border relative overflow-hidden ${isSelected ? `${selStyle} text-white` : `${colorTint} ${isDark ? 'text-gray-200' : 'text-gray-700'}`}`}>
+                  <span className="relative z-10 leading-relaxed">{opt.l}</span>
+                </button>); };
+              return <>{makeCard(0, currentItem.a)}<div className="text-center"><Text size="xs" emphasis="faint">— or —</Text></div>{makeCard(1, currentItem.b)}</>;
+            })()
+          : (currentItem.o ? currentItem.o.map((label, i) => ({ v: i + 1, l: label })) : assessCurrentScale || []).map((option, i) => {
             const isSelected = assessResponses[rawIdx] === option.v;
             const colorTint = gradientStyles[assessCurrentTest.color]?.[i % 5] || '';
             const selStyle = selectedStyles[assessCurrentTest.color] || '';
@@ -2809,7 +2943,7 @@ const AssessQuestionScreen = ({ isDark, assess, undoDelay }) => {
               </button>
             );
           })}
-          {!currentItem.o && <div className="text-center pt-1">
+          {!currentItem.a && !currentItem.o && <div className="text-center pt-1">
             <button onClick={(e) => { e.stopPropagation(); assessFinalizeSubmit(null); }}
               className={`text-xs px-3 py-1 rounded-full transition-colors ${assessResponses[rawIdx] === null ? (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-300 text-gray-600') : (isDark ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}>
               Doesn't apply to me
@@ -2836,6 +2970,27 @@ const ResultCard = ({ icon, title, subtitle, isDark, gradientClass, children }) 
   </Card>
 );
 
+// — CLINICAL CONSENT SCREEN —
+const ClinicalConsentScreen = ({ isDark, assess, onNavigate }) => {
+  return (
+    <Screen header={<NavBar back title="Clinical Screens" onBack={() => onNavigate('assess-picker')} />}>
+      <Screen.Body className="flex flex-col items-center justify-center px-6 gap-6 text-center">
+        <Text size="xl">📋</Text>
+        <Text as="h2" weight="semibold">Before you begin</Text>
+        <Stack gap={3} className="max-w-sm">
+          <Text size="sm" emphasis="secondary">These are validated clinical screening tools, not diagnoses.</Text>
+          <Text size="sm" emphasis="secondary">They can help you understand patterns in your mental health, but they don't replace professional assessment.</Text>
+          <Text size="sm" emphasis="subtle">Results are stored only on your device.</Text>
+        </Stack>
+        <Stack direction="row" gap={3} className="mt-4">
+          <Button variant="ghost" onClick={() => onNavigate('assess-picker')}>Go back</Button>
+          <Button variant="primary" color="blue" onClick={() => assess.assessConfirmClinicalConsent()}>I understand — continue</Button>
+        </Stack>
+      </Screen.Body>
+    </Screen>
+  );
+};
+
 const AssessResultsScreen = ({ isDark, assess, entityType, onNavigate }) => {
   const { assessCurrentTest, assessCompleted, assessNudgeData, assessStartTest } = assess;
   const testId = assess.assessCurrentTestId;
@@ -2854,6 +3009,19 @@ const AssessResultsScreen = ({ isDark, assess, entityType, onNavigate }) => {
   return (
     <Screen header={<NavBar back title="Your Results" onBack={() => onNavigate('categories')} />}>
       <Screen.Body className="space-y-4">
+        {/* PHQ-9 Crisis Resources on results — persistent, not dismissible */}
+        {testId === 'phq9' && results?.severity && results.severity !== 'Minimal' && (
+          <Card style={{ background: isDark ? `rgba(${colorOf('blue').rgb},0.12)` : `rgba(${colorOf('blue').rgb},0.06)`, border: `1px solid ${isDark ? `rgba(${colorOf('blue').rgb},0.3)` : `rgba(${colorOf('blue').rgb},0.2)`}` }}>
+            <Stack gap={2}>
+              <Text size="sm" weight="semibold" style={{ color: isDark ? COLOR_HEX.blue.light : COLOR_HEX.blue.base }}>Support is available</Text>
+              <Stack gap={1}>
+                <Text size="xs" weight="medium">📞 <strong>988 Suicide & Crisis Lifeline</strong> — call or text <strong>988</strong></Text>
+                <Text size="xs" weight="medium">💬 <strong>Crisis Text Line</strong> — text <strong>HOME</strong> to <strong>741741</strong></Text>
+                <Text size="xs" emphasis="subtle">If you're in immediate danger, call <strong>911</strong></Text>
+              </Stack>
+            </Stack>
+          </Card>
+        )}
         {/* Quick Profile Results */}
         {testId === 'quick-profile' && results && (() => {
           const getDesc = () => {
@@ -2891,6 +3059,65 @@ const AssessResultsScreen = ({ isDark, assess, entityType, onNavigate }) => {
               );
             })}
             {results.score != null && !results.traits && <div className="text-center"><Text heading={2} className="mb-1">{Math.round(results.score)}</Text><Text size="xs" emphasis="subtle">out of 100</Text></div>}
+            {/* Subscale breakdown bars */}
+            {(() => {
+              const subs = results.subcategories || results.dimensions || results.foundations || results.styles || null;
+              const subNames = { exec: 'Executive Function', inat: 'Inattention', hyper: 'Hyperactivity', imp: 'Impulsivity', emot: 'Emotional',
+                passion: 'Passion', perseverance: 'Perseverance', care: 'Care', fairness: 'Fairness', loyalty: 'Loyalty', authority: 'Authority', purity: 'Purity',
+                comp: 'Competing', collab: 'Collaborating', compr: 'Compromising', avoid: 'Avoiding', accom: 'Accommodating',
+                'self-awareness': 'Self-Awareness', 'self-management': 'Self-Management', 'social-awareness': 'Social Awareness', 'relationship-management': 'Relationship Mgmt',
+                honesty: 'Honesty', humility: 'Humility', aff: 'Affiliative', enh: 'Self-Enhancing', agg: 'Aggressive', def: 'Self-Defeating',
+                dir: 'Directness', emo: 'Emotionality', max: 'Maximizing', del: 'Deliberation' };
+              if (!subs) return null;
+              const baseColor = COLOR_HEX[test.color]?.base || COLOR_HEX.violet.base;
+              return (
+                <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-base)' }}>
+                  <Text size="xxs" weight="semibold" emphasis="subtle" className="mb-2 uppercase tracking-wide">Breakdown</Text>
+                  <Stack gap={1.5}>
+                    {Object.entries(subs).map(([key, val]) => (
+                      <div key={key}>
+                        <Stack direction="row" className="justify-between mb-0.5"><Text size="xxs" emphasis="subtle">{subNames[key] || key}</Text><Text size="xxs" weight="medium">{Math.round(val)}</Text></Stack>
+                        <div className="h-1.5 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}><div className="h-full rounded-full transition-all" style={{ width: `${Math.max(3, Math.min(100, val))}%`, background: baseColor }} /></div>
+                      </div>
+                    ))}
+                  </Stack>
+                </div>
+              );
+            })()}
+            {/* Love Language profile */}
+            {results.receive && results.give && (() => {
+              const langNames = { words: 'Words', time: 'Quality Time', gifts: 'Gifts', service: 'Service', touch: 'Touch' };
+              const baseColor = COLOR_HEX[test.color]?.base || COLOR_HEX.pink.base;
+              const renderProfile = (label, profile) => {
+                const max = Math.max(...Object.values(profile), 1);
+                return (
+                  <div>
+                    <Text size="xxs" weight="semibold" emphasis="subtle" className="mb-1 uppercase tracking-wide">{label}</Text>
+                    <Stack gap={1}>
+                      {Object.entries(profile).map(([key, val]) => (
+                        <div key={key}>
+                          <Stack direction="row" className="justify-between mb-0.5"><Text size="xxs" emphasis="subtle">{langNames[key] || key}</Text><Text size="xxs" weight="medium">{val}</Text></Stack>
+                          <div className="h-1.5 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}><div className="h-full rounded-full" style={{ width: `${(val / max) * 100}%`, background: baseColor }} /></div>
+                        </div>
+                      ))}
+                    </Stack>
+                  </div>
+                );
+              };
+              return (
+                <div className="mt-3 pt-3 space-y-3" style={{ borderTop: '1px solid var(--border-base)' }}>
+                  {renderProfile('Receiving', results.receive)}
+                  {renderProfile('Giving', results.give)}
+                </div>
+              );
+            })()}
+            {/* Quadrant label for 2-axis tests */}
+            {results.quadrant && <div className="mt-3 pt-3 text-center" style={{ borderTop: '1px solid var(--border-base)' }}><Text size="sm" weight="semibold">{results.quadrant}</Text>{results.axes && <Text size="xxs" emphasis="subtle" className="mt-1">{Object.entries(results.axes).map(([k, v]) => `${k}: ${v}`).join(' · ')}</Text>}</div>}
+            {/* Self-monitoring tier */}
+            {results.tier && <div className="mt-2 text-center"><Text size="xs" emphasis="subtle">{results.tier}</Text></div>}
+            {/* Clinical severity */}
+            {results.severity && <div className="mt-2 text-center"><Text size="xs" weight="medium">{results.severity}</Text></div>}
+            {results.elevated != null && <div className="mt-2 text-center"><Text size="xs" weight="medium">{results.elevated ? `Elevated (${results.indicators} indicators)` : `Not elevated (${results.indicators} indicators)`}</Text></div>}
           </ResultCard>
         )}
         {/* Nudge */}
@@ -2921,7 +3148,7 @@ const ProfileCategoryList = ({ assessCompleted, entityType, currentTier, onStart
   for (const catId of ASSESS_CATEGORY_ORDER) {
     const cat = ASSESS_CATEGORIES[catId];
     if (!cat || (cat.entityHint && cat.entityHint !== entityType) || (cat.tier || 0) > currentTier) continue;
-    const catTests = cat.tests.filter(id => ASSESS_TESTS[id]);
+    const catTests = cat.tests.filter(id => ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
     const allDone = catTests.every(id => assessCompleted[id]);
     const doneCount = catTests.filter(id => assessCompleted[id]).length;
     const firstIncomplete = catTests.find(id => !assessCompleted[id]);
@@ -3347,7 +3574,7 @@ const AnalysisScreen = ({ isDark, assess, entityType, onboardingAnswers, onNavig
   const catCount = getCompletedCategoryCount(assessCompleted, entityType);
   const groupsWithData = ANALYSIS_CATEGORIES
     .filter(g => currentTier >= g.minTier)
-    .map(g => ({ ...g, completedTests: g.tests.filter(id => assessCompleted[id] && ASSESS_TESTS[id]) }))
+    .map(g => ({ ...g, completedTests: g.tests.filter(id => assessCompleted[id] && ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived) }))
     .filter(g => g.completedTests.length > 0);
   if (catCount < 2) return (
     <Screen header={<NavBar back title="Analysis" onBack={() => onNavigate('categories')} />}>
@@ -5326,7 +5553,7 @@ function App() {
   const [screen, setScreenRaw] = useState(getInitialScreen);
   const [previousScreen, setPreviousScreen] = useState(null);
   // pushState routing — major screens push browser history
-  const HISTORY_SCREENS = new Set(['landing', 'categories', 'settings', 'question', 'assess-picker', 'assess-results', 'compare', 'public-profile', 'verify-hub', 'verify-eval-summary', 'profile', 'assess-analysis', 'history', 'identity']);
+  const HISTORY_SCREENS = new Set(['landing', 'categories', 'settings', 'question', 'assess-picker', 'assess-results', 'clinical-consent', 'compare', 'public-profile', 'verify-hub', 'verify-eval-summary', 'profile', 'assess-analysis', 'history', 'identity']);
   const setScreen = useCallback((next) => {
     setScreenRaw(prev => {
       if (next !== prev && HISTORY_SCREENS.has(next)) {
@@ -5668,6 +5895,7 @@ function App() {
     if (screen === 'compare') return <ErrorBoundary feature="Compare"><CompareScreen isDark={isDark} assess={assess} entityType={entityType} displayName={displayName} compareData={compareData} compareLoading={compareLoading} onNavigate={setScreen} /></ErrorBoundary>;
     if (screen === 'public-profile') return <PublicProfileScreen isDark={isDark} profileId={publicProfileId} onNavigate={setScreen} />;
     if (screen === 'assess-picker') return <AssessPickerScreen isDark={isDark} entityType={entityType} assess={assess} onNavigate={setScreen} />;
+    if (screen === 'clinical-consent') return <ClinicalConsentScreen isDark={isDark} assess={assess} onNavigate={setScreen} />;
     if (screen === 'assess-question') return <ErrorBoundary feature="Assessment"><AssessQuestionScreen isDark={isDark} assess={assess} undoDelay={undoDelay} /></ErrorBoundary>;
     if (screen === 'assess-results') return <AssessResultsScreen isDark={isDark} assess={assess} entityType={entityType} onNavigate={setScreen} />;
     if (screen === 'profile') return <ProfileScreen isDark={isDark} assess={assess} entityType={entityType} onboardingAnswers={onboardingAnswers} responses={responses} onNavigate={setScreen} />;

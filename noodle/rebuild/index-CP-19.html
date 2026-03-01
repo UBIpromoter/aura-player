@@ -131,7 +131,7 @@
 </head>
 <body style="background: var(--bg-main);">
   <div id="root"></div>
-  <button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.22)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.7)'">&#x21bb; Refresh</button>
+  <button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:var(--bg-elevated);color:var(--text-secondary);border:1px solid var(--border-base);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s">&#x21bb; Refresh</button>
 
   <!-- Suppress Tailwind CDN warning -->
   <script>
@@ -590,23 +590,27 @@ const useCloudSync = () => {
   };
 
   // Process retry queue on mount / auth change
-  useEffect(() => {
-    if (!auth?.user) return;
+  const retryProcessing = useRef(false);
+  const processRetryQueue = useCallback(async () => {
+    if (!auth?.user || retryProcessing.current) return;
     const queue = getRetryQueue();
     if (queue.length === 0) return;
-    setRetryQueue([]);
-    (async () => {
-      for (const op of queue) {
-        try {
-          if (op.type === 'completed') {
-            await supabase.from('assessment_results').upsert({ user_id: auth.user.id, category_id: op.testId, status: 'completed', answers: op.answers || {}, traits: op.traits || {}, progress: null, completed_at: op.completedAt, updated_at: new Date().toISOString() }, { onConflict: 'user_id,category_id' });
-          } else if (op.type === 'progress') {
-            await supabase.from('assessment_results').upsert({ user_id: auth.user.id, category_id: op.testId, status: 'in_progress', answers: op.progress || {}, traits: null, progress: op.progress || {}, updated_at: new Date().toISOString() }, { onConflict: 'user_id,category_id' });
-          }
-        } catch { addToRetryQueue(op); }
-      }
-    })();
+    retryProcessing.current = true;
+    const failed = [];
+    for (const op of queue) {
+      try {
+        if (op.type === 'completed') {
+          await supabase.from('assessment_results').upsert({ user_id: auth.user.id, category_id: op.testId, status: 'completed', answers: op.answers || {}, traits: op.traits || {}, progress: null, completed_at: op.completedAt, updated_at: new Date().toISOString() }, { onConflict: 'user_id,category_id' });
+        } else if (op.type === 'progress') {
+          await supabase.from('assessment_results').upsert({ user_id: auth.user.id, category_id: op.testId, status: 'in_progress', answers: op.progress || {}, traits: null, progress: op.progress || {}, updated_at: new Date().toISOString() }, { onConflict: 'user_id,category_id' });
+        }
+      } catch { failed.push(op); }
+    }
+    setRetryQueue(failed);
+    retryProcessing.current = false;
+    if (failed.length === 0) setSyncStatus(s => s === 'failed' ? 'idle' : s);
   }, [auth?.user?.id]);
+  useEffect(() => { processRetryQueue(); }, [processRetryQueue]);
 
   const saveCompleted = async (testId, answers, traits) => {
     if (!auth?.user) return;
@@ -691,7 +695,7 @@ const useCloudSync = () => {
     return { completed: mergedCompleted, inProgress: mergedInProgress };
   };
 
-  return { saveCompleted, saveProgress, loadAll, deleteAssessment, clearAll, syncOnLogin, syncStatus, setSyncStatus };
+  return { saveCompleted, saveProgress, loadAll, deleteAssessment, clearAll, syncOnLogin, syncStatus, setSyncStatus, processRetryQueue };
 };
 
 // — RESPONSE CAPTURE HOOK (responses table, auth-gated)
@@ -872,7 +876,11 @@ const useScrollRestore = (screenId) => {
     const el = ref.current;
     if (!el || !screenId) return;
     if (_scrollCache[screenId]) el.scrollTop = _scrollCache[screenId];
-    const onScroll = () => { _scrollCache[screenId] = el.scrollTop; };
+    const onScroll = () => {
+      _scrollCache[screenId] = el.scrollTop;
+      const keys = Object.keys(_scrollCache);
+      if (keys.length > 20) keys.slice(0, 10).forEach(k => delete _scrollCache[k]);
+    };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => { el.removeEventListener('scroll', onScroll); };
   }, [screenId]);
@@ -1426,19 +1434,19 @@ const HAPTIC = { tap: 10, confidence: 15, verdict: 20, complete: [10, 50, 10], u
 // Sync status indicator — subtle dot in header area
 const SyncIndicator = ({ status, onRetry }) => {
   if (status === 'idle') return null;
-  const colors = { syncing: 'var(--text-muted)', synced: '#4ade80', failed: '#fbbf24' };
+  const colors = { syncing: 'var(--text-muted)', synced: COLOR_HEX.emerald.light, failed: COLOR_HEX.amber.light };
   const labels = { syncing: 'Syncing…', synced: 'Synced', failed: 'Sync failed' };
   return (
     <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
       <span className="w-2 h-2 rounded-full" style={{ background: colors[status], animation: status === 'syncing' ? 'pulse 1.5s ease-in-out infinite' : 'none' }} />
       <Text size="xs" emphasis="faint">{labels[status]}</Text>
-      {status === 'failed' && onRetry && <button onClick={onRetry} className="text-xs cursor-pointer" style={{ color: '#fbbf24' }}>↻</button>}
+      {status === 'failed' && onRetry && <button onClick={onRetry} className="text-xs cursor-pointer" style={{ color: COLOR_HEX.amber.light }}>↻</button>}
     </div>
   );
 };
 
 class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  constructor(props) { super(props); this.state = { hasError: false, error: null, resetCount: 0 }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   componentDidCatch(error, info) { console.error(`[ErrorBoundary:${this.props.feature || 'app'}]`, error, info); }
   render() {
@@ -1450,14 +1458,14 @@ class ErrorBoundary extends React.Component {
           <Stack align="center" gap={3} className={isFeature ? 'py-6' : ''}>
             <Text size={isFeature ? 'sm' : 'xl'} weight="semibold">{isFeature ? `${feature} unavailable` : 'Something went wrong'}</Text>
             <Text size="xs" emphasis="muted" className="text-center">{this.state.error?.message || 'An unexpected error occurred'}</Text>
-            <Button size="sm" variant={isFeature ? 'secondary' : 'primary'} onClick={() => this.setState({ hasError: false, error: null })}>
+            <Button size="sm" variant={isFeature ? 'secondary' : 'primary'} onClick={() => this.setState(s => ({ hasError: false, error: null, resetCount: s.resetCount + 1 }))}>
               Try Again
             </Button>
           </Stack>
         </Card>
       );
     }
-    return this.props.children;
+    return <React.Fragment key={this.state.resetCount}>{this.props.children}</React.Fragment>;
   }
 }
 
@@ -1655,7 +1663,7 @@ const PhoneFrame = ({ children, isDark = true, width = 440, height = 956, devOff
           const label = level === 'max' ? 'Fill' : `${Math.round(level * 100)}%`;
           return <button key={String(level)} onClick={() => setZoom(level)}
             className="px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer"
-            style={{ background: active ? 'rgba(96,165,250,0.25)' : 'rgba(255,255,255,0.08)', color: active ? '#60a5fa' : 'rgba(255,255,255,0.45)', border: active ? '1px solid rgba(96,165,250,0.4)' : '1px solid rgba(255,255,255,0.12)' }}>{label}</button>;
+            style={{ background: active ? 'rgba(96,165,250,0.25)' : 'var(--bg-elevated)', color: active ? '#60a5fa' : 'var(--text-subtle)', border: active ? '1px solid rgba(96,165,250,0.4)' : '1px solid var(--border-base)' }}>{label}</button>;
         })}
       </div>
       <div className="relative bg-[#1a1a1c] rounded-[58px] p-3.5 shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.4))', zoom: effectiveZoom !== 1 ? effectiveZoom : undefined, transformOrigin: 'top center' }}>
@@ -1825,7 +1833,7 @@ const QuestionCard = ({ question, isDark, evidenceExpanded, onToggleEvidence }) 
                     {item.type === 'stat' ? (
                       <div className="flex items-center justify-between">
                         <Text size="sm" emphasis="secondary">{item.label}</Text>
-                        <Text size="sm" weight="semibold" style={{ color: isDark ? '#34d399' : '#059669' }}>{item.value}</Text>
+                        <Text size="sm" weight="semibold" color={isDark ? COLOR_HEX.emerald.light : COLOR_HEX.emerald.base}>{item.value}</Text>
                       </div>
                     ) : (
                       <Text size="sm" emphasis="secondary" className="italic leading-relaxed">"{item.text}"</Text>
@@ -1891,11 +1899,10 @@ const useAnswerFlow = ({ undoDelay = 1, tapDelay = 400, graceEnabled = false, gr
       return;
     }
     if (pendingSubmit) return;
-    haptic(HAPTIC.tap);
     if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     let newCount;
     if (tappedAnswer === answer) { newCount = Math.min(tapCount + 1, 4); setTapCount(newCount); haptic(HAPTIC.confidence); }
-    else { newCount = 1; setTappedAnswer(answer); setTapCount(1); }
+    else { newCount = 1; setTappedAnswer(answer); setTapCount(1); haptic(HAPTIC.tap); }
     if (!requireConfirmation) tapTimeoutRef.current = setTimeout(() => doPend(answer, newCount), tapDelay);
   };
   const handleRightClick = (e, answer) => { e.preventDefault(); if (pendingSubmit || tappedAnswer !== answer) return; if (tapCount > 1) setTapCount(tapCount - 1); };
@@ -2098,9 +2105,7 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => 
   const { pendingSubmit, undoDelay, justUndone, showTips, showGestureHint, setShowGestureHint, showConfirmOverlay, confirmColor, tappedAnswer, setTappedAnswer, tapCount, setTapCount } = uiState;
   const [activeModal, setActiveModal] = useState(null);
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
-  // Reset evidence panel when question changes
-  const prevQIdRef = useRef(currentQuestion?.id);
-  if (currentQuestion?.id !== prevQIdRef.current) { prevQIdRef.current = currentQuestion?.id; if (evidenceExpanded) setEvidenceExpanded(false); }
+  useEffect(() => { setEvidenceExpanded(false); }, [currentQuestion?.id]);
   if (!currentQuestion) return (
     <Placeholder icon="🎉" title="All done!" />
   );
@@ -2124,7 +2129,7 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => 
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [activeModal, isAnswered, pendingSubmit, isBinary, currentIndex]);
+  }, [activeModal, isAnswered, pendingSubmit, isBinary, currentIndex, goToPrev, goToNext, handleAnswerTap, handleUndo]);
   return (
     <div className="flex-1 flex flex-col overflow-hidden no-scrollbar relative">
       {/* Track Selector */}
@@ -2289,37 +2294,67 @@ const ASSESS_STYLES = (() => {
 })();
 
 const ASSESS_CATEGORIES = {
+  // Tier 0: Gateway (always available)
   'ai-identity': { name: 'AI Identity', icon: '🤖', color: 'cyan', tests: ['ai-style', 'ai-self', 'ai-values', 'ai-vision'], tier: 0, entityHint: 'ai' },
   quickstart: { name: 'Quick Profile', icon: '✨', color: 'blue', tests: ['quick-profile'], tier: 0, entityHint: 'human' },
-  starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'], tier: 1 },
-  personality: { name: 'Personality', icon: '🎭', color: 'rose', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'], tier: 2 },
-  character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity'], tier: 2 },
-  shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P'], tier: 2 },
-  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['reasoning', 'cognitive', 'chronotype', 'reasoning-2', 'reasoning-3', 'adhd'], tier: 2 },
-  relationships: { name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment'], tier: 2 },
-  behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], tier: 2 },
+  // Tier 1: Starter Pack (unlocked by Quick Profile)
+  starter: { name: 'Starter Pack', icon: '🚀', color: 'indigo', tests: ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy', 'starter-wellbeing'], tier: 1 },
+  // Tier 2: Branching — each starter module unlocks its branch
+  personality: { name: 'Personality', icon: '🎭', color: 'rose', tests: ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O', 'self-monitoring'], tier: 2, branch: 'personality' },
+  shadow: { name: 'Shadow Self', icon: '🌑', color: 'slate', tests: ['shadow-M', 'shadow-N', 'shadow-P', 'humor-style'], tier: 2, branch: 'shadow' },
+  drive: { name: 'Drive & Values', icon: '🔥', color: 'orange', tests: ['grit', 'growth-mindset', 'locus-of-control', 'values', 'decision-style'], tier: 2, branch: 'drive' },
+  mind: { name: 'Mind', icon: '🧠', color: 'blue', tests: ['reasoning', 'cognitive', 'chronotype', 'reasoning-2', 'reasoning-3', 'adhd', 'creativity'], tier: 2, branch: 'cognition' },
+  relationships: { name: 'Relationships', icon: '💚', color: 'pink', tests: ['attachment', 'conflict-style', 'emotional-intelligence', 'love-language', 'communication-style'], tier: 2, branch: 'social' },
+  character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity', 'impostor'], tier: 2, branch: 'action' },
+  behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], tier: 2, branch: 'action' },
+  wellbeing: { name: 'Wellbeing', icon: '🌿', color: 'emerald', tests: ['life-satisfaction', 'resilience'], tier: 2, branch: 'wellness' },
+  // Clinical (opt-in, always available behind consent gate)
+  clinical: { name: 'Clinical Screens', icon: '📊', color: 'blue', tests: ['phq9', 'gad7'], tier: 0, clinical: true, requiresConsent: true },
 };
-const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'relationships', 'character', 'behavior', 'mind', 'shadow'];
+const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'shadow', 'drive', 'mind', 'relationships', 'character', 'behavior', 'wellbeing', 'clinical'];
 const ASSESS_TEST_TO_CATEGORY = {};
 Object.entries(ASSESS_CATEGORIES).forEach(([catId, cat]) => { cat.tests.forEach(testId => { ASSESS_TEST_TO_CATEGORY[testId] = catId; }); });
+const ASSESS_VERSION = 2;
 const ASSESS_STORAGE_KEY = 'aura-assessments-v1';
 
-const calculateAssessTier = (completed) => {
-  if (!completed) return 0;
-  const starterModules = ['starter-personality', 'starter-motivation', 'starter-thinking', 'starter-connection', 'starter-strategy'];
-  if (starterModules.every(id => completed[id])) return 2;
-  if (completed['quick-profile'] || completed['ai-style'] || completed['ai-self'] || completed['ai-values'] || completed['ai-vision']) return 1;
-  return 0;
+// Branch unlock mapping: starter module → branch it unlocks
+const ASSESS_BRANCH_MAP = {
+  'starter-personality': 'personality',
+  'starter-motivation': 'drive',
+  'starter-thinking': 'cognition',
+  'starter-connection': 'social',
+  'starter-strategy': 'action',
+  'starter-wellbeing': 'wellness',
 };
+
+const calculateAssessUnlocks = (completed) => {
+  const unlocks = { tier: 0, branches: {} };
+  if (!completed) return unlocks;
+  if (completed['quick-profile'] || completed['ai-style'] || completed['ai-self'] || completed['ai-values'] || completed['ai-vision']) unlocks.tier = 1;
+  for (const [starterId, branchId] of Object.entries(ASSESS_BRANCH_MAP)) {
+    if (completed[starterId]) { unlocks.branches[branchId] = true; unlocks.tier = Math.max(unlocks.tier, 2); }
+  }
+  // Shadow requires 3+ of 5 Big Five completed
+  const bigFiveCount = ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'].filter(id => completed[id]).length;
+  if (bigFiveCount >= 3) unlocks.branches.shadow = true;
+  return unlocks;
+};
+// Backward-compatible wrapper
+const calculateAssessTier = (completed) => calculateAssessUnlocks(completed).tier;
+
 const getFeatureTier = (assessCompleted, isLoggedIn) => {
   const c = Object.keys(assessCompleted || {}).length;
   if (c >= 5 || isLoggedIn) return 3; if (c >= 3) return 2; if (c >= 1) return 1; return 0;
 };
-const getCategoryStatus = (catId, assessCompleted, assessInProgress, tier) => {
+// Category status — branch-aware
+const getCategoryStatus = (catId, assessCompleted, assessInProgress, tier, unlocks) => {
   const cat = ASSESS_CATEGORIES[catId];
   if (!cat) return 'locked';
   if ((cat.tier || 0) > tier) return 'locked';
-  const catTests = cat.tests.filter(id => ASSESS_TESTS[id]);
+  // Branch gate — use pre-computed unlocks if provided
+  if (cat.branch) { const u = unlocks || calculateAssessUnlocks(assessCompleted); if (!u.branches[cat.branch]) return 'locked'; }
+  if (cat.requires && !cat.requires.every(id => assessCompleted[id])) return 'locked';
+  const catTests = cat.tests.filter(id => ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
   if (catTests.every(id => assessCompleted[id])) return 'done';
   if (catTests.some(id => assessCompleted[id] || assessInProgress?.[id])) return 'in-progress';
   return 'available';
@@ -2328,7 +2363,7 @@ const getCompletedCategoryCount = (assessCompleted, entityType) => {
   let count = 0;
   for (const [_, cat] of Object.entries(ASSESS_CATEGORIES)) {
     if (cat.entityHint && cat.entityHint !== entityType) continue;
-    const ct = cat.tests.filter(id => ASSESS_TESTS[id]);
+    const ct = cat.tests.filter(id => ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
     if (ct.length > 0 && ct.every(id => assessCompleted[id])) count++;
   }
   return count;
@@ -2346,12 +2381,15 @@ const ASSESS_NUDGE_COPY = {
   _behavior: "Explore how your personality shows up in action.",
   _mind: "See how you think, learn, and process.",
   _shadow: "One last layer — the parts you don't show everyone.",
+  _drive: "Explore what fuels your ambition and values.",
+  _wellbeing: "Check in on how you're doing.",
+  _clinical: "Validated screening tools — not diagnoses.",
 };
 const getAssessNudge = (completedTestId, newCompleted, entityType) => {
   const fromCatId = ASSESS_TEST_TO_CATEGORY[completedTestId];
   if (!fromCatId) return null;
   const fromCat = ASSESS_CATEGORIES[fromCatId];
-  const nextInCategory = fromCat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id]);
+  const nextInCategory = fromCat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
   if (nextInCategory) return { type: 'same-category', toCatId: fromCatId, toCategory: fromCat, nextTestId: nextInCategory };
   const tier = calculateAssessTier(newCompleted);
   const recommendations = [];
@@ -2360,7 +2398,7 @@ const getAssessNudge = (completedTestId, newCompleted, entityType) => {
     const cat = ASSESS_CATEGORIES[catId];
     if (!cat || (cat.tier || 0) > tier) continue;
     if (cat.entityHint && cat.entityHint !== entityType) continue;
-    const nextTestId = cat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id]);
+    const nextTestId = cat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
     if (!nextTestId) continue;
     const message = ASSESS_NUDGE_COPY[`${fromCatId}-${catId}`] || ASSESS_NUDGE_COPY[`_${catId}`] || "Continue your journey.";
     recommendations.push({ toCatId: catId, toCategory: cat, nextTestId, message });
@@ -2383,9 +2421,9 @@ const spectrumColors = {
   'bigfive-C': { left: '#8b5cf6', right: '#10b981', leftLabel: 'Flexible', rightLabel: 'Organized' },
   'bigfive-N': { left: '#06b6d4', right: '#f97316', leftLabel: 'Steady', rightLabel: 'Sensitive' },
   'bigfive-O': { left: '#64748b', right: '#a855f7', leftLabel: 'Practical', rightLabel: 'Curious' },
-  'shadow-M': { left: '#ffffff', right: '#000000', leftLabel: 'Direct', rightLabel: 'Strategic' },
-  'shadow-N': { left: '#ffffff', right: '#000000', leftLabel: 'Humble', rightLabel: 'Confident' },
-  'shadow-P': { left: '#ffffff', right: '#000000', leftLabel: 'Empathic', rightLabel: 'Detached' },
+  'shadow-M': { left: '#94a3b8', right: '#1e293b', leftLabel: 'Direct', rightLabel: 'Strategic' },
+  'shadow-N': { left: '#94a3b8', right: '#1e293b', leftLabel: 'Humble', rightLabel: 'Confident' },
+  'shadow-P': { left: '#94a3b8', right: '#1e293b', leftLabel: 'Empathic', rightLabel: 'Detached' },
   'starter-personality': { left: '#818cf8', right: '#c084fc', leftLabel: 'Reflective', rightLabel: 'Expressive' },
   'starter-motivation': { left: '#f472b6', right: '#fb923c', leftLabel: 'Internal', rightLabel: 'External' },
   'starter-thinking': { left: '#60a5fa', right: '#34d399', leftLabel: 'Analytical', rightLabel: 'Intuitive' },
@@ -2422,8 +2460,9 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
   const [assessEntering, setAssessEntering] = useState(false);
   const [assessResponses, setAssessResponses] = useState({});
   const [assessSkipped, setAssessSkipped] = useState([]);
-  const [assessCompleted, setAssessCompleted] = useState(() => { try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).completed || {} : {}; } catch { return {}; } });
-  const [assessInProgress, setAssessInProgress] = useState(() => { try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); return s ? JSON.parse(s).inProgress || {} : {}; } catch { return {}; } });
+  const [assessInitData] = useState(() => { try { const s = localStorage.getItem(ASSESS_STORAGE_KEY); if (!s) return { completed: {}, inProgress: {}, migrated: false }; const d = JSON.parse(s); if (d.assessVersion !== ASSESS_VERSION) { localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ assessVersion: ASSESS_VERSION, completed: {}, inProgress: {} })); return { completed: {}, inProgress: {}, migrated: !!Object.keys(d.completed || {}).length }; } return { completed: d.completed || {}, inProgress: d.inProgress || {}, migrated: false }; } catch { return { completed: {}, inProgress: {}, migrated: false }; } });
+  const [assessCompleted, setAssessCompleted] = useState(assessInitData.completed);
+  const [assessInProgress, setAssessInProgress] = useState(assessInitData.inProgress);
   const [assessPending, setAssessPending] = useState(null);
   const [assessShowCompletion, setAssessShowCompletion] = useState(false);
   const [assessShowDemoMenu, setAssessShowDemoMenu] = useState(false);
@@ -2439,8 +2478,12 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
   const [assessShowUndoToast, setAssessShowUndoToast] = useState(false);
   const [assessUnlockMessage, setAssessUnlockMessage] = useState(null);
   const [assessNudgeData, setAssessNudgeData] = useState(null);
+  const [assessShowCrisisResources, setAssessShowCrisisResources] = useState(false);
+  const [assessClinicalConsent, setAssessClinicalConsent] = useState(() => { try { return localStorage.getItem('aura-clinical-consent') === 'true'; } catch { return false; } });
+  // V2 migration toast
+  useEffect(() => { if (assessInitData.migrated) { setAssessUnlockMessage('Assessment system updated — your progress has been reset'); setTimeout(() => setAssessUnlockMessage(null), 4000); } }, []);
   const assessSaveToStorage = (completed, progress, demoActive = assessDemoActive, savedUserData = assessSavedUserData, demoProfile = assessDemoProfile, demoControls = showDemoControls) => {
-    localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ completed, inProgress: progress, demoActive, savedUserData, demoProfile, showDemoControls: demoControls }));
+    localStorage.setItem(ASSESS_STORAGE_KEY, JSON.stringify({ assessVersion: ASSESS_VERSION, completed, inProgress: progress, demoActive, savedUserData, demoProfile, showDemoControls: demoControls }));
   };
 
   const assessCurrentTest = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
@@ -2490,9 +2533,16 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     cloudSync?.saveCompleted(assessCurrentTestId, resp, results);
     const prevTier = calculateAssessTier(assessCompleted);
     const newTier = calculateAssessTier(newCompleted);
-    if (newTier > prevTier) {
-      const msgs = { 1: { title: "Starter Pack Unlocked!", subtitle: "Begin your deep dive into self-discovery" }, 2: { title: "All Branches Unlocked!", subtitle: "Explore Personality, Mind, Shadow & more" } };
-      setAssessUnlockMessage(msgs[newTier]);
+    if (newTier > prevTier && newTier === 1) {
+      setAssessUnlockMessage({ title: "Starter Pack Unlocked!", subtitle: "Begin your deep dive into self-discovery" });
+    }
+    // Branch unlock — name the specific branch, not "all"
+    const prevUnlocks = calculateAssessUnlocks(assessCompleted);
+    const newUnlocks = calculateAssessUnlocks(newCompleted);
+    const newBranches = Object.keys(newUnlocks.branches).filter(b => newUnlocks.branches[b] && !prevUnlocks.branches[b]);
+    if (newBranches.length > 0) {
+      const branchInfo = ASSESS_BRANCHES.find(b => b.id === newBranches[0]);
+      setAssessUnlockMessage({ title: `${branchInfo?.icon || '🔓'} ${branchInfo?.name || 'New Branch'} Unlocked!`, subtitle: `You can now explore ${branchInfo?.name || 'new assessments'}` });
     }
     setAssessShowCompletion(true);
     haptic(HAPTIC.complete);
@@ -2514,14 +2564,34 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     for (let i = 0; i < assessCurrentIndex; i++) { if (resp[i] === undefined) { assessGoToQuestion(i); return; } }
   };
 
+  const [assessPendingClinicalTest, setAssessPendingClinicalTest] = useState(null);
   const assessStartTest = (testId) => {
+    const catId = ASSESS_TEST_TO_CATEGORY[testId];
+    const cat = catId ? ASSESS_CATEGORIES[catId] : null;
+    // Branch lock enforcement — silently refuse if branch not unlocked
+    if (cat?.branch) {
+      const u = calculateAssessUnlocks(assessCompleted);
+      if (!u.branches[cat.branch]) return;
+    }
+    // Clinical consent gate
+    if (cat?.requiresConsent && !assessClinicalConsent) {
+      setAssessPendingClinicalTest(testId);
+      setScreen('clinical-consent');
+      return;
+    }
     setAssessCurrentTestId(testId);
     const progress = assessInProgress[testId];
     setAssessCurrentIndex(progress?.index || 0);
     setAssessResponses(progress?.responses || {});
     setAssessSkipped(progress?.skipped || []);
     setAssessPending(null);
+    setAssessShowCrisisResources(false);
     setScreen('assess-question');
+  };
+  const assessConfirmClinicalConsent = () => {
+    setAssessClinicalConsent(true);
+    try { localStorage.setItem('aura-clinical-consent', 'true'); } catch {}
+    if (assessPendingClinicalTest) { assessStartTest(assessPendingClinicalTest); setAssessPendingClinicalTest(null); }
   };
   const assessSaveAndExit = () => {
     clearTimeout(assessTimeoutRef.current);
@@ -2530,6 +2600,10 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     setAssessInProgress(newProgress);
     assessSaveToStorage(assessCompleted, newProgress);
     cloudSync?.saveProgress(assessCurrentTestId, progressObj);
+    setScreen('assess-picker');
+  };
+  const assessDiscardAndExit = () => {
+    clearTimeout(assessTimeoutRef.current);
     setScreen('assess-picker');
   };
   const assessFinalizeSubmit = (value) => {
@@ -2544,6 +2618,10 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     const test = assessCurrentTestId ? ASSESS_TESTS[assessCurrentTestId] : null;
     const item = test?.items?.[rawIdx];
     responseCapture?.captureAssessResponse(assessCurrentTestId, rawIdx, value, test && item ? { test: assessCurrentTestId, name: test.name, q: item.q, idx: rawIdx } : null);
+    // PHQ-9 safety: show crisis resources if suicidality item (index 8) endorsed
+    // PHQ-9 safety: one-way trigger — once shown, persists until dismissed or test exits.
+    // Intentionally does not re-evaluate on answer change (safe default).
+    if (assessCurrentTestId === 'phq9' && rawIdx === 8 && value > 1) setAssessShowCrisisResources(true);
     assessAdvanceToNext(newResponses, newSkipped);
   };
   const assessHandleAnswerTap = (value) => { assessFinalizeSubmit(value); };
@@ -2592,35 +2670,37 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     assessShowExitConfirm, setAssessShowExitConfirm, assessExpandedCategory, setAssessExpandedCategory,
     assessDemoActive, assessDemoProfile, showDemoControls, setShowDemoControls,
     assessSavedUserData, assessShowDemoInfo, setAssessShowDemoInfo, assessProfileSwitching,
-    assessShowUndoToast, assessUnlockMessage, assessNudgeData,
+    assessShowUndoToast, assessUnlockMessage, assessNudgeData, assessShowCrisisResources, setAssessShowCrisisResources, assessClinicalConsent, assessConfirmClinicalConsent, assessPendingClinicalTest,
     assessCurrentTest, assessTestColor, assessCurrentScale, assessTotalQuestions, assessGatewayActiveItems,
-    assessStartTest, assessSaveAndExit, assessGoToQuestion, assessHandleAnswerTap, assessHandleUndo,
+    assessStartTest, assessSaveAndExit, assessDiscardAndExit, assessGoToQuestion, assessHandleAnswerTap, assessHandleUndo,
     assessFinalizeSubmit, assessCanFinish, assessFinishAssessment,
     assessLoadDemoProfile, assessClearDemo, assessClearAll,
   };
 };
 
 // — ASSESSMENT PICKER SCREEN
-const AssessCategoryCard = ({ catId, cat, catTests, isDark, assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, assessStartTest }) => {
+const AssessCategoryCard = ({ catId, cat, catTests, isDark, assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, assessStartTest, status }) => {
+  const isLocked = status === 'locked';
   const totalQ = catTests.reduce((s, [_, t]) => s + (t.questionCount || t.items.length), 0);
   const answeredQ = catTests.reduce((s, [id, t]) => { if (assessCompleted[id]) return s + (t.questionCount || t.items.length); const p = assessInProgress[id]; return s + (p ? Object.keys(p.responses || {}).length : 0); }, 0);
-  const pct = (answeredQ / totalQ) * 100;
+  const pct = isLocked ? 0 : (answeredQ / totalQ) * 100;
   const t = twColor(cat.color);
-  const isExpanded = assessExpandedCategory === catId;
+  const isExpanded = !isLocked && assessExpandedCategory === catId;
   const hasModules = catTests.length > 1;
   const handleClick = () => {
+    if (isLocked) return;
     if (hasModules) { setAssessExpandedCategory(isExpanded ? null : catId); }
     else if (catTests[0]) { assessStartTest(catTests[0][0]); }
   };
   return (
     <div>
-      <button onClick={handleClick} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all border ${isDark ? 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06]' : 'border-black/[0.06] bg-white hover:bg-gray-50'}`}>
-        <ProgressCircle progress={pct} size={40} strokeWidth={3} color={cat.color} text={pct > 0 ? `${Math.round(pct)}%` : cat.icon} gradientId={`cat-${catId}`} isDark={isDark} textSize="text-[10px]" iconSize="text-sm" />
+      <button onClick={handleClick} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all border ${isLocked ? 'opacity-50 cursor-not-allowed' : ''} ${isDark ? 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06]' : 'border-black/[0.06] bg-white hover:bg-gray-50'}`}>
+        <ProgressCircle progress={pct} size={40} strokeWidth={3} color={cat.color} text={isLocked ? '🔒' : (pct > 0 ? `${Math.round(pct)}%` : cat.icon)} gradientId={`cat-${catId}`} isDark={isDark} textSize="text-[10px]" iconSize="text-sm" />
         <div className="flex-1 min-w-0">
           <Text weight="medium">{cat.name}</Text>
-          <Text size="xxs" emphasis="subtle">{catTests.length} module{catTests.length > 1 ? 's' : ''} · {totalQ} questions</Text>
+          {isLocked ? <Text size="xxs" emphasis="faint">Complete the starter to unlock</Text> : <Text size="xxs" emphasis="subtle">{catTests.length} module{catTests.length > 1 ? 's' : ''} · {totalQ} questions</Text>}
         </div>
-        {hasModules && <Text as="span" size="xxs" emphasis="faint">{isExpanded ? '▾' : '▸'}</Text>}
+        {!isLocked && hasModules && <Text as="span" size="xxs" emphasis="faint">{isExpanded ? '▾' : '▸'}</Text>}
       </button>
       {isExpanded && hasModules && (
         <div className="ml-6 mt-1 space-y-1">
@@ -2647,26 +2727,37 @@ const AssessCategoryCard = ({ catId, cat, catTests, isDark, assessCompleted, ass
   );
 };
 
+// Branch section definitions for grouped picker
+const ASSESS_BRANCHES = [
+  { id: 'personality', name: 'Personality', icon: '🎭', categories: ['personality', 'shadow'], starter: 'starter-personality' },
+  { id: 'drive', name: 'Drive & Values', icon: '🔥', categories: ['drive'], starter: 'starter-motivation' },
+  { id: 'cognition', name: 'Mind', icon: '🧠', categories: ['mind'], starter: 'starter-thinking' },
+  { id: 'social', name: 'Relationships', icon: '💚', categories: ['relationships'], starter: 'starter-connection' },
+  { id: 'action', name: 'Character & Behavior', icon: '💎', categories: ['character', 'behavior'], starter: 'starter-strategy' },
+  { id: 'wellness', name: 'Wellbeing', icon: '🌿', categories: ['wellbeing'], starter: 'starter-wellbeing' },
+];
+
 const AssessPickerScreen = ({ isDark, entityType, assess, onNavigate }) => {
-  const { assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, showDemoControls, assessDemoActive, assessDemoProfile, assessSavedUserData, assessShowDemoMenu, setAssessShowDemoMenu, assessShowDemoInfo, setAssessShowDemoInfo, assessProfileSwitching, assessStartTest, assessLoadDemoProfile, assessClearDemo, assessClearAll } = assess;
+  const { assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, showDemoControls, assessDemoActive, assessDemoProfile, assessStartTest, assessLoadDemoProfile, assessClearDemo } = assess;
   const currentTier = calculateAssessTier(assessCompleted);
-  const visibleCategories = Object.entries(ASSESS_CATEGORIES).filter(([_, cat]) => (cat.tier || 0) <= currentTier && (!cat.entityHint || cat.entityHint === entityType));
+  const unlocks = calculateAssessUnlocks(assessCompleted);
   const isFirstTimeUser = currentTier === 0 && !assessCompleted['quick-profile'] && !assessCompleted['ai-style'];
-  const categoriesWithStatus = visibleCategories.map(([catId, cat]) => {
-    const catTests = cat.tests.map(id => [id, ASSESS_TESTS[id]]).filter(([_, t]) => t);
-    const status = getCategoryStatus(catId, assessCompleted, assessInProgress, currentTier);
+
+  const makeCatStatus = (catId) => {
+    const cat = ASSESS_CATEGORIES[catId];
+    if (!cat) return null;
+    const catTests = cat.tests.map(id => [id, ASSESS_TESTS[id]]).filter(([_, t]) => t && !t.archived);
+    const status = getCategoryStatus(catId, assessCompleted, assessInProgress, currentTier, unlocks);
     return { catId, cat, catTests, allComplete: status === 'done', hasProgress: status === 'in-progress', status };
-  });
-  const heroPriority = entityType === 'ai' ? ['ai-identity','quickstart','starter','personality','relationships','character','behavior','mind','shadow'] : ['quickstart','starter','personality','relationships','character','behavior','mind','shadow'];
-  const allIncomplete = categoriesWithStatus.filter(c => !c.allComplete);
-  const inProgressItems = allIncomplete.filter(c => c.hasProgress);
-  const heroCategory = inProgressItems.length > 0 ? inProgressItems[0] : heroPriority.reduce((found, id) => found || allIncomplete.find(c => c.catId === id), null);
-  const incompleteCategories = allIncomplete.filter(c => c !== heroCategory).sort((a, b) => {
-    if (a.hasProgress && !b.hasProgress) return -1; if (!a.hasProgress && b.hasProgress) return 1;
-    const ai = heroPriority.indexOf(a.catId), bi = heroPriority.indexOf(b.catId);
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
-  const completedCategories = categoriesWithStatus.filter(c => c.allComplete);
+  };
+
+  // Gateway categories
+  const gatewayCats = (entityType === 'ai' ? ['ai-identity', 'quickstart'] : ['quickstart']).map(makeCatStatus).filter(Boolean);
+  // Starter
+  const starterCat = makeCatStatus('starter');
+  // Clinical
+  const clinicalCat = makeCatStatus('clinical');
+
   return (
     <Screen>
       <NavBar back onBack={() => onNavigate('categories')}
@@ -2698,33 +2789,52 @@ const AssessPickerScreen = ({ isDark, entityType, assess, onNavigate }) => {
             <Button color="violet" className="mt-6" onClick={() => assessStartTest(entityType === 'ai' ? 'ai-style' : 'quick-profile')}>Start →</Button>
           </div>
         )}
-        {!isFirstTimeUser && heroCategory && (() => {
-          const { catId, cat, catTests } = heroCategory;
-          const totalQ = catTests.reduce((s, [_, t]) => s + (t.questionCount || t.items.length), 0);
-          const answeredQ = catTests.reduce((s, [id, t]) => { if (assessCompleted[id]) return s + (t.questionCount || t.items.length); const p = assessInProgress[id]; return s + (p ? Object.keys(p.responses || {}).length : 0); }, 0);
-          const pct = (answeredQ / totalQ) * 100;
-          const hex = colorOf(cat.color);
-          const t = twColor(cat.color);
-          const firstIncomplete = catTests.filter(([id]) => !assessCompleted[id])[0];
-          return (
-            <div className="mb-3">
-              <button onClick={() => firstIncomplete ? assessStartTest(firstIncomplete[0]) : catTests[0] && assessStartTest(catTests[0][0])} className={`w-full relative rounded-2xl overflow-hidden text-left border ${isDark ? 'border-white/[0.06]' : 'border-black/[0.10] shadow-sm'}`}>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="aura-breathe rounded-full" style={{ width: 240, height: 240, background: `radial-gradient(ellipse at center, rgba(${hex.rgb}, ${isDark ? 0.12 : 0.08}) 0%, transparent 70%)` }} /></div>
-                <div className={`relative z-10 p-3.5 ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
-                  <Stack direction="row" align="center" gap={3}>
-                    <ProgressCircle progress={pct} size={44} strokeWidth={3} color={cat.color} text={pct > 0 ? `${Math.round(pct)}%` : cat.icon} gradientId={`hero-${catId}`} isDark={isDark} textSize="text-xs" />
-                    <Text weight="semibold" className="flex-1">{cat.name}</Text>
-                    <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${isDark ? `bg-${t}-500/25 text-${t}-300 border border-${t}-500/30` : `bg-${t}-100 text-${t}-600`}`}>{pct > 0 ? 'Continue →' : 'Start →'}</span>
-                  </Stack>
-                </div>
-              </button>
+        {!isFirstTimeUser && (<Stack gap={4}>
+          {/* Gateway */}
+          {gatewayCats.some(c => !c.allComplete) && <div className="space-y-2">{gatewayCats.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>}
+          {/* Starter Pack */}
+          {currentTier >= 1 && starterCat && !starterCat.allComplete && (
+            <div>
+              <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">🚀 Starter Pack</Text>
+              <AssessCategoryCard {...starterCat} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />
             </div>
-          );
-        })()}
-        {!isFirstTimeUser && incompleteCategories.length > 0 && <div className="space-y-2 mb-4">{incompleteCategories.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>}
-        {!isFirstTimeUser && completedCategories.length > 0 && (
-          <div className="mt-4"><Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">Completed</Text><div className="space-y-2">{completedCategories.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div></div>
-        )}
+          )}
+          {/* Branch sections */}
+          {currentTier >= 1 && ASSESS_BRANCHES.map(branch => {
+            const isUnlocked = !!unlocks.branches[branch.id];
+            const branchCats = branch.categories.map(makeCatStatus).filter(Boolean);
+            const allDone = branchCats.every(c => c.allComplete);
+            if (allDone && branchCats.length > 0) return null; // shown in completed section
+            const starterTest = ASSESS_TESTS[branch.starter];
+            const starterName = starterTest?.name || branch.name;
+            return (
+              <div key={branch.id} style={!isUnlocked ? { opacity: 0.5 } : undefined}>
+                <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">{branch.icon} {branch.name}</Text>
+                {!isUnlocked ? (
+                  <Card variant="plain" className="py-3 px-4">
+                    <Text size="xs" emphasis="subtle">Complete <strong>{starterName}</strong> to unlock</Text>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">{branchCats.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>
+                )}
+              </div>
+            );
+          })}
+          {/* Clinical */}
+          {clinicalCat && (
+            <div>
+              <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">📋 Clinical Screens</Text>
+              <AssessCategoryCard {...clinicalCat} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />
+            </div>
+          )}
+          {/* Completed */}
+          {(() => {
+            const done = [...gatewayCats, starterCat, ...ASSESS_BRANCHES.flatMap(b => b.categories.map(makeCatStatus)), clinicalCat].filter(c => c && c.allComplete);
+            return done.length > 0 ? (
+              <div><Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">✅ Completed</Text><div className="space-y-2">{done.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div></div>
+            ) : null;
+          })()}
+        </Stack>)}
       </div>
     </Screen>
   );
@@ -2732,7 +2842,7 @@ const AssessPickerScreen = ({ isDark, entityType, assess, onNavigate }) => {
 
 // — ASSESSMENT QUESTION SCREEN
 const AssessQuestionScreen = ({ isDark, assess, undoDelay }) => {
-  const { assessCurrentTest, assessCurrentIndex, assessTotalQuestions, assessGatewayActiveItems, assessResponses, assessSkipped, assessCurrentScale, assessShowCompletion, assessUnlockMessage, assessShowUndoToast, assessShowExitConfirm, setAssessShowExitConfirm, assessPending, assessEntering, assessTestColor, assessCanFinish, assessFinishAssessment, assessSaveAndExit, assessGoToQuestion, assessHandleAnswerTap, assessHandleUndo, assessFinalizeSubmit } = assess;
+  const { assessCurrentTest, assessCurrentIndex, assessTotalQuestions, assessGatewayActiveItems, assessResponses, assessSkipped, assessCurrentScale, assessShowCompletion, assessUnlockMessage, assessShowUndoToast, assessShowExitConfirm, setAssessShowExitConfirm, assessPending, assessEntering, assessTestColor, assessCanFinish, assessFinishAssessment, assessSaveAndExit, assessDiscardAndExit, assessGoToQuestion, assessHandleAnswerTap, assessHandleUndo, assessFinalizeSubmit, assessShowCrisisResources, setAssessShowCrisisResources } = assess;
   if (!assessCurrentTest) return null;
   const gwMap = assessGatewayActiveItems || null;
   const rawIdx = gwMap ? gwMap[assessCurrentIndex] : assessCurrentIndex;
@@ -2759,12 +2869,31 @@ const AssessQuestionScreen = ({ isDark, assess, undoDelay }) => {
         );
       })()}
       {assessShowUndoToast && <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg animate-pulse ${isDark ? 'bg-white/[0.08] border border-white/[0.12] text-white' : 'bg-gray-900/[0.08] border border-gray-900/[0.12] text-gray-900'}`}>↩ Undone</div>}
+      {/* PHQ-9 Crisis Resources — non-blocking, compassionate */}
+      {assessShowCrisisResources && (
+        <div className="absolute inset-x-0 top-[48px] z-40 mx-3" style={{ animation: 'fadeSlideIn 0.3s ease-out both' }}>
+          <Card style={{ background: isDark ? `rgba(${colorOf('blue').rgb},0.12)` : `rgba(${colorOf('blue').rgb},0.06)`, backdropFilter: 'blur(12px)', border: `1px solid ${isDark ? `rgba(${colorOf('blue').rgb},0.3)` : `rgba(${colorOf('blue').rgb},0.2)`}` }}>
+            <Stack gap={2}>
+              <Stack direction="row" className="justify-between items-start">
+                <Text size="sm" weight="semibold" style={{ color: isDark ? COLOR_HEX.blue.light : COLOR_HEX.blue.base }}>You're not alone</Text>
+                <button onClick={() => setAssessShowCrisisResources(false)} className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full cursor-pointer" style={{ color: isDark ? `rgba(${colorOf('blue').rgb},0.6)` : `rgba(${colorOf('blue').rgb},0.5)` }}>✕</button>
+              </Stack>
+              <Text size="xs" emphasis="subtle">If you're going through a difficult time, support is available right now.</Text>
+              <Stack gap={1}>
+                <Text size="xs" weight="medium">📞 <strong>988 Suicide & Crisis Lifeline</strong> — call or text <strong>988</strong></Text>
+                <Text size="xs" weight="medium">💬 <strong>Crisis Text Line</strong> — text <strong>HOME</strong> to <strong>741741</strong></Text>
+                <Text size="xs" emphasis="subtle">If you're in immediate danger, call <strong>911</strong></Text>
+              </Stack>
+            </Stack>
+          </Card>
+        </div>
+      )}
       {assessShowExitConfirm && (
         <Modal open onClose={() => setAssessShowExitConfirm(false)} title="Exit Assessment?">
-          <Text size="xs" emphasis="subtle" className="mb-4">Your answers will not be saved.</Text>
+          <Text size="xs" emphasis="subtle" className="mb-4">Save your progress or discard and exit?</Text>
           <Stack direction="row" gap={3}>
-            <Button color="violet" size="full" onClick={() => { setAssessShowExitConfirm(false); assessSaveAndExit(); }}>Save</Button>
-            <Button color="rose" variant="primary" size="full" onClick={() => { setAssessShowExitConfirm(false); assessSaveAndExit(); }}>Exit</Button>
+            <Button color="violet" size="full" onClick={() => { setAssessShowExitConfirm(false); assessSaveAndExit(); }}>Save & Exit</Button>
+            <Button color="rose" variant="primary" size="full" onClick={() => { setAssessShowExitConfirm(false); assessDiscardAndExit(); }}>Discard</Button>
           </Stack>
         </Modal>
       )}
@@ -2791,7 +2920,17 @@ const AssessQuestionScreen = ({ isDark, assess, undoDelay }) => {
           </div>
         </div>
         <div className="flex-shrink-0 px-4 pb-4 space-y-2">
-          {(currentItem.o ? currentItem.o.map((label, i) => ({ v: i + 1, l: label })) : assessCurrentScale || []).map((option, i) => {
+          {currentItem.a && currentItem.b ? /* Love Language forced-choice pairs */
+            (() => {
+              const selStyle = selectedStyles[assessCurrentTest.color] || '';
+              const makeCard = (v, opt) => { const isSelected = assessResponses[rawIdx] === v; const colorTint = gradientStyles[assessCurrentTest.color]?.[v * 2] || ''; return (
+                <button key={v} onClick={(e) => { e.stopPropagation(); assessHandleAnswerTap(v); }}
+                  className={`w-full py-4 px-5 rounded-xl text-left transition-all border relative overflow-hidden ${isSelected ? `${selStyle} text-white` : `${colorTint} ${isDark ? 'text-gray-200' : 'text-gray-700'}`}`}>
+                  <span className="relative z-10 leading-relaxed">{opt.l}</span>
+                </button>); };
+              return <>{makeCard(0, currentItem.a)}<div className="text-center"><Text size="xs" emphasis="faint">— or —</Text></div>{makeCard(1, currentItem.b)}</>;
+            })()
+          : (currentItem.o ? currentItem.o.map((label, i) => ({ v: i + 1, l: label })) : assessCurrentScale || []).map((option, i) => {
             const isSelected = assessResponses[rawIdx] === option.v;
             const colorTint = gradientStyles[assessCurrentTest.color]?.[i % 5] || '';
             const selStyle = selectedStyles[assessCurrentTest.color] || '';
@@ -2804,7 +2943,7 @@ const AssessQuestionScreen = ({ isDark, assess, undoDelay }) => {
               </button>
             );
           })}
-          {!currentItem.o && <div className="text-center pt-1">
+          {!currentItem.a && !currentItem.o && <div className="text-center pt-1">
             <button onClick={(e) => { e.stopPropagation(); assessFinalizeSubmit(null); }}
               className={`text-xs px-3 py-1 rounded-full transition-colors ${assessResponses[rawIdx] === null ? (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-300 text-gray-600') : (isDark ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}>
               Doesn't apply to me
@@ -2831,6 +2970,27 @@ const ResultCard = ({ icon, title, subtitle, isDark, gradientClass, children }) 
   </Card>
 );
 
+// — CLINICAL CONSENT SCREEN —
+const ClinicalConsentScreen = ({ isDark, assess, onNavigate }) => {
+  return (
+    <Screen header={<NavBar back title="Clinical Screens" onBack={() => onNavigate('assess-picker')} />}>
+      <Screen.Body className="flex flex-col items-center justify-center px-6 gap-6 text-center">
+        <Text size="xl">📋</Text>
+        <Text as="h2" weight="semibold">Before you begin</Text>
+        <Stack gap={3} className="max-w-sm">
+          <Text size="sm" emphasis="secondary">These are validated clinical screening tools, not diagnoses.</Text>
+          <Text size="sm" emphasis="secondary">They can help you understand patterns in your mental health, but they don't replace professional assessment.</Text>
+          <Text size="sm" emphasis="subtle">Results are stored only on your device.</Text>
+        </Stack>
+        <Stack direction="row" gap={3} className="mt-4">
+          <Button variant="ghost" onClick={() => onNavigate('assess-picker')}>Go back</Button>
+          <Button variant="primary" color="blue" onClick={() => assess.assessConfirmClinicalConsent()}>I understand — continue</Button>
+        </Stack>
+      </Screen.Body>
+    </Screen>
+  );
+};
+
 const AssessResultsScreen = ({ isDark, assess, entityType, onNavigate }) => {
   const { assessCurrentTest, assessCompleted, assessNudgeData, assessStartTest } = assess;
   const testId = assess.assessCurrentTestId;
@@ -2847,8 +3007,21 @@ const AssessResultsScreen = ({ isDark, assess, entityType, onNavigate }) => {
   };
 
   return (
-    <Screen header={<NavBar back title="Your Results" onBack={() => onNavigate('assess-picker')} />}>
+    <Screen header={<NavBar back title="Your Results" onBack={() => onNavigate('categories')} />}>
       <Screen.Body className="space-y-4">
+        {/* PHQ-9 Crisis Resources on results — persistent, not dismissible */}
+        {testId === 'phq9' && results?.severity && results.severity !== 'Minimal' && (
+          <Card style={{ background: isDark ? `rgba(${colorOf('blue').rgb},0.12)` : `rgba(${colorOf('blue').rgb},0.06)`, border: `1px solid ${isDark ? `rgba(${colorOf('blue').rgb},0.3)` : `rgba(${colorOf('blue').rgb},0.2)`}` }}>
+            <Stack gap={2}>
+              <Text size="sm" weight="semibold" style={{ color: isDark ? COLOR_HEX.blue.light : COLOR_HEX.blue.base }}>Support is available</Text>
+              <Stack gap={1}>
+                <Text size="xs" weight="medium">📞 <strong>988 Suicide & Crisis Lifeline</strong> — call or text <strong>988</strong></Text>
+                <Text size="xs" weight="medium">💬 <strong>Crisis Text Line</strong> — text <strong>HOME</strong> to <strong>741741</strong></Text>
+                <Text size="xs" emphasis="subtle">If you're in immediate danger, call <strong>911</strong></Text>
+              </Stack>
+            </Stack>
+          </Card>
+        )}
         {/* Quick Profile Results */}
         {testId === 'quick-profile' && results && (() => {
           const getDesc = () => {
@@ -2880,12 +3053,71 @@ const AssessResultsScreen = ({ isDark, assess, entityType, onNavigate }) => {
               return (
                 <div key={key} className="mb-3">
                   {info && <Stack direction="row" className="justify-between mb-0.5"><Text as="span" size="xxs" weight="medium" emphasis="faint">{info.low}</Text><Text as="span" size="xxs" weight="medium" emphasis="faint">{info.high}</Text></Stack>}
-                  {spec && <div className="h-2.5 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}><div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white border-2 border-gray-800 shadow-lg" style={{ left: `${Math.max(2, Math.min(98, val))}%`, transform: 'translate(-50%, -50%)' }} /></div>}
+                  {spec && <div className="h-2.5 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}><div className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 shadow-lg ${isDark ? 'bg-white border-gray-800' : 'bg-gray-800 border-gray-300'}`} style={{ left: `${Math.max(2, Math.min(98, val))}%`, transform: 'translate(-50%, -50%)' }} /></div>}
                   {info && <Text size="xxs" emphasis="subtle" className="mt-1">{info.strength(val)}</Text>}
                 </div>
               );
             })}
             {results.score != null && !results.traits && <div className="text-center"><Text heading={2} className="mb-1">{Math.round(results.score)}</Text><Text size="xs" emphasis="subtle">out of 100</Text></div>}
+            {/* Subscale breakdown bars */}
+            {(() => {
+              const subs = results.subcategories || results.dimensions || results.foundations || results.styles || null;
+              const subNames = { exec: 'Executive Function', inat: 'Inattention', hyper: 'Hyperactivity', imp: 'Impulsivity', emot: 'Emotional',
+                passion: 'Passion', perseverance: 'Perseverance', care: 'Care', fairness: 'Fairness', loyalty: 'Loyalty', authority: 'Authority', purity: 'Purity',
+                comp: 'Competing', collab: 'Collaborating', compr: 'Compromising', avoid: 'Avoiding', accom: 'Accommodating',
+                'self-awareness': 'Self-Awareness', 'self-management': 'Self-Management', 'social-awareness': 'Social Awareness', 'relationship-management': 'Relationship Mgmt',
+                honesty: 'Honesty', humility: 'Humility', aff: 'Affiliative', enh: 'Self-Enhancing', agg: 'Aggressive', def: 'Self-Defeating',
+                dir: 'Directness', emo: 'Emotionality', max: 'Maximizing', del: 'Deliberation' };
+              if (!subs) return null;
+              const baseColor = COLOR_HEX[test.color]?.base || COLOR_HEX.violet.base;
+              return (
+                <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-base)' }}>
+                  <Text size="xxs" weight="semibold" emphasis="subtle" className="mb-2 uppercase tracking-wide">Breakdown</Text>
+                  <Stack gap={1.5}>
+                    {Object.entries(subs).map(([key, val]) => (
+                      <div key={key}>
+                        <Stack direction="row" className="justify-between mb-0.5"><Text size="xxs" emphasis="subtle">{subNames[key] || key}</Text><Text size="xxs" weight="medium">{Math.round(val)}</Text></Stack>
+                        <div className="h-1.5 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}><div className="h-full rounded-full transition-all" style={{ width: `${Math.max(3, Math.min(100, val))}%`, background: baseColor }} /></div>
+                      </div>
+                    ))}
+                  </Stack>
+                </div>
+              );
+            })()}
+            {/* Love Language profile */}
+            {results.receive && results.give && (() => {
+              const langNames = { words: 'Words', time: 'Quality Time', gifts: 'Gifts', service: 'Service', touch: 'Touch' };
+              const baseColor = COLOR_HEX[test.color]?.base || COLOR_HEX.pink.base;
+              const renderProfile = (label, profile) => {
+                const max = Math.max(...Object.values(profile), 1);
+                return (
+                  <div>
+                    <Text size="xxs" weight="semibold" emphasis="subtle" className="mb-1 uppercase tracking-wide">{label}</Text>
+                    <Stack gap={1}>
+                      {Object.entries(profile).map(([key, val]) => (
+                        <div key={key}>
+                          <Stack direction="row" className="justify-between mb-0.5"><Text size="xxs" emphasis="subtle">{langNames[key] || key}</Text><Text size="xxs" weight="medium">{val}</Text></Stack>
+                          <div className="h-1.5 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}><div className="h-full rounded-full" style={{ width: `${(val / max) * 100}%`, background: baseColor }} /></div>
+                        </div>
+                      ))}
+                    </Stack>
+                  </div>
+                );
+              };
+              return (
+                <div className="mt-3 pt-3 space-y-3" style={{ borderTop: '1px solid var(--border-base)' }}>
+                  {renderProfile('Receiving', results.receive)}
+                  {renderProfile('Giving', results.give)}
+                </div>
+              );
+            })()}
+            {/* Quadrant label for 2-axis tests */}
+            {results.quadrant && <div className="mt-3 pt-3 text-center" style={{ borderTop: '1px solid var(--border-base)' }}><Text size="sm" weight="semibold">{results.quadrant}</Text>{results.axes && <Text size="xxs" emphasis="subtle" className="mt-1">{Object.entries(results.axes).map(([k, v]) => `${k}: ${v}`).join(' · ')}</Text>}</div>}
+            {/* Self-monitoring tier */}
+            {results.tier && <div className="mt-2 text-center"><Text size="xs" emphasis="subtle">{results.tier}</Text></div>}
+            {/* Clinical severity */}
+            {results.severity && <div className="mt-2 text-center"><Text size="xs" weight="medium">{results.severity}</Text></div>}
+            {results.elevated != null && <div className="mt-2 text-center"><Text size="xs" weight="medium">{results.elevated ? `Elevated (${results.indicators} indicators)` : `Not elevated (${results.indicators} indicators)`}</Text></div>}
           </ResultCard>
         )}
         {/* Nudge */}
@@ -2916,7 +3148,7 @@ const ProfileCategoryList = ({ assessCompleted, entityType, currentTier, onStart
   for (const catId of ASSESS_CATEGORY_ORDER) {
     const cat = ASSESS_CATEGORIES[catId];
     if (!cat || (cat.entityHint && cat.entityHint !== entityType) || (cat.tier || 0) > currentTier) continue;
-    const catTests = cat.tests.filter(id => ASSESS_TESTS[id]);
+    const catTests = cat.tests.filter(id => ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
     const allDone = catTests.every(id => assessCompleted[id]);
     const doneCount = catTests.filter(id => assessCompleted[id]).length;
     const firstIncomplete = catTests.find(id => !assessCompleted[id]);
@@ -3342,7 +3574,7 @@ const AnalysisScreen = ({ isDark, assess, entityType, onboardingAnswers, onNavig
   const catCount = getCompletedCategoryCount(assessCompleted, entityType);
   const groupsWithData = ANALYSIS_CATEGORIES
     .filter(g => currentTier >= g.minTier)
-    .map(g => ({ ...g, completedTests: g.tests.filter(id => assessCompleted[id] && ASSESS_TESTS[id]) }))
+    .map(g => ({ ...g, completedTests: g.tests.filter(id => assessCompleted[id] && ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived) }))
     .filter(g => g.completedTests.length > 0);
   if (catCount < 2) return (
     <Screen header={<NavBar back title="Analysis" onBack={() => onNavigate('categories')} />}>
@@ -3400,6 +3632,7 @@ const CommunityBar = ({ question, community, isDark }) => {
   if (!community?.evaluators?.length) return null;
   const evals = community.evaluators;
   const total = evals.length;
+  if (total === 0) return null;
   if (question.type === 'binary') {
     const yesCount = evals.filter(e => e.answer === 0).length;
     const yesPct = Math.round((yesCount / total) * 100);
@@ -3407,8 +3640,8 @@ const CommunityBar = ({ question, community, isDark }) => {
       <div className="mt-2 space-y-1" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
         <div className="flex justify-between"><Text size="xs" emphasis="secondary">Yes {yesPct}%</Text><Text size="xs" emphasis="secondary">No {100 - yesPct}%</Text></div>
         <div className="h-2 rounded-full overflow-hidden flex" style={{ background: 'var(--bg-elevated)' }}>
-          <div className="h-full rounded-l-full" style={{ width: `${yesPct}%`, background: isDark ? '#4ade80' : '#16a34a' }} />
-          <div className="h-full rounded-r-full flex-1" style={{ background: isDark ? '#f87171' : '#dc2626' }} />
+          <div className="h-full rounded-l-full" style={{ width: `${yesPct}%`, background: isDark ? BINARY_COLORS.yes.shades[1] : BINARY_COLORS.yes.shades[3] }} />
+          <div className="h-full rounded-r-full flex-1" style={{ background: isDark ? BINARY_COLORS.no.shades[1] : BINARY_COLORS.no.shades[3] }} />
         </div>
         <Text size="xs" emphasis="faint" className="text-center">{total} responses</Text>
       </div>
@@ -3417,7 +3650,7 @@ const CommunityBar = ({ question, community, isDark }) => {
   // Multiple choice — horizontal stacked bar
   const opts = question.options || [];
   const counts = opts.map((_, oi) => evals.filter(e => e.answer === oi).length);
-  const mcColors = ['#a78bfa', '#60a5fa', '#34d399', '#fbbf24'];
+  const mcColors = [COLOR_HEX.violet.light, COLOR_HEX.blue.light, COLOR_HEX.emerald.light, COLOR_HEX.amber.light];
   return (
     <div className="mt-2 space-y-1" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
       {opts.map((opt, oi) => {
@@ -3477,15 +3710,15 @@ const HistoryScreen = ({ isDark, questions, responses, questionMeta, communityRe
                   <Text size="xs" className="leading-snug line-clamp-2">{q.text}</Text>
                   <Stack direction="row" align="center" gap={2} className="mt-1.5">
                     <Text as="span" size="xs" weight="medium" color={
-                      q.type === 'binary' ? (q.response.answer === 0 ? '#4ade80' : '#f87171') : COLOR_HEX.violet.light
+                      q.type === 'binary' ? (q.response.answer === 0 ? BINARY_COLORS.yes.shades[1] : BINARY_COLORS.no.shades[1]) : COLOR_HEX.violet.light
                     }>{getAnswerLabel(q)}</Text>
                     <span className="flex gap-0.5">
                       {[1,2,3,4].map(i => <span key={i} className="w-1.5 h-1.5 rounded-full"
                         style={{ background: i <= q.response.confidence ? COLOR_HEX.violet.light : 'var(--bg-elevated)' }} />)}
                     </span>
-                    <Text as="span" size="xs" emphasis="subtle">{CONFIDENCE_LABELS[q.response.confidence]}</Text>
-                    {q.meta?.flag && <Text as="span" size="xs" style={{ color: isDark ? '#fb7185' : '#e11d48' }}>⚑</Text>}
-                    {q.meta?.explain && <Text as="span" size="xs" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>✎</Text>}
+                    <Text as="span" size="xs" emphasis="subtle">{CONFIDENCE_LABELS[q.response.confidence - 1]}</Text>
+                    {q.meta?.flag && <Text as="span" size="xs" color={COLOR_HEX.rose.light}>⚑</Text>}
+                    {q.meta?.explain && <Text as="span" size="xs" color={COLOR_HEX.amber.light}>✎</Text>}
                   </Stack>
                   {q.community && (
                     <button onClick={() => setExpandedId(isExpanded ? null : q.id)} className="w-full mt-1.5 flex items-center justify-between cursor-pointer" style={{ background: 'none', border: 'none', padding: 0 }}>
@@ -3515,11 +3748,13 @@ const IDENTITY_QUESTIONS = [
 const IdentityOnboardingFlow = ({ isDark, onComplete }) => {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
+  const timerRef = useRef(null);
+  useEffect(() => () => clearTimeout(timerRef.current), []);
   const q = IDENTITY_QUESTIONS[step];
   const handleSelect = (val) => {
     const next = { ...answers, [q.id]: val };
     setAnswers(next);
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       if (step + 1 < IDENTITY_QUESTIONS.length) setStep(step + 1);
       else { localStorage.setItem(IDENTITY_ONBOARD_KEY, JSON.stringify(next)); onComplete(next); }
     }, 300);
@@ -3535,7 +3770,7 @@ const IdentityOnboardingFlow = ({ isDark, onComplete }) => {
       {q.isText ? (
         <Stack gap={3} className="w-full max-w-xs">
           <input value={answers[q.id] || ''} onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))} placeholder={q.placeholder}
-            onKeyDown={e => { if (e.key === 'Enter') handleTextSubmit(); }}
+            onKeyDown={e => { if (e.key === 'Enter') handleTextSubmit(); }} onFocus={e => e.target.select()} maxLength={100}
             className="w-full px-4 py-3 rounded-xl text-center" style={{ background: 'var(--bg-input)', color: 'var(--input-text)', border: '1px solid var(--border-base)' }} autoFocus />
           <Stack direction="row" gap={2} className="justify-center">
             <Button variant="ghost" size="sm" onClick={handleTextSubmit}>Skip</Button>
@@ -3547,7 +3782,7 @@ const IdentityOnboardingFlow = ({ isDark, onComplete }) => {
           {q.options.map(opt => (
             <button key={opt} onClick={() => handleSelect(opt)}
               className="w-full px-4 py-3 rounded-xl text-left transition-all btn-feedback cursor-pointer"
-              style={{ background: answers[q.id] === opt ? 'rgba(52,211,153,0.15)' : 'var(--bg-card)', border: `1px solid ${answers[q.id] === opt ? 'rgba(52,211,153,0.4)' : 'var(--border-card)'}`, color: 'var(--text-primary)' }}>
+              style={{ background: answers[q.id] === opt ? `rgba(${COLOR_HEX.emerald.rgb},0.15)` : 'var(--bg-card)', border: `1px solid ${answers[q.id] === opt ? `rgba(${COLOR_HEX.emerald.rgb},0.4)` : 'var(--border-card)'}`, color: 'var(--text-primary)' }}>
               <Text size="sm">{opt}</Text>
             </button>
           ))}
@@ -3559,6 +3794,7 @@ const IdentityOnboardingFlow = ({ isDark, onComplete }) => {
 
 const IdentityScreen = ({ isDark, onNavigate }) => {
   const [onboardingDone, setOnboardingDone] = useState(() => !!localStorage.getItem(IDENTITY_ONBOARD_KEY));
+  const identityData = useMemo(() => { try { return JSON.parse(localStorage.getItem(IDENTITY_ONBOARD_KEY) || '{}'); } catch { return {}; } }, [onboardingDone]);
   const auth = useAuth();
   if (!onboardingDone) {
     return (
@@ -3585,17 +3821,13 @@ const IdentityScreen = ({ isDark, onNavigate }) => {
           </Card>
           <Card>
             <Text size="xs" weight="semibold" emphasis="subtle" className="uppercase tracking-wide mb-2">About You</Text>
-            {(() => {
-              try { const ob = JSON.parse(localStorage.getItem(IDENTITY_ONBOARD_KEY) || '{}');
-                return (
+            {identityData.source || identityData['know-anyone'] || identityData.location ? (
                   <Stack gap={2}>
-                    {ob.source && <Stack direction="row" className="justify-between"><Text size="sm" emphasis="secondary">Found Aura</Text><Text size="sm" emphasis="muted">{ob.source}</Text></Stack>}
-                    {ob['know-anyone'] && <Stack direction="row" className="justify-between"><Text size="sm" emphasis="secondary">Connections</Text><Text size="sm" emphasis="muted">{ob['know-anyone']}</Text></Stack>}
-                    {ob.location && <Stack direction="row" className="justify-between"><Text size="sm" emphasis="secondary">Location</Text><Text size="sm" emphasis="muted">{ob.location}</Text></Stack>}
+                    {identityData.source && <Stack direction="row" className="justify-between"><Text size="sm" emphasis="secondary">Found Aura</Text><Text size="sm" emphasis="muted">{identityData.source}</Text></Stack>}
+                    {identityData['know-anyone'] && <Stack direction="row" className="justify-between"><Text size="sm" emphasis="secondary">Connections</Text><Text size="sm" emphasis="muted">{identityData['know-anyone']}</Text></Stack>}
+                    {identityData.location && <Stack direction="row" className="justify-between"><Text size="sm" emphasis="secondary">Location</Text><Text size="sm" emphasis="muted">{identityData.location}</Text></Stack>}
                   </Stack>
-                );
-              } catch { return <Text size="sm" emphasis="muted">No info yet</Text>; }
-            })()}
+            ) : <Text size="sm" emphasis="muted">No info yet</Text>}
           </Card>
         </Stack>
       </Screen.Body>
@@ -3604,7 +3836,7 @@ const IdentityScreen = ({ isDark, onNavigate }) => {
 };
 
 // — SETTINGS SCREEN — Phase 5 + Phase 6 auth
-const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityType, onBack, onReset, hasAssessmentData, onResetAssessments, displayName, setDisplayName, hasVerificationData, onResetVerification }) => {
+const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityType, onBack, onReset, hasAssessmentData, onResetAssessments, displayName, setDisplayName, hasVerificationData, onResetVerification, responses }) => {
   const { undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak } = settings;
   const auth = useAuth();
   const [devTapCount, setDevTapCount] = useState(0);
@@ -3744,27 +3976,36 @@ const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityTy
             <Text size="sm" weight="medium" className="mb-2">Your Data</Text>
             <Stack direction="row" gap={2}>
               <Button variant="secondary" color="emerald" size="sm" onClick={() => {
-                const data = { responses: JSON.parse(localStorage.getItem('aura-responses') || '{}'), stats: JSON.parse(localStorage.getItem('aura-stats') || '{}'), timestamp: new Date().toISOString() };
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `aura-export-${Date.now()}.json`; a.click();
+                try {
+                  if (!responses || !Object.keys(responses).length) return;
+                  const data = { responses, timestamp: new Date().toISOString() };
+                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = `aura-export-${Date.now()}.json`; a.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                } catch (err) { console.error('Export failed:', err); }
               }}>JSON</Button>
               <Button variant="secondary" color="blue" size="sm" onClick={() => {
-                const resp = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')?.answers || {};
-                const lines = ['# Aura Export', `*${new Date().toLocaleDateString()}*`, ''];
-                const grouped = {};
-                QUESTIONS.forEach(q => {
-                  const r = resp[q.id]; if (!r) return;
-                  const cat = q.category || 'other';
-                  if (!grouped[cat]) grouped[cat] = [];
-                  const answer = q.type === 'binary' ? (r.answer === 0 ? 'Yes' : 'No') : (q.options?.[r.answer] || '?');
-                  grouped[cat].push(`- **${q.text}**  \n  ${answer} (confidence: ${'●'.repeat(r.confidence)}${'○'.repeat(4 - r.confidence)})`);
-                });
-                Object.entries(grouped).forEach(([cat, items]) => {
-                  const catInfo = CATEGORIES.find(c => c.id === cat);
-                  lines.push(`## ${catInfo?.icon || '★'} ${catInfo?.name || cat}`, '', ...items, '');
-                });
-                const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
-                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `aura-export-${Date.now()}.md`; a.click();
+                try {
+                  if (!responses || !Object.keys(responses).length) return;
+                  const lines = ['# Aura Export', `*${new Date().toLocaleDateString()}*`, ''];
+                  const grouped = {};
+                  QUESTIONS.forEach(q => {
+                    const r = responses[q.id]; if (!r) return;
+                    const cat = q.category || 'other';
+                    if (!grouped[cat]) grouped[cat] = [];
+                    const answer = q.type === 'binary' ? (r.answer === 0 ? 'Yes' : 'No') : (q.options?.[r.answer] || '?');
+                    grouped[cat].push(`- **${q.text}**  \n  ${answer} (confidence: ${'●'.repeat(r.confidence)}${'○'.repeat(4 - r.confidence)})`);
+                  });
+                  Object.entries(grouped).forEach(([cat, items]) => {
+                    const catInfo = CATEGORIES.find(c => c.id === cat);
+                    lines.push(`## ${catInfo?.icon || '★'} ${catInfo?.name || cat}`, '', ...items, '');
+                  });
+                  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = `aura-export-${Date.now()}.md`; a.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                } catch (err) { console.error('Export failed:', err); }
               }}>Markdown</Button>
             </Stack>
           </Card>
@@ -3832,12 +4073,12 @@ const ShareButtons = ({ getText, getUrl, isDark }) => {
         try { await navigator.clipboard.writeText(`${text}\n${url}`); } catch (_) {}
         setCopied(true); setTimeout(() => setCopied(false), 2000);
       })} disabled={!!sharing} className="flex flex-col items-center gap-1.5">
-        <div className={btnClass} style={copied ? { background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' } : btnStyle}>
+        <div className={btnClass} style={copied ? { background: `rgba(${COLOR_HEX.emerald.rgb}, 0.2)`, color: COLOR_HEX.emerald.light } : btnStyle}>
           {copied
-            ? <svg style={{ color: '#34d399' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            ? <svg style={{ color: COLOR_HEX.emerald.light }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             : <svg style={{ color: 'var(--text-secondary)' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
         </div>
-        <span style={{ ...labelStyle, color: copied ? '#34d399' : 'var(--text-subtle)' }}>{copied ? 'Copied!' : sharing === 'copy' ? '...' : 'Link'}</span>
+        <span style={{ ...labelStyle, color: copied ? COLOR_HEX.emerald.light : 'var(--text-subtle)' }}>{copied ? 'Copied!' : sharing === 'copy' ? '...' : 'Link'}</span>
       </button>
     </div>
   );
@@ -3845,6 +4086,7 @@ const ShareButtons = ({ getText, getUrl, isDark }) => {
 
 // — TRAIT BARS — Phase 5: Shared comparison visualization
 const TraitBars = ({ traits1, traits2, name1, name2, initial1, initial2, isPreview }) => {
+  const { isDark } = useTheme();
   const traitLabels = { E: ['Reserved', 'Outgoing'], A: ['Direct', 'Empathetic'], C: ['Flexible', 'Organized'], N: ['Steady', 'Sensitive'], O: ['Practical', 'Curious'] };
   const traitColors = { E: ['#6366f1', '#f59e0b'], A: ['#3b82f6', '#ec4899'], C: ['#8b5cf6', '#10b981'], N: ['#06b6d4', '#f97316'], O: ['#64748b', '#a855f7'] };
   return (
@@ -3861,7 +4103,7 @@ const TraitBars = ({ traits1, traits2, name1, name2, initial1, initial2, isPrevi
               <Text as="span" size="xxs" weight="medium" emphasis="subtle">{labels[1]}</Text>
             </Stack>
             <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${colors[0]}40, ${colors[1]}40)` }}>
-              <div className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-white border-2 border-white text-[8px] font-bold text-gray-800"
+              <div className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full border-2 text-[8px] font-bold ${isDark ? 'bg-white border-white text-gray-800' : 'bg-gray-800 border-gray-800 text-white'}`}
                 style={{ left: `${Math.max(5, Math.min(95, val1))}%`, marginLeft: -10, boxShadow: '0 1px 4px rgba(0,0,0,0.35)', opacity: isPreview ? 0.5 : 1 }}>
                 {initial1}
               </div>
@@ -3877,7 +4119,7 @@ const TraitBars = ({ traits1, traits2, name1, name2, initial1, initial2, isPrevi
       })}
       <div className="flex items-center gap-5 mt-2 justify-center">
         <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded-full bg-white border-2 border-white flex items-center justify-center text-[7px] font-bold text-gray-800" style={{ opacity: isPreview ? 0.5 : 1 }}>{initial1}</div>
+          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center text-[7px] font-bold ${isDark ? 'bg-white border-white text-gray-800' : 'bg-gray-800 border-gray-800 text-white'}`} style={{ opacity: isPreview ? 0.5 : 1 }}>{initial1}</div>
           <Text as="span" size="xxs" emphasis="subtle">{name1}</Text>
         </div>
         {traits2 && (
@@ -4111,7 +4353,7 @@ const StampRow = ({ providerConfig, claim, isOAuthLinked, onOAuthLink, onOAuthUn
 };
 
 // — CATEGORY SCREEN — Hub/Home (ported from production, rebuilt with Legos)
-const CategoryScreen = ({ isDark, questions, responses, stats, assess, entityType, qotdData, qotdResponse, syncStatus, onNavigate, onSelectCategory, onAssessSurprise }) => {
+const CategoryScreen = ({ isDark, questions, responses, stats, assess, entityType, qotdData, qotdResponse, syncStatus, onRetrySync, onNavigate, onSelectCategory, onAssessSurprise }) => {
   const auth = useAuth();
   const isLoggedIn = !!auth.user;
   const catScrollRef = useScrollRestore('categories');
@@ -4149,7 +4391,7 @@ const CategoryScreen = ({ isDark, questions, responses, stats, assess, entityTyp
           <Text as="span" size="sm" weight="bold" color={isDark ? COLOR_HEX.violet.light : COLOR_HEX.violet.base}>Lv.{stats.level || 1}</Text>
         </Stack>
         <Stack direction="row" align="center" gap={3}>
-          {syncStatus && syncStatus !== 'idle' && <SyncIndicator status={syncStatus} />}
+          {syncStatus && syncStatus !== 'idle' && <SyncIndicator status={syncStatus} onRetry={onRetrySync} />}
           {stats.streak > 0 && <Text as="span" size="sm" weight="medium" color={COLOR_HEX.amber.light}>🔥{stats.streak}</Text>}
           <button onClick={() => onNavigate('profile')} className="btn-feedback">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm relative"
@@ -4901,7 +5143,7 @@ const VerifySubjectCard = ({ subject, isDone, onSelect }) => {
         {isDone ? (
           <span className="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0" style={{
             background: isDark ? 'rgba(16,185,129,0.2)' : 'rgba(16,185,129,0.1)',
-            color: isDark ? '#34d399' : '#059669',
+            color: isDark ? COLOR_HEX.emerald.light : COLOR_HEX.emerald.base,
           }}>Done</span>
         ) : (
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
@@ -5232,7 +5474,7 @@ const VerifyEvalSummary = ({ isDark, data, subject, onSubmit, onBack, readOnly }
         <div className="rounded-2xl p-5 mb-4 text-center"
           style={{ background: `linear-gradient(135deg, rgba(${c.rgb}, 0.15), rgba(${c.rgb}, 0.05))`, border: `1px solid rgba(${c.rgb}, 0.25)` }}>
           {verdict && (
-            <div className={`text-lg font-bold mb-3`} style={{ color: isPositive ? '#34d399' : '#fb7185' }}>
+            <div className={`text-lg font-bold mb-3`} style={{ color: isPositive ? COLOR_HEX.emerald.light : COLOR_HEX.rose.light }}>
               {isPositive ? 'Yes' : 'No'}
             </div>
           )}
@@ -5311,7 +5553,7 @@ function App() {
   const [screen, setScreenRaw] = useState(getInitialScreen);
   const [previousScreen, setPreviousScreen] = useState(null);
   // pushState routing — major screens push browser history
-  const HISTORY_SCREENS = new Set(['landing', 'categories', 'settings', 'question', 'assess-picker', 'assess-results', 'compare', 'public-profile', 'verify-hub', 'verify-eval-summary', 'profile', 'assess-analysis', 'history', 'identity']);
+  const HISTORY_SCREENS = new Set(['landing', 'categories', 'settings', 'question', 'assess-picker', 'assess-results', 'clinical-consent', 'compare', 'public-profile', 'verify-hub', 'verify-eval-summary', 'profile', 'assess-analysis', 'history', 'identity']);
   const setScreen = useCallback((next) => {
     setScreenRaw(prev => {
       if (next !== prev && HISTORY_SCREENS.has(next)) {
@@ -5647,12 +5889,13 @@ function App() {
       </div>
     );
     if (screen === 'path-choice') return <PathChoiceScreen isDark={isDark} entityType={entityType} onboardingAnswers={onboardingAnswers} onReveal={handleChooseReveal} onExplore={handleChooseExplore} onSkip={() => setScreen('categories')} onReset={resetDemo} />;
-    if (screen === 'categories') return <CategoryScreen isDark={isDark} questions={questions} responses={responses} stats={stats} assess={assess} entityType={entityType} qotdData={qotdData} qotdResponse={qotdResponse} syncStatus={cloudSync.syncStatus} onNavigate={setScreen} onSelectCategory={handleSelectCategory} onAssessSurprise={handleAssessSurprise} />;
+    if (screen === 'categories') return <CategoryScreen isDark={isDark} questions={questions} responses={responses} stats={stats} assess={assess} entityType={entityType} qotdData={qotdData} qotdResponse={qotdResponse} syncStatus={cloudSync.syncStatus} onRetrySync={cloudSync.processRetryQueue} onNavigate={setScreen} onSelectCategory={handleSelectCategory} onAssessSurprise={handleAssessSurprise} />;
     if (screen === 'qotd') return <QotdScreen isDark={isDark} qotdData={qotdData} qotdResponse={qotdResponse} setQotdResponse={setQotdResponse} onNavigate={setScreen} />;
-    if (screen === 'settings') return <SettingsScreen isDark={isDark} toggleTheme={toggleTheme} settings={{ undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak }} entityType={entityType} setEntityType={setEntityType} onBack={() => setScreen(previousScreen || 'categories')} onReset={resetDemo} hasAssessmentData={Object.keys(assess.assessCompleted || {}).length > 0} onResetAssessments={assess.assessClearAll} displayName={displayName} setDisplayName={setDisplayName} hasVerificationData={Object.keys(verifyEvaluations).length > 0} onResetVerification={resetVerification} />;
+    if (screen === 'settings') return <SettingsScreen isDark={isDark} toggleTheme={toggleTheme} settings={{ undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak }} entityType={entityType} setEntityType={setEntityType} onBack={() => setScreen(previousScreen || 'categories')} onReset={resetDemo} hasAssessmentData={Object.keys(assess.assessCompleted || {}).length > 0} onResetAssessments={assess.assessClearAll} displayName={displayName} setDisplayName={setDisplayName} hasVerificationData={Object.keys(verifyEvaluations).length > 0} onResetVerification={resetVerification} responses={responses} />;
     if (screen === 'compare') return <ErrorBoundary feature="Compare"><CompareScreen isDark={isDark} assess={assess} entityType={entityType} displayName={displayName} compareData={compareData} compareLoading={compareLoading} onNavigate={setScreen} /></ErrorBoundary>;
     if (screen === 'public-profile') return <PublicProfileScreen isDark={isDark} profileId={publicProfileId} onNavigate={setScreen} />;
     if (screen === 'assess-picker') return <AssessPickerScreen isDark={isDark} entityType={entityType} assess={assess} onNavigate={setScreen} />;
+    if (screen === 'clinical-consent') return <ClinicalConsentScreen isDark={isDark} assess={assess} onNavigate={setScreen} />;
     if (screen === 'assess-question') return <ErrorBoundary feature="Assessment"><AssessQuestionScreen isDark={isDark} assess={assess} undoDelay={undoDelay} /></ErrorBoundary>;
     if (screen === 'assess-results') return <AssessResultsScreen isDark={isDark} assess={assess} entityType={entityType} onNavigate={setScreen} />;
     if (screen === 'profile') return <ProfileScreen isDark={isDark} assess={assess} entityType={entityType} onboardingAnswers={onboardingAnswers} responses={responses} onNavigate={setScreen} />;
