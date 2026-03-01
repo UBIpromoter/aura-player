@@ -221,24 +221,12 @@
     } else if (testId === 'integrity') {
       results.score = calculateScaleScore(test.items, resp);
     } else if (testId === 'adhd') {
-      // v2: handle reverse-keyed items for indicator count
-      results.indicators = 0;
-      test.items.forEach((item, i) => {
-        if (resp[i] !== undefined && resp[i] !== null) {
-          if (item.k === '-') {
-            if (resp[i] <= 2) results.indicators++;
-          } else {
-            if (resp[i] >= 4) results.indicators++;
-          }
-        }
-      });
-      // v2: subscale scoring with reverse-key handling
+      results.indicators = Object.values(resp).filter(v => v !== null && v >= 4).length;
+      // v2: subscale scoring for expanded items
       const subSums = {}, subCounts = {};
       test.items.forEach((item, i) => {
         if (resp[i] !== undefined && resp[i] !== null && item.sub) {
-          let value = resp[i];
-          if (item.k === '-') value = 6 - value;
-          subSums[item.sub] = (subSums[item.sub] || 0) + value;
+          subSums[item.sub] = (subSums[item.sub] || 0) + resp[i];
           subCounts[item.sub] = (subCounts[item.sub] || 0) + 1;
         }
       });

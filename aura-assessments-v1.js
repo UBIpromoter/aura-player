@@ -29,28 +29,19 @@
     gateway: null, // Custom branching options per question - handled in UI
   };
 
-  // ==================== ASSESSMENTS (V2) ====================
-  // V1 snapshot: aura-assessments-v1.js (locked, never modify)
-  // V2 = clean cut. Items were rewritten, reordered, added, deleted.
-  // V1 response data in Supabase/localStorage does NOT map to V2 indices.
-  //
-  // RULES (V2 forward — no more free rewrites):
-  // 1. NEVER delete a test — add 'archived: true' to hide
-  // 2. NEVER delete questions — index matters for responses
-  // 3. NEVER reorder questions — index is stored in responses
+  // ==================== ASSESSMENTS ====================
+  // RULES:
+  // 1. NEVER delete a test - can add 'archived: true' to hide
+  // 2. NEVER delete questions within a test - question index matters for responses
+  // 3. NEVER reorder questions - index is stored in responses
   // 4. Can ADD questions to the END of a test's items array
   // 5. Minor edits (typos) OK, major changes = discuss implications
   //
-  // TEST IDS: bigfive-E, bigfive-A, bigfive-C, bigfive-N, bigfive-O,
-  // adhd, cognitive, attachment, risk, integrity,
-  // shadow-M, shadow-N, shadow-P, chronotype,
-  // reasoning, reasoning-2, reasoning-3,
-  // starter-personality, starter-motivation, starter-thinking,
-  // starter-connection, starter-strategy, starter-wellbeing,
-  // life-satisfaction, grit, growth-mindset, locus-of-control,
-  // impostor, values, emotional-intelligence, conflict-style,
-  // resilience, creativity, phq9, gad7, aq10 (archived)
-  // ==========================================================
+  // TEST IDS (used in responses.test_id): bigfive-E, bigfive-A, bigfive-C,
+  // bigfive-N, bigfive-O, adhd, cognitive, attachment, risk, integrity,
+  // shadow-M, shadow-N, shadow-P, chronotype, reasoning, reasoning-2, reasoning-3,
+  // starter-personality, starter-motivation, starter-thinking, starter-connection, starter-strategy
+  // =====================================================
   var ASSESS_TESTS = {
     // Big Five broken into 5 bite-sized modules by trait
     'bigfive-E': {
@@ -79,7 +70,7 @@
         { q: "I feel others' emotions", t: 'A', k: '+' },
         { q: "I make people feel at ease", t: 'A', k: '+' },
         { q: "I am not really interested in others", t: 'A', k: '-' },
-        { q: "I can be critical or sarcastic with others", t: 'A', k: '-' },
+        { q: "I insult people", t: 'A', k: '-' },
         { q: "I am not interested in other people's problems", t: 'A', k: '-' },
         { q: "I feel little concern for others", t: 'A', k: '-' },
         { q: "I am hard to get to know", t: 'A', k: '-' },
@@ -89,7 +80,7 @@
       name: 'Conscientiousness', icon: '\u{1F4CB}', color: 'violet', scale: 'likeme', parent: 'bigfive', trait: 'C',
       description: 'How you approach tasks and goals',
       items: [
-        { q: "I like to be prepared", t: 'C', k: '+' },
+        { q: "I am always prepared", t: 'C', k: '+' },
         { q: "I pay attention to details", t: 'C', k: '+' },
         { q: "I get chores done right away", t: 'C', k: '+' },
         { q: "I like order", t: 'C', k: '+' },
@@ -122,10 +113,10 @@
       description: 'How you explore ideas and experiences',
       items: [
         { q: "I have a vivid imagination", t: 'O', k: '+' },
-        { q: "I enjoy exploring unusual ideas", t: 'O', k: '+' },
-        { q: "I enjoy thinking about abstract ideas", t: 'O', k: '+' },
+        { q: "I have excellent ideas", t: 'O', k: '+' },
+        { q: "I am quick to understand things", t: 'O', k: '+' },
+        { q: "I use difficult words", t: 'O', k: '+' },
         { q: "I spend time reflecting on things", t: 'O', k: '+' },
-        { q: "I'm often curious about the deeper meaning of things", t: 'O', k: '+' },
         { q: "I am not interested in abstract ideas", t: 'O', k: '-' },
         { q: "I do not have a good imagination", t: 'O', k: '-' },
         { q: "I have difficulty understanding abstract ideas", t: 'O', k: '-' },
@@ -135,21 +126,20 @@
     },
     adhd: {
       name: 'ADHD Screen', icon: '\u26A1', color: 'blue', scale: 'frequency',
-      framing: 'Think about your experiences over the past 6 months.',
       items: [
-        { q: "I have trouble wrapping up final details once the hard parts are done", sub: 'inat', k: '+' },
-        { q: "I have difficulty getting organized for tasks", sub: 'exec', k: '+' },
-        { q: "I have problems remembering appointments", sub: 'inat', k: '+' },
-        { q: "I avoid or delay starting tasks that require thought", sub: 'exec', k: '+' },
-        { q: "I fidget when I have to sit for a long time", sub: 'hyper', k: '+' },
-        { q: "I feel driven by a motor, overly active", sub: 'hyper', k: '+' },
-        { q: "I consistently underestimate how long things will take", sub: 'exec', k: '+' },
-        { q: "I lose track of time when focused on something interesting, even when I have other responsibilities", sub: 'hyper', k: '+' },
-        { q: "I struggle to start tasks even when I know they're important", sub: 'exec', k: '+' },
-        { q: "I walk into a room and forget why I went there", sub: 'inat', k: '+' },
-        { q: "I interrupt people because thoughts feel urgent and might disappear", sub: 'imp', k: '+' },
-        { q: "I sustain attention on routine tasks without difficulty", sub: 'inat', k: '-' },
-        { q: "I complete tasks on schedule without reminders", sub: 'exec', k: '-' },
+        { q: "I have trouble wrapping up final details once the hard parts are done" },
+        { q: "I have difficulty getting organized for tasks" },
+        { q: "I have problems remembering appointments" },
+        { q: "I avoid or delay starting tasks that require thought" },
+        { q: "I fidget when I have to sit for a long time" },
+        { q: "I feel driven by a motor, overly active" },
+        // v2: expanded to 12 items — adding subscales for better coverage
+        { q: "I consistently underestimate how long things will take", sub: 'exec' },
+        { q: "My emotions feel more intense than other people's seem to be", sub: 'emot' },
+        { q: "When something interests me, I can lose track of everything else for hours", sub: 'hyper' },
+        { q: "I struggle to start tasks even when I know they're important", sub: 'exec' },
+        { q: "I walk into a room and forget why I went there", sub: 'inat' },
+        { q: "I interrupt people because thoughts feel urgent and might disappear", sub: 'imp' },
       ]
     },
     cognitive: {
@@ -163,7 +153,7 @@
         { q: "I take things literally, missing the subtext", k: '+' },
         { q: "I don't naturally sense when someone wants to end a conversation", k: '+' },
         { q: "I rely on words more than tone or expressions", k: '+' },
-        { q: "I often struggle to understand why people behave the way they do in social situations", k: '+' },
+        { q: "Movie characters' decisions often puzzle me", k: '+' },
         { q: "I enjoy organizing info into categories and systems", k: '+' },
         { q: "Learning rules and patterns is deeply satisfying", k: '+' },
         // v2: reverse items for balance — measures intuitive/social processing
@@ -181,7 +171,7 @@
         { q: "Feeling truly secure in a relationship is rare", d: 'anx' },
         { q: "I need more reassurance than most that I'm valued", d: 'anx' },
         { q: "The possibility of being left weighs on me heavily", d: 'anx' },
-        { q: "I sometimes push for closeness and later worry I came across as too needy", d: 'anx' },
+        { q: "I push for closeness in ways that feel desperate after", d: 'anx' },
         { q: "I'm most comfortable not depending on anyone", d: 'av' },
         { q: "Opening up emotionally makes me feel exposed", d: 'av' },
         { q: "When relationships get too close, I want space", d: 'av' },
@@ -226,7 +216,7 @@
       items: [
         { q: "I wouldn't use flattery to get ahead, even if it would work", k: '+', sub: 'hon' },
         { q: "If I knew I'd never be caught, I'd be tempted to cheat", k: '-', sub: 'hon' },
-        { q: "Making a lot of money is not a top priority for me", k: '+', sub: 'hum' },
+        { q: "Having a lot of money is not especially important to me", k: '+', sub: 'hum' },
         { q: "I would enjoy owning expensive luxury goods", k: '-', sub: 'hum' },
         { q: "I deserve more respect than the average person", k: '-', sub: 'hum' },
         { q: "I want people to know I'm an important, high-status person", k: '-', sub: 'hum' },
@@ -247,7 +237,7 @@
         { q: "Most people can be influenced through their insecurities", k: '+' },
         { q: "I prefer strategies where I come out ahead", k: '+' },
         { q: "I carefully manage what different people know about me", k: '+', n: "Consider this in your typical social context" },
-        { q: "Sometimes it's better to be careful with your words than to be completely open", k: '+', n: "Think about everyday trade-offs, not extreme scenarios" },
+        { q: "Long-term planning beats short-term honesty", k: '+', n: "Think about everyday trade-offs, not extreme scenarios" },
         // v2: reverse-keyed items to prevent acquiescence bias
         { q: "I prefer straightforward honesty over strategic maneuvering", k: '-' },
         { q: "I feel uncomfortable when I notice someone being manipulated", k: '-' },
@@ -265,7 +255,7 @@
         { q: "I'm more capable than most people I meet", k: '+' },
         { q: "I enjoy receiving compliments and recognition", k: '+' },
         // v2: reverse-keyed items to prevent acquiescence bias
-        { q: "I can celebrate others' achievements without comparing them to my own", k: '-' },
+        { q: "I genuinely celebrate other people's achievements without comparing", k: '-' },
         { q: "I don't need to be the center of attention to feel valued", k: '-' },
         { q: "I can admit when someone else is better at something than me", k: '-' },
       ]
@@ -276,7 +266,7 @@
       items: [
         { q: "I stay calm in situations that upset others", k: '+' },
         { q: "People say I can be insensitive sometimes", k: '+' },
-        { q: "When making difficult decisions, I prioritize logic over emotional considerations", k: '+' },
+        { q: "I make decisions based on logic, not feelings", k: '+' },
         { q: "I rarely feel guilty about my choices", k: '+' },
         { q: "I get bored easily and need stimulation", k: '+' },
         { q: "Other people's problems aren't my concern", k: '+' },
@@ -296,7 +286,7 @@
         { q: "I feel most creative late at night", k: '-' },
         { q: "I struggle to focus after 9pm", k: '+' },
         { q: "Weekend mornings are for sleeping in", k: '-' },
-        { q: "I feel alert and productive before noon", k: '+' },
+        { q: "I'm usually the first one ready to leave social events", k: '+' },
       ]
     },
     // IQ-style reasoning test
@@ -375,12 +365,12 @@
       description: 'Who are you? Core personality traits.',
       items: [
         { q: "I am the first person to introduce myself in a group", c: 'extraversion', k: '+' },
-        { q: "I'll grind through a boring task just to get it done", c: 'conscientiousness', k: '+' },
+        { q: "I finish tasks even when they become repetitive or boring", c: 'conscientiousness', k: '+' },
         { q: "I apologize first after an argument, even if I am not wrong", c: 'agreeableness', k: '+' },
         { q: "I feel physically tense when I have a long to-do list", c: 'neuroticism', k: '+' },
         { q: "I leave my belongings in random places around the house", c: 'conscientiousness', k: '-' },
-        { q: "In a room full of strangers, I'm more of a listener than a talker", c: 'extraversion', k: '-' },
-        { q: "When a decision comes down to it, my own needs have to come first", c: 'agreeableness', k: '-' },
+        { q: "I stay quiet when I am in a room full of strangers", c: 'extraversion', k: '-' },
+        { q: "I prioritize my own needs over the feelings of people around me", c: 'agreeableness', k: '-' },
         { q: "I choose new experiences over sticking to familiar routines", c: 'openness', k: 'T' },
         { q: "I replay conversations in my head wondering if I said something wrong", c: 'neuroticism', k: '+' },
       ]
@@ -389,13 +379,13 @@
       name: 'Motivation', icon: '\u{1F3AF}', color: 'indigo', scale: 'likeme', parent: 'starter',
       description: 'What do you want? What drives your decisions.',
       items: [
-        { q: "I break my goals down into small, daily checkboxes", c: 'achievement', k: '+' },
+        { q: "I set daily targets to track my progress toward a goal", c: 'achievement', k: '+' },
         { q: "I check my bank balance more than once a day", c: 'security', k: '+' },
-        { q: "I do my best work when I'm the one calling the shots", c: 'autonomy', k: '+' },
-        { q: "I'd rather power through and finish something than stop for a break", c: 'achievement', k: '+' },
-        { q: "When it comes to money, I hate the idea of losing even a little", c: 'risk', k: '-' },
+        { q: "I work on projects where I make all the decisions", c: 'autonomy', k: '+' },
+        { q: "I prioritize completing a task over taking a break", c: 'achievement', k: '+' },
+        { q: "I avoid investments where there is a chance of losing money", c: 'risk', k: '-' },
         { q: "I follow rules even when I am alone", c: 'security', k: '+' },
-        { q: "In a group, I'm more comfortable letting someone else take charge", c: 'autonomy', k: '-' },
+        { q: "I let other people lead the way in group settings", c: 'autonomy', k: '-' },
         { q: "I take a high-risk gamble over a safe, small win", c: 'risk', k: 'T' },
       ]
     },
@@ -405,10 +395,10 @@
       items: [
         { q: "I write a plan before starting a new project", c: 'planning', k: '+' },
         { q: "I read every word of a contract before signing", c: 'depth', k: '+' },
-        { q: "Noise doesn't break my concentration", c: 'focus', k: '+' },
-        { q: "Even after I find an answer, I keep digging for more information", c: 'depth', k: '+' },
-        { q: "I start one thing and end up down a completely different rabbit hole", c: 'focus', k: '-' },
-        { q: "I tend to get things done ahead of schedule", c: 'speed', k: '+' },
+        { q: "I work in a noisy room without losing focus", c: 'focus', k: '+' },
+        { q: "I search for more data after I have found an answer", c: 'depth', k: '+' },
+        { q: "I lose track of my original goal while working", c: 'focus', k: '-' },
+        { q: "I finish a task faster than others expect me to", c: 'speed', k: '+' },
         { q: "I jump into a task before reading the instructions", c: 'planning', k: '-' },
         { q: "I choose a fast decision over a perfect one", c: 'speed', k: 'T' },
       ]
@@ -419,11 +409,11 @@
       items: [
         { q: "I tell friends when I am feeling sad or lonely", c: 'vulnerability', k: '+' },
         { q: "I check my phone constantly for new messages", c: 'anxiety', k: '+' },
-        { q: "I don't mind when friends borrow my phone", c: 'trust', k: '+' },
+        { q: "I let others hold my phone or laptop without watching them", c: 'trust', k: '+' },
         { q: "I choose one-on-one time over attending a large party", c: 'social_depth', k: '+' },
         { q: "I ask for help the moment I feel overwhelmed", c: 'trust', k: '+' },
         { q: "I talk about my mistakes with people I have just met", c: 'vulnerability', k: '+' },
-        { q: "I'm comfortable going a few days without seeing my partner", c: 'anxiety', k: '-' },
+        { q: "I stay calm when I do not see my partner for days", c: 'anxiety', k: '-' },
         { q: "I prefer a few deep friendships over many casual acquaintances", c: 'social_depth', k: 'T' },
       ]
     },
@@ -432,13 +422,13 @@
       description: 'How do you win? Your competitive approach.',
       items: [
         { q: "I keep score during a friendly game", c: 'competition', k: '+' },
-        { q: "I like to think a few steps ahead before I act", c: 'strategy', k: '+' },
+        { q: "I visualize the next three steps before taking the first", c: 'strategy', k: '+' },
         { q: "I take action instead of waiting for others to fix problems", c: 'agency', k: '+' },
         { q: "I ask for a better price when buying a product", c: 'confidence', k: '+' },
         { q: "I blame bad luck when a project fails", c: 'agency', k: '-' },
         { q: "I volunteer to lead a meeting or group", c: 'confidence', k: '+' },
         { q: "I hide my plans from others until they are finished", c: 'strategy', k: '-' },
-        { q: "For me, winning is more important than playing fair", c: 'competition', k: 'T' },
+        { q: "I prioritize winning over playing the game fairly", c: 'competition', k: 'T' },
       ]
     },
 
@@ -693,10 +683,8 @@
       items: [
         { q: "In most ways, my life is close to my ideal", k: '+' },
         { q: "The conditions of my life are excellent", k: '+' },
-        { q: "There are many things about my life I would change", k: '-' },
         { q: "I am satisfied with my life", k: '+' },
         { q: "So far I have gotten the important things I want in life", k: '+' },
-        { q: "My life feels far from where I want it to be", k: '-' },
         { q: "If I could live my life over, I would change almost nothing", k: '+' },
       ]
     },
@@ -726,9 +714,6 @@
         { q: "Your intelligence is something you can substantially change", k: '+' },
         { q: "You can learn new things but can't really change your basic intelligence", k: '-' },
         { q: "No matter how much intelligence you have, you can always change it quite a bit", k: '+' },
-        { q: "People can always substantially improve their abilities with effort", k: '+' },
-        { q: "You have a certain amount of talent, and you can't do much to change it", k: '-' },
-        { q: "With enough practice, anyone can develop skills in areas where they have no natural talent", k: '+' },
       ]
     },
 
@@ -739,10 +724,8 @@
       items: [
         { q: "What happens to me is mostly determined by my own actions", k: '+' },
         { q: "Whether I get what I want is mostly in my own hands", k: '+' },
-        { q: "When I fail, it's usually because of things I could have controlled", k: '+' },
+        { q: "My life is determined by my own actions", k: '+' },
         { q: "Whether at work or in my personal life, what I can achieve is mainly determined by factors beyond my control", k: '-' },
-        { q: "I feel powerless to change important things in my life", k: '-' },
-        { q: "Success in life is mostly a matter of luck", k: '-' },
       ]
     },
 
@@ -754,8 +737,7 @@
         { q: "I worry that people will find out I'm not as capable as they think", k: '+' },
         { q: "I attribute my successes to luck or timing rather than ability", k: '+' },
         { q: "I feel like a fraud even when I receive genuine praise", k: '+' },
-        { q: "I downplay my achievements when talking to others", k: '+' },
-        { q: "I often feel my achievements aren't as impressive as others think", k: '+' },
+        { q: "I downplay my achievements because I don't think they're that impressive", k: '+' },
         { q: "I feel confident that my successes reflect my actual abilities", k: '-' },
       ]
     },
@@ -780,8 +762,8 @@
         { q: "Some people just deserve better treatment than others", k: '-', sub: 'fair' },
         { q: "When the government makes laws, fairness should be the top concern", k: '+', sub: 'fair' },
         // Loyalty
-        { q: "I feel strong loyalty toward the groups I belong to", k: '+', sub: 'loyal' },
-        { q: "Family loyalty is very important to me, even in difficult situations", k: '+', sub: 'loyal' },
+        { q: "I am proud of my country's history", k: '+', sub: 'loyal' },
+        { q: "People should be loyal to their family members, even when they have done something wrong", k: '+', sub: 'loyal' },
         { q: "It is more important to be a team player than to express yourself", k: '+', sub: 'loyal' },
         { q: "I don't feel strong bonds with the groups I belong to", k: '-', sub: 'loyal' },
         // Authority
@@ -790,8 +772,8 @@
         { q: "I think most traditions exist for good reason", k: '+', sub: 'auth' },
         { q: "I believe questioning authority is more important than obeying it", k: '-', sub: 'auth' },
         // Purity
-        { q: "Some actions feel wrong to me even if no one appears to be directly harmed", k: '+', sub: 'pure' },
-        { q: "I believe some behaviors are morally wrong even if they are widely accepted", k: '+', sub: 'pure' },
+        { q: "People should not do things that are disgusting, even if no one is harmed", k: '+', sub: 'pure' },
+        { q: "I would call some acts wrong on the grounds that they are unnatural", k: '+', sub: 'pure' },
         { q: "I think chastity is an outdated and unnecessary virtue", k: '-', sub: 'pure' },
         { q: "I believe certain things are sacred and should be treated accordingly", k: '+', sub: 'pure' },
       ]
@@ -845,7 +827,7 @@
         { q: "Set aside my own concerns to satisfy the other person's needs", k: '+', sub: 'accom' },
         // Cross-cutting reverse items
         { q: "I find it difficult to let go of what I want in a disagreement", k: '-', sub: 'accom' },
-        { q: "Even when an issue matters to me, I sometimes avoid bringing it up", k: '+', sub: 'avoid' },
+        { q: "I rarely avoid a confrontation when something matters to me", k: '-', sub: 'avoid' },
       ]
     },
 
@@ -857,10 +839,8 @@
         { q: "I tend to bounce back after illness, injury, or hardship", k: '+' },
         { q: "I can deal with whatever comes my way", k: '+' },
         { q: "I try to see the humorous side of problems", k: '+' },
-        { q: "When something stressful happens, it takes me a long time to recover", k: '-' },
         { q: "Having to cope with stress makes me stronger", k: '+' },
         { q: "I tend to recover quickly after setbacks", k: '+' },
-        { q: "I often feel overwhelmed by setbacks", k: '-' },
         { q: "I can achieve goals despite obstacles", k: '+' },
         { q: "Under pressure, I can stay focused and think clearly", k: '+' },
         { q: "I am not easily discouraged by failure", k: '+' },
@@ -878,7 +858,7 @@
         { q: "I often come up with ideas others haven't thought of", k: '+', sub: 'orig' },
         { q: "I enjoy brainstorming multiple solutions to a single problem", k: '+', sub: 'div' },
         { q: "I trust my ability to create something meaningful", k: '+', sub: 'conf' },
-        { q: "I regularly do creative things", k: '+', sub: 'prac' },
+        { q: "I regularly make or build things outside of work", k: '+', sub: 'prac' },
         { q: "I prefer tried-and-true approaches over experimental ones", k: '-', sub: 'div' },
         { q: "I see connections between things that seem unrelated", k: '+', sub: 'orig' },
         { q: "I feel anxious when asked to be creative on the spot", k: '-', sub: 'conf' },
@@ -927,11 +907,10 @@
       ]
     },
 
-    // Autism Spectrum (AQ-10 inspired) — ARCHIVED: conflates autism with social anxiety
+    // Autism Spectrum (AQ-10 inspired)
     'aq10': {
       name: 'Autism Spectrum', icon: '\u{1F9E9}', color: 'teal', scale: 'agreement',
       clinical: true,
-      archived: true,
       framing: 'This screens for autistic traits. Many people score high without meeting clinical criteria. Neurodiversity is normal variation, not a deficiency.',
       disclaimer: 'A high score suggests traits worth exploring with a professional. It is not a diagnosis.',
       items: [

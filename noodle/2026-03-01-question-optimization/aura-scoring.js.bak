@@ -221,51 +221,22 @@
     } else if (testId === 'integrity') {
       results.score = calculateScaleScore(test.items, resp);
     } else if (testId === 'adhd') {
-      // v2: handle reverse-keyed items for indicator count
-      results.indicators = 0;
-      test.items.forEach((item, i) => {
-        if (resp[i] !== undefined && resp[i] !== null) {
-          if (item.k === '-') {
-            if (resp[i] <= 2) results.indicators++;
-          } else {
-            if (resp[i] >= 4) results.indicators++;
-          }
-        }
-      });
-      // v2: subscale scoring with reverse-key handling
-      const subSums = {}, subCounts = {};
-      test.items.forEach((item, i) => {
-        if (resp[i] !== undefined && resp[i] !== null && item.sub) {
-          let value = resp[i];
-          if (item.k === '-') value = 6 - value;
-          subSums[item.sub] = (subSums[item.sub] || 0) + value;
-          subCounts[item.sub] = (subCounts[item.sub] || 0) + 1;
-        }
-      });
-      if (Object.keys(subSums).length > 0) {
-        results.subscales = {};
-        for (const s in subSums) {
-          results.subscales[s] = Math.round((subSums[s] / (subCounts[s] * 5)) * 100);
-        }
-      }
+      results.indicators = Object.values(resp).filter(v => v !== null && v >= 4).length;
     } else if (testId === 'cognitive') {
-      // v2: now uses keying for reverse items (Processing Style)
-      results.score = calculateScaleScore(test.items, resp);
+      const vals = Object.values(resp).filter(v => v !== null);
+      results.score = vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / (vals.length * 5)) * 100) : 0;
     } else if (testId === 'attachment') {
-      let anxSum = 0, avSum = 0, secSum = 0, anxCount = 0, avCount = 0, secCount = 0;
+      let anxSum = 0, avSum = 0, anxCount = 0, avCount = 0;
       test.items.forEach((item, i) => {
         if (resp[i] && resp[i] !== null) {
           if (item.d === 'anx') { anxSum += resp[i]; anxCount++; }
-          else if (item.d === 'sec') { secSum += resp[i]; secCount++; }
           else { avSum += resp[i]; avCount++; }
         }
       });
-      results.anxiety = anxCount > 0 ? (anxSum / anxCount).toFixed(1) : '0';
-      results.avoidance = avCount > 0 ? (avSum / avCount).toFixed(1) : '0';
-      results.security = secCount > 0 ? (secSum / secCount).toFixed(1) : '0';
-      const highAnx = results.anxiety > 3, highAv = results.avoidance > 3, highSec = results.security > 3;
-      // If secure items score high and anxiety/avoidance low, clearly Secure
-      results.style = highSec && !highAnx && !highAv ? 'Secure' : highAnx && !highAv ? 'Anxious' : !highAnx && highAv ? 'Avoidant' : highAnx && highAv ? 'Fearful' : 'Secure';
+      results.anxiety = (anxSum / anxCount).toFixed(1);
+      results.avoidance = (avSum / avCount).toFixed(1);
+      const highAnx = results.anxiety > 3, highAv = results.avoidance > 3;
+      results.style = !highAnx && !highAv ? 'Secure' : highAnx && !highAv ? 'Anxious' : !highAnx && highAv ? 'Avoidant' : 'Fearful';
     } else if (testId === 'risk') {
       // Overall score (excludes nulls from N/A)
       let sum = 0, count = 0;
@@ -394,102 +365,6 @@
       for (const cat in catSums) {
         results.categories[cat] = { name: catMap[cat] || cat, score: Math.round(catSums[cat] / catCounts[cat]) };
       }
-    // ==================== NEW TEST SCORING (Tech Tree v2) ====================
-    // Attachment v2: now with secure dimension
-    } else if (testId === 'attachment-v2-handled') {
-      // This is a placeholder — attachment scoring above already handles the base case.
-      // The secure items (d: 'sec') are handled in the updated attachment block below.
-    // Generic Likert tests: life-satisfaction, grit, growth-mindset, locus-of-control,
-    // impostor, resilience, creativity, values, emotional-intelligence, conflict-style
-    // phq9, gad7, aq10
-    } else if (['life-satisfaction', 'grit', 'growth-mindset', 'locus-of-control', 'impostor',
-                 'resilience', 'creativity', 'phq9', 'gad7', 'aq10'].includes(testId)) {
-      results.score = calculateScaleScore(test.items, resp);
-      // Subcategory scores if defined
-      if (test.subcategories) {
-        const subSums = {}, subCounts = {};
-        test.items.forEach((item, i) => {
-          if (resp[i] !== undefined && resp[i] !== null && item.sub) {
-            let value = resp[i];
-            if (item.k === '-') value = 6 - value;
-            subSums[item.sub] = (subSums[item.sub] || 0) + value;
-            subCounts[item.sub] = (subCounts[item.sub] || 0) + 1;
-          }
-        });
-        results.subcategories = {};
-        for (const s in subSums) {
-          results.subcategories[s] = Math.round((subSums[s] / (subCounts[s] * 5)) * 100);
-        }
-      }
-      // Clinical test severity bands
-      if (test.clinical) {
-        const rawSum = Object.values(resp).filter(v => v !== null).reduce((a, b) => a + b, 0);
-        if (testId === 'phq9') {
-          results.severity = rawSum <= 4 ? 'Minimal' : rawSum <= 9 ? 'Mild' : rawSum <= 14 ? 'Moderate' : rawSum <= 19 ? 'Moderately Severe' : 'Severe';
-        } else if (testId === 'gad7') {
-          results.severity = rawSum <= 4 ? 'Minimal' : rawSum <= 9 ? 'Mild' : rawSum <= 14 ? 'Moderate' : 'Severe';
-        } else if (testId === 'aq10') {
-          const indicators = Object.entries(resp).filter(([i, v]) => {
-            if (v === null) return false;
-            const item = test.items[parseInt(i)];
-            return item.k === '+' ? v >= 4 : v <= 2;
-          }).length;
-          results.indicators = indicators;
-          results.elevated = indicators >= 6;
-        }
-      }
-    } else if (testId === 'values') {
-      results.score = calculateScaleScore(test.items, resp);
-      // Per-foundation scores
-      const subSums = {}, subCounts = {};
-      test.items.forEach((item, i) => {
-        if (resp[i] !== undefined && resp[i] !== null && item.sub) {
-          let value = resp[i];
-          if (item.k === '-') value = 6 - value;
-          subSums[item.sub] = (subSums[item.sub] || 0) + value;
-          subCounts[item.sub] = (subCounts[item.sub] || 0) + 1;
-        }
-      });
-      results.foundations = {};
-      for (const s in subSums) {
-        results.foundations[s] = Math.round((subSums[s] / (subCounts[s] * 5)) * 100);
-      }
-    } else if (testId === 'emotional-intelligence') {
-      results.score = calculateScaleScore(test.items, resp);
-      // Per-dimension scores
-      const subSums = {}, subCounts = {};
-      test.items.forEach((item, i) => {
-        if (resp[i] !== undefined && resp[i] !== null && item.sub) {
-          let value = resp[i];
-          if (item.k === '-') value = 6 - value;
-          subSums[item.sub] = (subSums[item.sub] || 0) + value;
-          subCounts[item.sub] = (subCounts[item.sub] || 0) + 1;
-        }
-      });
-      results.dimensions = {};
-      for (const s in subSums) {
-        results.dimensions[s] = Math.round((subSums[s] / (subCounts[s] * 5)) * 100);
-      }
-    } else if (testId === 'conflict-style') {
-      // Profile across 5 conflict modes
-      const subSums = {}, subCounts = {};
-      test.items.forEach((item, i) => {
-        if (resp[i] !== undefined && resp[i] !== null && item.sub) {
-          let value = resp[i];
-          if (item.k === '-') value = 6 - value;
-          subSums[item.sub] = (subSums[item.sub] || 0) + value;
-          subCounts[item.sub] = (subCounts[item.sub] || 0) + 1;
-        }
-      });
-      results.styles = {};
-      for (const s in subSums) {
-        results.styles[s] = Math.round((subSums[s] / (subCounts[s] * 5)) * 100);
-      }
-      // Primary style = highest scoring
-      const sorted = Object.entries(results.styles).sort((a, b) => b[1] - a[1]);
-      const styleNames = { comp: 'Competing', collab: 'Collaborating', compr: 'Compromising', avoid: 'Avoiding', accom: 'Accommodating' };
-      results.primaryStyle = sorted.length > 0 ? styleNames[sorted[0][0]] || sorted[0][0] : 'Unknown';
-      results.score = sorted.length > 0 ? sorted[0][1] : 0;
     }
     return results;
   };
