@@ -217,9 +217,6 @@
       results.trait = test.trait;
       results.traitName = ASSESS_SHADOW_TRAITS[test.trait];
       results.score = calculateScaleScore(test.items, resp);
-    // Integrity (HEXACO)
-    } else if (testId === 'integrity') {
-      results.score = calculateScaleScore(test.items, resp);
     } else if (testId === 'adhd') {
       // v2: handle reverse-keyed items for indicator count
       results.indicators = 0;
@@ -396,14 +393,9 @@
       }
     // ==================== NEW TEST SCORING (Tech Tree v2) ====================
     // Attachment v2: now with secure dimension
-    } else if (testId === 'attachment-v2-handled') {
-      // This is a placeholder — attachment scoring above already handles the base case.
-      // The secure items (d: 'sec') are handled in the updated attachment block below.
-    // Generic Likert tests: life-satisfaction, grit, growth-mindset, locus-of-control,
-    // impostor, resilience, creativity, values, emotional-intelligence, conflict-style
-    // phq9, gad7, aq10
+    // Generic Likert tests — handles subcategory scores automatically
     } else if (['life-satisfaction', 'grit', 'growth-mindset', 'locus-of-control', 'impostor',
-                 'resilience', 'creativity', 'phq9', 'gad7', 'aq10'].includes(testId)) {
+                 'resilience', 'creativity', 'integrity', 'phq9', 'gad7', 'aq10'].includes(testId)) {
       results.score = calculateScaleScore(test.items, resp);
       // Subcategory scores if defined
       if (test.subcategories) {

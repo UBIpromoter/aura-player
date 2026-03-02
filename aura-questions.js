@@ -572,7 +572,7 @@ const Q_RAW = [
 // Expand to full format
 const QUESTIONS = Q_RAW.filter(q => !q.x).map(q => ({
   id: q.id, type: T[q.t], text: q.q, category: C[q.c],
-  ...(q.o && { options: q.o }), ...(q.e && { preEvidence: q.e }), _v: q.v,
+  ...(q.o && { options: q.o }), ...(q.e && { preEvidence: q.e }), ...(q.sub && { sub: q.sub }), _v: q.v,
 }));
 const getCategoryList = () => Object.values(CAT_MAP);
 
