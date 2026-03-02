@@ -1025,11 +1025,11 @@ const SpectrumBar = ({ value = 50, leftColor = '#6b7280', rightColor = '#8b5cf6'
 };
 // --- Interactive ---
 
-const CONFIDENCE_LABELS = ['Gaps', 'Fair', 'Confident', 'Certain'];
+const CONFIDENCE_LABELS = ['Doubt', 'Uncertain', 'Believe so', 'Certain'];
 const CONFIDENCE_LONG_LABELS = [
-  '1 — Notable gaps in my knowledge',
-  '2 — Fairly confident, some uncertainty',
-  '3 — Very confident, no reason to doubt',
+  '1 — I have doubts about this',
+  '2 — Uncertain, could go either way',
+  '3 — I believe so, no major red flags',
   "4 — Certain, I'd stake my reputation",
 ];
 
@@ -1484,8 +1484,8 @@ const MC_COLORS = [
   { hex: COLOR_HEX.cyan.base, name: 'cyan', shades: ['#67e8f9', '#22d3ee', '#06b6d4', '#0891b2'], rgb: COLOR_HEX.cyan.rgb },
   { hex: '#ec4899', name: 'pink', shades: ['#f9a8d4', '#f472b6', '#ec4899', '#db2777'], rgb: '236, 72, 153' },
 ];
-const CONFIDENCE_LABEL_MAP = { 1: "Hunch", 2: "Leaning", 3: "Firm", 4: "Certain" };
-const getStars = (count) => '★'.repeat(Math.min(Math.max(count, 1), 4));
+const CONFIDENCE_LABEL_MAP = { 1: "Gut", 2: "Leaning", 3: "Certain" };
+const getStars = (count) => '★'.repeat(Math.min(Math.max(count, 1), 3));
 const QOTD_POOL = [
   { type: 'binary', text: 'Should AI systems be required to identify themselves when interacting with humans?', sponsor: { name: 'AI Safety Institute', avatar: '🏛️' }, distribution: { yes: [142, 287, 412, 389], no: [98, 156, 201, 162] } },
   { type: 'binary', text: 'Is universal basic income inevitable as automation increases?', sponsor: { name: 'Future of Work Foundation', avatar: '🤖' }, distribution: { yes: [198, 312, 287, 245], no: [156, 234, 189, 167] } },
@@ -1708,11 +1708,11 @@ const VortexButton = ({ onSingleTap, onDoubleTap, className = "text-xl btn-feedb
 // — CONFIDENCE STYLE — gradient/glow math for answer buttons
 const getConfidenceStyle = ({ c, isDark, tapCount, isSelected, isPending, wasAnswered, isAnswered, otherSelected, confidence, grayMode }) => {
   if (wasAnswered || isPending) {
-    const r = Math.min(confidence, 4);
+    const r = Math.min(confidence, 3);
     return { borderColor: `rgba(${c.rgb}, ${isDark ? 0.40 + r*0.10 : 0.50 + r*0.12})`, background: isDark ? `linear-gradient(135deg, rgba(${c.rgb},${0.10+r*0.05}) 0%, rgba(${c.rgb},${0.05+r*0.025}) 100%)` : `linear-gradient(135deg, rgba(${c.rgb},${0.14+r*0.05}) 0%, rgba(${c.rgb},${0.06+r*0.025}) 100%)`, boxShadow: `0 0 ${14+r*4}px rgba(${c.rgb},${isDark?0.15+r*0.05:0.18+r*0.06}), 0 0 ${30+r*5}px rgba(${c.rgb},${isDark?0.08+r*0.02:0.10+r*0.03})`, textColor: isDark ? '#fff' : c.base };
   }
   if (isSelected) {
-    const r = Math.min(tapCount, 4);
+    const r = Math.min(tapCount, 3);
     return { borderColor: `rgba(${c.rgb}, ${isDark ? 0.30+r*0.12 : 0.40+r*0.12})`, background: isDark ? `linear-gradient(135deg, rgba(${c.rgb},${0.06+r*0.05}) 0%, rgba(${c.rgb},${0.02+r*0.03}) 100%)` : `linear-gradient(135deg, rgba(${c.rgb},${0.10+r*0.05}) 0%, rgba(${c.rgb},${0.04+r*0.03}) 100%)`, boxShadow: `0 0 ${12+r*4}px rgba(${c.rgb},${isDark?0.10+r*0.05:0.15+r*0.06}), 0 0 ${30+r*5}px rgba(${c.rgb},${isDark?0.05+r*0.025:0.08+r*0.03})`, textColor: isDark ? '#fff' : c.base };
   }
   if (otherSelected || isAnswered) {
@@ -1902,7 +1902,7 @@ const useAnswerFlow = ({ undoDelay = 1, tapDelay = 400, graceEnabled = false, gr
     if (pendingSubmit) return;
     if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     let newCount;
-    if (tappedAnswer === answer) { newCount = Math.min(tapCount + 1, 4); setTapCount(newCount); haptic(HAPTIC.confidence); }
+    if (tappedAnswer === answer) { newCount = Math.min(tapCount + 1, 3); setTapCount(newCount); haptic(HAPTIC.confidence); }
     else { newCount = 1; setTappedAnswer(answer); setTapCount(1); haptic(HAPTIC.tap); }
     if (!requireConfirmation) tapTimeoutRef.current = setTimeout(() => doPend(answer, newCount), tapDelay);
   };
@@ -2082,55 +2082,368 @@ const WelcomeScreen = ({ onSignIn, onCreateAccount, onTryFirst, onAI, isDark }) 
   );
 };
 
+// ==================== ON-RAMP V2: QUICK READ ====================
+// 8 questions → 3 encouragement beats → Quick Read result → two exits
+const ONRAMP_QUESTIONS = [
+  { id: 'or-1', text: "Which came first?", options: ["The chicken", "The egg"], icons: ["🐔", "🥚"], colors: ['amber', 'blue'] },
+  { id: 'or-2', text: "Dogs or cats?", options: ["Dogs", "Cats"], icons: ["🐕", "🐈"], colors: ['blue', 'emerald'] },
+  { id: 'or-3', text: "Better superpower?", options: ["Flight", "Invisibility"], icons: ["🦅", "👻"], colors: ['cyan', 'pink'] },
+  { id: 'or-4', text: "Is a hot dog a sandwich?", options: ["Yes", "No"], icons: ["🌭", "🚫"], colors: ['amber', 'rose'] },
+  { id: 'or-5', text: "Pineapple on pizza?", options: ["Yes please", "Absolutely not"], icons: ["🍍", "🍕"], colors: ['emerald', 'rose'] },
+  { id: 'or-6', text: "Rather be early or exactly on time?", options: ["Early", "On time"], icons: ["⏰", "🎯"], colors: ['teal', 'violet'] },
+  { id: 'or-7', text: "Trust your gut or trust the data?", options: ["Gut", "Data"], icons: ["💡", "📊"], colors: ['amber', 'indigo'] },
+  { id: 'or-8', text: "Cashier gives you $20 too much. Keep it?", options: ["Keep it", "Say something"], icons: ["💰", "🤝"], colors: ['amber', 'emerald'] },
+];
+
+const ONRAMP_MAJORITY = { 'or-4': 1, 'or-5': 1 };
+
+function scoreQuickRead(answers, timings) {
+  const openness = (answers['or-4'] === 0 ? 1 : 0) + (answers['or-5'] === 0 ? 1 : 0);
+  const consc = answers['or-6'] === 0 ? 1 : 0;
+  const intuitive = answers['or-7'] === 0;
+  const principled = answers['or-8'] === 1;
+  const earlyTimes = [timings['or-1'], timings['or-2'], timings['or-3']].filter(Boolean);
+  const avgEarly = earlyTimes.length > 0 ? earlyTimes.reduce((a,b) => a+b, 0) / earlyTimes.length : 2000;
+  const fast = avgEarly < 2500;
+  return { openness, consc, intuitive, principled, fast };
+}
+
+const QUICK_READ_BANK = [
+  { match: s => s.fast && s.intuitive && s.principled,
+    text: "You trust your gut and move. No second-guessing, no shortcuts." },
+  { match: s => s.fast && s.intuitive && !s.principled,
+    text: "You read the room fast and act on instinct. The rulebook is more of a suggestion." },
+  { match: s => s.fast && !s.intuitive && s.principled,
+    text: "You need the logic to check out \u2014 fast. Doing right and thinking clearly are the same thing." },
+  { match: s => s.fast && !s.intuitive && !s.principled,
+    text: "You run the numbers before anyone else blinks. The smartest move wins, rules or not." },
+  { match: s => !s.fast && s.intuitive && s.principled,
+    text: "You let decisions breathe. When the moment\u2019s right, doing the right thing is just reflex." },
+  { match: s => !s.fast && s.intuitive && !s.principled,
+    text: "You wait for the feeling to land. Once it does, the rulebook can wait." },
+  { match: s => !s.fast && !s.intuitive && s.principled,
+    text: "You work the problem until it\u2019s solved right. Patient, principled, every time." },
+  { match: s => !s.fast && !s.intuitive && !s.principled,
+    text: "You map every option before choosing. What works matters more than what\u2019s proper." },
+  { match: s => s.openness === 2 && s.fast,
+    text: "You\u2019re open to anything and ready now. A little chaos never hurt." },
+  { match: s => s.openness === 2 && s.principled,
+    text: "You\u2019ll entertain any idea \u2014 except a dishonest one. Flexible mind, firm backbone." },
+  { match: s => s.openness === 0 && !s.intuitive && s.principled,
+    text: "You trust what\u2019s proven and follow through. The rules exist for a reason." },
+  { match: s => s.openness === 0 && s.fast,
+    text: "You know what you want and don\u2019t waste time deciding. Direct and sure-footed." },
+  { match: s => s.consc && s.intuitive,
+    text: "You show up prepared but trust the gut once there. Structure meets instinct." },
+  { match: s => s.consc && s.principled,
+    text: "You believe in doing the work right. No shortcuts, no excuses \u2014 that\u2019s the standard." },
+  { match: s => !s.consc && s.openness >= 1 && !s.principled,
+    text: "You roll with whatever comes. The gray areas? Not losing sleep over those." },
+  { match: s => !s.consc && s.principled,
+    text: "You keep things easy but the conscience stays sharp. Relaxed, never careless." },
+  { match: s => s.openness >= 1 && !s.fast && !s.intuitive,
+    text: "You\u2019ll consider the unexpected \u2014 but only after doing the homework first." },
+  { match: s => s.openness === 0 && s.principled && !s.fast,
+    text: "You take your time and play it straight. People trust that more than they realize." },
+  { match: s => s.openness === 2 && s.intuitive && !s.consc,
+    text: "You follow curiosity wherever it wanders. If it feels right, that\u2019s reason enough." },
+  { match: () => true,
+    text: "You know exactly where you stand \u2014 even on the small stuff. Steady and clear." },
+];
+
+function getQuickRead(scores) {
+  for (const entry of QUICK_READ_BANK) {
+    if (entry.match(scores)) return entry.text;
+  }
+  return QUICK_READ_BANK[QUICK_READ_BANK.length - 1].text;
+}
+
 const OnboardingFlow = ({ isDark, onComplete, onSkip, onReset }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
-  const question = ONBOARDING_QUESTIONS[currentIndex];
-  const isAnswered = answers[question?.id] !== undefined;
-  const totalQuestions = ONBOARDING_QUESTIONS.length;
-  const handleTap = (answer) => {
-    if (isAnswered) return;
-    const newAnswers = { ...answers, [question.id]: { answer, confidence: 1 } };
-    setAnswers(newAnswers);
-    if (currentIndex < totalQuestions - 1) setCurrentIndex(currentIndex + 1);
-    else onComplete(newAnswers);
+  const [timings, setTimings] = useState({});
+  const [beatText, setBeatText] = useState(null);
+  const [beatOpacity, setBeatOpacity] = useState(0);
+  const [phase, setPhase] = useState('questions'); // 'questions' | 'quickread'
+  const [quickReadText, setQuickReadText] = useState('');
+  const [quickReadVisible, setQuickReadVisible] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+  const questionStartTime = useRef(Date.now());
+  const pendingNext = useRef(null);
+
+  const question = ONRAMP_QUESTIONS[currentIndex];
+  const totalQuestions = ONRAMP_QUESTIONS.length;
+
+  // Reset timer on question change
+  useEffect(() => {
+    questionStartTime.current = Date.now();
+  }, [currentIndex]);
+
+  // Encouragement beat logic
+  const showBeat = (text, duration = 1500) => {
+    setBeatText(text);
+    setBeatOpacity(1);
+    return new Promise(resolve => {
+      setTimeout(() => {
+        setBeatOpacity(0);
+        setTimeout(() => { setBeatText(null); resolve(); }, 400);
+      }, duration);
+    });
   };
+
+  const advanceQuestion = (latestAnswers, latestTimings) => {
+    setTransitioning(true);
+    // Wait for full fade-out (matches CSS transition duration) before swapping content
+    setTimeout(() => {
+      if (currentIndex < totalQuestions - 1) {
+        setCurrentIndex(currentIndex + 1);
+        // New content renders at opacity 0 (still transitioning), then fade in next frame
+        requestAnimationFrame(() => requestAnimationFrame(() => setTransitioning(false)));
+      } else {
+        const ans = latestAnswers || answers;
+        const tms = latestTimings || timings;
+        const scores = scoreQuickRead(ans, tms);
+        const read = getQuickRead(scores);
+        setQuickReadText(read);
+        localStorage.setItem('aura_quickread_answers', JSON.stringify({ answers: ans, timings: tms }));
+        localStorage.setItem('aura_quickread_result', JSON.stringify({ text: read, scores, ts: Date.now() }));
+        setPhase('quickread');
+        setTransitioning(false);
+        setTimeout(() => setQuickReadVisible(true), 100);
+      }
+    }, 280);
+  };
+
+  const handleTap = async (answerIdx) => {
+    if (answers[question?.id] !== undefined || transitioning) return;
+    const elapsed = Date.now() - questionStartTime.current;
+    const newAnswers = { ...answers, [question.id]: answerIdx };
+    const newTimings = { ...timings, [question.id]: elapsed };
+    setAnswers(newAnswers);
+    setTimings(newTimings);
+
+    const qNum = currentIndex + 1;
+
+    if (qNum === 3) {
+      const t1 = newTimings['or-1'] || 3000;
+      const t2 = newTimings['or-2'] || 3000;
+      const t3 = elapsed;
+      const total = t1 + t2 + t3;
+      const anyOver3s = t1 > 3000 || t2 > 3000 || t3 > 3000;
+      const beatMsg = anyOver3s ? "You actually thought about that one." : (total < 6000 ? "You don't hesitate." : null);
+      if (beatMsg) await showBeat(beatMsg, 2500);
+      advanceQuestion(newAnswers, newTimings);
+    } else if (qNum === 5) {
+      const q4ans = newAnswers['or-4'];
+      const q5ans = answerIdx;
+      const q4majority = ONRAMP_MAJORITY['or-4'];
+      const q5majority = ONRAMP_MAJORITY['or-5'];
+      const withMajority = (q4ans === q4majority ? 1 : 0) + (q5ans === q5majority ? 1 : 0);
+      const beatMsg = withMajority >= 2 ? "Safe choice." : "Controversial.";
+      await showBeat(beatMsg, 2200);
+      advanceQuestion(newAnswers, newTimings);
+    } else if (qNum === 7) {
+      await showBeat("That one matters. Remember your answer.", 2800);
+      advanceQuestion(newAnswers, newTimings);
+    } else {
+      advanceQuestion(newAnswers, newTimings);
+    }
+  };
+
+  const handleReveal = () => {
+    const flat = { ...answers };
+    onComplete({ answers: flat, timings, quickRead: quickReadText, keepGoing: true, path: 'reveal' });
+  };
+  const handleExplore = () => {
+    const flat = { ...answers };
+    onComplete({ answers: flat, timings, quickRead: quickReadText, keepGoing: true, path: 'explore' });
+  };
+  const handleImGood = () => {
+    const flat = { ...answers };
+    onComplete({ answers: flat, timings, quickRead: quickReadText, keepGoing: false });
+  };
+
+  // Quick Read result screen
+  if (phase === 'quickread') {
+    const vc = colorOf('violet');
+    const tc = colorOf('teal');
+    return (
+      <Screen className="overflow-hidden">
+        {/* Atmospheric glow */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: '-10%' }}>
+          <div style={{
+            position: 'absolute', width: 500, height: 500, borderRadius: '50%',
+            background: `radial-gradient(circle, rgba(${vc.rgb},${isDark?0.12:0.10}) 0%, rgba(${vc.rgb},0.04) 40%, transparent 70%)`,
+            animation: 'aura-breathe 10s ease-in-out infinite',
+          }} />
+        </div>
+
+        <Stack align="center" className="flex-1 px-6 relative z-10 justify-center"
+          style={{ opacity: quickReadVisible ? 1 : 0, transition: 'opacity 0.8s ease-out' }}>
+          <Card color="violet" glow shine className="max-w-sm w-full rounded-3xl" style={{
+            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: isDark
+              ? `0 0 40px rgba(${vc.rgb},0.15), 0 0 80px rgba(${vc.rgb},0.06), 0 8px 32px rgba(0,0,0,0.4)`
+              : `0 0 30px rgba(${vc.rgb},0.12), 0 8px 32px rgba(0,0,0,0.08)`,
+            padding: '2.5rem 2rem',
+          }}>
+            <Text size="xs" weight="semibold" emphasis="muted" className="tracking-widest uppercase text-center mb-3">
+              A quick read on you
+            </Text>
+            <div className="w-10 mx-auto mb-5" style={{ height: 2, background: `rgba(${vc.rgb}, 0.4)`, borderRadius: 1 }} />
+            <Text size="xl" weight="medium" className="text-center leading-relaxed italic" style={{ textWrap: 'balance' }}>
+              "{quickReadText}"
+            </Text>
+            <Text size="xs" emphasis="faint" className="text-center mt-6">
+              That was the quick version. There's a lot more to find.
+            </Text>
+          </Card>
+        </Stack>
+
+        {/* Path choice — integrated into Quick Read */}
+        <Stack align="center" className="flex-shrink-0 px-6 pb-8 relative z-10" gap={3}
+          style={{ opacity: quickReadVisible ? 1 : 0, transition: 'opacity 1s ease-out 0.5s' }}>
+          <Stack className="w-full max-w-sm" gap={3}>
+            <Button variant="outline" color="violet" size="full" shine onClick={handleReveal}
+              style={{
+                background: isDark
+                  ? `linear-gradient(135deg, rgba(${vc.rgb},0.14) 0%, rgba(${vc.rgb},0.06) 100%)`
+                  : `linear-gradient(135deg, rgba(${vc.rgb},0.12) 0%, rgba(${vc.rgb},0.05) 100%)`,
+                borderColor: `rgba(${vc.rgb}, ${isDark ? 0.50 : 0.35})`,
+                color: isDark ? vc.light : vc.base,
+              }}>
+              Go deeper
+            </Button>
+            <Button variant="outline" color="teal" size="full" shine onClick={handleExplore}
+              style={{
+                background: isDark
+                  ? `linear-gradient(135deg, rgba(${tc.rgb},0.12) 0%, rgba(${tc.rgb},0.05) 100%)`
+                  : `linear-gradient(135deg, rgba(${tc.rgb},0.10) 0%, rgba(${tc.rgb},0.04) 100%)`,
+                borderColor: `rgba(${tc.rgb}, ${isDark ? 0.40 : 0.30})`,
+                color: isDark ? tc.light : tc.base,
+              }}>
+              Explore questions
+            </Button>
+          </Stack>
+          <Button variant="ghost" size="sm" onClick={handleImGood}>I'm good for now</Button>
+        </Stack>
+      </Screen>
+    );
+  }
+
+  // Question phase
   if (!question) return null;
+
   return (
     <Screen className="overflow-hidden">
-      <Stack direction="row" align="center" className="justify-between px-5 pt-4 pb-2">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-2">
         <VortexButton onSingleTap={onSkip} onDoubleTap={onReset} className="text-3xl btn-feedback cursor-pointer" />
-      </Stack>
-      <Stack align="center" className="flex-1 justify-center px-6 relative">
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-8%' }}>
-          {(() => { const c0 = colorOf(question.colors?.[0]); const c1 = colorOf(question.colors?.[1], 'blue'); return <>
-            <div style={{ position: 'absolute', width: 420, height: 420, borderRadius: '50%', background: `radial-gradient(circle, rgba(${c0.rgb},${isDark?0.14:0.12}) 0%, rgba(${c0.rgb},${isDark?0.05:0.06}) 35%, transparent 65%)`, animation: 'aura-breathe 8s ease-in-out infinite' }} />
-            <div style={{ position: 'absolute', width: 350, height: 350, borderRadius: '50%', background: `radial-gradient(circle, rgba(${c1.rgb},0.10) 0%, rgba(${c1.rgb},0.04) 40%, transparent 65%)`, animation: 'aura-breathe 6s ease-in-out infinite 1s' }} />
-          </>; })()}
+        <div className="flex items-center gap-1">
+          {ONRAMP_QUESTIONS.map((_, i) => (
+            <div key={i} className="rounded-full transition-all duration-300" style={{
+              width: i === currentIndex ? 16 : 6, height: 6,
+              background: i < currentIndex
+                ? (isDark ? 'rgba(139,92,246,0.5)' : 'rgba(139,92,246,0.4)')
+                : i === currentIndex
+                  ? (isDark ? 'rgba(139,92,246,0.8)' : 'rgba(139,92,246,0.7)')
+                  : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
+            }} />
+          ))}
         </div>
-        <div className="max-w-sm px-4 relative">
+        <div className="w-8" />
+      </div>
+
+      {/* Upper zone — question centered, atmospheric */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 relative">
+        {/* Encouragement beat overlay */}
+        {beatText && (
+          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+            <Text size="lg" weight="medium" emphasis="subtle" className="italic px-6 text-center"
+              style={{ opacity: beatOpacity, transition: 'opacity 0.4s ease-in-out' }}>
+              {beatText}
+            </Text>
+          </div>
+        )}
+
+        {/* Aura glow */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-8%' }}>
+          {(() => {
+            const c0 = colorOf(question.colors?.[0]);
+            const c1 = colorOf(question.colors?.[1], 'blue');
+            return <>
+              <div style={{
+                position: 'absolute', width: 420, height: 420, borderRadius: '50%',
+                background: `radial-gradient(circle, rgba(${c0.rgb},${isDark?0.14:0.12}) 0%, rgba(${c0.rgb},${isDark?0.05:0.06}) 35%, transparent 65%)`,
+                animation: 'aura-breathe 8s ease-in-out infinite',
+              }} />
+              <div style={{
+                position: 'absolute', width: 350, height: 350, borderRadius: '50%',
+                background: `radial-gradient(circle, rgba(${c1.rgb},0.10) 0%, rgba(${c1.rgb},0.04) 40%, transparent 65%)`,
+                animation: 'aura-breathe 6s ease-in-out infinite 1s',
+              }} />
+            </>;
+          })()}
+        </div>
+
+        {/* Question text */}
+        <div className="max-w-sm px-4 relative" style={{
+          opacity: (transitioning || beatText) ? 0 : 1,
+          transition: 'opacity 0.25s ease-in-out',
+        }}>
+          {(() => {
+            const c = colorOf(question.colors?.[0]);
+            return (
+              <div className="absolute inset-0 pointer-events-none" style={{
+                width: '200%', height: '200%', left: '-50%', top: '-50%',
+                background: `radial-gradient(ellipse at center, rgba(${c.rgb},${isDark?0.12:0.08}) 0%, rgba(${c.rgb},${isDark?0.04:0.02}) 40%, transparent 70%)`,
+              }} />
+            );
+          })()}
           <Text as="h2" weight="medium" className="question-text text-center relative z-10">{question.text}</Text>
         </div>
-      </Stack>
-      <Stack align="center" className="flex-shrink-0 px-6 pb-8">
-        <div className="w-full max-w-sm space-y-3">
+      </div>
+
+      {/* Lower zone — buttons */}
+      <div className="flex-shrink-0 flex flex-col items-center px-6 pb-8">
+        <div className="w-full max-w-sm space-y-3" style={{
+          opacity: transitioning ? 0 : 1,
+          transition: 'opacity 0.2s',
+        }}>
           {question.options.map((option, idx) => {
-            const answered = answers[question.id]?.answer === idx;
             const icon = question.icons?.[idx];
-            const c = colorOf(question.colors?.[idx] || 'violet');
+            const colorName = question.colors?.[idx] || 'violet';
+            const c = colorOf(colorName);
+            const isChosen = answers[question.id] === idx;
+            const isOther = answers[question.id] !== undefined && !isChosen;
             return (
-              <button key={idx} onClick={() => handleTap(idx)} disabled={isAnswered}
+              <button
+                key={idx}
+                onClick={() => handleTap(idx)}
+                disabled={answers[question.id] !== undefined}
                 className="w-full h-14 resp-h-lg rounded-2xl flex items-center justify-center gap-4 transition-all btn-feedback shine-card border cursor-pointer"
-                style={answered ? { borderColor: `rgba(${c.rgb},0.6)`, background: `linear-gradient(135deg, rgba(${c.rgb},${isDark?0.25:0.15}) 0%, rgba(${c.rgb},${isDark?0.12:0.06}) 100%)`, boxShadow: `0 0 18px rgba(${c.rgb},0.25), 0 0 40px rgba(${c.rgb},0.12)`, '--accent-rgb': c.rgb }
-                : { borderColor: isDark ? `rgba(${c.rgb},0.25)` : `rgba(${c.rgb},0.35)`, background: `linear-gradient(135deg, rgba(${c.rgb},0.08) 0%, rgba(${c.rgb},0.03) 100%)`, boxShadow: `0 0 12px rgba(${c.rgb},0.10), 0 0 30px rgba(${c.rgb},0.05)`, '--accent-rgb': c.rgb }}>
+                style={{
+                  borderColor: isChosen ? `rgba(${c.rgb}, ${isDark ? 0.55 : 0.60})` : isDark ? `rgba(${c.rgb}, 0.25)` : `rgba(${c.rgb}, 0.35)`,
+                  background: isChosen
+                    ? `linear-gradient(135deg, rgba(${c.rgb},0.20) 0%, rgba(${c.rgb},0.10) 100%)`
+                    : `linear-gradient(135deg, rgba(${c.rgb},0.08) 0%, rgba(${c.rgb},0.03) 100%)`,
+                  boxShadow: isChosen
+                    ? `0 0 20px rgba(${c.rgb},0.25), 0 0 40px rgba(${c.rgb},0.12)`
+                    : isDark ? `0 0 12px rgba(${c.rgb},0.10), 0 0 30px rgba(${c.rgb},0.05)` : `0 0 8px rgba(${c.rgb},0.08), 0 0 20px rgba(${c.rgb},0.04)`,
+                  opacity: isOther ? 0.4 : 1,
+                  '--accent-rgb': c.rgb,
+                }}
+              >
                 {icon && <span className="text-xl leading-none">{icon}</span>}
-                <span className="resp-text-lg font-semibold" style={{ color: answered ? (isDark ? '#fff' : c.base) : (isDark ? c.light : c.base) }}>{option}</span>
+                <span className="resp-text-lg font-semibold" style={{ color: isDark ? c.light : c.base }}>
+                  {option}
+                </span>
               </button>
             );
           })}
         </div>
         <div className="h-10" />
-      </Stack>
+      </div>
     </Screen>
   );
 };
@@ -2281,7 +2594,7 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => 
                 {isBinary ? <BinaryButtons isDark={isDark} tappedAnswer={tappedAnswer} tapCount={tapCount} isAnswered={isAnswered} currentResponse={currentResponse} onTap={handleAnswerTap} onRightClick={handleAnswerRightClick} pendingSubmit={pendingSubmit} category={currentQuestion?.category} undoDelay={undoDelay} onUndo={handleUndo} />
                 : <MCButtons options={currentQuestion.options} isDark={isDark} tappedAnswer={tappedAnswer} tapCount={tapCount} isAnswered={isAnswered} currentResponse={currentResponse} onTap={handleAnswerTap} onRightClick={handleAnswerRightClick} pendingSubmit={pendingSubmit} mcColorMode={mcColorMode} undoDelay={undoDelay} onUndo={handleUndo} />}
               </div>
-              <Stack direction="row" align="center" className={`relative px-4 mt-3 mb-2 justify-center resp-max-w mx-auto ${(isAnswered || pendingSubmit) ? 'invisible' : ''}`}>
+              <Stack direction="row" align="center" className={`relative px-4 mt-3 mb-2 justify-center resp-max-w mx-auto ${isAnswered ? 'invisible' : ''}`}>
                 <Stack direction="row" gap={2} className="w-full">
                   {[
                     { label: isBinary ? "Can't" : "None", onClick: () => setActiveModal('cant') },
@@ -2393,9 +2706,9 @@ const ASSESS_CATEGORIES = {
   behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], tier: 2, branch: 'action' },
   wellbeing: { name: 'Wellbeing', icon: '🌿', color: 'emerald', tests: ['life-satisfaction', 'resilience'], tier: 2, branch: 'wellness' },
   // Clinical (opt-in, always available behind consent gate)
-  clinical: { name: 'Clinical Screens', icon: '📊', color: 'blue', tests: ['phq9', 'gad7'], tier: 0, clinical: true, requiresConsent: true },
+  clinical: { name: 'Clinical Screens', icon: '📊', color: 'blue', tests: ['phq9', 'gad7'], tier: 0, clinical: true, requiresConsent: true, hidden: true },
 };
-const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'shadow', 'drive', 'mind', 'relationships', 'character', 'behavior', 'wellbeing', 'clinical'];
+const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'shadow', 'drive', 'mind', 'relationships', 'character', 'behavior', 'wellbeing'];
 const ASSESS_TEST_TO_CATEGORY = {};
 Object.entries(ASSESS_CATEGORIES).forEach(([catId, cat]) => { cat.tests.forEach(testId => { ASSESS_TEST_TO_CATEGORY[testId] = catId; }); });
 const ASSESS_VERSION = 2;
@@ -2480,7 +2793,7 @@ const getAssessNudge = (completedTestId, newCompleted, entityType) => {
   for (const catId of ASSESS_CATEGORY_ORDER) {
     if (catId === fromCatId) continue;
     const cat = ASSESS_CATEGORIES[catId];
-    if (!cat || (cat.tier || 0) > tier) continue;
+    if (!cat || cat.hidden || (cat.tier || 0) > tier) continue;
     if (cat.entityHint && cat.entityHint !== entityType) continue;
     const nextTestId = cat.tests.find(id => !newCompleted[id] && ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
     if (!nextTestId) continue;
@@ -2516,6 +2829,67 @@ const spectrumColors = {
 };
 
 const PROGRESS_GRADIENTS = Object.fromEntries(Object.entries(COLOR_HEX).map(([c, hex]) => [c, { from: hex.base, to: hex.light }]));
+
+// — INSIGHT ROW — emoji + label + text
+const InsightRow = ({ emoji, label, text, isDark }) => (
+  <div className="flex gap-2 items-start">
+    <span className="text-sm flex-shrink-0">{emoji}</span>
+    <Text size="xxs" emphasis="secondary"><Text as="span" size="xxs" weight="medium">{label}:</Text> {text}</Text>
+  </div>
+);
+
+// — TRAIT SPECTRUM — name + gradient bar + low/high labels + white dot marker
+const TraitSpectrum = ({ name, score, lowLabel, highLabel, color = 'violet', gradFrom, gradTo, compact = false, isDark }) => {
+  const grad = PROGRESS_GRADIENTS[color] || PROGRESS_GRADIENTS.violet;
+  const barFrom = gradFrom || grad.from;
+  const barTo = gradTo || grad.to;
+  if (compact) {
+    return (
+      <div className="py-1.5">
+        {name && <Text size="xxs" weight="medium" className="mb-0.5">{name}</Text>}
+        <div className="flex items-center gap-2">
+          <Text as="span" size="xxs" emphasis="faint" className="w-16 text-right truncate flex-shrink-0">{lowLabel}</Text>
+          <div className="flex-1 h-2 rounded-full relative" style={{ background: `linear-gradient(to right, ${barFrom}, ${barTo})` }}>
+            <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white" style={{ left: `${Math.max(5, Math.min(95, score))}%`, marginLeft: -6, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+          </div>
+          <Text as="span" size="xxs" emphasis="faint" className="w-16 truncate flex-shrink-0">{highLabel}</Text>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="py-1">
+      {name && <Text size="xxs" weight="medium" className="mb-1">{name}</Text>}
+      <Stack direction="row" className="justify-between mb-0.5">
+        <Text as="span" size="xxs" emphasis="faint">{lowLabel}</Text>
+        <Text as="span" size="xxs" emphasis="faint">{highLabel}</Text>
+      </Stack>
+      <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${barFrom}, ${barTo})` }}>
+        <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white" style={{ left: `${Math.max(5, Math.min(95, score))}%`, marginLeft: -8, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+      </div>
+    </div>
+  );
+};
+
+// — SCORE GAUGE — circular SVG gauge
+const ScoreGauge = ({ value, label, isDark, color = 'violet' }) => {
+  const grad = PROGRESS_GRADIENTS[color] || PROGRESS_GRADIENTS.violet;
+  return (
+    <div className="text-center">
+      <div className="relative w-24 h-24 mx-auto">
+        <svg className="w-24 h-24 transform -rotate-90">
+          <circle cx="48" cy="48" r="40" stroke={isDark ? '#374151' : '#e5e7eb'} strokeWidth="8" fill="none" />
+          <circle cx="48" cy="48" r="40" stroke="url(#scoreGrad)" strokeWidth="8" fill="none" strokeLinecap="round" strokeDasharray={`${(value / 100) * 251.2} 251.2`} />
+          <defs><linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor={grad.from} /><stop offset="100%" stopColor={grad.to} /></linearGradient></defs>
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Text heading={3} style={{ color: grad.to }}>{value}%</Text>
+        </div>
+      </div>
+      {label && <Text size="xxs" emphasis="faint" className="mt-2">{label}</Text>}
+    </div>
+  );
+};
 
 // — PROGRESS CIRCLE
 const ProgressCircle = ({ progress = 0, size = 48, strokeWidth = 3, color = 'violet', icon = null, text = null, gradientId = 'prog', isDark = true, glow = true, iconSize = 'text-lg', textSize = 'text-sm', onClick = null }) => {
@@ -2625,8 +2999,9 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     const newUnlocks = calculateAssessUnlocks(newCompleted);
     const newBranches = Object.keys(newUnlocks.branches).filter(b => newUnlocks.branches[b] && !prevUnlocks.branches[b]);
     if (newBranches.length > 0) {
-      const branchInfo = ASSESS_BRANCHES.find(b => b.id === newBranches[0]);
-      setAssessUnlockMessage({ title: `${branchInfo?.icon || '🔓'} ${branchInfo?.name || 'New Branch'} Unlocked!`, subtitle: `You can now explore ${branchInfo?.name || 'new assessments'}` });
+      // Find the category that this branch unlocks (match branch field in ASSESS_CATEGORIES)
+      const branchCat = Object.values(ASSESS_CATEGORIES).find(c => c.branch === newBranches[0]);
+      setAssessUnlockMessage({ title: `${branchCat?.icon || '🔓'} ${branchCat?.name || 'New Branch'} Unlocked!`, subtitle: `You can now explore ${branchCat?.name || 'new assessments'}` });
     }
     setAssessShowCompletion(true);
     haptic(HAPTIC.complete);
@@ -2823,15 +3198,8 @@ const AssessCategoryCard = ({ catId, cat, catTests, isDark, assessCompleted, ass
   );
 };
 
-// Branch section definitions for grouped picker
-const ASSESS_BRANCHES = [
-  { id: 'personality', name: 'Personality', icon: '🎭', categories: ['personality', 'shadow'], starter: 'starter-personality' },
-  { id: 'drive', name: 'Drive & Values', icon: '🔥', categories: ['drive'], starter: 'starter-motivation' },
-  { id: 'cognition', name: 'Mind', icon: '🧠', categories: ['mind'], starter: 'starter-thinking' },
-  { id: 'social', name: 'Relationships', icon: '💚', categories: ['relationships'], starter: 'starter-connection' },
-  { id: 'action', name: 'Character & Behavior', icon: '💎', categories: ['character', 'behavior'], starter: 'starter-strategy' },
-  { id: 'wellness', name: 'Wellbeing', icon: '🌿', categories: ['wellbeing'], starter: 'starter-wellbeing' },
-];
+// Tier-2 branch categories (filtered at render time, not shown as locked teasers)
+const ASSESS_BRANCH_CATS = ['personality', 'shadow', 'drive', 'mind', 'relationships', 'character', 'behavior', 'wellbeing'];
 
 const AssessPickerScreen = ({ isDark, entityType, assessState, assessActions, onNavigate }) => {
   const { assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, showDemoControls, assessDemoActive, assessDemoProfile } = assessState;
@@ -2852,8 +3220,6 @@ const AssessPickerScreen = ({ isDark, entityType, assessState, assessActions, on
   const gatewayCats = (entityType === 'ai' ? ['ai-identity', 'quickstart'] : ['quickstart']).map(makeCatStatus).filter(Boolean);
   // Starter
   const starterCat = makeCatStatus('starter');
-  // Clinical
-  const clinicalCat = makeCatStatus('clinical');
 
   return (
     <Screen>
@@ -2889,47 +3255,103 @@ const AssessPickerScreen = ({ isDark, entityType, assessState, assessActions, on
         {!isFirstTimeUser && (<Stack gap={4}>
           {/* Gateway */}
           {gatewayCats.some(c => !c.allComplete) && <div className="space-y-2">{gatewayCats.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>}
-          {/* Starter Pack */}
-          {currentTier >= 1 && starterCat && !starterCat.allComplete && (
-            <div>
-              <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">🚀 Starter Pack</Text>
-              <AssessCategoryCard {...starterCat} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />
-            </div>
-          )}
-          {/* Branch sections */}
-          {currentTier >= 1 && ASSESS_BRANCHES.map(branch => {
-            const isUnlocked = !!unlocks.branches[branch.id];
-            const branchCats = branch.categories.map(makeCatStatus).filter(Boolean);
-            const allDone = branchCats.every(c => c.allComplete);
-            if (allDone && branchCats.length > 0) return null; // shown in completed section
-            const starterTest = ASSESS_TESTS[branch.starter];
-            const starterName = starterTest?.name || branch.name;
+          {/* Starter Pack — hero CTA when incomplete */}
+          {currentTier >= 1 && starterCat && !starterCat.allComplete && (() => {
+            const doneCount = starterCat.catTests.filter(([id]) => assessCompleted[id]).length;
+            const nextModule = starterCat.catTests.find(([id]) => !assessCompleted[id]);
+            const nextTest = nextModule ? ASSESS_TESTS[nextModule[0]] : null;
             return (
-              <div key={branch.id} style={!isUnlocked ? { opacity: 0.5 } : undefined}>
-                <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">{branch.icon} {branch.name}</Text>
-                {!isUnlocked ? (
-                  <Card variant="plain" className="py-3 px-4">
-                    <Text size="xs" emphasis="subtle">Complete <strong>{starterName}</strong> to unlock</Text>
-                  </Card>
-                ) : (
-                  <div className="space-y-2">{branchCats.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>
-                )}
+              <div>
+                <Card variant="plain" className="p-4" style={{ background: isDark ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.05)', border: `1px solid ${isDark ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.15)'}` }}>
+                  <Stack direction="row" align="center" gap={3}>
+                    <ProgressCircle progress={Math.round((doneCount / starterCat.catTests.length) * 100)} size={52} color="indigo" text={`${doneCount}/${starterCat.catTests.length}`} textSize="text-xs" isDark={isDark} gradientId="starter-hero" />
+                    <div className="flex-1">
+                      <Text weight="semibold">Starter Pack</Text>
+                      {nextTest && <Text size="xxs" emphasis="subtle" className="mt-0.5">Next: {nextTest.name}</Text>}
+                    </div>
+                  </Stack>
+                  {nextModule && <Button color="indigo" className="w-full mt-3" onClick={() => assessStartTest(nextModule[0])}>Continue →</Button>}
+                </Card>
               </div>
             );
-          })}
-          {/* Clinical */}
-          {clinicalCat && (
-            <div>
-              <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">📋 Clinical Screens</Text>
-              <AssessCategoryCard {...clinicalCat} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />
-            </div>
-          )}
-          {/* Completed */}
+          })()}
+          {/* Unlocked branches — only shown AFTER Starter Pack is complete */}
+          {currentTier >= 2 && starterCat?.allComplete && (() => {
+            const branchCats = ASSESS_BRANCH_CATS.map(makeCatStatus).filter(Boolean);
+            const unlockedActive = branchCats.filter(c => {
+              const status = getCategoryStatus(c.catId, assessCompleted, assessInProgress, currentTier, unlocks);
+              return status !== 'locked' && !c.allComplete;
+            });
+            const lockedBranches = branchCats.filter(c => {
+              const status = getCategoryStatus(c.catId, assessCompleted, assessInProgress, currentTier, unlocks);
+              return status === 'locked';
+            });
+            if (unlockedActive.length === 0 && lockedBranches.length === 0) return null;
+            // Progressive reveal: start with 3, expand as user explores
+            const branchesStarted = unlockedActive.filter(c => c.catTests.some(([id]) => assessCompleted[id])).length;
+            const maxVisible = Math.min(3 + branchesStarted, unlockedActive.length);
+            const visible = unlockedActive.slice(0, maxVisible);
+            const hiddenCount = unlockedActive.length - maxVisible + lockedBranches.length;
+            return (
+              <div>
+                {visible.length > 0 && (<>
+                  <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">Deep Dives</Text>
+                  <div className="space-y-1">
+                    {visible.map((c, i) => {
+                      const cat = ASSESS_CATEGORIES[c.catId];
+                      const t = twColor(cat.color);
+                      const doneCount = c.catTests.filter(([id]) => assessCompleted[id]).length;
+                      const firstIncomplete = c.catTests.find(([id]) => !assessCompleted[id]);
+                      return (
+                        <button key={c.catId} onClick={() => firstIncomplete && assessStartTest(firstIncomplete[0])}
+                          className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all cursor-pointer ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-gray-50'}`}>
+                          <span className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-base ${isDark ? `bg-${t}-900/40` : `bg-${t}-100`}`}>{cat.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <Text weight="medium">{cat.name}</Text>
+                            {doneCount > 0 && <Text size="xxs" emphasis="faint">{doneCount}/{c.catTests.length} complete</Text>}
+                          </div>
+                          <Text as="span" size="xxs" weight="medium" className={`text-${t}-400`}>{doneCount > 0 ? 'Continue →' : 'Start →'}</Text>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>)}
+                {hiddenCount > 0 && (() => {
+                  const hiddenUnlocked = unlockedActive.length - maxVisible;
+                  // If only locked branches remain, give specific requirements
+                  if (hiddenUnlocked <= 0 && lockedBranches.length > 0) {
+                    const bigFiveCount = ['bigfive-E', 'bigfive-A', 'bigfive-C', 'bigfive-N', 'bigfive-O'].filter(id => assessCompleted[id]).length;
+                    const needMore = 3 - bigFiveCount;
+                    if (needMore > 0) return <Text size="xxs" emphasis="faint" className={`${visible.length > 0 ? 'mt-3' : ''} text-center`}>Complete {needMore} more Personality {needMore === 1 ? 'module' : 'modules'} to unlock Shadow Self</Text>;
+                    return null;
+                  }
+                  return <Text size="xxs" emphasis="faint" className={`${visible.length > 0 ? 'mt-3' : ''} text-center`}>{hiddenCount} more to explore</Text>;
+                })()}
+              </div>
+            );
+          })()}
+          {/* Clinical screens removed — phq9/gad7 not ported to rebuild yet */}
+          {/* Completed — compact list */}
           {(() => {
-            const done = [...gatewayCats, starterCat, ...ASSESS_BRANCHES.flatMap(b => b.categories.map(makeCatStatus)), clinicalCat].filter(c => c && c.allComplete);
-            return done.length > 0 ? (
-              <div><Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">✅ Completed</Text><div className="space-y-2">{done.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div></div>
-            ) : null;
+            const allCats = [...gatewayCats, starterCat, ...ASSESS_BRANCH_CATS.map(makeCatStatus)].filter(c => c && c.allComplete);
+            if (allCats.length === 0) return null;
+            return (
+              <div>
+                <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">Completed</Text>
+                <div className="space-y-1">
+                  {allCats.map(c => {
+                    const cat = ASSESS_CATEGORIES[c.catId];
+                    return (
+                      <div key={c.catId} className="flex items-center gap-3 p-2 rounded-lg">
+                        <span className="text-base">{cat.icon}</span>
+                        <Text size="sm" emphasis="subtle" className="flex-1">{cat.name}</Text>
+                        <Text size="xxs" emphasis="faint">✓</Text>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
           })()}
         </Stack>)}
       </div>
@@ -3079,7 +3501,7 @@ const ClinicalConsentScreen = ({ isDark, assessActions, onNavigate }) => {
         <Stack gap={3} className="max-w-sm">
           <Text size="sm" emphasis="secondary">These are validated clinical screening tools, not diagnoses.</Text>
           <Text size="sm" emphasis="secondary">They can help you understand patterns in your mental health, but they don't replace professional assessment.</Text>
-          <Text size="sm" emphasis="subtle">Results are stored only on your device.</Text>
+          <Text size="sm" emphasis="subtle">Your results are private and secure.</Text>
         </Stack>
         <Stack direction="row" gap={3} className="mt-4">
           <Button variant="ghost" onClick={() => onNavigate('assess-picker')}>Go back</Button>
@@ -3098,16 +3520,67 @@ const AssessResultsScreen = ({ isDark, assessState, assessActions, entityType, o
   const results = assessCompleted[testId];
   if (!test || !results) return <Placeholder title="No results" />;
   const colors = getAssessColor(test.color, isDark);
+  // Enhanced trait info with Strength + Shadow + Tip framework
   const traitInfo = {
-    E: { low: 'Reserved', high: 'Outgoing', strength: v => v > 60 ? 'Natural connector who energizes groups' : v < 40 ? 'Deep thinker who recharges through reflection' : 'Flexible between social and solo modes' },
-    A: { low: 'Analytical', high: 'Empathetic', strength: v => v > 60 ? 'Creates harmony and builds trust easily' : v < 40 ? 'Cuts through noise to find truth' : 'Balances compassion with objectivity' },
-    C: { low: 'Flexible', high: 'Organized', strength: v => v > 60 ? 'Reliable executor who delivers consistently' : v < 40 ? 'Adapts quickly to changing circumstances' : 'Balances planning with adaptability' },
-    N: { low: 'Calm', high: 'Sensitive', strength: v => v > 60 ? 'Deep emotional intelligence and empathy' : v < 40 ? 'Steady presence under pressure' : 'Moderate emotional responsiveness' },
-    O: { low: 'Practical', high: 'Curious', strength: v => v > 60 ? 'Visionary thinking and creative problem-solving' : v < 40 ? 'Grounded execution and proven methods' : 'Blends innovation with practicality' },
+    E: { low: 'Reserved', high: 'Outgoing',
+      strength: v => v > 60 ? 'Natural connector who energizes groups' : v < 40 ? 'Deep thinker who recharges through reflection' : 'Flexible between social and solo modes',
+      shadow: v => v > 60 ? 'May struggle with alone time or quiet reflection' : v < 40 ? 'Networking and small talk can feel draining' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Schedule deliberate quiet time for processing' : v < 40 ? 'Prepare conversation starters before social events' : 'Trust your instincts on when to engage vs. withdraw' },
+    A: { low: 'Analytical', high: 'Empathetic',
+      strength: v => v > 60 ? 'Creates harmony and builds trust easily' : v < 40 ? 'Cuts through noise to find truth' : 'Balances compassion with objectivity',
+      shadow: v => v > 60 ? 'May avoid necessary conflict or hard truths' : v < 40 ? 'Directness can come across as cold' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Practice saying "no" in low-stakes situations' : v < 40 ? 'Pause to acknowledge emotions before giving feedback' : 'Use your balance as a mediator strength' },
+    C: { low: 'Flexible', high: 'Organized',
+      strength: v => v > 60 ? 'Reliable executor who delivers consistently' : v < 40 ? 'Adapts quickly to changing circumstances' : 'Balances planning with adaptability',
+      shadow: v => v > 60 ? 'Rigidity and perfectionism can slow you down' : v < 40 ? 'Details and follow-through may slip' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Embrace "good enough" for low-stakes tasks' : v < 40 ? 'Use external systems (calendars, reminders) as scaffolding' : 'Leverage your flexibility as a superpower' },
+    N: { low: 'Calm', high: 'Sensitive',
+      strength: v => v > 60 ? 'Deep emotional intelligence and empathy' : v < 40 ? 'Steady presence under pressure' : 'Moderate emotional responsiveness',
+      shadow: v => v > 60 ? 'Emotional intensity can be overwhelming' : v < 40 ? 'May miss emotional cues or seem detached' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Develop grounding techniques for intense moments' : v < 40 ? 'Check in explicitly with others about their feelings' : 'Your balance helps you support others effectively' },
+    O: { low: 'Practical', high: 'Curious',
+      strength: v => v > 60 ? 'Visionary thinking and creative problem-solving' : v < 40 ? 'Grounded execution and proven methods' : 'Blends innovation with practicality',
+      shadow: v => v > 60 ? 'May chase novelty over finishing projects' : v < 40 ? 'Resistance to change or new approaches' : 'Neither extreme poses significant friction',
+      tip: v => v > 60 ? 'Set "finish before starting new" rules' : v < 40 ? 'Schedule time to explore one new idea monthly' : 'Use your balance to bridge visionaries and operators' },
   };
 
+  // Interpretive data objects
+  const adhdLevel = results?.indicators >= 4 ? { label: 'High Indicators', bg: 'from-rose-500 to-orange-500', desc: 'Several indicators present. These patterns may significantly impact daily life.', strength: 'Hyperfocus, creativity, out-of-the-box thinking', shadow: 'Time blindness, task initiation, emotional regulation' } : results?.indicators >= 2 ? { label: 'Moderate Indicators', bg: 'from-amber-500 to-yellow-500', desc: 'Some indicators present. Worth monitoring how they affect you.', strength: 'Bursts of productive energy, adaptability', shadow: 'Occasional focus challenges, restlessness' } : { label: 'Low Indicators', bg: 'from-emerald-500 to-teal-500', desc: 'Few indicators. Likely typical neurological patterns.', strength: 'Consistent focus and task management', shadow: 'May not relate to ADHD experiences' };
+  const riskLevel = results?.score >= 70 ? { label: 'Bold Explorer', desc: 'You embrace uncertainty and chase big opportunities', strength: 'Seizes opportunities others miss, comfortable with ambiguity', shadow: 'May underestimate downsides or act impulsively', tip: 'Build in a 24-hour rule for major decisions' } : results?.score >= 40 ? { label: 'Calculated Risk Taker', desc: 'You weigh risks carefully before acting', strength: 'Makes informed bets, balances caution with action', shadow: 'Analysis paralysis on edge cases', tip: 'Set decision deadlines to avoid overthinking' } : { label: 'Security Seeker', desc: 'You prefer stability and careful planning', strength: 'Protects against downside, builds lasting foundations', shadow: 'May miss opportunities that require a leap', tip: 'Practice small, reversible risks to build comfort' };
+  const attachInfo = {
+    Secure: { desc: 'You feel comfortable with intimacy and independence', strength: 'Forms deep bonds while maintaining healthy boundaries', shadow: 'May not fully understand others\' attachment struggles', tip: 'Use your security to create safe space for others' },
+    Anxious: { desc: 'You seek closeness but worry about abandonment', strength: 'Deeply committed, attuned to relationship dynamics', shadow: 'Reassurance-seeking can strain relationships', tip: 'Build self-soothing practices for anxious moments' },
+    Avoidant: { desc: 'You value independence and may keep emotional distance', strength: 'Self-sufficient, maintains boundaries effectively', shadow: 'May push away those who get too close', tip: 'Practice small vulnerability with trusted people' },
+    Fearful: { desc: 'You desire closeness but fear vulnerability', strength: 'Deep capacity for connection when trust is built', shadow: 'Push-pull dynamics can confuse partners', tip: 'Work with a therapist on attachment patterns' }
+  };
+  const integrityLevel = results?.score >= 70 ? { label: 'The Sincere Idealist', strength: 'Trusted implicitly, builds authentic relationships', shadow: 'May judge others who bend rules pragmatically', tip: 'Accept that others navigate ethics differently' } : results?.score >= 40 ? { label: 'The Balanced Pragmatist', strength: 'Adapts approach while maintaining core values', shadow: 'Occasional uncertainty about the "right" choice', tip: 'Define your non-negotiables clearly' } : { label: 'The Strategic Navigator', strength: 'Reads situations and optimizes outcomes skillfully', shadow: 'Others may question your motives', tip: 'Be transparent about your reasoning process' };
+  const shadowInfo = {
+    M: { high: 'Strategic Thinker', mid: 'Situational Tactician', low: 'Transparent Operator', strength: s => s > 60 ? 'Masterful at navigating complex social dynamics' : s < 40 ? 'Builds trust through authentic openness' : 'Flexes between directness and strategy', shadow: s => s > 60 ? 'Others may perceive manipulation' : s < 40 ? 'May be outmaneuvered by strategic players' : 'Occasional uncertainty on approach' },
+    N: { high: 'Confident Leader', mid: 'Healthy Self-Regard', low: 'Humble Collaborator', strength: s => s > 60 ? 'Commands attention and inspires others' : s < 40 ? 'Elevates team over self, builds loyalty' : 'Balances confidence with humility', shadow: s => s > 60 ? 'May not see blind spots or hear criticism' : s < 40 ? 'May undersell yourself or defer too much' : 'Neither extreme causes friction' },
+    P: { high: 'Cool Under Pressure', mid: 'Emotionally Balanced', low: 'Deeply Empathetic', strength: s => s > 60 ? 'Makes hard decisions without emotional interference' : s < 40 ? 'Deep connections and emotional attunement' : 'Balances logic and emotion well', shadow: s => s > 60 ? 'May seem cold or miss emotional cues' : s < 40 ? 'Emotional contagion can be draining' : 'Neither extreme causes friction' }
+  };
+  const chronoInfo = {
+    'Morning Lark': { strength: 'Peak focus in early hours when distractions are low', shadow: 'Energy crashes in late afternoon/evening', tip: 'Front-load important work before noon' },
+    'Night Owl': { strength: 'Creative breakthroughs in quiet late hours', shadow: 'Mornings feel like wading through mud', tip: 'Protect your night time for deep work' },
+    'Third Bird': { strength: 'Adaptable energy that works with any schedule', shadow: 'May lack the intensity peaks others have', tip: 'Experiment to find your personal sweet spots' }
+  };
+  const starterLabels = {
+    extraversion: { low: 'Reserved', high: 'Outgoing' }, conscientiousness: { low: 'Flexible', high: 'Disciplined' },
+    agreeableness: { low: 'Direct', high: 'Accommodating' }, neuroticism: { low: 'Calm', high: 'Sensitive' },
+    openness: { low: 'Traditional', high: 'Adventurous' },
+    achievement: { low: 'Process-focused', high: 'Goal-driven' }, security: { low: 'Risk-tolerant', high: 'Security-seeking' },
+    autonomy: { low: 'Collaborative', high: 'Independent' }, risk: { low: 'Cautious', high: 'Bold' },
+    planning: { low: 'Spontaneous', high: 'Methodical' }, depth: { low: 'Quick scan', high: 'Deep dive' },
+    focus: { low: 'Multi-tasker', high: 'Single-track' }, speed: { low: 'Deliberate', high: 'Fast-mover' },
+    vulnerability: { low: 'Private', high: 'Open book' }, anxiety: { low: 'Secure', high: 'Vigilant' },
+    trust: { low: 'Guarded', high: 'Trusting' }, social_depth: { low: 'Wide network', high: 'Inner circle' },
+    competition: { low: 'Cooperative', high: 'Competitive' }, strategy: { low: 'Transparent', high: 'Strategic' },
+    agency: { low: 'Reactive', high: 'Proactive' }, confidence: { low: 'Modest', high: 'Assertive' },
+  };
+  const starterModuleNames = { 'starter-personality': 'Personality', 'starter-motivation': 'Motivation', 'starter-thinking': 'Thinking', 'starter-connection': 'Connection', 'starter-strategy': 'Strategy', 'starter-wellbeing': 'Wellbeing' };
+
   return (
-    <Screen header={<NavBar back title="Your Results" onBack={() => onNavigate('categories')} />}>
+    <Screen header={<NavBar back title="Your Results" onBack={() => onNavigate('assess-picker')} />}>
       <Screen.Body className="space-y-4">
         {/* PHQ-9 Crisis Resources on results — persistent, not dismissible */}
         {testId === 'phq9' && results?.severity && results.severity !== 'Minimal' && (
@@ -3144,20 +3617,229 @@ const AssessResultsScreen = ({ isDark, assessState, assessActions, entityType, o
             </ResultCard>
           );
         })()}
-        {/* Generic trait results (Big Five, Starter, Shadow) */}
-        {testId !== 'quick-profile' && results && (
-          <ResultCard icon={test.icon} title={test.name} subtitle={results.score != null ? `Score: ${Math.round(results.score)}` : undefined} isDark={isDark} gradientClass={colors.grad}>
-            {results.traits && Object.entries(results.traits).map(([key, val]) => {
-              const spec = spectrumColors[testId] || spectrumColors[`${test.parent}-${test.trait}`];
-              const info = traitInfo[key];
-              return (
-                <div key={key} className="mb-3">
-                  {info && <Stack direction="row" className="justify-between mb-0.5"><Text as="span" size="xxs" weight="medium" emphasis="faint">{info.low}</Text><Text as="span" size="xxs" weight="medium" emphasis="faint">{info.high}</Text></Stack>}
-                  {spec && <div className="h-2.5 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}><div className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 shadow-lg ${isDark ? 'bg-white border-gray-800' : 'bg-gray-800 border-gray-300'}`} style={{ left: `${Math.max(2, Math.min(98, val))}%`, transform: 'translate(-50%, -50%)' }} /></div>}
-                  {info && <Text size="xxs" emphasis="subtle" className="mt-1">{info.strength(val)}</Text>}
+        {/* Big Five Results — cumulative trait spectrums + insights */}
+        {test.parent === 'bigfive' && results && (() => {
+          const bigFiveModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'bigfive');
+          const completedModules = bigFiveModules.filter(([id]) => assessCompleted[id]);
+          const remaining = bigFiveModules.length - completedModules.length;
+          return (
+            <ResultCard icon="🎭" title="Big Five" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/5 complete`} isDark={isDark} gradientClass={colors.grad}>
+              <Stack gap={3}>
+                {completedModules.map(([id, t]) => {
+                  const r = assessCompleted[id];
+                  const spec = spectrumColors[id] || { left: '#8b5cf6', right: '#a78bfa', leftLabel: '', rightLabel: '' };
+                  return (
+                    <div key={id}>
+                      <Text size="xxs" weight="medium" style={{ color: isDark ? COLOR_HEX.violet.light : COLOR_HEX.violet.base }} className="mb-1">{r.traitName}</Text>
+                      <div className="h-2.5 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
+                        <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white" style={{ left: `${Math.max(5, Math.min(95, r.score))}%`, marginLeft: -7, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                      </div>
+                      <Stack direction="row" className="justify-between mt-0.5">
+                        <Text as="span" size="xxs" emphasis="faint">{spec.leftLabel}</Text>
+                        <Text as="span" size="xxs" emphasis="faint">{spec.rightLabel}</Text>
+                      </Stack>
+                    </div>
+                  );
+                })}
+              </Stack>
+              <Card variant="plain" className="mt-4 p-3" style={{ background: isDark ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.06)' }}>
+                <Text size="xxs" weight="medium" style={{ color: isDark ? COLOR_HEX.violet.light : COLOR_HEX.violet.base }} className="mb-2">{results.traitName} Insights</Text>
+                <Stack gap={1.5}>
+                  <InsightRow emoji="💪" label="Strength" text={traitInfo[test.trait].strength(results.score)} isDark={isDark} />
+                  <InsightRow emoji="💡" label="Tip" text={traitInfo[test.trait].tip(results.score)} isDark={isDark} />
+                </Stack>
+              </Card>
+              {remaining > 0 && <Text size="xxs" emphasis="faint" className="text-center">{remaining} more to complete Big Five</Text>}
+            </ResultCard>
+          );
+        })()}
+        {/* Shadow Results — cumulative spectrums + strength/watch */}
+        {test.parent === 'shadow' && results && (() => {
+          const shadowModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'shadow');
+          const completedModules = shadowModules.filter(([id]) => assessCompleted[id]);
+          const remaining = shadowModules.length - completedModules.length;
+          return (
+            <ResultCard icon="🌑" title="Shadow Self" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/3 complete`} isDark={isDark} gradientClass={colors.grad}>
+              <Stack gap={4}>
+                {completedModules.map(([id, t]) => {
+                  const r = assessCompleted[id];
+                  const spec = spectrumColors[id] || { left: '#94a3b8', right: '#1e293b', leftLabel: '', rightLabel: '' };
+                  return (
+                    <div key={id} className="space-y-1">
+                      <Text size="sm" weight="medium" emphasis="secondary">{r.traitName}</Text>
+                      <div className="h-3 rounded-full relative" style={{ background: `linear-gradient(to right, ${spec.left}, ${spec.right})` }}>
+                        <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white" style={{ left: `${Math.max(5, Math.min(95, r.score))}%`, marginLeft: -8, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                      </div>
+                      <Stack direction="row" className="justify-between">
+                        <Text as="span" size="xxs" emphasis="faint">{spec.leftLabel}</Text>
+                        <Text as="span" size="xxs" emphasis="faint">{spec.rightLabel}</Text>
+                      </Stack>
+                    </div>
+                  );
+                })}
+              </Stack>
+              <Card variant="plain" className="mt-4 p-3" style={{ background: isDark ? 'rgba(100,116,139,0.12)' : 'rgba(100,116,139,0.06)' }}>
+                <Text size="xxs" weight="medium" emphasis="secondary" className="mb-2">{results.traitName} Insights</Text>
+                <Stack gap={1.5}>
+                  <InsightRow emoji="💪" label="Strength" text={shadowInfo[test.trait].strength(results.score)} isDark={isDark} />
+                  <InsightRow emoji="⚡" label="Watch" text={shadowInfo[test.trait].shadow(results.score)} isDark={isDark} />
+                </Stack>
+              </Card>
+              {remaining > 0 && <Text size="xxs" emphasis="faint" className="text-center">{remaining} more to complete Shadow Self</Text>}
+            </ResultCard>
+          );
+        })()}
+        {/* Starter Pack Results — per-construct TraitSpectrum bars + module chips */}
+        {test.parent === 'starter' && results && (() => {
+          const starterModules = Object.entries(ASSESS_TESTS).filter(([_, t]) => t.parent === 'starter');
+          const completedModules = starterModules.filter(([id]) => assessCompleted[id]);
+          const remaining = starterModules.length - completedModules.length;
+          return (
+            <ResultCard icon="🚀" title="Starter Pack" subtitle={remaining === 0 ? 'Assessment complete' : `${completedModules.length}/${starterModules.length} complete`} isDark={isDark} gradientClass={colors.grad}>
+              {results.constructs && (
+                <div>
+                  <Text size="xxs" weight="medium" style={{ color: isDark ? COLOR_HEX.indigo.light : COLOR_HEX.indigo.base }} className="mb-1">{starterModuleNames[testId]} Constructs</Text>
+                  <div className="space-y-0">
+                    {Object.entries(results.constructs).map(([construct, score], ci) => {
+                      const labels = starterLabels[construct] || { low: 'Low', high: 'High' };
+                      const displayName = construct.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                      const cColors = [['#6366f1','#a78bfa'],['#3b82f6','#60a5fa'],['#14b8a6','#2dd4bf'],['#8b5cf6','#c4b5fd'],['#06b6d4','#67e8f9'],['#10b981','#34d399'],['#f59e0b','#fbbf24'],['#d946ef','#e879f9']][ci % 8];
+                      return <TraitSpectrum key={construct} name={displayName} score={score} lowLabel={labels.low} highLabel={labels.high} gradFrom={cColors[0]} gradTo={cColors[1]} compact={true} isDark={isDark} />;
+                    })}
+                  </div>
                 </div>
-              );
-            })}
+              )}
+              {remaining > 0 && <Text size="xxs" emphasis="faint" className="text-center mt-3">{remaining} more to complete Starter Pack</Text>}
+            </ResultCard>
+          );
+        })()}
+        {/* ADHD Results — indicator dots + strength/challenge + disclaimer */}
+        {testId === 'adhd' && results && (
+          <ResultCard icon={test.icon} title={adhdLevel.label} subtitle={`${results.indicators}/6 indicators present`} isDark={isDark} gradientClass={colors.grad}>
+            <div className="flex justify-center gap-2 py-2">
+              {[1,2,3,4,5,6].map(i => (
+                <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i <= results.indicators ? `bg-gradient-to-br ${adhdLevel.bg} text-white` : (isDark ? 'bg-white/[0.04] text-gray-600' : 'bg-gray-200 text-gray-400')}`}>{i}</div>
+              ))}
+            </div>
+            <Stack gap={2} className="pt-2">
+              <InsightRow emoji="💪" label="Potential Strength" text={adhdLevel.strength} isDark={isDark} />
+              <InsightRow emoji="⚡" label="Potential Challenge" text={adhdLevel.shadow} isDark={isDark} />
+            </Stack>
+            <Card variant="plain" className="p-3 mt-2" style={{ background: isDark ? 'rgba(59,130,246,0.08)' : 'rgba(59,130,246,0.06)' }}>
+              <Text size="xxs" style={{ color: isDark ? COLOR_HEX.blue.light : COLOR_HEX.blue.base }}>This is a screening tool, not a diagnosis. Consult a professional for evaluation.</Text>
+            </Card>
+          </ResultCard>
+        )}
+        {/* Integrity Results — ScoreGauge + insights */}
+        {testId === 'integrity' && results && (
+          <ResultCard icon={test.icon} title={integrityLevel.label} subtitle="Honesty-Humility" isDark={isDark} gradientClass={colors.grad}>
+            <ScoreGauge value={results.score} isDark={isDark} color={test.color} />
+            <Stack gap={2} className="pt-2">
+              <InsightRow emoji="💪" label="Your Strength" text={integrityLevel.strength} isDark={isDark} />
+              <InsightRow emoji="⚡" label="Watch For" text={integrityLevel.shadow} isDark={isDark} />
+              <InsightRow emoji="💡" label="Pro Tip" text={integrityLevel.tip} isDark={isDark} />
+            </Stack>
+          </ResultCard>
+        )}
+        {/* Cognitive/ND Results — spectrum bar */}
+        {testId === 'cognitive' && results && (
+          <ResultCard icon={test.icon} title={results.score > 60 ? 'Neurodivergent Patterns' : results.score < 40 ? 'Neurotypical Patterns' : 'Mixed Patterns'} subtitle="Cognitive Style" isDark={isDark} gradientClass={colors.grad}>
+            <Card variant="plain" className="p-4">
+              <Stack direction="row" className="justify-between mb-2">
+                <Text size="xxs" emphasis="faint">Neurotypical</Text>
+                <Text size="xxs" emphasis="faint">Neurodivergent</Text>
+              </Stack>
+              <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-gray-400 via-teal-500 to-teal-400">
+                <div className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 shadow-lg ${isDark ? 'border-gray-800' : 'border-gray-300'}`} style={{ left: `calc(${results.score}% - 10px)` }} />
+              </div>
+              <div className="text-center mt-3">
+                <Text heading={2} style={{ color: isDark ? COLOR_HEX.teal.light : COLOR_HEX.teal.base }}>{results.score}%</Text>
+                <Text size="xxs" emphasis="faint" className="mt-1">alignment with ND traits</Text>
+              </div>
+            </Card>
+          </ResultCard>
+        )}
+        {/* Risk Results — level + ScoreGauge + subcategory bars + insights */}
+        {testId === 'risk' && results && (
+          <ResultCard icon={test.icon} title={riskLevel.label} subtitle="Risk Tolerance" isDark={isDark} gradientClass={colors.grad}>
+            <ScoreGauge value={results.score} label="Risk Appetite" isDark={isDark} color={test.color} />
+            {results.subcategories && Object.keys(results.subcategories).length > 0 && (
+              <Card variant="plain" className="p-3 mt-2" style={{ background: isDark ? 'rgba(245,158,11,0.08)' : 'rgba(245,158,11,0.04)' }}>
+                <Text size="xxs" weight="medium" style={{ color: isDark ? COLOR_HEX.amber.light : COLOR_HEX.amber.base }} className="mb-2">Risk Profile Breakdown</Text>
+                <div className="space-y-0.5">
+                  {Object.entries(test.subcategories || {}).map(([key, label]) => {
+                    const score = results.subcategories[key];
+                    if (score === undefined) return null;
+                    return <TraitSpectrum key={key} name={label} score={score} lowLabel="Cautious" highLabel="Bold" color="amber" compact={true} isDark={isDark} />;
+                  })}
+                </div>
+              </Card>
+            )}
+            <Stack gap={2} className="pt-2">
+              <InsightRow emoji="💪" label="Your Strength" text={riskLevel.strength} isDark={isDark} />
+              <InsightRow emoji="⚡" label="Watch For" text={riskLevel.shadow} isDark={isDark} />
+              <InsightRow emoji="💡" label="Pro Tip" text={riskLevel.tip} isDark={isDark} />
+            </Stack>
+          </ResultCard>
+        )}
+        {/* Attachment Results — style card + description + insights */}
+        {testId === 'attachment' && results && (
+          <ResultCard icon={test.icon} title={results.style} subtitle="Attachment Style" isDark={isDark} gradientClass={colors.grad}>
+            <div className="grid grid-cols-2 gap-4 p-4 rounded-xl" style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+              <div className="text-center">
+                <Text heading={2} style={{ color: COLOR_HEX.rose.base }}>{results.anxiety}</Text>
+                <Text size="xxs" emphasis="faint" className="mt-1">Anxiety</Text>
+              </div>
+              <div className="text-center">
+                <Text heading={2} style={{ color: COLOR_HEX.blue.base }}>{results.avoidance}</Text>
+                <Text size="xxs" emphasis="faint" className="mt-1">Avoidance</Text>
+              </div>
+            </div>
+            <Stack gap={2} className="pt-2">
+              <InsightRow emoji="💬" label="What This Means" text={attachInfo[results.style]?.desc} isDark={isDark} />
+              <InsightRow emoji="💪" label="Your Strength" text={attachInfo[results.style]?.strength} isDark={isDark} />
+              <InsightRow emoji="⚡" label="Watch For" text={attachInfo[results.style]?.shadow} isDark={isDark} />
+              <InsightRow emoji="💡" label="Pro Tip" text={attachInfo[results.style]?.tip} isDark={isDark} />
+            </Stack>
+          </ResultCard>
+        )}
+        {/* Chronotype Results — type-specific spectrum + insights */}
+        {testId === 'chronotype' && results && (
+          <ResultCard icon={results.type === 'Morning Lark' ? '🌅' : results.type === 'Night Owl' ? '🦉' : '🐦'} title={results.type} subtitle="Energy Rhythm" isDark={isDark} gradientClass={colors.grad}>
+            <Card variant="plain" className="p-4">
+              <Stack direction="row" className="justify-between mb-2">
+                <Text size="xxs" emphasis="faint">🌅 Morning</Text>
+                <Text size="xxs" emphasis="faint">Night 🌙</Text>
+              </Stack>
+              <div className="h-4 rounded-full overflow-hidden relative bg-gradient-to-r from-amber-400 via-sky-400 to-indigo-500">
+                <div className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full border-2 shadow-lg ${isDark ? 'border-gray-800' : 'border-gray-300'}`} style={{ left: `calc(${100 - results.score}% - 10px)` }} />
+              </div>
+            </Card>
+            <Stack gap={2} className="pt-2">
+              <InsightRow emoji="💪" label="Your Strength" text={chronoInfo[results.type]?.strength} isDark={isDark} />
+              <InsightRow emoji="⚡" label="Watch For" text={chronoInfo[results.type]?.shadow} isDark={isDark} />
+              <InsightRow emoji="💡" label="Pro Tip" text={chronoInfo[results.type]?.tip} isDark={isDark} />
+            </Stack>
+          </ResultCard>
+        )}
+        {/* Reasoning Results */}
+        {(testId === 'reasoning' || testId === 'reasoning-2' || testId === 'reasoning-3') && results && (
+          <ResultCard icon="🧠" title={results.level} subtitle={`${results.correct}/${results.total} Correct`} isDark={isDark} gradientClass={colors.grad}>
+            <div className="text-center mb-3">
+              <Text heading={2} style={{ color: isDark ? COLOR_HEX.blue.light : COLOR_HEX.blue.base }}>{results.score}%</Text>
+            </div>
+            <div className="h-3 rounded-full overflow-hidden" style={{ background: isDark ? '#374151' : '#e5e7eb' }}>
+              <div className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all" style={{ width: `${results.score}%` }} />
+            </div>
+            <Stack gap={2} className="pt-3">
+              <InsightRow emoji="📊" label="Performance" text={results.score >= 75 ? 'Strong logical and pattern recognition skills' : results.score >= 50 ? 'Solid reasoning with room to grow' : 'Practice strengthens these skills over time'} isDark={isDark} />
+              <InsightRow emoji="💡" label="Note" text="This brief quiz measures a narrow slice of cognitive ability. Real intelligence is multifaceted." isDark={isDark} />
+            </Stack>
+          </ResultCard>
+        )}
+        {/* Generic fallback — for tests without dedicated renderers */}
+        {testId !== 'quick-profile' && test.parent !== 'bigfive' && test.parent !== 'shadow' && test.parent !== 'starter' && testId !== 'adhd' && testId !== 'integrity' && testId !== 'cognitive' && testId !== 'risk' && testId !== 'attachment' && testId !== 'chronotype' && testId !== 'reasoning' && testId !== 'reasoning-2' && testId !== 'reasoning-3' && results && (
+          <ResultCard icon={test.icon} title={test.name} subtitle={results.score != null ? `Score: ${Math.round(results.score)}` : undefined} isDark={isDark} gradientClass={colors.grad}>
             {results.score != null && !results.traits && <div className="text-center"><Text heading={2} className="mb-1">{Math.round(results.score)}</Text><Text size="xs" emphasis="subtle">out of 100</Text></div>}
             {/* Subscale breakdown bars */}
             {(() => {
@@ -3213,19 +3895,44 @@ const AssessResultsScreen = ({ isDark, assessState, assessActions, entityType, o
             })()}
             {/* Quadrant label for 2-axis tests */}
             {results.quadrant && <div className="mt-3 pt-3 text-center" style={{ borderTop: '1px solid var(--border-base)' }}><Text size="sm" weight="semibold">{results.quadrant}</Text>{results.axes && <Text size="xxs" emphasis="subtle" className="mt-1">{Object.entries(results.axes).map(([k, v]) => `${k}: ${v}`).join(' · ')}</Text>}</div>}
-            {/* Self-monitoring tier */}
             {results.tier && <div className="mt-2 text-center"><Text size="xs" emphasis="subtle">{results.tier}</Text></div>}
-            {/* Clinical severity */}
             {results.severity && <div className="mt-2 text-center"><Text size="xs" weight="medium">{results.severity}</Text></div>}
             {results.elevated != null && <div className="mt-2 text-center"><Text size="xs" weight="medium">{results.elevated ? `Elevated (${results.indicators} indicators)` : `Not elevated (${results.indicators} indicators)`}</Text></div>}
           </ResultCard>
         )}
-        {/* Nudge */}
-        {assessNudgeData && (
-          <Card onClick={() => assessStartTest(assessNudgeData.nextTestId)} className="text-left">
-            <Text size="xs" emphasis="subtle">{assessNudgeData.message || "Continue your journey."}</Text>
-            <Text weight="medium" className="mt-1">{assessNudgeData.toCategory?.name} →</Text>
-          </Card>
+        {/* Nudge — specific next step */}
+        {assessNudgeData && assessNudgeData.type === 'same-category' && (() => {
+          const nextTest = ASSESS_TESTS[assessNudgeData.nextTestId];
+          return (
+            <Card onClick={() => assessStartTest(assessNudgeData.nextTestId)} className="text-left cursor-pointer">
+              <Stack direction="row" align="center" gap={3}>
+                <div className="text-2xl">{nextTest?.icon || '→'}</div>
+                <div className="flex-1">
+                  <Text size="xs" emphasis="subtle">Next up</Text>
+                  <Text weight="medium">{nextTest?.name || assessNudgeData.toCategory?.name} →</Text>
+                </div>
+              </Stack>
+            </Card>
+          );
+        })()}
+        {assessNudgeData && assessNudgeData.type === 'next-category' && (
+          <div>
+            <Text size="xs" emphasis="subtle" className="mb-2 text-center">Ready for more?</Text>
+            <Stack gap={2}>
+              {(assessNudgeData.recommendations || [assessNudgeData]).slice(0, 3).map(rec => (
+                <Card key={rec.toCatId} onClick={() => assessStartTest(rec.nextTestId)} className="text-left cursor-pointer">
+                  <Stack direction="row" align="center" gap={3}>
+                    <div className="text-2xl">{rec.toCategory?.icon || '🔮'}</div>
+                    <div className="flex-1">
+                      <Text weight="medium">{rec.toCategory?.name}</Text>
+                      <Text size="xxs" emphasis="subtle">{rec.message}</Text>
+                    </div>
+                    <Text emphasis="faint">→</Text>
+                  </Stack>
+                </Card>
+              ))}
+            </Stack>
+          </div>
         )}
         {/* Quick links — analysis + profile */}
         <Stack direction="row" gap={2} className="justify-center mt-2">
@@ -3247,7 +3954,7 @@ const ProfileCategoryList = ({ assessCompleted, entityType, currentTier, onStart
   const available = [], completed = [];
   for (const catId of ASSESS_CATEGORY_ORDER) {
     const cat = ASSESS_CATEGORIES[catId];
-    if (!cat || (cat.entityHint && cat.entityHint !== entityType) || (cat.tier || 0) > currentTier) continue;
+    if (!cat || cat.hidden || (cat.entityHint && cat.entityHint !== entityType) || (cat.tier || 0) > currentTier) continue;
     const catTests = cat.tests.filter(id => ASSESS_TESTS[id] && !ASSESS_TESTS[id].archived);
     const allDone = catTests.every(id => assessCompleted[id]);
     const doneCount = catTests.filter(id => assessCompleted[id]).length;
@@ -4826,9 +5533,9 @@ const verifyLoad = () => {
 };
 
 const VERIFY_CONFIDENCE_LABELS = [
-  '1 — Notable gaps in my knowledge',
-  '2 — Fairly confident, some uncertainty',
-  '3 — Very confident, no reason to doubt',
+  '1 — I have doubts about this',
+  '2 — Uncertain, could go either way',
+  '3 — I believe so, no major red flags',
   "4 — Certain, I'd stake my reputation",
 ];
 
@@ -4838,7 +5545,7 @@ const VERIFY_IDENTITY_CHECK = {
   fields: [
     { id: 'double-life', label: 'Could they game the system?', subtitle: 'Ability to pass off a sybil',
       options: ['Unlikely', 'Maybe', 'Likely'] },
-    { id: 'only-account', label: 'Do you believe they only have one account?',
+    { id: 'only-account', label: 'Do you believe this is their real account?',
       options: ['Yes', 'Unsure', 'Doubt it'] },
   ],
 };
@@ -4851,7 +5558,7 @@ const VERIFY_PATH_A_QUESTIONS = [
       { id: 'a1-last-interact', label: 'Last contact', options: ['Recently', 'This year', 'Longer'] },
     ]},
   { id: 'a2-identity', ...VERIFY_IDENTITY_CHECK },
-  { id: 'a3-verdict', text: 'Is this a real person with\njust one account?', type: 'verdict',
+  { id: 'a3-verdict', text: 'Is this a real person\nwith a legitimate account?', type: 'verdict',
     verdictOptions: ['Yes', 'No'],
     flags: ["Haven't seen them in a while", 'Only know one context', 'Something feels off', 'Other'] },
 ];
@@ -4866,7 +5573,7 @@ const VERIFY_PATH_B_QUESTIONS = [
       { label: 'Supporting evidence', options: ['Social graph — looks authentic', 'Connections — already in Aura', 'Referral — from someone I trust', 'Profile — matches what I observed', 'Nothing supporting'] },
     ]},
   { id: 'b3-identity', ...VERIFY_IDENTITY_CHECK },
-  { id: 'b4-verdict', text: 'Is this a real person with\njust one account?', type: 'verdict',
+  { id: 'b4-verdict', text: 'Is this a real person\nwith a legitimate account?', type: 'verdict',
     verdictOptions: ['Yes', 'No'],
     flags: ['Only met once', 'One context only', 'Kept things guarded', 'Could game the system', 'Something feels off', 'Other'] },
 ];
@@ -4879,7 +5586,7 @@ const VERIFY_PATH_C_QUESTIONS = [
     options: ['Connections — rich, verified network', 'Self-attestation — believable story', 'Evaluators — multiple already confident', 'Referral chain — strong and traceable', 'Other'] },
   { id: 'c3-weakest', text: 'Biggest gaps?', type: 'multi', subtitle: 'Pick up to two.', maxSelect: 2,
     options: ['Connections — thin network', 'Verification — no in-person check', 'History — new profile, little activity', 'Attestation — generic, nothing specific', 'Other'] },
-  { id: 'c4-verdict', text: 'Is this a real person with\njust one account?', type: 'verdict',
+  { id: 'c4-verdict', text: 'Is this a real person\nwith a legitimate account?', type: 'verdict',
     verdictOptions: ['Yes', 'No'],
     flags: ['Thin profile', 'Looks like other fakes', 'Something feels off', 'Other'] },
 ];
@@ -5095,7 +5802,7 @@ const VerifyActionButton = ({ label, color = 'emerald', onClick, disabled, secon
 const VerifyStarConfidence = ({ color = 'emerald', value, onChange }) => {
   const { isDark } = useTheme();
   const c = colorOf(color);
-  const labels = ['Gaps', 'Fair', 'Confident', 'Certain'];
+  const labels = ['Doubt', 'Uncertain', 'Believe so', 'Certain'];
   return (
     <Stack align="center" className="w-full" gap={4} style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
       <Stack direction="row" align="start" className="justify-center" gap={5}>
@@ -5261,6 +5968,7 @@ const VerifyEvidenceCombined = ({ question, color, answer, onAnswer }) => {
   };
   return (
     <Stack gap={4} className="w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      <Text size="xs" emphasis="faint" className="text-center -mt-1">Toggle all that apply in each section</Text>
       {question.sections.map((section, si) => (
         <div key={si}>
           <Text size="xs" weight="semibold" emphasis="faint" className="uppercase tracking-wide mb-2">{section.label}</Text>
@@ -5307,8 +6015,10 @@ const VerifyMultiToggle = ({ question, color, answer, onAnswer }) => {
     if (question.maxSelect && next.length > question.maxSelect) return;
     onAnswer(next);
   };
+  const hint = question.maxSelect ? `Pick up to ${question.maxSelect}` : 'Toggle all that apply';
   return (
     <Stack gap={2} className="w-full" style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+      {!question.subtitle && <Text size="xs" emphasis="faint" className="text-center -mt-1 mb-1">{hint}</Text>}
       {question.options.map(opt => (
         <VerifyToggle key={opt} label={opt} color={color} isOn={selected.includes(opt)} onToggle={() => toggle(opt)} />
       ))}
@@ -5818,6 +6528,7 @@ function App() {
   const [communityResults, setCommunityResults] = useState(() => generateDemoCommunityResults());
   const [sessionAnsweredIds] = useState(() => new Set());
   const [savedQuestions, setSavedQuestions] = useState(() => new Set(stored.current.saved || []));
+  const recentQuestionIds = useRef(new Set());
   const [showGestureHint, setShowGestureHint] = useState(() => !localStorage.getItem('aura-hint-confidence-dismissed'));
   // Question meta (flags, explanations) — persisted so HistoryScreen can read them
   const [questionMeta, setQuestionMeta] = useState(() => {
@@ -6000,10 +6711,19 @@ function App() {
     const trackFilter = selectedTrack ? (q) => q.type === selectedTrack : () => true;
     const subFilter = selectedSub ? (q) => q.sub === selectedSub : () => true;
     const match = (q) => !resp[q.id] && trackFilter(q) && subFilter(q);
-    for (let i = fromIndex + 1; i < questions.length; i++) { if (match(questions[i])) return i; }
-    for (let i = 0; i < fromIndex; i++) { if (match(questions[i])) return i; }
-    return null;
+    const recent = recentQuestionIds.current;
+    // Prefer non-recent questions first
+    let fallback = null;
+    for (let i = fromIndex + 1; i < questions.length; i++) { if (match(questions[i])) { if (!recent.has(questions[i].id)) return i; if (fallback === null) fallback = i; } }
+    for (let i = 0; i < fromIndex; i++) { if (match(questions[i])) { if (!recent.has(questions[i].id)) return i; if (fallback === null) fallback = i; } }
+    return fallback;
   };
+  // Track recent questions, clear on track/sub change
+  useEffect(() => {
+    const q = questions[currentIndex];
+    if (q) { recentQuestionIds.current.add(q.id); if (recentQuestionIds.current.size > 20) { const first = recentQuestionIds.current.values().next().value; recentQuestionIds.current.delete(first); } }
+  }, [currentIndex]);
+  useEffect(() => { recentQuestionIds.current.clear(); }, [selectedTrack, selectedSub]);
   const goToNext = () => {
     const next = findNextUnanswered(currentIndex);
     if (next !== null) { mainFlow.reset(); setCurrentIndex(next); }
@@ -6034,12 +6754,26 @@ function App() {
     if (onboardingComplete) { setScreen('categories'); return; }
     setScreen('onboarding');
   };
-  const handleOnboardingComplete = (answers) => {
-    setOnboardingAnswers(answers);
+  const handleOnboardingComplete = (result) => {
+    const flat = result.answers || result; // V2 or V1 format
+    setOnboardingAnswers(flat);
+    localStorage.setItem(ONBOARD_STORAGE_KEY, JSON.stringify(flat));
     setOnboardingComplete(true);
-    localStorage.setItem(ONBOARD_STORAGE_KEY, JSON.stringify(answers));
-    // Bridge → auto-start quick-profile if not done yet
-    if (!assessState.assessCompleted['quick-profile']) {
+
+    if (result.keepGoing === false) {
+      // "I'm good for now" → hub
+      setScreen('assess-picker');
+    } else if (result.path === 'reveal') {
+      // "Go deeper" → bridge or direct to assessments
+      if (!assessState.assessCompleted['quick-profile']) {
+        setScreen('onboarding-bridge');
+      } else {
+        handleChooseReveal();
+      }
+    } else if (result.path === 'explore') {
+      // "Explore questions" → hub
+      setScreen('categories');
+    } else if (!assessState.assessCompleted['quick-profile']) {
       setScreen('onboarding-bridge');
     } else {
       setScreen('path-choice');
@@ -6258,11 +6992,12 @@ function App() {
 
   const syncOverlay = syncLoading ? <LoadingOverlay message="Syncing your data…" /> : null;
 
-  // Persistent settings gear — shows on all screens except settings
-  const settingsGearEl = screen !== 'settings' ? (
+  // Persistent settings gear — only on hub/categories/question/assess-picker screens (no NavBar overlap)
+  const GEAR_SCREENS = new Set(['categories', 'question', 'assess-picker', 'qotd']);
+  const settingsGearEl = GEAR_SCREENS.has(screen) ? (
     <button onClick={goToSettings} className="absolute top-3 right-3 z-40 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all"
       style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', backdropFilter: 'blur(8px)' }}>
-      <Text as="span" size="sm" emphasis="subtle">⚙</Text>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-subtle)' }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
   ) : null;
 
