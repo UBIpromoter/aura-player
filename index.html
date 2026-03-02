@@ -50,7 +50,7 @@
       :root { color-scheme: dark; }
     }
     .question-text {
-      font-size: clamp(20px, 6vw, 28px);
+      font-size: clamp(22px, 6.5vw, 32px);
       line-height: 1.35;
       text-wrap: balance;
     }
@@ -111,9 +111,9 @@
     .resp-max-w { max-width: clamp(320px, 94vw, 460px) !important; }
     .resp-gap > * + * { margin-top: clamp(10px, 3.4vw, 16px) !important; }
     .resp-gap-sm > * + * { margin-top: clamp(8px, 2.8vw, 14px) !important; }
-    .resp-text-lg { font-size: clamp(16px, 4.3vw, 20px) !important; }
-    .resp-text-md { font-size: clamp(14px, 3.8vw, 17px) !important; }
-    .resp-text-sm { font-size: clamp(12px, 3.3vw, 14px) !important; }
+    .resp-text-lg { font-size: clamp(17px, 4.5vw, 22px) !important; }
+    .resp-text-md { font-size: clamp(15px, 4vw, 19px) !important; }
+    .resp-text-sm { font-size: clamp(13px, 3.5vw, 16px) !important; }
     .resp-px { padding-left: clamp(12px, 4.2vw, 24px) !important; padding-right: clamp(12px, 4.2vw, 24px) !important; }
     /* Additional animations */
     @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -129,7 +129,6 @@
 </head>
 <body style="background: var(--bg-main);">
   <div id="root"></div>
-  <button onclick="location.reload()" style="position:fixed;top:12px;right:12px;z-index:99999;padding:8px 18px;font-size:15px;font-weight:600;background:var(--bg-elevated);color:var(--text-secondary);border:1px solid var(--border-base);border-radius:8px;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s">&#x21bb; Refresh</button>
 
   <!-- Suppress Tailwind CDN warning -->
   <script>
@@ -1036,14 +1035,14 @@ const Confidence = ({ value = 0, onChange, color = 'violet', labels = CONFIDENCE
   if (variant === 'inline') {
     return (
       <span className={`font-medium opacity-60 ${className}`} style={{ color: c.light, '--accent-rgb': c.rgb }}>
-        {'★'.repeat(Math.min(Math.max(value, 1), 4))}
+        {'★'.repeat(Math.min(Math.max(value, 1), 3))}
       </span>
     );
   }
   return (
     <div className={`flex flex-col items-center gap-2 ${className}`}>
       <Stack direction="row" gap={3} style={{ '--accent-rgb': c.rgb }}>
-        {[1, 2, 3, 4].map(level => {
+        {[1, 2, 3].map(level => {
           const active = value >= level;
           const isExact = value === level;
           return (
@@ -1563,7 +1562,7 @@ const generateFakeResults = (question) => {
     dist.d.forEach((optCounts, oi) => { optCounts.forEach((count, ci) => { for (let i = 0; i < count; i++) evaluators.push({ id: `e${id++}`, answer: oi, confidence: ci + 1, score: 40 + Math.floor(Math.random() * 40) }); }); });
   } else {
     const count = 600 + Math.floor(Math.random() * 200);
-    for (let i = 0; i < count; i++) evaluators.push({ id: `e${id++}`, answer: question.type === 'binary' ? (Math.random() > 0.5 ? 0 : 1) : Math.floor(Math.random() * (question.options?.length || 4)), confidence: 1 + Math.floor(Math.random() * 4), score: 40 + Math.floor(Math.random() * 40) });
+    for (let i = 0; i < count; i++) evaluators.push({ id: `e${id++}`, answer: question.type === 'binary' ? (Math.random() > 0.5 ? 0 : 1) : Math.floor(Math.random() * (question.options?.length || 4)), confidence: 1 + Math.floor(Math.random() * 3), score: 40 + Math.floor(Math.random() * 40) });
   }
   return { evaluators };
 };
@@ -1573,8 +1572,8 @@ const generateDemoAnswers = () => {
     const q = QUESTIONS.find(q => q.id === i); if (!q) continue;
     const ts = now - Math.floor(Math.random() * 7) * 86400000 - Math.floor(Math.random() * 24) * 3600000;
     answers[i] = q.type === 'binary'
-      ? { answer: Math.random() > 0.5 ? 0 : 1, confidence: 1 + Math.floor(Math.random() * 4), timestamp: ts }
-      : { answer: Math.floor(Math.random() * (q.options?.length || 4)), confidence: 1 + Math.floor(Math.random() * 4), timestamp: ts };
+      ? { answer: Math.random() > 0.5 ? 0 : 1, confidence: 1 + Math.floor(Math.random() * 3), timestamp: ts }
+      : { answer: Math.floor(Math.random() * (q.options?.length || 4)), confidence: 1 + Math.floor(Math.random() * 3), timestamp: ts };
   }
   return answers;
 };
@@ -1849,7 +1848,7 @@ const QuestionCard = ({ question, isDark, evidenceExpanded, onToggleEvidence }) 
 };
 const TipBanner = ({ isDark, onDismiss }) => (
   <div onClick={onDismiss} className={`rounded-md px-3 py-1 flex items-center justify-between cursor-pointer mb-2 ${isDark ? 'bg-violet-900/30 border border-violet-500/30' : 'bg-violet-100 border border-violet-300'}`}>
-    <span className={`text-sm ${isDark ? 'text-violet-300' : 'text-violet-700'}`}><span className="font-medium">Tip:</span> Confident? Tap up to four times</span>
+    <span className={`text-sm ${isDark ? 'text-violet-300' : 'text-violet-700'}`}><span className="font-medium">Tip:</span> Confident? Tap up to three times</span>
     <span className={`text-sm ml-2 ${isDark ? 'text-violet-500' : 'text-violet-400'}`}>✕</span>
   </div>
 );
@@ -1886,7 +1885,7 @@ const useAnswerFlow = ({ undoDelay = 1, tapDelay = 400, graceEnabled = false, gr
   };
   const handleTap = (answer) => {
     if (pendingSubmit && inGracePeriod && graceEnabled) {
-      if (answer === pendingSubmit.answer && pendingSubmit.confidence < 4) {
+      if (answer === pendingSubmit.answer && pendingSubmit.confidence < 3) {
         const newConf = pendingSubmit.confidence + 1;
         haptic(HAPTIC.confidence);
         setPendingSubmit({ ...pendingSubmit, confidence: newConf });
@@ -2162,6 +2161,7 @@ const OnboardingFlow = ({ isDark, onComplete, onSkip, onReset }) => {
   const [timings, setTimings] = useState({});
   const [beatText, setBeatText] = useState(null);
   const [beatOpacity, setBeatOpacity] = useState(0);
+  const beatResolveRef = useRef(null);
   const [phase, setPhase] = useState('questions'); // 'questions' | 'quickread'
   const [quickReadText, setQuickReadText] = useState('');
   const [quickReadVisible, setQuickReadVisible] = useState(false);
@@ -2177,17 +2177,17 @@ const OnboardingFlow = ({ isDark, onComplete, onSkip, onReset }) => {
     questionStartTime.current = Date.now();
   }, [currentIndex]);
 
-  // Encouragement beat logic
+  // Encouragement beat logic (tap-to-skip via beatResolveRef)
   const showBeat = (text, duration = 1500) => {
     setBeatText(text);
     setBeatOpacity(1);
     return new Promise(resolve => {
-      setTimeout(() => {
-        setBeatOpacity(0);
-        setTimeout(() => { setBeatText(null); resolve(); }, 400);
-      }, duration);
+      const finish = () => { setBeatOpacity(0); setTimeout(() => { setBeatText(null); beatResolveRef.current = null; resolve(); }, 300); };
+      beatResolveRef.current = finish;
+      setTimeout(() => { if (beatResolveRef.current === finish) finish(); }, duration);
     });
   };
+  const skipBeat = () => { if (beatResolveRef.current) beatResolveRef.current(); };
 
   const advanceQuestion = (latestAnswers, latestTimings) => {
     setTransitioning(true);
@@ -2229,7 +2229,7 @@ const OnboardingFlow = ({ isDark, onComplete, onSkip, onReset }) => {
       const total = t1 + t2 + t3;
       const anyOver3s = t1 > 3000 || t2 > 3000 || t3 > 3000;
       const beatMsg = anyOver3s ? "You actually thought about that one." : (total < 6000 ? "You don't hesitate." : null);
-      if (beatMsg) await showBeat(beatMsg, 2200);
+      if (beatMsg) await showBeat(beatMsg, 1200);
       advanceQuestion(newAnswers, newTimings);
     } else if (qNum === 5) {
       const q4ans = newAnswers['or-4'];
@@ -2238,10 +2238,10 @@ const OnboardingFlow = ({ isDark, onComplete, onSkip, onReset }) => {
       const q5majority = ONRAMP_MAJORITY['or-5'];
       const withMajority = (q4ans === q4majority ? 1 : 0) + (q5ans === q5majority ? 1 : 0);
       const beatMsg = withMajority >= 2 ? "Safe choice." : "Controversial.";
-      await showBeat(beatMsg, 2000);
+      await showBeat(beatMsg, 1000);
       advanceQuestion(newAnswers, newTimings);
     } else if (qNum === 7) {
-      await showBeat("That one matters. Remember your answer.", 2500);
+      await showBeat("That one matters. Remember your answer.", 1400);
       advanceQuestion(newAnswers, newTimings);
     } else {
       advanceQuestion(newAnswers, newTimings);
@@ -2352,18 +2352,8 @@ const OnboardingFlow = ({ isDark, onComplete, onSkip, onReset }) => {
         <div className="w-8" />
       </div>
 
-      {/* Upper zone — question centered, atmospheric */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 relative">
-        {/* Encouragement beat overlay */}
-        {beatText && (
-          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-            <Text size="lg" weight="medium" emphasis="subtle" className="italic px-6 text-center"
-              style={{ opacity: beatOpacity, transition: 'opacity 0.4s ease-in-out' }}>
-              {beatText}
-            </Text>
-          </div>
-        )}
-
+      {/* Upper zone — question centered, atmospheric. Tap to skip beat. */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 relative" onClick={beatText ? skipBeat : undefined}>
         {/* Aura glow */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-8%' }}>
           {(() => {
@@ -2384,9 +2374,9 @@ const OnboardingFlow = ({ isDark, onComplete, onSkip, onReset }) => {
           })()}
         </div>
 
-        {/* Question text */}
+        {/* Question text — stays visible during beats */}
         <div className="max-w-sm px-4 relative" style={{
-          opacity: (transitioning || beatText) ? 0 : 1,
+          opacity: transitioning ? 0 : 1,
           transition: 'opacity 0.25s ease-in-out',
         }}>
           {(() => {
@@ -2399,6 +2389,16 @@ const OnboardingFlow = ({ isDark, onComplete, onSkip, onReset }) => {
             );
           })()}
           <Text as="h2" weight="medium" className="question-text text-center relative z-10">{question.text}</Text>
+        </div>
+
+        {/* Encouragement beat — below the question */}
+        <div className="mt-4 h-8 flex items-center justify-center">
+          {beatText && (
+            <Text size="sm" weight="medium" emphasis="subtle" className="italic px-6 text-center"
+              style={{ opacity: beatOpacity, transition: 'opacity 0.3s ease-in-out' }}>
+              {beatText}
+            </Text>
+          )}
         </div>
       </div>
 
@@ -2478,7 +2478,7 @@ const Q_MODAL_FLAG = { title: 'Flag this question', icon: '🚩', color: 'amber'
 const Q_MODAL_EXPLAIN = { title: 'Why did you answer this way?', icon: '💬', color: 'blue', reasons: ['Gut feeling', 'Personal experience', 'Research', 'Logic', 'Clicked wrong', 'Misunderstood'] };
 const Q_MODAL_CANT = { title: "Can't answer", icon: '🤷', color: 'slate', reasons: ['Need more context', 'Question is unclear', 'Conflicting feelings', 'Not my area', 'Too personal'] };
 
-const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => {
+const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState, onNavigate }) => {
   const { currentQuestion, currentIndex, questions, responses, communityResults, isAnswered, isBinary, answeredCount, totalQuestions, currentResponse, mcColorMode, sessionAnsweredIds, savedQuestions, selectedTrack, selectedSub, questionMeta, setQuestionMeta } = questionState;
   const { setCommunityResults, handleUndo, goToPrev, goToNext, findNextUnanswered, setCurrentIndex, handleAnswerTap, handleAnswerRightClick, submitAnswer, saveForLater, skipQuestion, clearUndoneState, setSelectedTrack, setSelectedSub } = flowActions;
   const { pendingSubmit, undoDelay, justUndone, showTips, showGestureHint, setShowGestureHint, showConfirmOverlay, confirmColor, tappedAnswer, setTappedAnswer, tapCount, setTapCount } = uiState;
@@ -2537,6 +2537,7 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => 
           );
         })()}
         <button onClick={goToNext} disabled={!hasNext} className="text-xl font-bold w-8 h-8 flex items-center justify-center cursor-pointer"><Text as="span" emphasis={!hasNext ? "faint" : "secondary"}>▶</Text></button>
+        <button onClick={() => onNavigate('categories')} className="w-8 h-8 flex items-center justify-center cursor-pointer ml-1" title="Exit to hub"><Text as="span" size="sm" emphasis="subtle">✕</Text></button>
       </Stack>
       {/* Judgment subcategory filter chips */}
       {currentQuestion?.category === 'judgment' && (
@@ -2579,9 +2580,9 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState }) => 
               )}
             </div>
             {showConfirmOverlay && (
-              <Stack direction="row" align="center" className="absolute bottom-1 left-0 right-0 z-20 justify-center" gap={3}>
-                <button onClick={() => { setTappedAnswer(null); setTapCount(0); }} className="w-9 h-9 rounded-full btn-feedback flex items-center justify-center text-sm transition-all cursor-pointer" style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>✕</button>
-                <button onClick={() => submitAnswer()} className="w-11 h-11 rounded-full btn-feedback flex items-center justify-center text-lg transition-all cursor-pointer" style={{ color: isDark ? '#fff' : confirmColor?.base, background: `linear-gradient(135deg, rgba(${confirmColor?.rgb},0.30) 0%, rgba(${confirmColor?.rgb},0.15) 100%)`, border: `1px solid rgba(${confirmColor?.rgb}, 0.50)`, boxShadow: `0 0 18px rgba(${confirmColor?.rgb},0.25), 0 0 40px rgba(${confirmColor?.rgb},0.12)` }}>✓</button>
+              <Stack direction="row" align="center" className="absolute bottom-1 left-0 right-0 z-20 justify-center" gap={4}>
+                <button onClick={() => { setTappedAnswer(null); setTapCount(0); }} className="w-12 h-12 rounded-full btn-feedback flex items-center justify-center text-xl transition-all cursor-pointer" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', color: 'var(--text-muted)', border: '1.5px solid var(--border-subtle)' }}>✕</button>
+                <button onClick={() => submitAnswer()} className="w-14 h-14 rounded-full btn-feedback flex items-center justify-center text-2xl transition-all cursor-pointer" style={{ color: isDark ? '#fff' : confirmColor?.base, background: `linear-gradient(135deg, rgba(${confirmColor?.rgb},0.30) 0%, rgba(${confirmColor?.rgb},0.15) 100%)`, border: `1.5px solid rgba(${confirmColor?.rgb}, 0.50)`, boxShadow: `0 0 18px rgba(${confirmColor?.rgb},0.25), 0 0 40px rgba(${confirmColor?.rgb},0.12)` }}>✓</button>
               </Stack>
             )}
           </Stack>
@@ -2703,10 +2704,8 @@ const ASSESS_CATEGORIES = {
   character: { name: 'Character', icon: '💎', color: 'emerald', tests: ['integrity', 'impostor'], tier: 2, branch: 'action' },
   behavior: { name: 'Behavior', icon: '🎲', color: 'amber', tests: ['risk'], tier: 2, branch: 'action' },
   wellbeing: { name: 'Wellbeing', icon: '🌿', color: 'emerald', tests: ['life-satisfaction', 'resilience'], tier: 2, branch: 'wellness' },
-  // Clinical (opt-in, always available behind consent gate)
-  clinical: { name: 'Clinical Screens', icon: '📊', color: 'blue', tests: ['phq9', 'gad7'], tier: 0, clinical: true, requiresConsent: true },
 };
-const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'shadow', 'drive', 'mind', 'relationships', 'character', 'behavior', 'wellbeing', 'clinical'];
+const ASSESS_CATEGORY_ORDER = ['quickstart', 'starter', 'personality', 'shadow', 'drive', 'mind', 'relationships', 'character', 'behavior', 'wellbeing'];
 const ASSESS_TEST_TO_CATEGORY = {};
 Object.entries(ASSESS_CATEGORIES).forEach(([catId, cat]) => { cat.tests.forEach(testId => { ASSESS_TEST_TO_CATEGORY[testId] = catId; }); });
 const ASSESS_VERSION = 2;
@@ -2781,7 +2780,6 @@ const ASSESS_NUDGE_COPY = {
   _shadow: "One last layer — the parts you don't show everyone.",
   _drive: "Explore what fuels your ambition and values.",
   _wellbeing: "Check in on how you're doing.",
-  _clinical: "Validated screening tools — not diagnoses.",
 };
 const getAssessNudge = (completedTestId, newCompleted, entityType) => {
   const fromCatId = ASSESS_TEST_TO_CATEGORY[completedTestId];
@@ -2877,7 +2875,6 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
   const [assessUnlockMessage, setAssessUnlockMessage] = useState(null);
   const [assessNudgeData, setAssessNudgeData] = useState(null);
   const [assessShowCrisisResources, setAssessShowCrisisResources] = useState(false);
-  const [assessClinicalConsent, setAssessClinicalConsent] = useState(() => { try { return localStorage.getItem('aura-clinical-consent') === 'true'; } catch { return false; } });
   // V2 migration toast
   useEffect(() => { if (assessInitData.migrated) { setAssessUnlockMessage('Assessment system updated — your progress has been reset'); setTimeout(() => setAssessUnlockMessage(null), 4000); } }, []);
   const assessSaveToStorage = (completed, progress, demoActive = assessDemoActive, savedUserData = assessSavedUserData, demoProfile = assessDemoProfile, demoControls = showDemoControls) => {
@@ -2964,7 +2961,6 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     for (let i = 0; i < assessCurrentIndex; i++) { if (resp[i] === undefined) { assessGoToQuestion(i); return; } }
   };
 
-  const [assessPendingClinicalTest, setAssessPendingClinicalTest] = useState(null);
   const assessStartTest = (testId) => {
     const catId = ASSESS_TEST_TO_CATEGORY[testId];
     const cat = catId ? ASSESS_CATEGORIES[catId] : null;
@@ -2972,12 +2968,6 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     if (cat?.branch) {
       const u = calculateAssessUnlocks(assessCompleted);
       if (!u.branches[cat.branch]) return;
-    }
-    // Clinical consent gate
-    if (cat?.requiresConsent && !assessClinicalConsent) {
-      setAssessPendingClinicalTest(testId);
-      setScreen('clinical-consent');
-      return;
     }
     setAssessCurrentTestId(testId);
     const progress = assessInProgress[testId];
@@ -2987,11 +2977,6 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     setAssessPending(null);
     setAssessShowCrisisResources(false);
     setScreen('assess-question');
-  };
-  const assessConfirmClinicalConsent = () => {
-    setAssessClinicalConsent(true);
-    try { localStorage.setItem('aura-clinical-consent', 'true'); } catch {}
-    if (assessPendingClinicalTest) { assessStartTest(assessPendingClinicalTest); setAssessPendingClinicalTest(null); }
   };
   const assessSaveAndExit = () => {
     clearTimeout(assessTimeoutRef.current);
@@ -3070,13 +3055,12 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
     assessCurrentScale, assessTotalQuestions, assessGatewayActiveItems, assessTestColor,
     assessDemoActive, assessDemoProfile, showDemoControls, setShowDemoControls,
     assessSavedUserData, assessExpandedCategory, setAssessExpandedCategory,
-    assessClinicalConsent, assessPendingClinicalTest, assessNudgeData,
+    assessNudgeData,
   };
   const assessActions = {
     assessStartTest, assessSaveAndExit, assessDiscardAndExit,
     assessGoToQuestion, assessHandleAnswerTap, assessHandleUndo,
     assessFinalizeSubmit, assessCanFinish, assessFinishAssessment,
-    assessConfirmClinicalConsent,
     assessLoadDemoProfile, assessClearDemo, assessClearAll,
   };
   const assessUI = {
@@ -3168,8 +3152,6 @@ const AssessPickerScreen = ({ isDark, entityType, assessState, assessActions, on
   const gatewayCats = (entityType === 'ai' ? ['ai-identity', 'quickstart'] : ['quickstart']).map(makeCatStatus).filter(Boolean);
   // Starter
   const starterCat = makeCatStatus('starter');
-  // Clinical
-  const clinicalCat = makeCatStatus('clinical');
 
   return (
     <Screen>
@@ -3212,37 +3194,32 @@ const AssessPickerScreen = ({ isDark, entityType, assessState, assessActions, on
               <AssessCategoryCard {...starterCat} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />
             </div>
           )}
-          {/* Branch sections */}
-          {currentTier >= 1 && ASSESS_BRANCHES.map(branch => {
-            const isUnlocked = !!unlocks.branches[branch.id];
-            const branchCats = branch.categories.map(makeCatStatus).filter(Boolean);
-            const allDone = branchCats.every(c => c.allComplete);
-            if (allDone && branchCats.length > 0) return null; // shown in completed section
-            const starterTest = ASSESS_TESTS[branch.starter];
-            const starterName = starterTest?.name || branch.name;
-            return (
-              <div key={branch.id} style={!isUnlocked ? { opacity: 0.5 } : undefined}>
-                <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">{branch.icon} {branch.name}</Text>
-                {!isUnlocked ? (
-                  <Card variant="plain" className="py-3 px-4">
-                    <Text size="xs" emphasis="subtle">Complete the Starter Pack to unlock</Text>
-                  </Card>
-                ) : (
-                  <div className="space-y-2">{branchCats.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>
-                )}
-              </div>
-            );
-          })}
-          {/* Clinical */}
-          {clinicalCat && (
-            <div>
-              <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">📋 Clinical Screens</Text>
-              <AssessCategoryCard {...clinicalCat} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />
-            </div>
-          )}
+          {/* Branch sections — unlocked branches show categories, locked ones collapse to summary */}
+          {currentTier >= 1 && (() => {
+            const unlockedBranches = ASSESS_BRANCHES.filter(b => !!unlocks.branches[b.id]);
+            const lockedBranches = ASSESS_BRANCHES.filter(b => !unlocks.branches[b.id]);
+            return <>
+              {unlockedBranches.map(branch => {
+                const branchCats = branch.categories.map(makeCatStatus).filter(Boolean);
+                const allDone = branchCats.every(c => c.allComplete);
+                if (allDone && branchCats.length > 0) return null;
+                return (
+                  <div key={branch.id}>
+                    <Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">{branch.icon} {branch.name}</Text>
+                    <div className="space-y-2">{branchCats.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div>
+                  </div>
+                );
+              })}
+              {lockedBranches.length > 0 && (
+                <Card variant="plain" className="py-4 px-4" style={{ opacity: 0.6 }}>
+                  <Text size="xs" emphasis="subtle" className="text-center">Complete the Starter Pack to unlock {lockedBranches.length} more assessment areas</Text>
+                </Card>
+              )}
+            </>;
+          })()}
           {/* Completed */}
           {(() => {
-            const done = [...gatewayCats, starterCat, ...ASSESS_BRANCHES.flatMap(b => b.categories.map(makeCatStatus)), clinicalCat].filter(c => c && c.allComplete);
+            const done = [...gatewayCats, starterCat, ...ASSESS_BRANCHES.flatMap(b => b.categories.map(makeCatStatus))].filter(c => c && c.allComplete);
             return done.length > 0 ? (
               <div><Text size="xxs" weight="medium" emphasis="faint" className="mb-2 uppercase tracking-wide">✅ Completed</Text><div className="space-y-2">{done.map(c => <AssessCategoryCard key={c.catId} {...c} isDark={isDark} assessCompleted={assessCompleted} assessInProgress={assessInProgress} assessExpandedCategory={assessExpandedCategory} setAssessExpandedCategory={setAssessExpandedCategory} assessStartTest={assessStartTest} />)}</div></div>
             ) : null;
@@ -3386,26 +3363,6 @@ const ResultCard = ({ icon, title, subtitle, isDark, gradientClass, children }) 
 );
 
 // — CLINICAL CONSENT SCREEN —
-const ClinicalConsentScreen = ({ isDark, assessActions, onNavigate }) => {
-  return (
-    <Screen header={<NavBar back title="Clinical Screens" onBack={() => onNavigate('assess-picker')} />}>
-      <Screen.Body className="flex flex-col items-center justify-center px-6 gap-6 text-center">
-        <Text size="xl">📋</Text>
-        <Text as="h2" weight="semibold">Before you begin</Text>
-        <Stack gap={3} className="max-w-sm">
-          <Text size="sm" emphasis="secondary">These are validated clinical screening tools, not diagnoses.</Text>
-          <Text size="sm" emphasis="secondary">They can help you understand patterns in your mental health, but they don't replace professional assessment.</Text>
-          <Text size="sm" emphasis="subtle">Results are stored only on your device.</Text>
-        </Stack>
-        <Stack direction="row" gap={3} className="mt-4">
-          <Button variant="ghost" onClick={() => onNavigate('assess-picker')}>Go back</Button>
-          <Button variant="primary" color="blue" onClick={() => assessActions.assessConfirmClinicalConsent()}>I understand — continue</Button>
-        </Stack>
-      </Screen.Body>
-    </Screen>
-  );
-};
-
 const AssessResultsScreen = ({ isDark, assessState, assessActions, entityType, onNavigate }) => {
   const { assessCurrentTest, assessCompleted, assessNudgeData } = assessState;
   const { assessStartTest } = assessActions;
@@ -4550,7 +4507,7 @@ const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityTy
                     const cat = q.category || 'other';
                     if (!grouped[cat]) grouped[cat] = [];
                     const answer = q.type === 'binary' ? (r.answer === 0 ? 'Yes' : 'No') : (q.options?.[r.answer] || '?');
-                    grouped[cat].push(`- **${q.text}**  \n  ${answer} (confidence: ${'●'.repeat(r.confidence)}${'○'.repeat(4 - r.confidence)})`);
+                    grouped[cat].push(`- **${q.text}**  \n  ${answer} (confidence: ${'●'.repeat(Math.min(r.confidence, 3))}${'○'.repeat(3 - Math.min(r.confidence, 3))})`);
                   });
                   Object.entries(grouped).forEach(([cat, items]) => {
                     const catInfo = CATEGORIES.find(c => c.id === cat);
@@ -5422,14 +5379,14 @@ const VerifyActionButton = ({ label, color = 'emerald', onClick, disabled, secon
 const VerifyStarConfidence = ({ color = 'emerald', value, onChange }) => {
   const { isDark } = useTheme();
   const c = colorOf(color);
-  const labels = ['Doubt', 'Uncertain', 'Believe so', 'Certain'];
+  const labels = ['Doubt', 'Lean yes', 'Certain'];
   return (
     <Stack align="center" className="w-full" gap={4} style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
       <Stack direction="row" align="start" className="justify-center" gap={5}>
-        {[1, 2, 3, 4].map(level => {
+        {[1, 2, 3].map(level => {
           const isSelected = value !== undefined && level <= value;
           const isCurrent = value === level;
-          const intensity = [0.25, 0.4, 0.55, 0.75][level - 1];
+          const intensity = [0.25, 0.45, 0.75][level - 1];
           return (
             <button key={level} onClick={() => onChange(level)} className="flex flex-col items-center gap-2 transition-all duration-200">
               <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300"
@@ -6008,7 +5965,7 @@ const VerifyEvalSummary = ({ isDark, data, subject, onSubmit, onBack, readOnly }
   const verdict = verdictData.verdict;
   const isPositive = verdict === 'Yes';
   const confidence = verdictData.confidence || '--';
-  const confLabels = { 1: 'Some confidence, notable gaps', 2: 'Fairly confident, minor uncertainty', 3: 'Very confident', 4: 'Certain' };
+  const confLabels = { 1: 'Some confidence, notable gaps', 2: 'Fairly confident, minor uncertainty', 3: 'Very confident' };
   const rows = config.questions.filter(q => answers[q.id] !== undefined && q.type !== 'verdict').flatMap(q => {
     const a = answers[q.id];
     if (q.type === 'compact-connection') return (q.fields || []).filter(f => a?.[f.id]).map(f => ({ label: f.label, value: a[f.id] }));
@@ -6037,7 +5994,7 @@ const VerifyEvalSummary = ({ isDark, data, subject, onSubmit, onBack, readOnly }
             </div>
           )}
           <div className="flex justify-center gap-3 mb-3">
-            {[1, 2, 3, 4].map(level => {
+            {[1, 2, 3].map(level => {
               const isSelected = typeof confidence === 'number' && level <= confidence;
               return (
                 <div key={level} className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
@@ -6111,7 +6068,7 @@ function App() {
   const [screen, setScreenRaw] = useState(getInitialScreen);
   const [previousScreen, setPreviousScreen] = useState(null);
   // pushState routing — major screens push browser history
-  const HISTORY_SCREENS = new Set(['landing', 'categories', 'settings', 'question', 'assess-picker', 'assess-results', 'clinical-consent', 'compare', 'public-profile', 'verify-hub', 'verify-eval-summary', 'profile', 'assess-analysis', 'history', 'identity']);
+  const HISTORY_SCREENS = new Set(['landing', 'categories', 'settings', 'question', 'assess-picker', 'assess-results', 'compare', 'public-profile', 'verify-hub', 'verify-eval-summary', 'profile', 'assess-analysis', 'history', 'identity']);
   const setScreen = useCallback((next) => {
     setScreenRaw(prev => {
       if (next !== prev && HISTORY_SCREENS.has(next)) {
@@ -6490,7 +6447,6 @@ function App() {
     if (screen === 'compare') return <ErrorBoundary feature="Compare"><CompareScreen isDark={isDark} assessState={assessState} entityType={entityType} displayName={displayName} compareData={compareData} compareLoading={compareLoading} onNavigate={setScreen} /></ErrorBoundary>;
     if (screen === 'public-profile') return <PublicProfileScreen isDark={isDark} profileId={publicProfileId} onNavigate={setScreen} />;
     if (screen === 'assess-picker') return <AssessPickerScreen isDark={isDark} entityType={entityType} assessState={assessState} assessActions={assessActions} onNavigate={setScreen} />;
-    if (screen === 'clinical-consent') return <ClinicalConsentScreen isDark={isDark} assessActions={assessActions} onNavigate={setScreen} />;
     if (screen === 'assess-question') return <ErrorBoundary feature="Assessment"><AssessQuestionScreen isDark={isDark} assessState={assessState} assessActions={assessActions} assessUI={assessUI} undoDelay={undoDelay} /></ErrorBoundary>;
     if (screen === 'assess-results') return <AssessResultsScreen isDark={isDark} assessState={assessState} assessActions={assessActions} entityType={entityType} onNavigate={setScreen} />;
     if (screen === 'profile') return <ProfileScreen isDark={isDark} assessState={assessState} assessActions={assessActions} entityType={entityType} onboardingAnswers={onboardingAnswers} responses={responses} onNavigate={setScreen} />;
@@ -6534,7 +6490,7 @@ function App() {
         onBack={() => { setVerifyEvaluatorData(null); setVerifyCurrentSubjectId(null); setScreen('verify-hub'); }} />;
     }
     // Default: Question Flow
-    return <QuestionFlowScreen isDark={isDark}
+    return <QuestionFlowScreen isDark={isDark} onNavigate={setScreen}
       questionState={{ currentQuestion, currentIndex, questions, responses, communityResults, isAnswered, isBinary, answeredCount, totalQuestions, currentResponse, mcColorMode, sessionAnsweredIds, savedQuestions, selectedTrack, selectedSub, questionMeta, setQuestionMeta }}
       flowActions={{ setCommunityResults, handleUndo: mainFlow.handleUndo, goToPrev, goToNext, findNextUnanswered, setCurrentIndex: (i) => { mainFlow.reset(); setCurrentIndex(i); }, handleAnswerTap: mainFlow.handleTap, handleAnswerRightClick: mainFlow.handleRightClick, submitAnswer: mainFlow.submit, saveForLater, skipQuestion, clearUndoneState: mainFlow.clearUndone, setSelectedTrack, setSelectedSub }}
       uiState={{ pendingSubmit, undoDelay, justUndone, showTips, showGestureHint, setShowGestureHint, showConfirmOverlay, confirmColor, tappedAnswer, setTappedAnswer: mainFlow.setTappedAnswer, tapCount, setTapCount: mainFlow.setTapCount }} />;
