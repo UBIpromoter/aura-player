@@ -540,6 +540,8 @@ const AuthProvider = ({ children }) => {
 
 // — TOAST CONTEXT (replaces window.__auraToast)
 const ToastContext = createContext(null);
+const HomeNavContext = createContext(null);
+const useHomeNav = () => useContext(HomeNavContext);
 const useToast = () => useContext(ToastContext);
 const ToastProvider = ({ children }) => {
   const [msg, setMsg] = useState(null);
@@ -1146,21 +1148,25 @@ const SettingItem = ({ label, subtitle, children }) => (
   </Card>
 );
 
-const NavBar = ({ back, title, left, right, borderless, children, className = '', onBack }) => (
-  <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 relative z-10 ${className}`}
-    style={borderless ? {} : { borderBottom: '1px solid var(--border-base)' }}>
-    {children || <>
-      {back && <button className="text-base cursor-pointer" onClick={onBack}><Text as="span" emphasis="muted">←</Text></button>}
-      {left}
-      <div className="flex-1">
-        {typeof title === 'string'
-          ? <Text as="span" weight="medium">{title}</Text>
-          : title}
-      </div>
-      {right && <Stack direction="row" gap={3}>{right}</Stack>}
-    </>}
-  </div>
-);
+const NavBar = ({ back, title, left, right, borderless, children, className = '', onBack, hideHome }) => {
+  const goHome = useHomeNav();
+  return (
+    <div className={`h-[44px] flex-shrink-0 flex items-center gap-2 px-3 relative z-10 ${className}`}
+      style={borderless ? {} : { borderBottom: '1px solid var(--border-base)' }}>
+      {children || <>
+        {!hideHome && goHome && <button className="text-lg cursor-pointer mr-0.5 btn-feedback" onClick={goHome}>🌀</button>}
+        {back && <button className="text-base cursor-pointer" onClick={onBack}><Text as="span" emphasis="muted">←</Text></button>}
+        {left}
+        <div className="flex-1">
+          {typeof title === 'string'
+            ? <Text as="span" weight="medium">{title}</Text>
+            : title}
+        </div>
+        {right && <Stack direction="row" gap={3}>{right}</Stack>}
+      </>}
+    </div>
+  );
+};
 
 const SegmentBar = ({ total = 10, completed = 0, current = -1, color = 'violet' }) => {
   const { isDark } = useTheme();
@@ -2513,6 +2519,7 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState, onNav
     <Stack className="flex-1 overflow-hidden no-scrollbar relative">
       {/* Track Selector */}
       <Stack direction="row" align="center" className="h-[68px] flex-shrink-0 px-3 relative z-10" style={{ background: isDark ? 'rgba(17,24,39,0.5)' : 'rgba(255,255,255,0.9)', borderBottom: (() => { const c = colorOf(CAT_COLOR_MAP[currentQuestion?.category]); return `1px solid rgba(${c.rgb},${isDark?0.15:0.20})`; })() }} gap={3}>
+        <button onClick={() => onNavigate('categories')} className="text-lg cursor-pointer mr-0.5 btn-feedback" title="Home">🌀</button>
         <button onClick={goToPrev} disabled={currentIndex === 0} className="text-xl font-bold w-8 h-8 flex items-center justify-center cursor-pointer"><Text as="span" emphasis={currentIndex === 0 ? "faint" : "secondary"}>◀</Text></button>
         {(() => {
           const ynCount = questions.filter(q => q.type === 'binary' && !responses[q.id]).length;
@@ -2537,7 +2544,6 @@ const QuestionFlowScreen = ({ isDark, questionState, flowActions, uiState, onNav
           );
         })()}
         <button onClick={goToNext} disabled={!hasNext} className="text-xl font-bold w-8 h-8 flex items-center justify-center cursor-pointer"><Text as="span" emphasis={!hasNext ? "faint" : "secondary"}>▶</Text></button>
-        <button onClick={() => onNavigate('categories')} className="w-8 h-8 flex items-center justify-center cursor-pointer ml-1" title="Exit to hub"><Text as="span" size="sm" emphasis="subtle">✕</Text></button>
       </Stack>
       {/* Judgment subcategory filter chips */}
       {currentQuestion?.category === 'judgment' && (
@@ -4905,6 +4911,9 @@ const CategoryScreen = ({ isDark, questions, responses, stats, assessState, asse
         <Stack direction="row" align="center" gap={3}>
           {syncStatus && syncStatus !== 'idle' && <SyncIndicator status={syncStatus} onRetry={onRetrySync} />}
           {stats.streak > 0 && <Text as="span" size="sm" weight="medium" color={COLOR_HEX.amber.light}>🔥{stats.streak}</Text>}
+          <button onClick={() => onNavigate('settings')} className="btn-feedback w-7 h-7 rounded-full flex items-center justify-center" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-subtle)' }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
           <button onClick={() => onNavigate('profile')} className="btn-feedback">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm relative"
               style={isLoggedIn ? {
@@ -5136,7 +5145,7 @@ const VERIFY_PATH_A_QUESTIONS = [
     ]},
   { id: 'a2-identity', ...VERIFY_IDENTITY_CHECK },
   { id: 'a3-verdict', text: 'Is this a real person\nwith a legitimate account?', type: 'verdict',
-    verdictOptions: ['Yes', 'No'],
+    verdictOptions: ['Doubt it', 'Unsure', 'Yes'],
     flags: ["Haven't seen them in a while", 'Only know one context', 'Something feels off', 'Other'] },
 ];
 
@@ -5151,7 +5160,7 @@ const VERIFY_PATH_B_QUESTIONS = [
     ]},
   { id: 'b3-identity', ...VERIFY_IDENTITY_CHECK },
   { id: 'b4-verdict', text: 'Is this a real person\nwith a legitimate account?', type: 'verdict',
-    verdictOptions: ['Yes', 'No'],
+    verdictOptions: ['Doubt it', 'Unsure', 'Yes'],
     flags: ['Only met once', 'One context only', 'Kept things guarded', 'Could game the system', 'Something feels off', 'Other'] },
 ];
 
@@ -5164,7 +5173,7 @@ const VERIFY_PATH_C_QUESTIONS = [
   { id: 'c3-weakest', text: 'Biggest gaps?', type: 'multi', subtitle: 'Pick up to two.', maxSelect: 2,
     options: ['Connections — thin network', 'Verification — no in-person check', 'History — new profile, little activity', 'Attestation — generic, nothing specific', 'Other'] },
   { id: 'c4-verdict', text: 'Is this a real person\nwith a legitimate account?', type: 'verdict',
-    verdictOptions: ['Yes', 'No'],
+    verdictOptions: ['Doubt it', 'Unsure', 'Yes'],
     flags: ['Thin profile', 'Looks like other fakes', 'Something feels off', 'Other'] },
 ];
 
@@ -5437,10 +5446,9 @@ const VerifyVerdict = ({ question, color = 'emerald', answer, onAnswer }) => {
   return (
     <Stack align="center" className="w-full" gap={5} style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
       <Stack direction="row" className="w-full" gap={3}>
-        {(question.verdictOptions || ['Yes', 'No']).map((opt, i) => {
-          const isYes = i === 0;
+        {(question.verdictOptions || ['Doubt it', 'Unsure', 'Yes']).map((opt, i) => {
           const sel = verdict === opt;
-          const vc = isYes ? COLOR_HEX.emerald : COLOR_HEX.rose;
+          const vc = opt === 'Yes' ? COLOR_HEX.emerald : opt === 'Unsure' ? COLOR_HEX.amber : COLOR_HEX.rose;
           return (
             <button key={opt} onClick={() => setField('verdict', opt)}
               className="flex-1 py-4 rounded-2xl font-semibold text-base transition-all duration-200"
@@ -6077,6 +6085,7 @@ function App() {
       return next;
     });
   }, []);
+  const goHome = useCallback(() => setScreen('categories'), [setScreen]);
   useEffect(() => {
     // Seed initial history entry
     window.history.replaceState({ screen }, '', '');
@@ -6569,7 +6578,7 @@ function App() {
   const syncOverlay = syncLoading ? <LoadingOverlay message="Syncing your data…" /> : null;
 
   // Persistent settings gear — only on hub/categories/question/assess-picker screens (no NavBar overlap)
-  const GEAR_SCREENS = new Set(['categories', 'question', 'assess-picker', 'qotd']);
+  const GEAR_SCREENS = new Set(['question', 'qotd']);
   const settingsGearEl = GEAR_SCREENS.has(screen) ? (
     <button onClick={goToSettings} className="absolute top-3 right-3 z-40 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all"
       style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', backdropFilter: 'blur(8px)' }}>
@@ -6577,10 +6586,12 @@ function App() {
     </button>
   ) : null;
 
-  // Final render
+  // Final render — all paths wrapped in HomeNavContext for persistent 🌀 in NavBar
+  const wrapHome = (el) => <HomeNavContext.Provider value={goHome}>{el}</HomeNavContext.Provider>;
+
   if (displayMode === 'desktop' && IS_DEV) {
     const phoneSize = PHONE_SIZES.find(p => p.id === devPhoneSize) || PHONE_SIZES[2];
-    return (
+    return wrapHome(
       <>
         {pendingSubmit && <div className="fixed inset-0 z-[9999] bg-transparent" onClick={mainFlow.handleUndo} onMouseDown={mainFlow.handleUndo} style={{ cursor: 'pointer' }} />}
         <PhoneFrame isDark={isDark} width={phoneSize.w} height={phoneSize.h} devOffset={IS_DEV && showDevPanel && !devMinimized}>
@@ -6598,7 +6609,7 @@ function App() {
   }
   if (displayMode === 'desktop') {
     // Non-dev desktop: centered app container, no phone frame
-    return (
+    return wrapHome(
       <div className="min-h-screen flex items-center justify-center" style={{ background: isDark ? '#030712' : '#f3f4f6' }}>
         <div className="relative flex flex-col overflow-hidden" style={{ width: 440, height: '100vh', maxHeight: 956, background: 'var(--bg-main)', borderRadius: 16, boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}
           onClickCapture={(e) => { if (pendingSubmit) { e.stopPropagation(); mainFlow.handleUndo(); } }}>
@@ -6611,7 +6622,7 @@ function App() {
       </div>
     );
   }
-  return (
+  return wrapHome(
     <div className="h-full flex flex-col overflow-hidden relative" style={{ background: 'var(--bg-main)' }}
       onClickCapture={(e) => { if (pendingSubmit) { e.stopPropagation(); mainFlow.handleUndo(); } }}>
       {settingsGearEl}
