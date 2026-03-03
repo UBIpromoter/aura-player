@@ -85,9 +85,6 @@
       animation: aura-breathe 8s ease-in-out infinite;
       will-change: transform, opacity;
     }
-    /* Progress segment bar */
-    .seg-bar { display: flex; gap: 1px; height: 10px; padding: 2px 4px; }
-    .seg-bar > div { flex: 1; border-radius: 2px; transition: background 0.2s; }
     /* Track selector circles — production version */
     .q-circle { width: 40px; height: 40px; border-radius: 50%; padding: 3px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; cursor: pointer; }
     .q-circle-inner { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; }
@@ -1189,29 +1186,6 @@ const AnswerButton = ({ label, color = 'violet', variant = 'binary', value, inte
     </button>
   );
 };
-
-const ActionBar = ({ actions = [], className = '' }) => (
-  <Stack direction="row" align="center" gap={6} className={`justify-center ${className}`}>
-    {actions.map((a, i) => (
-      <button key={i} className="cursor-pointer" onClick={a.onClick}><Text as="span" size="xs" emphasis="subtle">{a.label}</Text></button>
-    ))}
-  </Stack>
-);
-
-const TrackSelector = ({ tracks = [], onBack, onForward }) => (
-  <div className="h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10"
-    style={{ background: 'var(--bg-elevated)', borderBottom: `1px solid rgba(${COLOR_HEX.violet.rgb},0.15)` }}>
-    {onBack && <button className="text-xl font-bold w-8 h-8 flex items-center justify-center cursor-pointer" onClick={onBack}><Text as="span" emphasis="muted">◀</Text></button>}
-    <Stack direction="row" align="center" className="flex-1 justify-center" gap={3}>
-      {tracks.map(t => (
-        <div key={t.id} className={`q-circ ${t.ringClass || ''}`} style={{ opacity: t.active ? 1 : 0.6, ...(t.active ? { width: 48, height: 48 } : {}) }}>
-          <div className="q-circ-inner" style={{ background: 'var(--bg-main)', color: 'var(--text-primary)' }}>{t.label}</div>
-        </div>
-      ))}
-    </Stack>
-    {onForward && <button className="text-xl font-bold w-8 h-8 flex items-center justify-center cursor-pointer" onClick={onForward}><Text as="span" emphasis="secondary">▶</Text></button>}
-  </div>
-);
 
 const ListItem = ({ icon, label, action, color = 'violet', completed, onClick }) => {
   const { isDark } = useTheme();
