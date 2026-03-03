@@ -57,9 +57,6 @@
     .safe-top { padding-top: env(safe-area-inset-top); }
     .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
     /* App-specific animations not in theme.css */
-    @keyframes fill { from { width: 100%; } to { width: 0%; } }
-    @keyframes shrink { from { width: 100%; } to { width: 0%; } }
-    @keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
     @keyframes sweepFill { from { width: 0%; } to { width: 100%; } }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     @keyframes float-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -88,9 +85,6 @@
       animation: aura-breathe 8s ease-in-out infinite;
       will-change: transform, opacity;
     }
-    /* Progress segment bar */
-    .seg-bar { display: flex; gap: 1px; height: 10px; padding: 2px 4px; }
-    .seg-bar > div { flex: 1; border-radius: 2px; transition: background 0.2s; }
     /* Track selector circles — production version */
     .q-circle { width: 40px; height: 40px; border-radius: 50%; padding: 3px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; cursor: pointer; }
     .q-circle-inner { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; }
@@ -783,9 +777,6 @@ const Stack = ({ direction = 'column', gap = 3, align, children, className = '',
   return <div className={`flex ${isRow ? 'flex-row' : 'flex-col'} gap-${gap} ${al ? `items-${al}` : ''} ${className}`} style={style} {...props}>{children}</div>;
 };
 
-const Container = ({ maxWidth = 480, padding = true, children, className = '', style, ...props }) => (
-  <div className={`mx-auto w-full ${padding ? 'px-4 sm:px-6' : ''} ${className}`} style={{ maxWidth, ...style }} {...props}>{children}</div>
-);
 // --- Text ---
 
 const TEXT_SIZES = { xxs: 'text-xs', xs: 'text-sm', sm: 'text-base', base: 'text-lg', lg: 'text-xl', xl: 'text-2xl', '2xl': 'text-3xl', '3xl': 'text-4xl', '4xl': 'text-5xl' };
@@ -1025,12 +1016,6 @@ const SpectrumBar = ({ value = 50, leftColor = '#6b7280', rightColor = '#8b5cf6'
 // --- Interactive ---
 
 const CONFIDENCE_LABELS = ['Doubt', 'Uncertain', 'Believe so', 'Certain'];
-const CONFIDENCE_LONG_LABELS = [
-  '1 — I have doubts about this',
-  '2 — Uncertain, could go either way',
-  '3 — I believe so, no major red flags',
-  "4 — Certain, I'd stake my reputation",
-];
 
 const Confidence = ({ value = 0, onChange, color = 'violet', labels = CONFIDENCE_LABELS, variant = 'stars', showLabel = true, className = '' }) => {
   const c = colorOf(color);
@@ -1168,20 +1153,6 @@ const NavBar = ({ back, title, left, right, borderless, children, className = ''
   );
 };
 
-const SegmentBar = ({ total = 10, completed = 0, current = -1, color = 'violet' }) => {
-  const { isDark } = useTheme();
-  const c = colorOf(color);
-  return (
-    <div className="seg-bar" style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.06)' }}>
-      {Array.from({ length: total }, (_, i) => (
-        <div key={i} style={{
-          background: i < completed ? c.base : i === current ? (isDark ? '#fff' : c.base) : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')
-        }} />
-      ))}
-    </div>
-  );
-};
-
 const CategoryCard = ({ icon, name, count, label = 'remaining', color = 'violet', glow = 'soft', onClick }) => (
   <Card color={color} glow={glow} shine onClick={onClick} style={{ padding: '14px 16px' }}>
     <Stack direction="row" gap={2} className="mb-2">
@@ -1215,43 +1186,6 @@ const AnswerButton = ({ label, color = 'violet', variant = 'binary', value, inte
     </button>
   );
 };
-
-const ActionBar = ({ actions = [], className = '' }) => (
-  <Stack direction="row" align="center" gap={6} className={`justify-center ${className}`}>
-    {actions.map((a, i) => (
-      <button key={i} className="cursor-pointer" onClick={a.onClick}><Text as="span" size="xs" emphasis="subtle">{a.label}</Text></button>
-    ))}
-  </Stack>
-);
-
-const TrackSelector = ({ tracks = [], onBack, onForward }) => (
-  <div className="h-[68px] flex-shrink-0 flex items-center gap-3 px-3 relative z-10"
-    style={{ background: 'var(--bg-elevated)', borderBottom: `1px solid rgba(${COLOR_HEX.violet.rgb},0.15)` }}>
-    {onBack && <button className="text-xl font-bold w-8 h-8 flex items-center justify-center cursor-pointer" onClick={onBack}><Text as="span" emphasis="muted">◀</Text></button>}
-    <Stack direction="row" align="center" className="flex-1 justify-center" gap={3}>
-      {tracks.map(t => (
-        <div key={t.id} className={`q-circ ${t.ringClass || ''}`} style={{ opacity: t.active ? 1 : 0.6, ...(t.active ? { width: 48, height: 48 } : {}) }}>
-          <div className="q-circ-inner" style={{ background: 'var(--bg-main)', color: 'var(--text-primary)' }}>{t.label}</div>
-        </div>
-      ))}
-    </Stack>
-    {onForward && <button className="text-xl font-bold w-8 h-8 flex items-center justify-center cursor-pointer" onClick={onForward}><Text as="span" emphasis="secondary">▶</Text></button>}
-  </div>
-);
-
-const AvatarRow = ({ name, subtitle, orbSize = 64, action, children, className = '' }) => (
-  <div className={`flex items-center gap-4 ${className}`}>
-    <div className="flex-shrink-0 rounded-full aura-orb" style={{ width: orbSize, height: orbSize }} />
-    <div className="flex-1">
-      <Stack direction="row" gap={2}>
-        <Text heading={4}>{name}</Text>
-        {action}
-      </Stack>
-      {subtitle && <Text size="sm" color={COLOR_HEX.violet.light} className="mt-0.5">{subtitle}</Text>}
-      {children}
-    </div>
-  </div>
-);
 
 const ListItem = ({ icon, label, action, color = 'violet', completed, onClick }) => {
   const { isDark } = useTheme();
