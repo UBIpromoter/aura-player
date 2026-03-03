@@ -4987,57 +4987,85 @@ const QotdScreen = ({ isDark, qotdData, qotdResponse, setQotdResponse, onNavigat
 
   return (
     <Screen header={<NavBar back title="Question of the Day" onBack={() => onNavigate('categories')} />}>
-      <Screen.Body className="space-y-4">
-        {qotdData.sponsor && (
-          <Stack direction="row" align="center" gap={2} className="justify-center">
-            <span className="text-sm">{qotdData.sponsor.avatar}</span>
-            <Text size="xxs" emphasis="subtle">{qotdData.sponsor.name}</Text>
-          </Stack>
-        )}
-        <div className="text-center px-4">
-          <Text size="lg" weight="semibold" className="leading-relaxed" style={{ textWrap: 'balance' }}>{qotdData.text}</Text>
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Blue atmospheric background */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: `radial-gradient(ellipse 80% 60% at 50% 20%, rgba(${COLOR_HEX.blue.rgb},${isDark ? 0.12 : 0.07}) 0%, transparent 70%)`
+        }} />
+
+        {/* Question area — vertically centered */}
+        <div className="flex-1 flex flex-col justify-center px-4 pb-2 overflow-y-auto no-scrollbar min-h-0 relative">
+          {qotdData.sponsor && (
+            <Stack direction="row" align="center" gap={2} className="justify-center mb-5">
+              <span className="text-sm">{qotdData.sponsor.avatar}</span>
+              <Text size="xxs" emphasis="faint">{qotdData.sponsor.name}</Text>
+            </Stack>
+          )}
+          <div className="text-center px-2 mb-2">
+            <Text size="lg" weight="semibold" className="leading-relaxed" style={{ textWrap: 'balance' }}>{qotdData.text}</Text>
+          </div>
+          {hasAnswered && rows && (
+            <div className="mt-6">
+              <Card style={{ background: isDark ? `rgba(${COLOR_HEX.blue.rgb},0.08)` : `rgba(${COLOR_HEX.blue.rgb},0.04)`, border: `1px solid rgba(${COLOR_HEX.blue.rgb},${isDark ? 0.20 : 0.12})` }}>
+                <Text size="xs" weight="semibold" emphasis="subtle" className="uppercase tracking-wide mb-3">Community Results</Text>
+                <Stack gap={2}>
+                  {rows.map((row, i) => (
+                    <Stack key={i} direction="row" align="center" gap={2}>
+                      <Text as="span" size="xs" weight="medium" className="w-8 text-right" style={{ color: row.isUser ? row.colors[2] : 'var(--text-subtle)' }}>
+                        {row.pct}%
+                      </Text>
+                      {renderConfidenceBar(row.byConf, row.colors, maxCount, row.isUser, 2, 'h-5', isDark)}
+                      <Text as="span" size="xxs" emphasis="subtle" className="w-8">{row.label}</Text>
+                    </Stack>
+                  ))}
+                </Stack>
+                <Text size="xxs" emphasis="faint" className="text-center mt-3">{qotdData.totalResponses?.toLocaleString()} responses</Text>
+              </Card>
+            </div>
+          )}
         </div>
 
+        {/* Bottom-pinned answer buttons */}
         {!hasAnswered && (
-          <div className="space-y-2 px-4">
-            {isBinary ? (
-              <Stack direction="row" gap={3}>
-                <Button color="emerald" size="full" className="flex-1" onClick={() => handleAnswer(0)}>Yes</Button>
-                <Button color="rose" size="full" className="flex-1" onClick={() => handleAnswer(1)}>No</Button>
-              </Stack>
-            ) : (
-              (qotdData.options || []).map((opt, idx) => {
-                const mc = MC_COLORS[idx % MC_COLORS.length];
-                return (
-                  <button key={idx} onClick={() => handleAnswer(idx)}
-                    className={`w-full py-3 px-4 rounded-xl text-left transition-all border ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-black/[0.06] bg-white'}`}
-                    style={tapped === idx ? { background: `rgba(${mc.rgb},0.2)`, borderColor: mc.hex } : {}}>
-                    <Text size="sm">{opt}</Text>
-                  </button>
-                );
-              })
-            )}
+          <div className="flex-shrink-0 border-t relative z-10" style={{
+            borderColor: `rgba(${COLOR_HEX.blue.rgb},${isDark ? 0.15 : 0.12})`,
+            background: isDark
+              ? `linear-gradient(180deg, rgba(3,7,18,1) 0%, rgba(${COLOR_HEX.blue.rgb},0.06) 100%)`
+              : `linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(${COLOR_HEX.blue.rgb},0.04) 100%)`
+          }}>
+            <div className="px-4 pt-3 pb-6">
+              {isBinary ? (
+                <div className="w-full max-w-sm resp-max-w mx-auto space-y-3">
+                  {[{ label: 'YES', answer: 0, c: COLOR_HEX.emerald }, { label: 'NO', answer: 1, c: COLOR_HEX.rose }].map(({ label, answer, c }) => (
+                    <button key={answer} onClick={() => handleAnswer(answer)}
+                      className="w-full h-14 rounded-2xl flex items-center justify-center border transition-all btn-feedback cursor-pointer"
+                      style={tapped === answer
+                        ? { background: `linear-gradient(135deg, rgba(${c.rgb},0.35) 0%, rgba(${c.rgb},0.20) 100%)`, borderColor: `rgba(${c.rgb},0.60)`, color: isDark ? c.light : c.base, boxShadow: `0 0 20px rgba(${c.rgb},0.25)` }
+                        : { background: isDark ? `rgba(${c.rgb},0.08)` : `rgba(${c.rgb},0.05)`, borderColor: `rgba(${c.rgb},0.25)`, color: isDark ? c.light : c.base }}>
+                      <span className="text-lg font-semibold">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="w-full max-w-sm resp-max-w mx-auto space-y-1.5">
+                  {(qotdData.options || []).map((opt, idx) => {
+                    const mc = MC_COLORS[idx % MC_COLORS.length];
+                    return (
+                      <button key={idx} onClick={() => handleAnswer(idx)}
+                        className="w-full h-10 rounded-2xl flex items-center justify-center px-5 border transition-all btn-feedback cursor-pointer"
+                        style={tapped === idx
+                          ? { background: `rgba(${mc.rgb},0.25)`, borderColor: mc.hex, color: isDark ? mc.shades[0] : mc.hex }
+                          : { background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', color: 'var(--text-primary)' }}>
+                        <span className="text-sm font-semibold">{opt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
-
-        {hasAnswered && rows && (
-          <Card>
-            <Text size="xs" weight="semibold" emphasis="subtle" className="uppercase tracking-wide mb-3">Community Results</Text>
-            <Stack gap={2}>
-              {rows.map((row, i) => (
-                <Stack key={i} direction="row" align="center" gap={2}>
-                  <Text as="span" size="xs" weight="medium" className="w-8 text-right" style={{ color: row.isUser ? row.colors[2] : 'var(--text-subtle)' }}>
-                    {row.pct}%
-                  </Text>
-                  {renderConfidenceBar(row.byConf, row.colors, maxCount, row.isUser, 2, 'h-5', isDark)}
-                  <Text as="span" size="xxs" emphasis="subtle" className="w-8">{row.label}</Text>
-                </Stack>
-              ))}
-            </Stack>
-            <Text size="xxs" emphasis="faint" className="text-center mt-3">{qotdData.totalResponses?.toLocaleString()} responses</Text>
-          </Card>
-        )}
-      </Screen.Body>
+      </div>
     </Screen>
   );
 };
