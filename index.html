@@ -3064,26 +3064,34 @@ const useAssessment = ({ setScreen, isDark, entityType, cloudSync, responseCaptu
 // — ASSESSMENT PICKER SCREEN
 const AssessCategoryCard = ({ catId, cat, catTests, isDark, assessCompleted, assessInProgress, assessExpandedCategory, setAssessExpandedCategory, assessStartTest, status }) => {
   const isLocked = status === 'locked';
+  const isDone = status === 'done';
+  const isAvailable = status === 'available';
   const totalQ = catTests.reduce((s, [_, t]) => s + (t.questionCount || t.items.length), 0);
   const answeredQ = catTests.reduce((s, [id, t]) => { if (assessCompleted[id]) return s + (t.questionCount || t.items.length); const p = assessInProgress[id]; return s + (p ? Object.keys(p.responses || {}).length : 0); }, 0);
   const pct = isLocked ? 0 : (answeredQ / totalQ) * 100;
   const t = twColor(cat.color);
-  const isExpanded = !isLocked && assessExpandedCategory === catId;
+  const ac = colorOf(cat.color);
+  const isExpanded = !isLocked && !isDone && assessExpandedCategory === catId;
   const hasModules = catTests.length > 1;
   const handleClick = () => {
-    if (isLocked) return;
+    if (isLocked || isDone) return;
     if (hasModules) { setAssessExpandedCategory(isExpanded ? null : catId); }
     else if (catTests[0]) { assessStartTest(catTests[0][0]); }
   };
+  const btnStyle = isDone
+    ? { opacity: 0.38 }
+    : isAvailable
+    ? { borderColor: `rgba(${ac.rgb}, 0.35)`, boxShadow: `0 0 14px rgba(${ac.rgb}, 0.12)`, background: isDark ? `rgba(${ac.rgb}, 0.07)` : `rgba(${ac.rgb}, 0.05)` }
+    : {};
   return (
     <div>
-      <button onClick={handleClick} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all border ${isLocked ? 'opacity-50 cursor-not-allowed' : ''} ${isDark ? 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06]' : 'border-black/[0.06] bg-white hover:bg-gray-50'}`}>
-        <ProgressCircle progress={pct} size={40} strokeWidth={3} color={cat.color} text={isLocked ? '🔒' : (pct > 0 ? `${Math.round(pct)}%` : cat.icon)} gradientId={`cat-${catId}`} isDark={isDark} textSize="text-[10px]" iconSize="text-sm" />
+      <button onClick={handleClick} style={btnStyle} className={`w-full ${isDone ? 'p-2.5' : 'p-3'} rounded-xl text-left flex items-center gap-3 transition-all border ${isLocked ? 'opacity-50 cursor-not-allowed' : isDone ? 'cursor-default' : ''} ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-black/[0.06] bg-white'} ${!isDone && !isLocked ? (isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-gray-50') : ''}`}>
+        <ProgressCircle progress={pct} size={40} strokeWidth={3} color={cat.color} text={isLocked ? '🔒' : isDone ? '✓' : (pct > 0 ? `${Math.round(pct)}%` : cat.icon)} gradientId={`cat-${catId}`} isDark={isDark} textSize="text-[10px]" iconSize="text-sm" />
         <div className="flex-1 min-w-0">
-          <Text weight="medium">{cat.name}</Text>
-          {isLocked ? <Text size="xxs" emphasis="faint">Complete the starter to unlock</Text> : <Text size="xxs" emphasis="subtle">{catTests.length} module{catTests.length > 1 ? 's' : ''} · {totalQ} questions</Text>}
+          <Text weight={isAvailable ? 'semibold' : 'medium'}>{cat.name}</Text>
+          {!isDone && (isLocked ? <Text size="xxs" emphasis="faint">Complete the starter to unlock</Text> : <Text size="xxs" emphasis="subtle">{catTests.length} module{catTests.length > 1 ? 's' : ''} · {totalQ} questions</Text>)}
         </div>
-        {!isLocked && hasModules && <Text as="span" size="xxs" emphasis="faint">{isExpanded ? '▾' : '▸'}</Text>}
+        {!isLocked && !isDone && hasModules && <Text as="span" size="xxs" emphasis="faint">{isExpanded ? '▾' : '▸'}</Text>}
       </button>
       {isExpanded && hasModules && (
         <div className="ml-6 mt-1 space-y-1">
