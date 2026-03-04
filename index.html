@@ -6429,6 +6429,7 @@ function App() {
   const [showDevPanel, setShowDevPanel] = useState(IS_DEV);
   const [devMinimized, setDevMinimized] = useState(false);
   const [devPhoneSize, setDevPhoneSize] = useState('15pm');
+  const [showDevNav, setShowDevNav] = useState(false);
   // Answer flow
   const mainFlow = useAnswerFlow({
     undoDelay,
@@ -6817,6 +6818,61 @@ function App() {
       </div>
     );
   })() : null;
+  // Dev Nav — floating screen picker for mobile/phone review sessions
+  const devNavScreens = [
+    { id: 'landing', label: 'Welcome' }, { id: 'onboarding', label: 'Onboard' }, { id: 'categories', label: 'Hub' },
+    { id: 'qotd', label: 'QotD' }, { id: 'qotd-results', label: 'QotD ✓' }, { id: 'question', label: 'Question' },
+    { id: 'assess-picker', label: 'Assess' }, { id: 'assess-question', label: 'Assess Q' }, { id: 'assess-results', label: 'Results' },
+    { id: 'profile', label: 'Profile' }, { id: 'assess-analysis', label: 'Analysis' }, { id: 'history', label: 'History' },
+    { id: 'settings', label: 'Settings' }, { id: 'identity', label: 'Identity' }, { id: 'compare', label: 'Compare' },
+    { id: 'verify-hub', label: 'Verify' },
+  ];
+  const devNavEl = (IS_DEV || activeDemoPersonaId !== null) ? (() => {
+    const handleDevNavTo = (id) => {
+      if (id === 'qotd-results') {
+        setQotdResponse({ answer: 0, confidence: 3, timestamp: Date.now() });
+        setScreen('qotd');
+      } else {
+        setScreen(id);
+      }
+      setShowDevNav(false);
+    };
+    const overlayBg = isDark ? '#111827' : '#f9fafb';
+    const chipBase = { background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 500, border: '1px solid transparent' };
+    const chipActive = { background: `rgba(${COLOR_HEX.violet.rgb},0.18)`, color: COLOR_HEX.violet.light, fontSize: '12px', fontWeight: 500, border: `1px solid rgba(${COLOR_HEX.violet.rgb},0.4)` };
+    return (
+      <>
+        {showDevNav && (
+          <div className="absolute inset-0 z-[9990] flex items-end" onClick={() => setShowDevNav(false)}
+            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+            <div className="w-full rounded-t-2xl pb-8 pt-3 px-3" style={{ background: overlayBg }} onClick={e => e.stopPropagation()}>
+              <div className="w-10 h-1 rounded-full mx-auto mb-3" style={{ background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)' }} />
+              <Text size="xxs" weight="semibold" emphasis="subtle" className="uppercase tracking-wide mb-3 block text-center">Jump to Screen</Text>
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                {devNavScreens.map(s => {
+                  const isActive = screen === s.id || (s.id === 'qotd-results' && screen === 'qotd' && qotdResponse !== null);
+                  return (
+                    <button key={s.id} onClick={() => handleDevNavTo(s.id)}
+                      className="py-2.5 rounded-xl text-center cursor-pointer transition-all"
+                      style={isActive ? chipActive : chipBase}>
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+        <button onClick={() => setShowDevNav(v => !v)}
+          className="absolute z-[9991] flex items-center justify-center cursor-pointer transition-all"
+          style={{ bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))', left: '12px', width: '32px', height: '32px', borderRadius: '50%', background: isDark ? 'rgba(139,92,246,0.22)' : 'rgba(139,92,246,0.14)', backdropFilter: 'blur(8px)', border: `1px solid rgba(${COLOR_HEX.violet.rgb},${showDevNav ? 0.6 : 0.3})` }}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke={COLOR_HEX.violet.light} strokeWidth="1.5" strokeLinecap="round">
+            <line x1="2" y1="3.5" x2="11" y2="3.5"/><line x1="2" y1="6.5" x2="11" y2="6.5"/><line x1="2" y1="9.5" x2="11" y2="9.5"/>
+          </svg>
+        </button>
+      </>
+    );
+  })() : null;
   const globalToastEl = globalToast ? (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-xl shadow-lg" style={{ background: `rgba(${COLOR_HEX.rose.rgb},0.9)`, backdropFilter: 'blur(8px)', animation: 'slideUp 0.3s ease-out both', maxWidth: '340px' }}>
       <Text size="sm" color="white" weight="medium">{globalToast}</Text>
@@ -6854,6 +6910,7 @@ function App() {
           <div className="flex-1 flex flex-col overflow-hidden relative">
             {settingsGearEl}
             {renderContent()}
+            {devNavEl}
           </div>
           {nudgeEl}
           {globalToastEl}
@@ -6871,6 +6928,7 @@ function App() {
           onClickCapture={(e) => { if (pendingSubmit) { e.stopPropagation(); mainFlow.handleUndo(); } }}>
           {settingsGearEl}
           <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
+          {devNavEl}
           {nudgeEl}
           {globalToastEl}
           {syncOverlay}
@@ -6883,6 +6941,7 @@ function App() {
       onClickCapture={(e) => { if (pendingSubmit) { e.stopPropagation(); mainFlow.handleUndo(); } }}>
       {settingsGearEl}
       <div className="flex-1 flex flex-col overflow-hidden">{renderContent()}</div>
+      {devNavEl}
       <div className="safe-bottom" />
       {nudgeEl}
       {globalToastEl}
