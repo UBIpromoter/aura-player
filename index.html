@@ -5194,6 +5194,10 @@ const verifySave = (evaluations) => {
 const verifyLoad = () => {
   try { const s = localStorage.getItem(VERIFY_STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; }
 };
+const EXPERT_KEY = 'aura-verify-expert-mode';
+const EXPERT_UNLOCK_THRESHOLD = 3;
+const expertModeLoad = () => { try { return JSON.parse(localStorage.getItem(EXPERT_KEY)) ?? false; } catch { return false; } };
+const expertModeSave = (v) => { try { localStorage.setItem(EXPERT_KEY, JSON.stringify(v)); } catch {} };
 
 const VERIFY_CONFIDENCE_LABELS = [
   '1 — I have doubts about this',
@@ -5707,6 +5711,383 @@ const VerifyTextInput = ({ question, color, answer, onAnswer, onContinue }) => {
   );
 };
 
+// ==================== EXPRESS MODE COMPONENTS ====================
+
+// ExpertChip — single-select chip (express mode)
+const ExpertChip = ({ options, value, onChange, color = 'emerald' }) => {
+  const c = colorOf(color);
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map(opt => {
+        const sel = value === opt;
+        return (
+          <button key={opt} onClick={() => onChange(opt)}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer"
+            style={{
+              background: sel ? `rgba(${c.rgb}, 0.22)` : 'rgba(255,255,255,0.04)',
+              border: sel ? `1px solid rgba(${c.rgb}, 0.45)` : '1px solid rgba(255,255,255,0.07)',
+              color: sel ? '#fff' : 'rgba(255,255,255,0.55)',
+            }}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// ExpertPill — toggle pill (express mode multi-select)
+const ExpertPill = ({ label, isOn, onToggle, color = 'emerald' }) => {
+  const c = colorOf(color);
+  return (
+    <button onClick={onToggle}
+      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer text-left"
+      style={{
+        background: isOn ? `rgba(${c.rgb}, 0.18)` : 'rgba(255,255,255,0.04)',
+        border: isOn ? `1px solid rgba(${c.rgb}, 0.35)` : '1px solid rgba(255,255,255,0.07)',
+        color: isOn ? '#fff' : 'rgba(255,255,255,0.55)',
+      }}>
+      {label}
+    </button>
+  );
+};
+
+// VerifyModeToggle — Guided/Express pill (visible after EXPERT_UNLOCK_THRESHOLD completions)
+const VerifyModeToggle = ({ expertMode, setExpertMode, completedCount, compact }) => {
+  if ((completedCount || 0) < EXPERT_UNLOCK_THRESHOLD) return null;
+  const c = COLOR_HEX.emerald;
+  return (
+    <div className={`flex ${compact ? 'justify-end' : 'justify-center'}`}>
+      <button onClick={() => { const next = !expertMode; setExpertMode(next); expertModeSave(next); }}
+        className="flex items-center rounded-full overflow-hidden transition-all duration-200 cursor-pointer"
+        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <span className="px-3 py-1 text-xs font-medium transition-all duration-200"
+          style={{
+            background: !expertMode ? `rgba(${c.rgb}, 0.2)` : 'transparent',
+            color: !expertMode ? c.light : 'rgba(255,255,255,0.35)',
+            borderRadius: !expertMode ? '9999px' : '0',
+          }}>Guided</span>
+        <span className="px-3 py-1 text-xs font-medium transition-all duration-200"
+          style={{
+            background: expertMode ? 'rgba(251,191,36,0.25)' : 'transparent',
+            color: expertMode ? '#fbbf24' : 'rgba(255,255,255,0.35)',
+            borderRadius: expertMode ? '9999px' : '0',
+          }}>Express</span>
+      </button>
+    </div>
+  );
+};
+
+// FlagToggle — flag option for express verdict section
+const FlagToggle = ({ label, isOn, onToggle, color = 'emerald' }) => {
+  const c = colorOf(color);
+  return (
+    <button onClick={onToggle}
+      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer"
+      style={{
+        background: isOn ? `rgba(${c.rgb}, 0.15)` : 'rgba(255,255,255,0.03)',
+        border: isOn ? `1px solid rgba(${c.rgb}, 0.3)` : '1px solid rgba(255,255,255,0.06)',
+        color: isOn ? '#fff' : 'rgba(255,255,255,0.45)',
+      }}>
+      <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 transition-all" style={{
+        background: isOn ? `rgba(${c.rgb}, 0.3)` : 'rgba(255,255,255,0.08)',
+        border: isOn ? `1px solid rgba(${c.rgb}, 0.5)` : '1px solid rgba(255,255,255,0.1)',
+      }}>
+        {isOn && <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 5L4.5 7.5L8 3" /></svg>}
+      </div>
+      {label}
+    </button>
+  );
+};
+
+// VerdictSelector — verdict buttons for express form
+const VerdictSelector = ({ options, value, onChange, color = 'emerald' }) => {
+  const c = colorOf(color);
+  const verdictColors = { 'Yes': COLOR_HEX.emerald, 'Doubt it': COLOR_HEX.rose, 'Unsure': COLOR_HEX.amber };
+  return (
+    <div className="flex gap-2 w-full">
+      {options.map(opt => {
+        const sel = value === opt;
+        const vc = verdictColors[opt] || c;
+        return (
+          <button key={opt} onClick={() => onChange(opt)}
+            className="flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer"
+            style={{
+              background: sel ? `linear-gradient(135deg, rgba(${vc.rgb}, 0.35), rgba(${vc.rgb}, 0.15))` : 'rgba(255,255,255,0.04)',
+              border: sel ? `1.5px solid rgba(${vc.rgb}, 0.6)` : '1px solid rgba(255,255,255,0.07)',
+              color: sel ? '#fff' : 'rgba(255,255,255,0.45)',
+              boxShadow: sel ? `0 0 20px rgba(${vc.rgb}, 0.2)` : 'none',
+            }}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// ExpressConfidenceInput — 3-level confidence (matches guided mode's 1-3 scale)
+const ExpressConfidenceInput = ({ value, onChange, color = 'emerald' }) => {
+  const c = colorOf(color);
+  const levels = [1, 2, 3];
+  const labels = { 1: 'Some confidence', 2: 'Fairly confident', 3: 'Very confident' };
+  return (
+    <div className="flex items-center gap-3">
+      {levels.map(level => {
+        const sel = typeof value === 'number' && level <= value;
+        return (
+          <button key={level} onClick={() => onChange(level)}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-200 cursor-pointer"
+            style={{
+              background: sel ? `rgba(${c.rgb}, ${0.25 + level * 0.12})` : 'rgba(255,255,255,0.06)',
+              border: sel ? `1.5px solid rgba(${c.rgb}, ${0.4 + level * 0.1})` : '1px solid rgba(255,255,255,0.08)',
+              color: sel ? '#fff' : 'rgba(255,255,255,0.3)',
+            }}>
+            {level}
+          </button>
+        );
+      })}
+      {value && <span className="text-xs ml-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{labels[value]}</span>}
+    </div>
+  );
+};
+
+// ExpertQuestionField — renders one question field in express form
+// Stores answers in same format as guided mode (compatible with VerifyEvalSummary)
+const ExpertQuestionField = ({ question, answers, setAnswer, color }) => {
+  const c = colorOf(color);
+  const a = answers[question.id];
+
+  // compact-connection: sub-fields stored under question.id as { fieldId: val }
+  if (question.type === 'compact-connection') {
+    const val = a || {};
+    return (
+      <div className="space-y-3">
+        {question.fields.map(field => (
+          <div key={field.id}>
+            <div className="text-[11px] font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>{field.label}</div>
+            <ExpertChip options={field.options} value={val[field.id]} onChange={v => setAnswer(question.id, { ...val, [field.id]: v })} color={color} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // identity-check: sub-fields stored under question.id as { fieldId: val }
+  if (question.type === 'identity-check') {
+    const val = a || {};
+    return (
+      <div className="space-y-3">
+        {question.fields.map(field => (
+          <div key={field.id}>
+            <div className="text-xs font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.7)' }}>{field.label}</div>
+            {field.subtitle && <div className="text-[10px] mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{field.subtitle}</div>}
+            <ExpertChip options={field.options} value={val[field.id]} onChange={v => setAnswer(question.id, { ...val, [field.id]: v })} color={color} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // single choice
+  if (question.type === 'single') {
+    return <ExpertChip options={question.options} value={a} onChange={v => setAnswer(question.id, v)} color={color} />;
+  }
+
+  // multi select
+  if (question.type === 'multi') {
+    const selected = Array.isArray(a) ? a : [];
+    const toggle = (opt) => {
+      if (selected.includes(opt)) {
+        setAnswer(question.id, selected.filter(x => x !== opt));
+      } else if (question.maxSelect && selected.length >= question.maxSelect) {
+        return;
+      } else {
+        setAnswer(question.id, [...selected, opt]);
+      }
+    };
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {question.options.map(opt => (
+          <ExpertPill key={opt} label={opt} isOn={selected.includes(opt)} onToggle={() => toggle(opt)} color={color} />
+        ))}
+      </div>
+    );
+  }
+
+  // text
+  if (question.type === 'text') {
+    return (
+      <input type="text" value={a || ''} onChange={e => setAnswer(question.id, e.target.value)}
+        placeholder={question.placeholder || ''}
+        className="w-full text-xs px-3 py-2.5 rounded-lg outline-none transition-all duration-200"
+        style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: a ? `1px solid rgba(${c.rgb}, 0.3)` : '1px solid rgba(255,255,255,0.08)',
+          color: '#fff',
+        }} />
+    );
+  }
+
+  // star-confidence — stored as number 1–3 (matching guided mode)
+  if (question.type === 'star-confidence') {
+    return <ExpressConfidenceInput value={a} onChange={v => setAnswer(question.id, v)} color={color} />;
+  }
+
+  // evidence-combined: sections stored under question.id as { s0: [...], s1: [...] }
+  if (question.type === 'evidence-combined') {
+    const val = a || {};
+    return (
+      <div className="space-y-3">
+        {question.sections.map((section, si) => {
+          const key = `s${si}`;
+          const selected = Array.isArray(val[key]) ? val[key] : [];
+          const toggle = (opt) => {
+            const next = selected.includes(opt) ? selected.filter(x => x !== opt) : [...selected, opt];
+            setAnswer(question.id, { ...val, [key]: next });
+          };
+          return (
+            <div key={section.label}>
+              <div className="text-[11px] font-semibold mb-1.5 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>{section.label}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {section.options.map(opt => (
+                  <ExpertPill key={opt} label={opt} isOn={selected.includes(opt)} onToggle={() => toggle(opt)} color={color} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // verdict: { verdict, confidence, flags }
+  if (question.type === 'verdict') {
+    const vd = typeof a === 'object' && a !== null ? a : {};
+    const setV = (key, val) => setAnswer(question.id, { ...vd, [key]: val });
+    const selectedFlags = Array.isArray(vd.flags) ? vd.flags : [];
+    const toggleFlag = (f) => setV('flags', selectedFlags.includes(f) ? selectedFlags.filter(x => x !== f) : [...selectedFlags, f]);
+    return (
+      <div className="space-y-4">
+        <VerdictSelector options={question.verdictOptions} value={vd.verdict} onChange={v => setV('verdict', v)} color={color} />
+        {vd.verdict && (
+          <div>
+            <div className="text-[11px] font-semibold mb-2 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>Confidence</div>
+            <ExpressConfidenceInput value={vd.confidence} onChange={v => setV('confidence', v)} color={color} />
+          </div>
+        )}
+        {vd.verdict && question.flags && question.flags.length > 0 && (
+          <div>
+            <div className="text-[11px] font-semibold mb-2 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>Any flags?</div>
+            <div className="flex flex-wrap gap-1.5">
+              {question.flags.map(f => (
+                <FlagToggle key={f} label={f} isOn={selectedFlags.includes(f)} onToggle={() => toggleFlag(f)} color={color} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+};
+
+// ExpressVerifyForm — single-screen evaluation form for experienced verifiers
+const ExpressVerifyForm = ({ isDark, subject, path, onComplete, onBack, expertMode, setExpertMode, completedCount }) => {
+  const config = VERIFY_PATH_CONFIG[path];
+  const color = config.color;
+  const c = colorOf(color);
+  const questions = config.questions;
+  const [answers, setAnswers] = useState({ gate: config.label });
+
+  const setAnswer = (id, val) => setAnswers(prev => ({ ...prev, [id]: val }));
+
+  const verdictKey = questions.find(q => q.type === 'verdict')?.id;
+  const verdictData = verdictKey ? answers[verdictKey] : null;
+  const canSubmit = verdictData?.verdict && verdictData?.confidence;
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    onComplete({ path, pathLabel: config.label, answers });
+  };
+
+  return (
+    <div className="flex-1 flex flex-col relative overflow-hidden" style={{ background: isDark ? '#030712' : '#f9fafb' }}>
+      {/* Ambient glow */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute left-1/2 top-1/4 -translate-x-1/2 -translate-y-1/2" style={{
+          width: 400, height: 400, borderRadius: '50%',
+          background: `radial-gradient(circle, rgba(${c.rgb}, 0.1) 0%, rgba(${c.rgb}, 0.03) 40%, transparent 65%)`,
+          animation: 'aura-breathe 8s ease-in-out infinite',
+        }} />
+      </div>
+      {/* Fixed header */}
+      <div className="flex-shrink-0 px-4 py-3 relative z-20" style={{
+        borderBottom: `1px solid rgba(${c.rgb}, 0.12)`,
+        background: isDark ? 'rgba(3,7,18,0.85)' : 'rgba(249,250,251,0.9)',
+        backdropFilter: 'blur(12px)',
+      }}>
+        <div className="flex items-center gap-3">
+          <button onClick={onBack}
+            className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 cursor-pointer transition-all"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 2L4 7L9 12" /></svg>
+          </button>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+            style={{ background: `rgba(${c.rgb}, 0.2)`, color: COLOR_HEX[color]?.light || '#fff' }}>
+            {subject?.name?.[0] || '?'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold truncate" style={{ color: isDark ? '#fff' : '#111' }}>{subject?.name}</div>
+            <div className="text-xs truncate" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>{subject?.city}</div>
+          </div>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+            style={{ background: `rgba(${c.rgb}, 0.15)`, border: `1px solid rgba(${c.rgb}, 0.25)` }}>
+            <span className="text-xs font-medium" style={{ color: COLOR_HEX[color]?.light || '#fff' }}>{config.label}</span>
+          </div>
+        </div>
+        <div className="mt-2">
+          <VerifyModeToggle expertMode={expertMode} setExpertMode={setExpertMode} completedCount={completedCount} compact />
+        </div>
+      </div>
+      {/* Scrollable form */}
+      <div className="flex-1 overflow-y-auto relative z-10 px-5 pt-5 pb-28">
+        <div className="space-y-6 max-w-sm mx-auto">
+          {questions.map((q, i) => {
+            const label = q.type === 'verdict'
+              ? (q.text.includes('\n') ? q.text.split('\n')[1] : q.text)
+              : q.text;
+            return (
+              <div key={q.id} style={{ animation: `fadeSlideIn 0.4s ease-out ${i * 0.06}s both` }}>
+                <div className="text-sm font-semibold mb-1" style={{ color: isDark ? '#f9fafb' : '#111' }}>{label}</div>
+                {q.subtitle && <div className="text-xs mb-2" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>{q.subtitle}</div>}
+                <ExpertQuestionField question={q} answers={answers} setAnswer={setAnswer} color={color} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* Fixed submit */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 px-5 pb-6 pt-4"
+        style={{ background: isDark ? 'linear-gradient(180deg, transparent 0%, rgba(3,7,18,0.95) 30%, rgba(3,7,18,1) 100%)' : 'linear-gradient(180deg, transparent 0%, rgba(249,250,251,0.95) 30%, rgba(249,250,251,1) 100%)' }}>
+        <div className="max-w-sm mx-auto">
+          <button onClick={handleSubmit} disabled={!canSubmit}
+            className="w-full py-3.5 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer"
+            style={{
+              background: canSubmit ? `linear-gradient(135deg, rgba(${c.rgb}, 0.5), rgba(${c.rgb}, 0.25))` : 'rgba(255,255,255,0.05)',
+              border: canSubmit ? `1.5px solid rgba(${c.rgb}, 0.6)` : '1px solid rgba(255,255,255,0.08)',
+              color: canSubmit ? '#fff' : 'rgba(255,255,255,0.25)',
+              boxShadow: canSubmit ? `0 0 20px rgba(${c.rgb}, 0.2)` : 'none',
+            }}>
+            Review & Submit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==================== VERIFY HUB ====================
 
 // Subject card — module-scope, uses useTheme
@@ -5756,13 +6137,13 @@ const VerifySubjectCard = ({ subject, isDone, onSelect }) => {
   );
 };
 
-const VerifyHub = ({ isDark, subjects, evaluations, onSelect, onViewCompleted, onBack }) => {
+const VerifyHub = ({ isDark, subjects, evaluations, onSelect, onViewCompleted, onBack, expertMode, setExpertMode, completedCount: completedCountProp }) => {
   const c = COLOR_HEX.emerald;
   const [search, setSearch] = useState('');
   const [showAllCompleted, setShowAllCompleted] = useState(false);
   const [showAllPending, setShowAllPending] = useState(false);
   const PENDING_COLLAPSE = 3;
-  const completedCount = Object.keys(evaluations).length;
+  const completedCount = completedCountProp !== undefined ? completedCountProp : Object.keys(evaluations).length;
 
   const pending = subjects.filter(s => !evaluations[s.id])
     .sort((a, b) => {
@@ -5777,7 +6158,12 @@ const VerifyHub = ({ isDark, subjects, evaluations, onSelect, onViewCompleted, o
 
   return (
     <VerifyScreenLayout color="emerald" onBack={onBack}>
-      <Text heading size="xl" weight="bold" className="mb-1">Verify</Text>
+      <div className="w-full flex items-center justify-between mb-1">
+        <Text heading size="xl" weight="bold">Verify</Text>
+        {expertMode !== undefined && setExpertMode && (
+          <VerifyModeToggle expertMode={expertMode} setExpertMode={setExpertMode} completedCount={completedCount} compact />
+        )}
+      </div>
       {/* Stats bar */}
       {completedCount > 0 && (
         <div className="flex items-center gap-3 mb-3 px-3 py-1.5 rounded-full" style={{
@@ -5868,7 +6254,7 @@ const VerifyHub = ({ isDark, subjects, evaluations, onSelect, onViewCompleted, o
 
 // ==================== VERIFY EVALUATOR FLOW ====================
 
-const VerifyEvaluatorFlow = ({ isDark, subject, onComplete, onBack, sharedPath, setSharedPath, sharedAnswers, setSharedAnswers }) => {
+const VerifyEvaluatorFlow = ({ isDark, subject, onComplete, onBack, sharedPath, setSharedPath, sharedAnswers, setSharedAnswers, expertMode, setExpertMode, completedCount }) => {
   const path = sharedPath;
   const setPath = setSharedPath;
   const answers = sharedAnswers;
@@ -5882,6 +6268,22 @@ const VerifyEvaluatorFlow = ({ isDark, subject, onComplete, onBack, sharedPath, 
     return VERIFY_PATH_CONFIG[p].questions.filter(q => !q.conditional || q.conditional(ans));
   };
 
+  // Express mode: single-screen form after path selection
+  if (phase === 'path' && expertMode && path) {
+    return (
+      <ExpressVerifyForm
+        isDark={isDark}
+        subject={subject}
+        path={path}
+        onComplete={onComplete}
+        onBack={() => { setPhase('route'); setPath(null); setAnswers({}); }}
+        expertMode={expertMode}
+        setExpertMode={setExpertMode}
+        completedCount={completedCount}
+      />
+    );
+  }
+
   // Route screen — "How do you know them?"
   if (phase === 'route') {
     // Smart path suggestion based on subject connections
@@ -5889,6 +6291,11 @@ const VerifyEvaluatorFlow = ({ isDark, subject, onComplete, onBack, sharedPath, 
     return (
       <VerifyScreenLayout color="emerald" onBack={onBack} subject={subject}>
         <Stack align="center" className="w-full mt-1" gap={4} style={{ animation: 'fadeSlideIn 0.4s ease-out both' }}>
+          {expertMode !== undefined && setExpertMode && (
+            <div className="w-full flex justify-end -mb-2">
+              <VerifyModeToggle expertMode={expertMode} setExpertMode={setExpertMode} completedCount={completedCount} compact />
+            </div>
+          )}
           <Text heading size="lg" weight="semibold" className="text-center px-2">
             How do you know them?
           </Text>
@@ -6346,6 +6753,9 @@ function App() {
   const [verifyEvaluatorData, setVerifyEvaluatorData] = useState(null);
   const [verifyFlowPath, setVerifyFlowPath] = useState(null);
   const [verifyFlowAnswers, setVerifyFlowAnswers] = useState({});
+  const [expertMode, setExpertModeState] = useState(() => expertModeLoad());
+  const setExpertMode = (v) => { setExpertModeState(v); expertModeSave(v); };
+  const verifyCompletedCount = Object.keys(verifyEvaluations).length;
   // Active demo persona (for UI indicators in Settings + AssessPickerScreen)
   const [activeDemoPersonaId, setActiveDemoPersonaId] = useState(null);
   // Compare / Public Profile
@@ -6730,9 +7140,10 @@ function App() {
     // Verification screens
     if (screen === 'verify-hub') {
       return <VerifyHub isDark={isDark} subjects={VERIFY_MOCK_SUBJECTS} evaluations={verifyEvaluations}
-        onSelect={(id) => { setVerifyCurrentSubjectId(id); setScreen('verify-evaluator'); }}
+        onSelect={(id) => { setVerifyCurrentSubjectId(id); setVerifyFlowPath(null); setVerifyFlowAnswers({}); setScreen('verify-evaluator'); }}
         onViewCompleted={(id) => { setVerifyCurrentSubjectId(id); setVerifyEvaluatorData(verifyEvaluations[id]); setScreen('verify-eval-summary-readonly'); }}
-        onBack={() => setScreen('categories')} />;
+        onBack={() => setScreen('categories')}
+        expertMode={expertMode} setExpertMode={setExpertMode} completedCount={verifyCompletedCount} />;
     }
     if (screen === 'verify-evaluator') {
       const subj = VERIFY_MOCK_SUBJECTS.find(s => s.id === verifyCurrentSubjectId);
@@ -6742,7 +7153,8 @@ function App() {
         sharedPath={verifyFlowPath} setSharedPath={setVerifyFlowPath}
         sharedAnswers={verifyFlowAnswers} setSharedAnswers={setVerifyFlowAnswers}
         onComplete={(data) => { setVerifyEvaluatorData(data); setScreen('verify-eval-summary'); }}
-        onBack={handleBack} /></ErrorBoundary>;
+        onBack={handleBack}
+        expertMode={expertMode} setExpertMode={setExpertMode} completedCount={verifyCompletedCount} /></ErrorBoundary>;
     }
     if (screen === 'verify-eval-summary') {
       if (!verifyEvaluatorData || !verifyCurrentSubjectId) { setScreen('verify-hub'); return null; }
