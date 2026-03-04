@@ -4914,7 +4914,23 @@ const StampRow = ({ providerConfig, claim, isOAuthLinked, onOAuthLink, onOAuthUn
 };
 
 // — CATEGORY SCREEN — Hub/Home (ported from production, rebuilt with Legos)
-const CategoryScreen = ({ isDark, questions, responses, stats, assessState, assessActions, entityType, qotdData, qotdResponse, syncStatus, onRetrySync, onNavigate, onSelectCategory, onAssessSurprise }) => {
+const CategoryScreen = ({ isDark, questions, responses, stats, assessState, assessActions, entityType, qotdData, qotdResponse, syncStatus, onRetrySync, onNavigate, onSelectCategory, onAssessSurprise, onLoadDemoPersona }) => {
+  // Triple-tap settings gear → load Casey demo profile
+  const gearTapRef = useRef({ count: 0, timer: null });
+  const handleGearClick = () => {
+    const g = gearTapRef.current;
+    g.count++;
+    clearTimeout(g.timer);
+    if (g.count >= 3) {
+      g.count = 0;
+      const casey = DEMO_PERSONAS.find(p => p.id === 'expert');
+      if (casey && onLoadDemoPersona) onLoadDemoPersona(casey);
+    } else {
+      g.timer = setTimeout(() => {
+        if (g.count < 3) { g.count = 0; onNavigate('settings'); }
+      }, 400);
+    }
+  };
   const auth = useAuth();
   const isLoggedIn = !!auth.user;
   const catScrollRef = useScrollRestore('categories');
@@ -4954,7 +4970,7 @@ const CategoryScreen = ({ isDark, questions, responses, stats, assessState, asse
         <Stack direction="row" align="center" gap={3}>
           {syncStatus && syncStatus !== 'idle' && <SyncIndicator status={syncStatus} onRetry={onRetrySync} />}
           {stats.streak > 0 && <Text as="span" size="sm" weight="medium" color={COLOR_HEX.amber.light}>🔥{stats.streak}</Text>}
-          <button onClick={() => onNavigate('settings')} className="btn-feedback w-7 h-7 rounded-full flex items-center justify-center" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
+          <button onClick={handleGearClick} className="btn-feedback w-7 h-7 rounded-full flex items-center justify-center" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-subtle)' }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
           <button onClick={() => onNavigate('profile')} className="btn-feedback">
@@ -7125,7 +7141,7 @@ function App() {
       </div>
     );
     if (screen === 'path-choice') return <PathChoiceScreen isDark={isDark} entityType={entityType} onboardingAnswers={onboardingAnswers} onReveal={handleChooseReveal} onExplore={handleChooseExplore} onSkip={() => setScreen('categories')} onReset={resetDemo} />;
-    if (screen === 'categories') return <CategoryScreen isDark={isDark} questions={questions} responses={responses} stats={stats} assessState={assessState} assessActions={assessActions} entityType={entityType} qotdData={qotdData} qotdResponse={qotdResponse} syncStatus={cloudSync.syncStatus} onRetrySync={cloudSync.processRetryQueue} onNavigate={setScreen} onSelectCategory={handleSelectCategory} onAssessSurprise={handleAssessSurprise} />;
+    if (screen === 'categories') return <CategoryScreen isDark={isDark} questions={questions} responses={responses} stats={stats} assessState={assessState} assessActions={assessActions} entityType={entityType} qotdData={qotdData} qotdResponse={qotdResponse} syncStatus={cloudSync.syncStatus} onRetrySync={cloudSync.processRetryQueue} onNavigate={setScreen} onSelectCategory={handleSelectCategory} onAssessSurprise={handleAssessSurprise} onLoadDemoPersona={loadDemoPersona} />;
     if (screen === 'qotd') return <QotdScreen isDark={isDark} qotdData={qotdData} qotdResponse={qotdResponse} setQotdResponse={setQotdResponse} onNavigate={setScreen} />;
     if (screen === 'settings') return <SettingsScreen isDark={isDark} toggleTheme={toggleTheme} settings={{ undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak }} entityType={entityType} setEntityType={setEntityType} onBack={() => setScreen(previousScreen || 'categories')} onReset={resetDemo} hasAssessmentData={Object.keys(assessState.assessCompleted || {}).length > 0} onResetAssessments={assessActions.assessClearAll} displayName={displayName} setDisplayName={setDisplayName} hasVerificationData={Object.keys(verifyEvaluations).length > 0} onResetVerification={resetVerification} responses={responses} onLoadDemoPersona={loadDemoPersona} activeDemoPersonaId={activeDemoPersonaId} />;
     if (screen === 'compare') return <ErrorBoundary feature="Compare"><CompareScreen isDark={isDark} assessState={assessState} entityType={entityType} displayName={displayName} compareData={compareData} compareLoading={compareLoading} onNavigate={setScreen} /></ErrorBoundary>;
