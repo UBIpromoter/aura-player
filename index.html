@@ -1962,7 +1962,7 @@ const GearButton = ({ onNavigate, onLoadDemoPersona, isDark }) => {
   };
   return (
     <button onClick={handleClick} className="btn-feedback w-7 h-7 rounded-full flex items-center justify-center" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-subtle)' }}><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style={{ color: 'var(--text-subtle)' }}><path d="M8.5 1h3l.5 2.5 1.7.7 2.2-1.3 2.1 2.1-1.3 2.2.7 1.7H20v3l-2.5.5-.7 1.7 1.3 2.2-2.1 2.1-2.2-1.3-1.7.7L11.5 19h-3L8 16.5l-1.7-.7-2.2 1.3-2.1-2.1 1.3-2.2L2.5 11 0 10.5v-3L2.5 7l.7-1.7L1.9 3.1 4 1l2.2 1.3L7.9 1.5 8.5 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/></svg>
     </button>
   );
 };
@@ -4486,6 +4486,26 @@ const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityTy
               <Text size="xxs" emphasis="faint" className="mt-2 text-center">Sign in to link accounts and earn stamps</Text>
             </Card>
           )}
+          {/* Demo Profiles — compact strip */}
+          {onLoadDemoPersona && (
+            <div className="flex gap-1.5 flex-wrap">
+              {USER_DEMO_PROFILES.map(persona => {
+                const isActive = activeDemoPersonaId === persona.id;
+                const c = colorOf(persona.color);
+                return (
+                  <button key={persona.id} onClick={() => onLoadDemoPersona(persona)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                    style={{
+                      background: isActive ? `rgba(${c.rgb}, 0.15)` : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+                      border: `1px solid ${isActive ? `rgba(${c.rgb}, 0.4)` : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)')}`,
+                      color: isActive ? c.light : (isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'),
+                    }}>
+                    <span>{persona.icon}</span>{persona.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <SettingItem label="Theme">
             <Toggle checked={isDark} onChange={toggleTheme} />
           </SettingItem>
@@ -4511,35 +4531,6 @@ const SettingsScreen = ({ isDark, toggleTheme, settings, entityType, setEntityTy
           <SettingItem label="I am a..." subtitle={entityType === 'ai' ? 'AI or non-biological entity' : 'Human'}>
             <Toggle checked={entityType === 'ai'} onChange={() => { const next = entityType === 'human' ? 'ai' : 'human'; setEntityType(next); auth.updateEntityType(next); }} color="cyan" />
           </SettingItem>
-          {/* Demo Profiles */}
-          {onLoadDemoPersona && (
-            <Card>
-              <Text size="xs" weight="semibold" emphasis="subtle" className="uppercase tracking-wide mb-1">Demo Profiles</Text>
-              <Text size="xxs" emphasis="faint" className="mb-3">Try the app as different users</Text>
-              <div className="space-y-2">
-                {USER_DEMO_PROFILES.map(persona => {
-                  const isActive = activeDemoPersonaId === persona.id;
-                  const c = colorOf(persona.color);
-                  return (
-                    <button key={persona.id} onClick={() => onLoadDemoPersona(persona)}
-                      className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer"
-                      style={{
-                        background: isActive ? `rgba(${c.rgb}, 0.1)` : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
-                        border: `1px solid ${isActive ? `rgba(${c.rgb}, 0.35)` : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)')}`,
-                      }}>
-                      <span className="text-xl w-7 text-center flex-shrink-0">{persona.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <Text size="sm" weight="medium" className={isActive ? '' : ''}
-                          style={{ color: isActive ? c.light : undefined }}>{persona.name}</Text>
-                        <Text size="xxs" emphasis="faint">{persona.desc}</Text>
-                      </div>
-                      {isActive && <span className="flex-shrink-0 w-2 h-2 rounded-full" style={{ background: c.base }} />}
-                    </button>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
           {/* Keyboard Shortcuts — collapsible */}
           <Card onClick={() => setKbOpen(!kbOpen)} style={{ cursor: 'pointer' }}>
             <Stack direction="row" align="center" className="justify-between">
@@ -7362,7 +7353,7 @@ function App() {
   const settingsGearEl = GEAR_SCREENS.has(screen) ? (
     <button onClick={handleFloatingGearClick} className="absolute top-3 right-3 z-40 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all"
       style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', backdropFilter: 'blur(8px)' }}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-subtle)' }}><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style={{ color: 'var(--text-subtle)' }}><path d="M8.5 1h3l.5 2.5 1.7.7 2.2-1.3 2.1 2.1-1.3 2.2.7 1.7H20v3l-2.5.5-.7 1.7 1.3 2.2-2.1 2.1-2.2-1.3-1.7.7L11.5 19h-3L8 16.5l-1.7-.7-2.2 1.3-2.1-2.1 1.3-2.2L2.5 11 0 10.5v-3L2.5 7l.7-1.7L1.9 3.1 4 1l2.2 1.3L7.9 1.5 8.5 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/></svg>
     </button>
   ) : null;
 
