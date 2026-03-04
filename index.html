@@ -1952,7 +1952,7 @@ const GearButton = ({ onNavigate, onLoadDemoPersona, isDark }) => {
     clearTimeout(g.timer);
     if (g.count >= 3) {
       g.count = 0;
-      const casey = DEMO_PERSONAS.find(p => p.id === 'expert');
+      const casey = USER_DEMO_PROFILES.find(p => p.id === 'expert');
       if (casey && onLoadDemoPersona) onLoadDemoPersona(casey);
     } else {
       g.timer = setTimeout(() => {
@@ -3602,13 +3602,16 @@ const ProfileCategoryList = ({ assessCompleted, entityType, currentTier, onStart
 };
 
 // — PROFILE SCREEN — Phase 4
-const ProfileScreen = ({ isDark, assessState, assessActions, entityType, onboardingAnswers, responses, onNavigate }) => {
+const ProfileScreen = ({ isDark, assessState, assessActions, entityType, onboardingAnswers, responses, onNavigate, displayName, activeDemoPersonaId }) => {
   const { assessCompleted, assessInProgress } = assessState;
   const { assessStartTest } = assessActions;
   const completedCount = Object.keys(assessCompleted).length;
   const archetype = calculateArchetype(assessCompleted);
   const hasPersonality = completedCount > 0;
   const currentTier = calculateAssessTier(assessCompleted);
+  const activePersona = activeDemoPersonaId ? USER_DEMO_PROFILES.find(p => p.id === activeDemoPersonaId) : null;
+  const personaColor = activePersona ? colorOf(activePersona.color) : null;
+  const shownName = activePersona?.displayName || displayName || (entityType === 'ai' ? 'AI Entity' : 'Guest');
   // Aura glow colors for avatar
   const getAuraStyle = () => {
     if (!hasPersonality) return {};
@@ -3636,12 +3639,15 @@ const ProfileScreen = ({ isDark, assessState, assessActions, entityType, onboard
               </div>
             ) : (
               <div className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-xl text-white"
-                style={{ background: `linear-gradient(135deg, ${COLOR_HEX.violet.base}, ${COLOR_HEX.pink.base})`, ...getAuraStyle() }}>
-                {entityType === 'ai' ? '🤖' : 'G'}
+                style={activePersona ? {
+                  background: `radial-gradient(circle at center, rgba(${personaColor.rgb}, 0.35), rgba(${personaColor.rgb}, 0.10) 70%, transparent)`,
+                  border: `2px solid rgba(${personaColor.rgb}, 0.60)`
+                } : { background: `linear-gradient(135deg, ${COLOR_HEX.violet.base}, ${COLOR_HEX.pink.base})`, ...getAuraStyle() }}>
+                {activePersona ? activePersona.icon : entityType === 'ai' ? '🤖' : 'G'}
               </div>
             )}
             <div className="flex-1">
-              <Text heading={4}>{entityType === 'ai' ? 'AI Entity' : 'Guest'}</Text>
+              <Text heading={4}>{shownName}</Text>
               {archetype?.primary ? (
                 <Text size="sm" color={COLOR_HEX.violet.light} className="mt-0.5">{archetype.primary.name}</Text>
               ) : (
@@ -4940,9 +4946,11 @@ const StampRow = ({ providerConfig, claim, isOAuthLinked, onOAuthLink, onOAuthUn
 };
 
 // — CATEGORY SCREEN — Hub/Home (ported from production, rebuilt with Legos)
-const CategoryScreen = ({ isDark, questions, responses, stats, assessState, assessActions, entityType, qotdData, qotdResponse, syncStatus, onRetrySync, onNavigate, onSelectCategory, onAssessSurprise, onLoadDemoPersona }) => {
+const CategoryScreen = ({ isDark, questions, responses, stats, assessState, assessActions, entityType, qotdData, qotdResponse, syncStatus, onRetrySync, onNavigate, onSelectCategory, onAssessSurprise, onLoadDemoPersona, activeDemoPersonaId }) => {
   const auth = useAuth();
   const isLoggedIn = !!auth.user;
+  const activePersona = activeDemoPersonaId ? USER_DEMO_PROFILES.find(p => p.id === activeDemoPersonaId) : null;
+  const personaColor = activePersona ? colorOf(activePersona.color) : null;
   const catScrollRef = useScrollRestore('categories');
   const tier = getFeatureTier(assessState.assessCompleted, isLoggedIn);
   const hasAnsweredQotd = qotdResponse !== null;
@@ -4980,16 +4988,24 @@ const CategoryScreen = ({ isDark, questions, responses, stats, assessState, asse
         <Stack direction="row" align="center" gap={3}>
           {syncStatus && syncStatus !== 'idle' && <SyncIndicator status={syncStatus} onRetry={onRetrySync} />}
           {stats.streak > 0 && <Text as="span" size="sm" weight="medium" color={COLOR_HEX.amber.light}>🔥{stats.streak}</Text>}
+          {activePersona && (
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full" style={{ background: `rgba(${personaColor.rgb},0.15)`, border: `1px solid rgba(${personaColor.rgb},0.30)` }}>
+              <Text as="span" size="xxs" style={{ color: personaColor.light }}>demo</Text>
+            </div>
+          )}
           <button onClick={() => onNavigate('profile')} className="btn-feedback">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm relative"
-              style={isLoggedIn ? {
+              style={activePersona ? {
+                background: `radial-gradient(circle at center, rgba(${personaColor.rgb}, 0.35), rgba(${personaColor.rgb}, 0.10) 70%, transparent)`,
+                border: `1.5px solid rgba(${personaColor.rgb}, 0.60)`
+              } : isLoggedIn ? {
                 background: `radial-gradient(circle at center, rgba(${COLOR_HEX.violet.rgb}, 0.35), rgba(${COLOR_HEX.blue.rgb}, 0.20) 70%, transparent)`,
                 border: `1.5px solid rgba(${COLOR_HEX.violet.rgb}, 0.50)`
               } : {
                 border: `1.5px dashed ${isDark ? '#4b5563' : '#9ca3af'}`,
                 color: isDark ? COLOR_HEX.gray.base : COLOR_HEX.gray.light
               }}>
-              {isLoggedIn ? <ProfileIcon size={14} color={isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)'} /> : '?'}
+              {activePersona ? activePersona.icon : isLoggedIn ? <ProfileIcon size={14} color={isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)'} /> : '?'}
             </div>
           </button>
           <GearButton onNavigate={onNavigate} onLoadDemoPersona={onLoadDemoPersona} isDark={isDark} />
@@ -7054,7 +7070,7 @@ function App() {
     clearTimeout(g.timer);
     if (g.count >= 3) {
       g.count = 0;
-      const casey = DEMO_PERSONAS.find(p => p.id === 'expert');
+      const casey = USER_DEMO_PROFILES.find(p => p.id === 'expert');
       if (casey) loadDemoPersona(casey);
     } else {
       g.timer = setTimeout(() => {
@@ -7164,7 +7180,7 @@ function App() {
       </div>
     );
     if (screen === 'path-choice') return <PathChoiceScreen isDark={isDark} entityType={entityType} onboardingAnswers={onboardingAnswers} onReveal={handleChooseReveal} onExplore={handleChooseExplore} onSkip={() => setScreen('categories')} onReset={resetDemo} onNavigate={setScreen} onLoadDemoPersona={loadDemoPersona} />;
-    if (screen === 'categories') return <CategoryScreen isDark={isDark} questions={questions} responses={responses} stats={stats} assessState={assessState} assessActions={assessActions} entityType={entityType} qotdData={qotdData} qotdResponse={qotdResponse} syncStatus={cloudSync.syncStatus} onRetrySync={cloudSync.processRetryQueue} onNavigate={setScreen} onSelectCategory={handleSelectCategory} onAssessSurprise={handleAssessSurprise} onLoadDemoPersona={loadDemoPersona} />;
+    if (screen === 'categories') return <CategoryScreen isDark={isDark} questions={questions} responses={responses} stats={stats} assessState={assessState} assessActions={assessActions} entityType={entityType} qotdData={qotdData} qotdResponse={qotdResponse} syncStatus={cloudSync.syncStatus} onRetrySync={cloudSync.processRetryQueue} onNavigate={setScreen} onSelectCategory={handleSelectCategory} onAssessSurprise={handleAssessSurprise} onLoadDemoPersona={loadDemoPersona} activeDemoPersonaId={activeDemoPersonaId} />;
     if (screen === 'qotd') return <QotdScreen isDark={isDark} qotdData={qotdData} qotdResponse={qotdResponse} setQotdResponse={setQotdResponse} onNavigate={setScreen} />;
     if (screen === 'settings') return <SettingsScreen isDark={isDark} toggleTheme={toggleTheme} settings={{ undoDelay, setUndoDelay, requireConfirmation, setRequireConfirmation, showTips, setShowTips, showStreak, setShowStreak }} entityType={entityType} setEntityType={setEntityType} onBack={() => setScreen(previousScreen || 'categories')} onReset={resetDemo} hasAssessmentData={Object.keys(assessState.assessCompleted || {}).length > 0} onResetAssessments={assessActions.assessClearAll} displayName={displayName} setDisplayName={setDisplayName} hasVerificationData={Object.keys(verifyEvaluations).length > 0} onResetVerification={resetVerification} responses={responses} onLoadDemoPersona={loadDemoPersona} activeDemoPersonaId={activeDemoPersonaId} />;
     if (screen === 'compare') return <ErrorBoundary feature="Compare"><CompareScreen isDark={isDark} assessState={assessState} entityType={entityType} displayName={displayName} compareData={compareData} compareLoading={compareLoading} onNavigate={setScreen} /></ErrorBoundary>;
@@ -7172,7 +7188,7 @@ function App() {
     if (screen === 'assess-picker') return <AssessPickerScreen isDark={isDark} entityType={entityType} assessState={assessState} assessActions={assessActions} onNavigate={setScreen} onLoadDemoPersona={loadDemoPersona} activeDemoPersonaId={activeDemoPersonaId} />;
     if (screen === 'assess-question') return <ErrorBoundary feature="Assessment"><AssessQuestionScreen isDark={isDark} assessState={assessState} assessActions={assessActions} assessUI={assessUI} undoDelay={undoDelay} /></ErrorBoundary>;
     if (screen === 'assess-results') return <AssessResultsScreen isDark={isDark} assessState={assessState} assessActions={assessActions} entityType={entityType} onNavigate={setScreen} />;
-    if (screen === 'profile') return <ProfileScreen isDark={isDark} assessState={assessState} assessActions={assessActions} entityType={entityType} onboardingAnswers={onboardingAnswers} responses={responses} onNavigate={setScreen} />;
+    if (screen === 'profile') return <ProfileScreen isDark={isDark} assessState={assessState} assessActions={assessActions} entityType={entityType} onboardingAnswers={onboardingAnswers} responses={responses} onNavigate={setScreen} displayName={displayName} activeDemoPersonaId={activeDemoPersonaId} />;
     if (screen === 'assess-analysis') return <AnalysisScreen isDark={isDark} assessState={assessState} entityType={entityType} onboardingAnswers={onboardingAnswers} onNavigate={setScreen} />;
     if (screen === 'history') return <HistoryScreen isDark={isDark} questions={questions} responses={responses} questionMeta={questionMeta} communityResults={communityResults} onNavigate={setScreen} />;
     if (screen === 'identity') return <ErrorBoundary feature="Identity"><IdentityScreen isDark={isDark} onNavigate={setScreen} displayName={displayName} assessmentCount={Object.keys(assessState.assessCompleted).length} /></ErrorBoundary>;
